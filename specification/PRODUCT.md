@@ -30,16 +30,18 @@ for the TypeScript line.
 
 The ABIogenesis TypeScript tenant is substrate evidence consumed through
 explicit release snapshots. The current TypeScript line consumes
-`@abiogenesis/typescript-tenant@3.9.0-rc.6` from
-`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.9.0-rc.6/`.
+`@abiogenesis/typescript-tenant@3.9.0-rc.7` from
+`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.9.0-rc.7/`.
 That cut proves GTL/ABG carriers, graph-function iteration, traversal probes,
 evented saga-frontier execution, no-compute-basis failure taxonomy,
 bootstrap-lineage slices, selected `abg.fn_composition` identity, canonical
 runtime event identity and millisecond event-time truth, staged `transform.C` /
 `evaluate.C` / `consequence.C` plugin boundaries, evaluation sets, composed
 stage tasks, replay-derived retry context, admitted output-authority
-projection, and target-carrier output admission before closure that
-`odd_sdlc.TS` may consume. It is not itself `odd_sdlc.TS`, and it does not
+projection, target-carrier output admission before closure, PTY-local-spawn
+worker supervision, heartbeat/progress lease separation, and trace-visible
+inactivity cleanup that `odd_sdlc.TS` may consume. It is not itself
+`odd_sdlc.TS`, and it does not
 complete the SDLC product behavior.
 
 `odd_sdlc.TS` release evidence is rooted at
@@ -428,6 +430,20 @@ assumptions inside that tenant surface and preserve them in the artifact or
 evidence. Core SDLC consumes these declarations generically; ecosystem-specific
 file names such as `build.sbt`, `Cargo.toml`, `package.json`, `pyproject.toml`,
 `pom.xml`, or `build.gradle` are tenant-spec data, not generic SDLC law.
+
+Tenant-stack disambiguation is an `F_P.transform` work protocol, not a new
+deterministic stack engine in SDLC core. When tenant stack authority is missing,
+contradictory, or insufficient for the declared product targets and execution
+contracts, the prompt-bearing worker may be given an imperative generic procedure:
+inspect the tenant stack authority surfaces, admitted bootstrap/design/ADR refs,
+declared product file targets and roles, declared build/test/proof commands, and
+current worksite execution-context files that affect how those commands run;
+state a compact reconciliation decision in the returned artifact; choose the
+repair surface as tenant authority, product files, both, or blocked/re-entry;
+and prove the chosen repair with the declared command or a bounded probe when
+that command can run. The procedure is a guardrail against bad local inference,
+not permission for SDLC core to decide ecosystem semantics. Evaluators verify
+that tenant authority, emitted files, declared commands, and evidence agree.
 
 The minimum tenant stack description includes a testing technology-stack
 section, either in `TECH_STACK.*` or an explicit `TESTING_TECH_STACK.*`

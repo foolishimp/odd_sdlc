@@ -456,6 +456,47 @@ function makeWorkspace() {
   return root;
 }
 
+function makeUnderstructuredConformWorkspace() {
+  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t151-conform-"));
+  mkdirSync(path.join(root, "specification/appendices"), { recursive: true });
+  mkdirSync(path.join(root, ".ai-workspace/context"), { recursive: true });
+  writeFileSync(
+    path.join(root, "README.md"),
+    ["# T-151 Conformance Fixture", "", "Build a governed product realization."].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, "specification/INTENT.md"),
+    ["# Intent", "", "INT-T151-001: Produce a governed realization."].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, "specification/REQUIREMENTS.md"),
+    ["# Requirements", "", "REQ-T151-LOOP-001: Preserve loop event projection."].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, "specification/appendices/APPENDIX_A.md"),
+    "# Appendix\n\nAdditional project context.\n",
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: t151_loop_projection",
+      "active_tenant: scala_spark",
+      "build_tenants:",
+      "  scala_spark:",
+      "    output_dir: build_tenants/scala_spark",
+      "    language: scala",
+      "    build_tool: sbt"
+    ].join("\n"),
+    "utf8"
+  );
+  return root;
+}
+
 function makeStart(workspaceRoot) {
   const module = constructSdlcGtlModule();
   const ingressReport = deriveSdlcWorkspaceIngressReport({
@@ -682,7 +723,7 @@ test("T-151 first_traversal returns the first admitted non-close consequence", a
 });
 
 test("T-164 converged start follows deterministic conformance to downstream graph work", async () => {
-  const workspace = makeWorkspace();
+  const workspace = makeUnderstructuredConformWorkspace();
   const start = makeConformStart(workspace);
   let refreshCalls = 0;
 
@@ -718,6 +759,20 @@ test("T-164 converged start follows deterministic conformance to downstream grap
     outcome.loop.attempts[0].nextLawfulAction,
     "rerun_start_for_downstream_graph"
   );
+  assert.deepStrictEqual(outcome.loop.attempts[0].emittedRuntimeEventKinds, [
+    "graph_call_opened",
+    "frame_opened",
+    "vector_traversal_planned",
+    "vector_evaluated",
+    "vector_closed"
+  ]);
+  assert.deepStrictEqual(outcome.emittedRuntimeEventKinds, [
+    "graph_call_opened",
+    "frame_opened",
+    "vector_traversal_planned",
+    "vector_evaluated",
+    "vector_closed"
+  ]);
 });
 
 test("T-164 converged start treats yield resume basis as same-edge continuation", () => {

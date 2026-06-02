@@ -190,11 +190,11 @@ test("T-181 worker prompts prevent whole-file Write drift in live PTY execution"
     });
     const prompt = promptForHandoff(manifest);
 
-    assert.match(prompt, /IO cap: reads <=80 lines/u);
-    assert.match(prompt, /jq\/rg\/cat\/git diff\/status end `\| head -80`/u);
-    assert.match(prompt, /sed is inclusive: end-start\+1<=80/u);
-    assert.match(prompt, /`200,299p` invalid \(100\), use `200,279p`/u);
-    assert.match(prompt, /no bare jq\/rg\/cat/u);
+    assert.match(prompt, /Tool-profile contract: this planning transform process/u);
+    assert.match(prompt, /must set limit <=80/u);
+    assert.doesNotMatch(prompt, /jq\/rg\/cat\/git diff\/status end `\| head -80`/u);
+    assert.doesNotMatch(prompt, /sed is inclusive: end-start\+1<=80/u);
+    assert.doesNotMatch(prompt, /no bare jq\/rg\/cat/u);
     assert.match(prompt, /do not use the Claude Write tool for whole-file replacement/u);
     assert.match(prompt, /targeted Edit operations/u);
     assert.doesNotMatch(prompt, /make the file-write operation the next worker action/u);
@@ -1561,11 +1561,13 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(pluginSetSource, /REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF/u);
   assert.doesNotMatch(source, /function designDepthFpEvaluatorRuleContract\(\)/u);
   assert.doesNotMatch(source, /evaluationRules: Object\.freeze/u);
-  assert.match(evaluatorPromptSource, /Do not leave background jobs running/u);
-  assert.match(evaluatorPromptSource, /store its PID in a variable/u);
-  assert.match(evaluatorPromptSource, /trap that kills and waits for that PID/u);
+  assert.match(evaluatorPromptSource, /Do not start background jobs/u);
+  assert.match(
+    evaluatorPromptSource,
+    /Do not execute a generated product, service, test, or script unless the active tool list explicitly exposes command execution/u
+  );
   assert.match(evaluatorPromptSource, /Do not use shell job-control cleanup such as `kill %1`/u);
-  assert.match(evaluatorPromptSource, /A passed assessment is invalid if a spawned service\/process remains live/u);
+  assert.match(evaluatorPromptSource, /A passed assessment is invalid if a spawned process remains live/u);
   assert.doesNotMatch(source, /designDepthFpEvaluatorRuleEnabled/u);
   assert.doesNotMatch(handoffSource, /designDepthFpEvaluatorRegistersEnabled/u);
   assert.doesNotMatch(handoffSource, /allowLegacyImplementationDesignDerivation/u);
@@ -1641,8 +1643,8 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(evaluatorPromptSource, /Do not repeat the same large requirement id list/u);
   assert.match(evaluatorPromptSource, /Do not print, cat, tail, grep, or paste full authority files into stdout/u);
   assert.match(evaluatorPromptSource, /Do not display worker_invocation_package\.json/u);
-  assert.match(evaluatorPromptSource, /Do not use cat, sed, head, tail, grep, jq '\.'/u);
-  assert.match(evaluatorPromptSource, /run Node snippets that read silently/u);
+  assert.match(evaluatorPromptSource, /Do not use command helpers to display the five primary inputs/u);
+  assert.match(evaluatorPromptSource, /use Read offset\/limit and inspect only bounded line ranges/u);
   assert.match(evaluatorPromptSource, /The content register path is the durable evaluation artifact/u);
   assert.match(evaluatorPromptSource, /system pre-creates that path as a non-admitted draft/u);
   assert.match(evaluatorPromptSource, /not a single-shot JSON response/u);
@@ -1683,7 +1685,7 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(evaluatorPromptSource, /Do not deterministically construct later semantic register rows/u);
   assert.match(evaluatorPromptSource, /Do not spend the run enumerating every requirement id before writing the register/u);
   assert.match(evaluatorPromptSource, /Draft-row timeout is worse than an admitted pressure map/u);
-  assert.match(evaluatorPromptSource, /Script output budget before first evaluator update: the only script allowed/u);
+  assert.match(evaluatorPromptSource, /Command-helper output budget before first evaluator update: command helpers are unavailable/u);
   assert.match(evaluatorPromptSource, /named carrier-helper update/u);
   assert.match(evaluatorPromptSource, /First-update carrier helper contract/u);
   assert.match(evaluatorPromptSource, /DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_REF/u);
@@ -1743,15 +1745,15 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(evaluatorPromptSource, /structural validity alone is not enough if exact product file paths drift/u);
   assert.match(evaluatorPromptSource, /must not appear in componentTopologyRows or componentRealizationRows merely to satisfy the source-row rule/u);
   assert.match(evaluatorPromptSource, /Required self-check before final response/u);
-  assert.match(evaluatorPromptSource, /every contentRows\[\] entry has exactly kind, rowRef, authorityFunction/u);
+  assert.match(evaluatorPromptSource, /Self-check contentRows\[\] entries: exactly kind, rowRef, authorityFunction/u);
   assert.match(evaluatorPromptSource, /fragmentVersion, targetAssetType, section, sequence, mergeMode, value/u);
-  assert.match(evaluatorPromptSource, /when non-null, verify aggregateDomainModel\.modelVersion/u);
+  assert.match(evaluatorPromptSource, /Self-check non-null aggregateDomainModel\.modelVersion/u);
   assert.match(evaluatorPromptSource, /aggregateDomainModel\.modelVersion/u);
-  assert.match(evaluatorPromptSource, /Object\.keys\(designCompletenessVerdict\)\.sort\(\)/u);
-  assert.match(evaluatorPromptSource, /\["attribute","entity","flow","kind","verdictVersion"\]/u);
-  assert.match(evaluatorPromptSource, /designCompletenessVerdict\.entity, \.attribute, and \.flow has exactly/u);
-  assert.match(evaluatorPromptSource, /moduleSchemaFragments\[\]\.entities\[\]\.invariants is an array and every invariant item is a string/u);
-  assert.match(evaluatorPromptSource, /aggregateDomainModel\.entities\[\]\.attributes, aggregateDomainModel\.operations/u);
+  assert.match(evaluatorPromptSource, /Self-check non-null designCompletenessVerdict keys: exactly attribute, entity, flow, kind, verdictVersion/u);
+  assert.match(evaluatorPromptSource, /Self-check each designCompletenessVerdict axis object: exactly axis, evidenceRefs, kind, reasons, status/u);
+  assert.match(evaluatorPromptSource, /Self-check moduleSchemaFragments\[\]\.entities\[\]\.invariants: array of strings/u);
+  assert.match(evaluatorPromptSource, /Self-check register arrays contain objects, not strings/u);
+  assert.match(evaluatorPromptSource, /Self-check nested register arrays contain objects, not strings/u);
   assert.match(evaluatorPromptSource, /Do not mark an axis partial or blocked merely because/u);
   assert.doesNotMatch(
     readRepoFile("build_tenants/typescript/code/src/operator/design_depth_register.ts"),

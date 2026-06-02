@@ -894,7 +894,11 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
     );
     assert.match(
       promptSource,
-      /If reviewedObligationIds is large, create the assessment with a short local script/u
+      /default review-grade evaluator process exposes only Read and Write/u
+    );
+    assert.match(
+      promptSource,
+      /must set limit <=80/u
     );
     assert.match(
       promptSource,
@@ -914,20 +918,16 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
     );
     assert.match(
       promptSource,
-      /For non-executable planning\/design\/review surfaces, prefer file inspection/u
+      /For non-executable planning\/design\/review surfaces, use bounded file inspection/u
     );
     assert.match(
       promptSource,
-      /If this executor exposes only shell access, use one bounded local script/u
+      /Do not run convenience grep\/count loops, command probes, helper scripts, or payload-printing commands/u
     );
     assert.match(promptSource, /Do not issue parallel tool calls/u);
     assert.match(
       promptSource,
-      /correct that helper once using already-read evidence and validation/u
-    );
-    assert.match(
-      promptSource,
-      /Do not convert evaluator helper-script failure into requirement\/product obligation findings/u
+      /Do not convert evaluator-side tool-profile, quoting, type-shape, key-shape, or schema-inspection failures into requirement\/product obligation findings/u
     );
     assert.match(
       promptSource,
@@ -960,6 +960,18 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
     assert.match(
       promptSource,
       /tenant stack authority contradicts emitted product files/u
+    );
+    assert.match(
+      promptSource,
+      /compact stack reconciliation decision/u
+    );
+    assert.match(
+      promptSource,
+      /Verify consistency among tenant stack authority, emitted product syntax\/files, declared product targets, declared execution commands, and returned execution evidence/u
+    );
+    assert.match(
+      promptSource,
+      /do not repair generated product files or mutate tenant-stack authority/u
     );
     assert.match(
       promptSource,
@@ -1005,7 +1017,42 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
       installedOperatorSource,
       /constrainReviewGradePlanningEvaluatorTools/u
     );
-    assert.match(installedOperatorSource, /"--tools", "Read,Write"/u);
+    assert.match(
+      installedOperatorSource,
+      /function constrainReviewGradePlanningEvaluatorTools[\s\S]*allowedTools: "Read,Write"/u
+    );
+    assert.doesNotMatch(
+      installedOperatorSource,
+      /function constrainReviewGradePlanningEvaluatorTools[\s\S]*reviewGradeEdgeRequiresShellTool/u
+    );
+    assert.doesNotMatch(
+      installedOperatorSource,
+      /function reviewGradeEdgeRequiresShellTool/u
+    );
+    assert.match(
+      installedOperatorSource,
+      /sdlcWorkerTargetUsesShellToolProfile/u
+    );
+    assert.match(
+      readRepoFile(
+        "build_tenants/typescript/code/src/operator/plugins/transform/launch_contract.ts"
+      ),
+      /sdlcWorkerTargetUsesShellToolProfile/u
+    );
+    assert.match(
+      readRepoFile(
+        "build_tenants/typescript/code/src/operator/worker_tool_profile.ts"
+      ),
+      /component_code_surface[\s\S]*component_test_surface[\s\S]*test_execution_surface[\s\S]*runtime_execution_surface[\s\S]*execution_result_surface/u
+    );
+    assert.match(
+      installedOperatorSource,
+      /reason\.reasonClass === "worker_runtime"[\s\S]*reason\.reasonClass === "assurance"[\s\S]*reason\.lawfulReentryPoint === "triage_gap"/u
+    );
+    const transportSource = readRepoFile(
+      "build_tenants/typescript/code/src/operator/transport.ts"
+    );
+    assert.match(transportSource, /"--tools"[\s\S]*input\.allowedTools/u);
     assert.match(installedOperatorSource, /component_code_surface/u);
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });

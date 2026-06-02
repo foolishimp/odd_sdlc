@@ -80,6 +80,7 @@ import {
   sdlcEdgeOutputPolicyForTargetAssetType,
   sdlcInstalledOperatorProjectsOutput
 } from "../../edge_output_policy.js";
+import { sdlcWorkerTargetUsesShellToolProfile } from "../../worker_tool_profile.js";
 import {
   observeProductMaterializationDelta as observeProductMaterializationDeltaFromModule,
   observeProductMaterializationDeltaWithDiagnostics as observeProductMaterializationDeltaWithDiagnosticsFromModule,
@@ -337,6 +338,7 @@ const REQUIREMENT_MARKER_EXPRESSION =
 const LOCAL_REQUIREMENT_HEADING_EXPRESSION =
   /^[ \t]{0,3}(?:#{1,6}\s+|[-*]\s+)?(R-\d{1,4})(?:\s*[:.-]\s*|\s+)([^\n]+?)\s*$/gimu;
 const MAX_INVOCATION_PACKAGE_REQUIREMENT_TRACE_IDS = 80;
+const MAX_PROMPT_VISIBLE_AUTHORITY_REF_LENGTH = 300;
 
 const TRAVERSAL_AUTHORITY_PATHS = Object.freeze([
   "specification/INTENT.md",
@@ -524,6 +526,20 @@ function targetIgnoresExecutionByproducts(targetAssetType: string): boolean {
     targetAssetType === "component_test_surface" ||
     targetAdmitsTestExecutionEvidence(targetAssetType)
   );
+}
+
+function transformWorkerIoDisciplineLines(
+  manifest: Pick<SdlcWorkerHandoffManifest, "targetAssetType">
+): readonly string[] {
+  if (sdlcWorkerTargetUsesShellToolProfile(manifest)) {
+    return Object.freeze([
+      "- IO cap: reads <=80 lines. jq/rg/cat/git diff/status end `| head -80`; no bare jq/rg/cat. sed is inclusive: end-start+1<=80; `200,299p` invalid (100), use `200,279p`."
+    ]);
+  }
+  return Object.freeze([
+    "- Tool-profile contract: this planning transform process exposes bounded file tools rather than shell command helpers. Do not plan around jq, rg, cat, sed, head, tail, grep, git, Node, or shell pipelines unless the active tool list explicitly exposes command execution.",
+    "- Read cap: every Read tool call over JSON, Markdown, report, manifest, or source artifacts must set limit <=80; inspect only the lines needed for the current checklist row."
+  ]);
 }
 
 function targetRequiresSourceAssetObligations(input: {
@@ -5327,6 +5343,13 @@ function outputAuthorityProjectionMatchesSourceAsset(input: {
   return refs.some((ref) => ref.includes(input.assetType));
 }
 
+function promptVisibleAuthorityRef(ref: string): string {
+  return ref.length <= MAX_PROMPT_VISIBLE_AUTHORITY_REF_LENGTH &&
+    !/[{}]/u.test(ref)
+    ? ref
+    : `authority-ref-digest://sha256:${sha256Text(ref)}`;
+}
+
 export function sourceAssetAuthorityRefsFromAbgOutputAuthorityProjections(input: {
   readonly assetType: string;
   readonly projections: readonly AdmittedOutputAuthorityProjection[];
@@ -5346,15 +5369,17 @@ export function sourceAssetAuthorityRefsFromAbgOutputAuthorityProjections(input:
         projection.payloadRef,
         projection.payloadContractRef,
         projection.payloadDigest,
+        projection.targetCarrierContractRef,
+        projection.targetCarrierContractDigest,
         projection.producerRef,
         projection.sourceEventRef,
         projection.authorityRef,
         projection.inputDigest,
         projection.projectionRef,
-        ...projection.validationRefs,
-        ...projection.evidenceRefs,
-        ...projection.relatedPayloadRefs
-      ].filter((ref): ref is string => typeof ref === "string" && ref.length > 0);
+        ...projection.validationRefs
+      ]
+        .filter((ref): ref is string => typeof ref === "string" && ref.length > 0)
+        .map(promptVisibleAuthorityRef);
     })
   );
 }
@@ -7104,7 +7129,7 @@ function compactComponentDepthDirective(
         "Preserve source component boundaries from the composite implementation design authority.",
         "On re-entry with Current evaluated gaps, make the listed blocker the first materialization target: inspect the cited product file and its nearest dependency authority, perform the minimal source repair, then update the component_depth_register evidence for that repaired row.",
         "Bounded repair order: before the first edit, read at most worker_construction_brief plus the cited gap evidence file, the target source file, and one directly imported dependency file when needed."
-      ].join(" ");
+      ].join("\n");
     case "component_realization_qualification_surface":
       return "Qualification edge worker role: read admitted component realization evidence and return bounded observations. The installed operator publishes the component_realization_qualification_surface carrier.";
     case "component_test_surface":
@@ -7118,7 +7143,7 @@ function compactComponentDepthDirective(
         "Preserve testClassId/testcase allocation from the composite test design authority.",
         "On re-entry, existing testcaseIds, requirementIds, source-overlap rows, and test files are monotonic: do not remove or narrow them unless Current evaluated gaps specifically cite that row as wrong_stage, trace_missing, schema_invalid, boundary_collapsed, semantic_not_realized, or test_overlap_missing.",
         "On schema-local re-entry, repair the rejected component_depth_register fields first, then update only the affected test-file tags or register rows named by Current evaluated gaps."
-      ].join(" ");
+      ].join("\n");
     case "component_test_qualification_surface":
       return "Qualification edge worker role: read admitted component-test and test-execution evidence and return bounded observations. The installed operator publishes the component_test_qualification_surface carrier.";
     case "component_repair_schedule_surface":
@@ -7133,7 +7158,7 @@ function compactComponentDepthDirective(
         "Set attributionConfidence=high only when the row binds concrete failed testcaseIds, componentIds, requirementIds, sourceRefs or testRefs, and execution evidence refs. If that evidence is absent or contradictory, use scheduleStatus=triage_gap with evidenceRefs that name the missing authority instead of emitting medium-confidence repair rows.",
         "On re-entry after component_repair_schedule_not_high_confidence or component_repair_schedule_triage_gap, treat the gap as the work queue: bind the row to concrete evidence and emit high-confidence repair rows when the evidence exists; otherwise preserve explicit residual pressure instead of pretending closure.",
         "Do not infer ecosystem-specific root cause as framework law. The schedule owns generic repair depth: failed executable obligation -> component/test/source ownership -> bounded repair target -> evidence refs."
-      ].join(" ");
+      ].join("\n");
     case "release_depth_parity_surface":
       return "Release-depth edge worker role: read admitted realization, test, repair, archive, and execution evidence and return bounded observations. The installed operator publishes the release_depth_parity_surface carrier.";
     default:
@@ -7235,6 +7260,7 @@ function compactDesignDepthDirective(
         "Evaluator-owned outputs stay with the framework: design-depth register, selected target-carrier payload, evaluator verdict, decomposition summary, dependency map, and admission JSON.",
         "The evaluate.C/F_P design-depth evaluator populates the design-depth register from the ADR, source authority, product file targets, requirement lineage, and post-transform evidence after this worker exits; deterministic framework code admits and validates that register before closure.",
         "Use ordinary ADR sections and compact Markdown tables for module boundary, product file targets, and requirement lineage; these are design artifact content, not evaluator-owned carrier JSON.",
+        "Implementation design ADR stack profile rows must expose tenant stack authority as scalar design facts when declared: language, runtime/module system, build tool, build config, dependency policy, test runner, and test command. Do not omit tenant-declared stack fields that the design-depth register admits.",
         "Write the ADR as bounded sections: header/status, context, decision, module boundary, product file targets, requirement lineage, and consequences.",
         "Hard output bound: keep the Markdown artifact under 450 lines, keep each write/edit payload under 180 lines, and use compact rows with source refs rather than copying upstream authority text.",
         "Keep the ADR proportional to immediate implementation structure: identify only the stack, module boundary, component/file targets, requirement lineage, and design decisions needed to materialize the declared product surface from current source assets.",
@@ -7247,7 +7273,7 @@ function compactDesignDepthDirective(
         "Map requirement obligations, runtime execution proof, process archives, test assertions, downstream evidence, and audit lineage to the owning design decision or carry them as residual pressure. Promote them into implementation modules only when the source design declares them as product modules or product data.",
         "For a single-file or script product, one module boundary, one primary source/program responsibility, and one materialization/invocation decision are sufficient.",
         trivialProductDirective
-      ].filter((directive): directive is string => directive !== null).join(" ");
+      ].filter((directive): directive is string => directive !== null).join("\n");
     default:
       return null;
   }
@@ -7311,7 +7337,11 @@ function tenantStackAuthorityRepairDirectives(input: {
   );
   return Object.freeze([
     `Tenant-stack authority repair target: ${target}.`,
-    "When tenant_stack_authority_missing or tenant_stack_authority_invalid is present, materialize or repair that TECH_STACK.json file as the canonical tenant technology-stack authority surface before returning product materialization.",
+    "When tenant_stack_authority_missing or tenant_stack_authority_invalid is present, use the generic stack reconciliation protocol before product-file edits or tenant-stack repairs.",
+    "Stack reconciliation protocol: inspect tenant stack authority surfaces, accepted bootstrap/design/ADR refs that mention stack/runtime/file targets/execution, declared product file targets and roles, declared build/test/proof commands, and current worksite execution-context files that affect how those commands run.",
+    "Record a compact stack reconciliation decision in the returned artifact or evidence: declared stack, relevant product targets, declared command, observed conflict or underdefinition, chosen repair surface as tenant authority, product files, both, or blocked/re-entry, and proof command or bounded probe result when executable.",
+    "Do not repair tenant-stack authority from an untested local assumption when the declared command can be run or probed; run the declared command or bounded probe first, or record why execution is unavailable.",
+    "Do not create undeclared build/config files merely to make an inferred ecosystem default true; repair the tenant authority surface when this edge permits it, or report blocked/re-entry pressure.",
     "Do not embed tenant-stack authority inside component_depth_register, target-carrier payloads, worker reports, or runtime archives; the evaluator reads it from the tenant spec authority surface.",
     "If the initial bootstrap names or implies stack-specific construction pressure and the tenant stack is missing or underdefined, create or repair the tenant TECH_STACK/TESTING_TECH_STACK authority from bootstrap facts and ADR/design decisions before materializing executable product files.",
     "Populate the tenant stack authority from current product/context/bootstrap facts and ADR/design decisions such as language, runtime/module system, build tool, build execution contract, test runner, test syntax, and test execution contract; declare buildConfigTargets or testBuildConfigTargets only when those config files are declared or materialized.",
@@ -7471,7 +7501,8 @@ function outcomeDirectivesForWorker(
       directives.push(
         "This is the lite design/ADR edge.",
         "Produce a compact implementation design/ADR from current workspace authority; evaluate.C/F_P will convert it plus the admitted ledgers into the design-depth register.",
-        "Give the evaluator enough product intent to infer topology: decision, module boundary, product file target, execution command, requirement lineage, and any stack/module pressure are required even when the product is a single script.",
+        "Give the evaluator enough product intent to infer topology: decision, module boundary, product file target, execution command, requirement lineage, and tenant-declared stack/module pressure are required even when the product is a single script.",
+        "When tenant stack authority exists, carry its required design-depth scalars into the ADR Stack Profile using values from that authority, not ecosystem defaults: language, runtime/module system, build tool, build config, dependency policy, test runner, and test command.",
         "When declaring file targets, make source syntax, test syntax, module/runtime system, extension choices, and execution commands match the admitted stack authority; if they diverge, repair the stack authority or the file targets instead of documenting a local override in prose."
       );
     }
@@ -7569,7 +7600,7 @@ function outcomeDirectivesForWorker(
           "For each source-role realization, materialize or repair the named source file and carry componentId, publicBoundary, requirementIds, source tags, and target-carrier component trace rows.",
       "For each supporting build_config or test product target declared by admitted design authority, embed or mirror the same active requirement ids in file-native comments when legal and target-carrier rows when that supporting file participates in the proof contract.",
       "If accepted authority says a source target is an executable, script, program, CLI, service entrypoint, or must print/emit/respond when run, connect the product behavior to that source file's runtime entrypoint. An exported helper that only works when called by a test does not satisfy executable product materialization.",
-      "Before writing or repairing source/test files, read the tenant stack authority surface when present. Treat it as the accepted runtime/build/test authority unless it is impossible under the effective workspace runtime, in which case repair that authority surface before product files.",
+      "Before writing or repairing source/test files, read the tenant stack authority surface, accepted design/ADR refs, declared product file targets, and declared execution contracts. If those inputs conflict, use the stack reconciliation protocol; do not change tenant-stack authority from an untested local assumption.",
       "Tenant stack authority must match the product files actually emitted. If source syntax, test syntax, module/runtime system, build tool, or test runner differs from the seeded stack authority, repair the tenant stack authority or product files instead of documenting a local override in prose.",
       "Pre-return syntax check: every emitted source, test, and build/config product file must use the language, module/import system, file extension, test framework, and command shape declared by tenant stack authority. Do not mix incompatible source/test module syntaxes inside one tenant.",
       "When admitted design authority puts role=test product targets in this component-code materialization edge, treat those tests as proof materialization for this edge: run the declared test execution contract from the tenant root before returning, and repair any syntax/runtime mismatch first.",
@@ -8607,10 +8638,11 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
             tenantToolEnvironment.disabledTools
           )}.`
         ];
+  const ioDisciplineLines = transformWorkerIoDisciplineLines(manifest);
   const declaredProductFileTargetLine =
     productMaterializationAuthority.declaredProductFileTargets.length === 0
-      ? "declared product file targets: none"
-      : `declared product file targets: ${listForPrompt(
+      ? "current-edge materialized product file targets: none"
+      : `current-edge materialized product file targets: ${listForPrompt(
           productMaterializationAuthority.declaredProductFileTargets
         )}`;
   const outcomeSummary = [
@@ -8709,7 +8741,7 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     "- Build a Requirement/Authority/Asset Checklist from requirements, target rows, expected artifacts, and evaluated gaps.",
     "- Do not return success while required checklist rows are unmapped. Keep Markdown proportional: grouped counts plus high-signal samples for broad sets by source/domain; do not list every id unless the target is a requirement-surface Trace Index or another admitted traceability/register surface that explicitly requires exact id rows.",
     ...requirementSurfaceTraceAxiomLines,
-    "- IO cap: reads <=80 lines. jq/rg/cat/git diff/status end `| head -80`; no bare jq/rg/cat. sed is inclusive: end-start+1<=80; `200,299p` invalid (100), use `200,279p`.",
+    ...ioDisciplineLines,
     "- For existing output, use targeted Edit/small operations; no full old/new artifact dumps.",
     "- Apply tenantToolEnvironment; do not run tools the tenant disables.",
     "- You may use agent-internal subagents or parallel workstreams as optional local compute strategy; split only from admitted work-plan, dependency, target-carrier, tranche, authority, and obligation refs.",

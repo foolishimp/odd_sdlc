@@ -7137,6 +7137,15 @@ test("T-188 component repair schedule receives admitted execution result authori
 test("T-189 source asset authority consumes ABG admitted output projections", () => {
   const workspace = makeWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const oversizedRuntimeRef = `runtime_projection:execution_basis:${JSON.stringify({
+    workspaceRoot: workspace,
+    target: "test_execution_result_surface",
+    replayBasis: "x".repeat(900)
+  })}`;
+  const oversizedDispatchRef = `result:fp_dispatch:${JSON.stringify({
+    basisId: oversizedRuntimeRef,
+    dispatchRef: "dispatch://odd-sdlc/public-start"
+  })}`;
   const admittedProjection = {
     kind: "admitted_output_authority_projection",
     scope: {
@@ -7162,8 +7171,11 @@ test("T-189 source asset authority consumes ABG admitted output projections", ()
     authorityRef: "authority://abg/t189/output-admitted",
     inputDigest: "sha256:t189-input",
     validationRefs: ["validation://abg/t189/payload_validated"],
-    evidenceRefs: ["evidence://abg/t189/execution-result"],
-    relatedPayloadRefs: ["payload://odd-sdlc/t189/related-execution-result"],
+    evidenceRefs: ["evidence://abg/t189/execution-result", oversizedRuntimeRef],
+    relatedPayloadRefs: [
+      "payload://odd-sdlc/t189/related-execution-result",
+      oversizedDispatchRef
+    ],
     projectionRef: "projection://abg/t189/output-authority"
   };
   const rejectedProjection = {
@@ -7194,6 +7206,15 @@ test("T-189 source asset authority consumes ABG admitted output projections", ()
   });
   assert(refs.includes(admittedProjection.payloadRef));
   assert(refs.includes(admittedProjection.projectionRef));
+  assert.equal(refs.includes(oversizedRuntimeRef), false);
+  assert.equal(refs.includes(oversizedDispatchRef), false);
+  assert.equal(refs.includes(admittedProjection.evidenceRefs[0]), false);
+  assert.equal(refs.includes(admittedProjection.relatedPayloadRefs[0]), false);
+  assert.equal(refs.some((ref) => ref.includes("execution_basis:{")), false);
+  assert.equal(
+    refs.every((ref) => ref.length <= 300),
+    true
+  );
   assert.equal(refs.includes(rejectedProjection.payloadRef), false);
   assert.equal(refs.includes(unrelatedProjection.payloadRef), false);
 
@@ -7216,6 +7237,16 @@ test("T-189 source asset authority consumes ABG admitted output projections", ()
   assert(sourceAsset);
   assert(sourceAsset.evidenceRefs.includes(admittedProjection.payloadRef));
   assert(sourceAsset.evidenceRefs.includes(admittedProjection.projectionRef));
+  assert.equal(sourceAsset.evidenceRefs.includes(oversizedRuntimeRef), false);
+  assert.equal(sourceAsset.evidenceRefs.includes(oversizedDispatchRef), false);
+  assert.equal(
+    sourceAsset.evidenceRefs.some((ref) => ref.includes("execution_basis:{")),
+    false
+  );
+  assert.equal(
+    sourceAsset.evidenceRefs.every((ref) => ref.length <= 300),
+    true
+  );
   assert(
     manifest.traversalObligationContext.authorityRefs.includes(
       admittedProjection.payloadRef

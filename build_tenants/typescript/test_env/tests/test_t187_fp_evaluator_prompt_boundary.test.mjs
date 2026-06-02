@@ -20,7 +20,10 @@ import {
   deriveSdlcConformProjectProfileFromWorkspace,
   writeDesignDepthDraftFragmentContentRegisterUpdate
 } from "../../build/semantic/code/src/index.js";
-import { reviewGradeEdgeFulfillmentPrompt } from "../../build/semantic/code/src/operator/plugins/evaluate/prompts.js";
+import {
+  designDepthFpEvaluatorPrompt,
+  reviewGradeEdgeFulfillmentPrompt
+} from "../../build/semantic/code/src/operator/plugins/evaluate/prompts.js";
 import { proportionalityProfileFromHopSelection } from "../../build/semantic/code/src/operator/plugins/transform/launch_contract.js";
 
 const evaluatorPromptSource = readFileSync(
@@ -156,6 +159,13 @@ function designDepthDraftRegister() {
       evidenceRefs: [sourceRef]
     }))
   };
+}
+
+function maxLineLength(text) {
+  return text.split(/\r?\n/u).reduce(
+    (max, line) => Math.max(max, line.length),
+    0
+  );
 }
 
 // A-050: the admitted Min(F_P)/proportionality fact is projected into the brief
@@ -301,6 +311,18 @@ test("T-187 worker prompts forbid outside-workspace home memory reads", () => {
 test("T-187 transform prompts bound terminal output for large authority reads", () => {
   assert.match(
     launchContractSource,
+    /function transformWorkerIoDisciplineLines/u
+  );
+  assert.match(
+    launchContractSource,
+    /Tool-profile contract: this planning transform process exposes bounded file tools/u
+  );
+  assert.match(
+    launchContractSource,
+    /every Read tool call over JSON, Markdown, report, manifest, or source artifacts must set limit <=80/u
+  );
+  assert.match(
+    launchContractSource,
     /IO cap: reads <=80 lines/u
   );
   assert.match(
@@ -398,19 +420,27 @@ test("T-187 review-grade evaluator prompt projects tenant-declared tool boundari
   );
   assert.match(
     evaluatorPromptSource,
-    /Apply currentState\.tenantToolEnvironment before choosing any local script runtime/u
+    /Apply currentState\.tenantToolEnvironment before choosing any evaluator tool/u
   );
   assert.match(
     evaluatorPromptSource,
-    /preserve tenant-declared environment variables when spawning child commands/u
+    /Under the default Read\/Write evaluator profile, treat tenant environment variables as declared context only/u
   );
   assert.match(
     evaluatorPromptSource,
-    /Do not synthesize, recompute, or overwrite tenant-declared environment variable values/u
+    /Preserve their names and do not synthesize, recompute, or overwrite their values/u
   );
   assert.match(
     evaluatorPromptSource,
-    /Read them from process\.env and pass process\.env through/u
+    /Tenant-declared environment variables are authority metadata/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /inherit the process environment unchanged/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /Under the default Read\/Write evaluator profile/u
   );
   assert.match(
     evaluatorPromptSource,
@@ -423,6 +453,10 @@ test("T-187 review-grade evaluator prompt projects tenant-declared tool boundari
   assert.match(
     evaluatorPromptSource,
     /Do not run tenant-disabled tools for assessment JSON writing/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /every Read tool call over JSON, Markdown, report, manifest, or source artifacts must set limit <=80/u
   );
 });
 
@@ -453,12 +487,14 @@ test("T-187 review-grade prompt renders tenant execution environment details", (
   assert.match(prompt, /Tenant disabled tools[^:]*: python3/u);
   assert.match(prompt, /Tenant workspace-local directories[^:]*: \.sbt\/, \.coursier\//u);
   assert.match(prompt, /Tenant environment variables[^:]*: SBT_OPTS, COURSIER_CACHE/u);
-  assert.match(prompt, /preserve tenant-declared environment variables/u);
-  assert.match(prompt, /Read them from process\.env and pass process\.env through/u);
+  assert.match(prompt, /Tenant-declared environment variables are authority metadata/u);
+  assert.match(prompt, /inherit the process environment unchanged/u);
+  assert.match(prompt, /Under the default Read\/Write evaluator profile/u);
   assert.match(
     prompt,
     /do not assign any name listed in currentState\.tenantToolEnvironment\.environmentVariableNames/u
   );
+  assert.equal(maxLineLength(prompt) <= 1000, true);
 });
 
 test("T-187 design-depth evaluator prompt projects tenant-declared tool and read boundaries", () => {
@@ -475,18 +511,161 @@ test("T-187 design-depth evaluator prompt projects tenant-declared tool and read
     /explicit workspace\/run-archive paths named in this prompt/u
   );
   assert.match(
+    evaluatorPromptSource,
+    /every Read tool call over JSON, Markdown, report, manifest, or source artifacts must set limit <=80/u
+  );
+  assert.match(
     installedOperatorSource,
     /designDepthFpEvaluatorPrompt\(\{[\s\S]*tenantToolEnvironment: tenantToolEnvironmentProjectionFor\(input\.manifest\)/u
   );
 });
 
-test("T-187 review-grade evaluator prompt avoids regex-literal sidecar failures", () => {
-  assert.match(evaluatorPromptSource, /avoid JavaScript regex literals/u);
-  assert.match(evaluatorPromptSource, /startsWith, includes, endsWith, split/u);
-  assert.match(evaluatorPromptSource, /construct the RegExp from a quoted string constant/u);
+test("T-188 evaluator prompts keep generated clauses line-inspectable", () => {
+  const prompt = designDepthFpEvaluatorPrompt({
+    manifest: {
+      outputFile:
+        "build_tenants/hello_world_javascript/design/adrs/ADR-002-implementation-design-surface.md"
+    },
+    manifestPath: "handoff_manifest.json",
+    governanceRef: "config://test",
+    governancePath: "config/work-category-governance/design_build.md",
+    constructionBriefPath: "worker_construction_brief.json",
+    invocationPackagePath: "worker_invocation_package.json",
+    workerReportPath: "worker_result_report.json",
+    workerReportSummaryLines: ["status=passed", "obligations=5"],
+    contentRegisterPath: "design_depth_fp_evaluator_content_register.json",
+    registerProjectionPath: "design_depth_fp_evaluator_register.json",
+    subworkstreamManifestPath: "evaluate_compute_subworkstream_manifest.json",
+    selectedCompositionRef: "composition://t188/selected",
+    selectedCompositionDigest: "sha256:t188",
+    selectedCompositionSelectionRef: "selection://t188",
+    selectedRegimeBindingRef: null,
+    tenantToolEnvironment: {
+      kind: "sdlc_tenant_tool_environment_projection",
+      sourceRefs: ["workspace://build_tenants/hello_world_javascript/spec/TECH_STACK.json"],
+      disabledTools: ["python3"],
+      allowedTools: [],
+      workspaceLocalDirectories: [],
+      environmentVariableNames: []
+    }
+  });
+
+  assert.equal(maxLineLength(prompt) <= 1000, true);
+  assert.doesNotMatch(prompt, /At minimum, verify every contentRows/u);
+  assert.match(prompt, /default design-depth evaluator process exposes only Read and Write/u);
+  assert.match(prompt, /must set limit <=80/u);
+  assert.doesNotMatch(prompt, /Prefer bounded Node summaries/u);
+  assert.doesNotMatch(prompt, /summarize selected keys with Node/u);
+  assert.doesNotMatch(prompt, /run Node snippets/u);
+  assert.doesNotMatch(prompt, /run a local JSON check/u);
+});
+
+test("T-188 implementation-design prompt keeps design-depth directive sectioned", () => {
+  assert.match(
+    launchContractSource,
+    /compactDesignDepthDirective[\s\S]*\.join\("\\n"\)/u
+  );
+});
+
+test("T-188 lite design prompt carries tenant stack scalars for design-depth admission", () => {
+  assert.match(
+    launchContractSource,
+    /Implementation design ADR stack profile rows must expose tenant stack authority as scalar design facts/u
+  );
+  assert.match(
+    launchContractSource,
+    /language, runtime\/module system, build tool, build config, dependency policy, test runner, and test command/u
+  );
+  assert.match(
+    launchContractSource,
+    /Do not omit tenant-declared stack fields that the design-depth register admits/u
+  );
+  assert.match(
+    launchContractSource,
+    /not ecosystem defaults/u
+  );
+});
+
+test("T-188 design-depth evaluator prompt forbids schema-invalid stack scalars", () => {
   assert.match(
     evaluatorPromptSource,
-    /regex-literal quoting mistakes are evaluator failures/u
+    /stackProfileRows\[\]\.language and stackProfileRows\[\]\.buildTool are required scalar strings/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /do not emit null inside required scalar fields/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /Never publish a schema-invalid stack row such as buildTool:null/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /emit an empty stackProfileRows section or a partial\/blocked designCompletenessVerdict axis/u
+  );
+});
+
+test("T-188 evaluator prompt does not infer build-config targets from ecosystem convention", () => {
+  assert.match(
+    evaluatorPromptSource,
+    /Include build_config files only when the ADR Product File Targets table, tenant stack authority, or another higher accepted product authority explicitly declares that exact build\/config target/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /do not infer package\/build files from ecosystem convention/u
+  );
+});
+
+test("T-188 worker prompt distinguishes current-edge materialization from downstream target design", () => {
+  assert.match(
+    launchContractSource,
+    /current-edge materialized product file targets: none/u
+  );
+  assert.doesNotMatch(
+    launchContractSource,
+    /declared product file targets: none/u
+  );
+});
+
+test("T-187 review-grade evaluator prompt matches the Read/Write tool profile", () => {
+  const prompt = reviewGradeEdgeFulfillmentPrompt({
+    manifest: {
+      graphFunctionName: "derive_component_code_surface",
+      edgeName: "derive_component_code_surface",
+      targetAssetType: "component_code_surface"
+    },
+    governanceRef: "config://test",
+    governancePath: "config/work-category-governance/coding_build.md",
+    constructionBriefPath: "worker_construction_brief.json",
+    invocationPackagePath: "worker_invocation_package.json",
+    workerReportPath: "worker_result_report.json",
+    assessmentPath: "review_grade_edge_fulfillment_assessment.json",
+    subworkstreamManifestPath: "evaluate_compute_subworkstream_manifest.json",
+    tenantToolEnvironment: {
+      kind: "sdlc_tenant_tool_environment_projection",
+      sourceRefs: [],
+      disabledTools: [],
+      allowedTools: [],
+      workspaceLocalDirectories: [],
+      environmentVariableNames: []
+    }
+  });
+
+  assert.equal(maxLineLength(prompt) <= 1000, true);
+  assert.match(prompt, /default review-grade evaluator process exposes only Read and Write/u);
+  assert.match(prompt, /must set limit <=80/u);
+  assert.doesNotMatch(prompt, /short local script/u);
+  assert.doesNotMatch(prompt, /Node sidecar script/u);
+  assert.doesNotMatch(prompt, /shell heredoc/u);
+  assert.doesNotMatch(prompt, /run it inside one bounded shell block/u);
+  assert.doesNotMatch(prompt, /parse it back/u);
+  assert.doesNotMatch(prompt, /child_process/u);
+  assert.doesNotMatch(prompt, /spawn\/exec/u);
+  assert.doesNotMatch(prompt, /spawning child commands/u);
+  assert.match(evaluatorPromptSource, /startsWith, includes, endsWith, and split-style/u);
+  assert.match(
+    evaluatorPromptSource,
+    /Regex quoting mistakes are evaluator failures/u
   );
 });
 
@@ -508,11 +687,7 @@ test("T-187 review-grade evaluator prompt keeps probe evidence workspace-local",
 test("T-187 review-grade evaluator prompt does not admit evaluator helper failures as product findings", () => {
   assert.match(
     evaluatorPromptSource,
-    /correct that helper once using already-read evidence and validation/u
-  );
-  assert.match(
-    evaluatorPromptSource,
-    /Do not convert evaluator helper-script failure into requirement\/product obligation findings/u
+    /Do not convert evaluator-side tool-profile, quoting, type-shape, key-shape, or schema-inspection failures into requirement\/product obligation findings/u
   );
   assert.match(
     evaluatorPromptSource,
@@ -522,6 +697,8 @@ test("T-187 review-grade evaluator prompt does not admit evaluator helper failur
     evaluatorPromptSource,
     /worker_construction_brief\.obligations may be an object map rather than an array/u
   );
+  assert.doesNotMatch(evaluatorPromptSource, /child_process/u);
+  assert.doesNotMatch(evaluatorPromptSource, /spawn\/exec/u);
 });
 
 test("T-187 review-grade evaluator prompt does not turn refs into obligations", () => {

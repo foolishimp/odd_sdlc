@@ -817,6 +817,23 @@ test("T-180 tenant stack repair routes to canonical tenant spec authority", () =
     prompt,
     /create or repair the tenant TECH_STACK\/TESTING_TECH_STACK authority from bootstrap facts and ADR\/design decisions/u
   );
+  assert.match(
+    prompt,
+    /generic stack reconciliation protocol before product-file edits or tenant-stack repairs/u
+  );
+  assert.match(
+    prompt,
+    /inspect tenant stack authority surfaces, accepted bootstrap\/design\/ADR refs/u
+  );
+  assert.match(
+    prompt,
+    /Record a compact stack reconciliation decision/u
+  );
+  assert.match(
+    prompt,
+    /Do not repair tenant-stack authority from an untested local assumption/u
+  );
+  assert.doesNotMatch(prompt, /effective workspace runtime/u);
 });
 
 test("T-172 semantically empty tenant stack authority blocks executable materialization admission", () => {

@@ -138,6 +138,30 @@ test("T-086 blocking reason carrier admits closed typed legacy projection", () =
   assert.equal(legacy.reasonClass, "runtime_policy");
 });
 
+test("T-188 evaluator process failures do not route to product F_P repair", () => {
+  for (const code of [
+    "review_grade_assessment_missing",
+    "review_grade_assessment_invalid",
+    "review_grade_evaluator_process_failed",
+    "review_grade_evaluator_process_timeout",
+    "review_grade_evaluator_mutated_input"
+  ]) {
+    const reason = makeSdlcBlockingReason({
+      code,
+      evidenceRefs: [`evidence://${code}`]
+    });
+    assert.equal(reason.reasonClass, "assurance");
+    assert.equal(reason.lawfulReentryPoint, "triage_gap");
+  }
+
+  const semanticFinding = makeSdlcBlockingReason({
+    code: "review_grade_edge_fulfillment_blocked",
+    evidenceRefs: ["evidence://semantic-finding"]
+  });
+  assert.equal(semanticFinding.reasonClass, "assurance");
+  assert.equal(semanticFinding.lawfulReentryPoint, "same_edge_retry");
+});
+
 test("T-170 F_D failure severity separates protocol context diagnostics and content", () => {
   const carrierMissing = makeSdlcBlockingReason({
     code: "target_carrier_admission_missing",

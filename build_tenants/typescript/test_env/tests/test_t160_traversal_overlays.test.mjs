@@ -177,6 +177,41 @@ test("T-160 lite overlay terminates on a bounded implementation edge", () => {
   );
 });
 
+test("T-160 framework-smoke Min(F_P) overlay terminates on component-code edge", () => {
+  const module = constructSdlcGtlModule();
+  const frameworkSmokeExecutive = module.graphFunctions.find(
+    (graphFunction) => graphFunction.name === FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE
+  );
+  assert(frameworkSmokeExecutive);
+  const graph = materializeGraphFunction(frameworkSmokeExecutive);
+  const finalVector = graph.vectors.at(-1);
+  assert(finalVector);
+
+  assert.deepStrictEqual(
+    graph.vectors.map((vector) => vector.name),
+    [
+      FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+      FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+    ]
+  );
+  assert.equal(finalVector.name, FG_DERIVE_LITE_COMPONENT_CODE_SURFACE);
+  assert.equal(finalVector.target.name, "component_code_surface");
+
+  const catalog = constructSdlcTraversalOverlayCatalog({ module });
+  const overlay = catalog.overlays.find(
+    (candidate) => candidate.overlayRef === SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF
+  );
+  assert(overlay);
+  assert.deepStrictEqual(
+    overlay.termination.terminalGraphFunctionRefs,
+    [FG_DERIVE_LITE_COMPONENT_CODE_SURFACE]
+  );
+  assert.equal(
+    overlay.assetTemplates[0]?.producerGraphFunctionRef,
+    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+  );
+});
+
 test("T-160 overlay binding distinguishes material assets from planned templates", () => {
   const module = constructSdlcGtlModule();
   const catalog = constructSdlcTraversalOverlayCatalog({ module });

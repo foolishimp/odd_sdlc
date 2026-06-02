@@ -377,13 +377,15 @@ function overlayDefinitions(): readonly OverlayDefinition[] {
       publicStartTargets: Object.freeze([FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE]),
       defaultStartTarget: FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
       terminalAssetTypes: Object.freeze(["component_code_surface"]),
-      terminalGraphFunctionNames: Object.freeze([FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE]),
+      terminalGraphFunctionNames: Object.freeze([
+        FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+      ]),
       lawfulStopDispositions: Object.freeze(["product_converged", "blocked"]),
       assetTemplates: Object.freeze([
         {
           assetType: "component_code_surface",
           defaultPath: "build_tenants/hello_world_javascript/src/hello.js",
-          producerGraphFunctionName: FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
+          producerGraphFunctionName: FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
           terminalRole: "terminal_asset"
         }
       ])

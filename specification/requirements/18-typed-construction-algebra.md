@@ -1,6 +1,6 @@
 # Typed Construction Algebra Requirements
 
-**Family**: REQ-F-ODDSDLC-074..084
+**Family**: REQ-F-ODDSDLC-074..085
 **Status**: Active
 **Category**: Governance, Runtime, Verification
 **Carries Forward From**:
@@ -464,6 +464,13 @@ failure surfaces.
   liveness activity streams, event archives, and forensic package payloads remain
   archive truth for explicit diagnosis, not default worker input or replay scan
   input.
+- AC-10: generated prompt artifacts are contract code and must remain directly
+  inspectable as proof surfaces. A prompt-bearing edge that requires human review
+  of the raw prompt must expose a compact, sectioned prompt whose governing
+  contract, authority refs, local disambiguation, and self-checks can be audited
+  without reading expanded packages or forensic payloads. If the prompt becomes
+  too large to inspect, the excess must move to typed referenced carriers,
+  bounded summaries, or reusable prompt law before closure.
 
 ### REQ-F-ODDSDLC-084 - construction algebra preserves selected composition epistemology
 
@@ -504,3 +511,46 @@ analyzer output, and operator documentation shall interpret `transform.C`,
   authorities; repair is represented by `EdgeClosureDecision.disposition` and
   selected continuation is represented by `NextActionProjection` over
   `ActionCatalog`
+
+### REQ-F-ODDSDLC-085 - tenant-stack ambiguity is resolved by generic F_P reconciliation protocol
+
+Prompt-bearing `F_P.transform` workers shall resolve tenant-stack ambiguity
+through a generic reconciliation procedure over admitted tenant/worksite
+authority, not through SDLC-core ecosystem semantics or hidden defaults.
+
+**Acceptance Criteria**:
+- AC-1: when tenant stack authority is missing, contradictory, invalid, or
+  underdefined for the current materialization edge, the worker-facing
+  construction brief or prompt states a generic stack-reconciliation protocol
+  before product-file edits or tenant-stack repairs
+- AC-2: the protocol instructs the worker to inspect the tenant stack authority
+  surfaces, accepted bootstrap/design/ADR refs that mention stack/runtime/file
+  targets/execution, declared product file targets and roles, declared
+  build/test/proof commands, and current worksite execution-context files that
+  affect how those declared commands run
+- AC-3: the protocol requires a compact stack reconciliation decision in the
+  returned artifact or evidence: declared stack, relevant product targets,
+  declared command, observed conflict or underdefinition, chosen repair surface
+  as tenant authority, product files, both, or blocked/re-entry, and proof
+  command or bounded probe result when executable
+- AC-4: the worker shall not repair tenant-stack authority from an untested
+  local assumption when the declared command can be run or probed; it first
+  executes the declared command or bounded probe, or records why execution is
+  unavailable
+- AC-5: the worker shall not create undeclared build/config files merely to make
+  an inferred ecosystem default true. If a config/build file is required, the
+  worker repairs the tenant authority surface when the edge permits that write,
+  or reports blocked/re-entry pressure
+- AC-6: SDLC core may carry the generic protocol, refs, digests, declared
+  targets, declared commands, read/write roots, and prior evaluator finding
+  classes. It shall not encode ecosystem-specific conclusions such as how a
+  particular manifest file changes module semantics, cache behavior, compiler
+  behavior, package resolution, or test execution semantics
+- AC-7: `evaluate.C` verifies consistency among tenant stack authority, emitted
+  product syntax/files, declared product targets, declared execution commands,
+  and returned execution evidence. It does not repair generated product files or
+  mutate tenant-stack authority
+- AC-8: if the stack remains unresolved after the worker's reconciliation
+  attempt, closure carries explicit residual pressure to the owning
+  bootstrap/design/tenant-authority surface rather than treating deterministic
+  execution failure, missing config, or worker prose as closure truth

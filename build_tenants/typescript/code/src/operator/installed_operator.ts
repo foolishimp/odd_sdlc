@@ -19,6 +19,7 @@ import {
   statSync
 } from "node:fs";
 import { uniqueSorted } from "../shared/collections.js";
+import { sdlcWorkerTargetUsesShellToolProfile } from "./worker_tool_profile.js";
 import {
   admitGraphSpanAssessment,
   constructGraphReentryAppliedEvent,
@@ -860,8 +861,12 @@ function installedStartWithLoop(input: {
     exhaustedDisposition: input.exhaustedDisposition,
     attempts: Object.freeze([...input.attempts])
   });
+  const loopEmittedRuntimeEventKinds = Object.freeze(
+    input.attempts.flatMap((attempt) => attempt.emittedRuntimeEventKinds)
+  );
   return Object.freeze({
     ...input.outcome,
+    emittedRuntimeEventKinds: loopEmittedRuntimeEventKinds,
     traversalConsequence: input.outcome.traversalConsequence,
     loop
   });
@@ -2941,24 +2946,12 @@ function designDepthFpEvaluatorStdoutBudgetBytes(): number {
   return sdlcOperatorRuntimePolicy().designDepthFpEvaluatorStdoutBudgetBytes;
 }
 
-function reviewGradeEdgeRequiresShellTool(
-  manifest: SdlcWorkerHandoffManifest
-): boolean {
-  return [
-    "component_code_surface",
-    "component_test_surface",
-    "test_execution_surface",
-    "runtime_execution_surface",
-    "execution_result_surface"
-  ].includes(manifest.targetAssetType);
-}
-
 function constrainPlanningTransformWorkerTools(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly transport: SdlcWorkerTransportContract;
   readonly processLaunch: ReturnType<typeof processLaunchForWorker>;
 }): ReturnType<typeof processLaunchForWorker> {
-  if (reviewGradeEdgeRequiresShellTool(input.manifest)) {
+  if (sdlcWorkerTargetUsesShellToolProfile(input.manifest)) {
     return input.processLaunch;
   }
   return constrainClaudeProcessLaunchTools({
@@ -2969,13 +2962,9 @@ function constrainPlanningTransformWorkerTools(input: {
 }
 
 function constrainReviewGradePlanningEvaluatorTools(input: {
-  readonly manifest: SdlcWorkerHandoffManifest;
   readonly transport: SdlcWorkerTransportContract;
   readonly processLaunch: ReturnType<typeof processLaunchForWorker>;
 }): ReturnType<typeof processLaunchForWorker> {
-  if (reviewGradeEdgeRequiresShellTool(input.manifest)) {
-    return input.processLaunch;
-  }
   return constrainClaudeProcessLaunchTools({
     transport: input.transport,
     processLaunch: input.processLaunch,
@@ -3868,6 +3857,7 @@ async function invokeWorkerThroughAbgProcessActor(input: {
       parser: parserForWorkerTransport(input.transport),
       executorProfile,
       timeoutMs: inactivityPolicy.timeoutMs,
+      inactivityTimeoutMs: inactivityPolicy.inactivityTimeoutMs,
       terminationGraceMs: inactivityPolicy.terminationGraceMs,
       heartbeatMs: inactivityPolicy.heartbeatMs,
       eventSink: (event) => {
@@ -4322,6 +4312,7 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
     parser: parserForWorkerTransport(input.transport),
     executorProfile,
     timeoutMs: evaluatorTimeoutMs,
+    inactivityTimeoutMs: inactivityPolicy.inactivityTimeoutMs,
     terminationGraceMs: inactivityPolicy.terminationGraceMs,
     heartbeatMs: inactivityPolicy.heartbeatMs,
     eventSink: input.eventSink
@@ -4754,7 +4745,6 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       : "";
   const executorProfile = selectedWorkerExecutorProfile();
   const processLaunch = constrainReviewGradePlanningEvaluatorTools({
-    manifest: input.manifest,
     transport: input.transport,
     processLaunch: processLaunchForWorker({
       transport: input.transport,
@@ -4852,6 +4842,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
     parser: parserForWorkerTransport(input.transport),
     executorProfile,
     timeoutMs: evaluatorTimeoutMs,
+    inactivityTimeoutMs: inactivityPolicy.inactivityTimeoutMs,
     terminationGraceMs: inactivityPolicy.terminationGraceMs,
     heartbeatMs: inactivityPolicy.heartbeatMs,
     eventSink: input.eventSink
@@ -8096,7 +8087,8 @@ function priorSilentInactivityCount(manifest: SdlcWorkerHandoffManifest): number
 function workerRuntimeTriageStop(postflight: SdlcPostflightResult): boolean {
   return postflight.blockingReasonCarriers.some(
     (reason) =>
-      reason.reasonClass === "worker_runtime" &&
+      (reason.reasonClass === "worker_runtime" ||
+        reason.reasonClass === "assurance") &&
       reason.lawfulReentryPoint === "triage_gap"
   );
 }

@@ -14,7 +14,7 @@ re_entry_point: design
 priority: critical
 triaged_at: 2026-06-01
 created_at: 2026-06-01
-updated_at: 2026-06-02
+updated_at: 2026-06-03
 governance_scope: STDO Method
 source_documents:
   - specification/PRODUCT.md
@@ -79,6 +79,7 @@ non_closure_conditions:
   - data_mapper-lite uses invented requirements or an untraceable mini-brief instead of a declared subset of the canonical data_mapper requirements document
   - data_mapper-lite closes without generated tests being executed through admitted test-execution evidence
   - prompt text reintroduces exact semantic construction scripts or stack-specific product repair recipes
+  - tenant-stack ambiguity is resolved by SDLC-core ecosystem defaults instead of a generic F_P reconciliation protocol over tenant/worksite authority
 ---
 
 # T-188: Force F_P Depth Through Same-Sandbox Iteration And Prompt Control
@@ -132,6 +133,9 @@ data_mapper product defects.
 - F_D/ABG owns admission, event truth, ledger fold, closure fold, replay, and
   routing from admitted truth.
 - Broad prompts must make iteration normal: tranche, assess, repair, continue.
+- Stack ambiguity is a generic F_P disambiguation protocol: the worker is told
+  where to look, what decision to record, and what proof to run, but SDLC core
+  does not decide ecosystem semantics.
 - Closure must honor admitted evaluator/depth facts even when the target carrier
   is structurally valid.
 - Downstream carry is a typed obligation handoff, not a way to delete pressure.
@@ -154,7 +158,11 @@ data_mapper product defects.
    through generated test execution evidence.
 5. Tighten broad transform/evaluate prompts around tranche iteration, subagent
    permission, depth-gap findings, and same-sandbox repair.
-6. Re-run focused proof, then run a same-sandbox data-mapper proof only after
+6. Tighten tenant-stack repair prompts around generic F_P reconciliation:
+   inspect tenant/worksite authority, record the stack reconciliation decision,
+   prove with declared command or bounded probe when runnable, and never encode
+   stack-specific defaults in SDLC core.
+7. Re-run focused proof, then run a same-sandbox data-mapper proof only after
    the deterministic failures cannot close.
 
 ## Implementation Progress
@@ -293,3 +301,264 @@ Result:
 - T-066/T-140/T-180 focused pack: passed, 102/102.
 - T-189 listed regression pack: passed, 58/58.
 - `git diff --check`: clean.
+
+### 2026-06-03 Tenant-Stack Reconciliation Extension
+
+Status: product/requirement law ratified; prompt realization landed; focused
+proof passed under this ticket.
+
+This is a lawful T-188 extension because it preserves the same target truth:
+generic work must converge through F_P construct/evaluate/repair turns without
+F_D semantic compensation. The observed hello-world JS run showed a stack
+ambiguity pattern inside `F_P.transform`: the worker first made an untested
+tenant-stack repair, ran the declared test, observed the real execution context,
+and then repaired its own work. The durable fix is not a JavaScript rule in
+SDLC core. It is a generic worker protocol that makes F_P inspect the governing
+tenant/worksite authority, record a compact reconciliation decision, and prove
+the chosen repair before returning.
+
+Requirement re-entry:
+
+- `specification/PRODUCT.md` now states that tenant-stack disambiguation is an
+  `F_P.transform` work protocol, not a deterministic stack engine in SDLC core.
+- `specification/requirements/18-typed-construction-algebra.md` now includes
+  `REQ-F-ODDSDLC-085`, requiring generic F_P tenant-stack reconciliation and
+  forbidding SDLC core from encoding ecosystem-specific stack conclusions.
+
+Prompt construction audit:
+
+- Free-form prompt construction is currently three lawful surfaces:
+  `promptForHandoff` for `transform.C`, `designDepthFpEvaluatorPrompt` for
+  design-depth `evaluate.C`, and `reviewGradeEdgeFulfillmentPrompt` for
+  review-grade `evaluate.C`.
+- Transform prompt-source carriers are JSON packages beside the prompt
+  (`worker_construction_brief.json`, `worker_invocation_package.json`,
+  `worker_brief.json`); they are not additional free-form prompt constructors.
+- Artifact catalog and analysis code reference prompt artifacts but do not
+  construct prompt text.
+
+Realization:
+
+- `REQ-F-ODDSDLC-085` is projected into coding-build/component-code transform
+  prompts when tenant stack authority is missing, invalid, contradictory, or
+  underdefined.
+- Transform prompts now require the generic stack reconciliation protocol:
+  inspect tenant/worksite authority, accepted bootstrap/design/ADR refs,
+  declared targets, declared commands, and worksite execution-context files;
+  record a compact reconciliation decision; prove with declared command or a
+  bounded probe when runnable; and do not infer stack-specific defaults.
+- Review-grade evaluator prompts now verify agreement among tenant authority,
+  emitted files/syntax, declared targets, declared execution commands, and
+  returned evidence. The evaluator remains read-only and does not repair product
+  files or tenant-stack authority.
+
+Proof run:
+
+```bash
+npm run build:semantic
+node --test test_env/tests/test_t143_product_materialization_authority_targets.test.mjs test_env/tests/test_t182_fp_review_grade_edge_fulfillment.test.mjs test_env/tests/test_t187_fp_evaluator_prompt_boundary.test.mjs
+```
+
+Result:
+
+- `build:semantic`: passed.
+- Focused prompt/proportionality pack: passed, 64/64.
+
+2026-06-03 live prompt audit update:
+
+- Raw prompt artifacts are treated as contract code, not wording. A generated
+  prompt that cannot be inspected directly is not an adequate proof surface.
+- `specification/requirements/18-typed-construction-algebra.md` now extends
+  `REQ-F-ODDSDLC-083` with AC-10: prompt-bearing edges must keep generated
+  prompt artifacts directly inspectable; excess detail must move to typed
+  referenced carriers, bounded summaries, or reusable prompt law.
+- T-132 JS live PTY run:
+  `build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260602T155109028Z_pid26716`.
+- Actual generated prompt sizes from the first live operator run:
+  - `worker_prompt.md`: 83 lines / 12,355 bytes.
+  - `design_depth_fp_evaluator_prompt.md`: 242 lines / 40,017 bytes.
+  - `review_grade_edge_fulfillment_prompt.md`: 135 lines / 22,106 bytes.
+- Actual first worker prompt now projects the tenant-stack scalar contract:
+  it requires ADR Stack Profile values from tenant authority for language,
+  runtime/module system, build tool, build config, dependency policy, test
+  runner, and test command; it also says not to use ecosystem defaults.
+- Actual first design-depth evaluator prompt now forbids `null` inside required
+  scalar fields and requires `stackProfileRows[].buildTool` to be a scalar string
+  when a stack row is emitted.
+- Live evaluator output initially drafted empty rows, then rewrote the register
+  into semantic rows. Final admitted design-depth register contains
+  `buildTool: node`, source target
+  `build_tenants/hello_world_javascript/src/hello.js`, test target
+  `build_tenants/hello_world_javascript/test/hello.test.js`, component
+  `hello_world_main`, and no `package.json`/build_config target.
+- Additional prompt ambiguity found and patched: the evaluator prompt example
+  allowed trivial products to include build_config file targets without saying
+  that build_config must be explicitly declared by authority. It now says
+  build_config files are included only when the ADR Product File Targets table,
+  tenant stack authority, or another higher accepted product authority explicitly
+  declares that exact build/config target, and not from ecosystem convention.
+- Additional transform prompt ambiguity found and patched: the worker prompt
+  outcome header used `declared product file targets: none`, which can confuse
+  current-edge materialization with downstream target design on design edges.
+  It now says `current-edge materialized product file targets: none`.
+- Additional auditability defect found and patched: ABG output authority
+  projection support refs were being copied wholesale into source-asset
+  obligation `evidenceRefs`, including serialized runtime/projection identity.
+  SDLC now carries compact prompt-visible ABG authority handles and validation
+  refs only; oversized/JSON-bearing refs are digest-compressed, and projection
+  support evidence remains in ABG/archive surfaces.
+- Prompt clause inspectability was tightened: generated evaluator prompts now
+  have focused line-length proof, and component-depth transform directives use
+  newline-separated clauses instead of multi-kilobyte single lines.
+- Focused prompt tests were extended to assert stack scalar validity,
+  build_config authority, current-edge materialization wording, ABG projection
+  evidence-ref compactness, and generated prompt line inspectability.
+
+### 2026-06-03 PTY Supervisor And Prompt-Profile Hardening
+
+Status: landed source + focused proof + clean PTY hello-world integration proof
+plus ABG release carry-forward. ABG `3.9.0-rc.7` is cut and tagged
+`v3.9.0-rc.7`; odd_sdlc now pins the RC7 release snapshot tarball that contains
+the supervisor changes.
+
+ABG/runtime fixes:
+
+- PTY execution now uses the topology
+  `pty_terminal -> agent_supervisor -> local-spawn -> worker` instead of
+  launching the worker directly under the terminal session.
+- The supervisor owns hard timeout, inactivity timeout, and process-group
+  cleanup for the local-spawned worker. It kills the worker process group and
+  escalates after the declared grace interval.
+- Supervisor decisions are emitted as runtime trace events:
+  `terminal_agent_supervisor_configured`,
+  `terminal_agent_supervisor_hard_timeout`, and
+  `terminal_agent_supervisor_inactivity_timeout`, with legacy compatibility
+  timeout events preserved for existing readers.
+- Heartbeat/liveness rows no longer reset the progress lease. Progress lease
+  reset is limited to substantive progress sources such as local-spawn stdout,
+  local-spawn stderr, PTY transcript, structured agent stream, tool call, result
+  artifact, and actor lifecycle fallback.
+- `inactivityTimeoutMs` is propagated through supervised-process actor calls.
+  Heartbeat-only but silent workers now trip inactivity instead of appearing
+  active forever.
+- The PTY supervisor request archive no longer serializes `env`. The worker
+  still inherits `process.env` through the supervisor process, but the trace
+  request does not persist environment values or secrets.
+
+SDLC fixes:
+
+- `installed_operator.ts` passes the profile/harness-provided
+  `inactivityTimeoutMs` to transform workers, design-depth evaluators, and
+  review-grade evaluators.
+- Worker tool-profile classification is centralized in
+  `worker_tool_profile.ts`, so prompt text and actual worker tool constraints
+  use the same shell-capability predicate.
+- Transform prompts are profile-aware:
+  - shell-capable transform edges receive the command IO cap;
+  - non-shell transform edges receive explicit `Read limit <=80` discipline and
+    no shell/JQ/sed/cat guidance.
+- Evaluator prompts are profile-aware:
+  - default review-grade/design-depth evaluator workers are `Read,Write`;
+  - they receive explicit `Read limit <=80` discipline;
+  - they are not told to spawn child processes, execute local commands, or use
+    shell helpers.
+- Framework-smoke overlay now routes the terminal product target through the
+  component-code producer edge so the smoke lane must dispatch code
+  materialization instead of stopping after design evidence.
+- Smoke/live script policy supplies the short hello-world lease values through
+  harness environment variables. Longer data_mapper-scale leases remain
+  profile/project policy, not ABG or SDLC core constants.
+
+Boundary review against the supervisor-risk flags:
+
+- No semantic prod vocabulary was added. The supervisor is control-plane only:
+  timeout, inactivity, process exit, and process-group cleanup.
+- The local-spawn fallback is not weaker than PTY supervision; the worker child
+  is directly owned by the supervisor inside the PTY envelope.
+- The smoke inactivity value is harness policy. It is intentionally short for
+  hello-world and must not be reused as the data_mapper default.
+- There is no automatic mid-artifact restart. Failures are recorded and the
+  operator decides retry/repair through the normal admitted lifecycle.
+- The PTY topology remains covered by a dedicated live proof instead of being
+  bypassed by local-spawn-only smoke execution.
+- Timeout/progress decisions are recorded in runtime trace artifacts rather
+  than re-derived silently after the fact.
+
+Focused proof:
+
+```bash
+# abiogenesis/build_tenants/abiogenesis/typescript
+npm run build:semantic
+node --test test_env/tests/test_t111_pty_terminal_executor.test.mjs \
+  test_env/tests/test_t097_supervised_process_actor.test.mjs \
+  test_env/tests/test_t129_runtime_liveness_observer.test.mjs
+git diff --check
+
+# odd_sdlc/build_tenants/typescript
+npm run build:semantic
+node --test test_env/tests/test_t187_fp_evaluator_prompt_boundary.test.mjs \
+  test_env/tests/test_t181_fp_evaluator_design_register.test.mjs \
+  test_env/tests/test_t182_fp_review_grade_edge_fulfillment.test.mjs \
+  test_env/tests/test_t086_blocking_reason_carriers.test.mjs \
+  test_env/tests/test_t160_traversal_overlays.test.mjs \
+  test_env/tests/test_t064_installed_operator_ux.test.mjs \
+  test_env/tests/test_t110_abg37_callout_projection.test.mjs
+git diff --check
+```
+
+Result:
+
+- ABG build + supervisor/liveness tests: passed, 24/24.
+- odd_sdlc build + prompt/routing/overlay focused pack: passed, 101/101.
+- `git diff --check`: clean in both repos.
+
+Clean live PTY proof:
+
+```bash
+npm run test:t132:hello-world-live:pty
+```
+
+Run archive:
+
+`build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260602T185439764Z_pid64209`
+
+Observed proof:
+
+- Scenario passed: 1/1, duration `1370936.680125ms` (about 22.85 minutes).
+- No orphan screen/supervisor/worker processes remained for the run ids after
+  completion.
+- Design transform prompt:
+  `.ai-workspace/runtime/odd_sdlc/operator-runs/20260602T185447060Z_pid64209/worker_prompt.md`
+  had explicit `Read limit <=80`; worker obeyed bounded reads.
+- Design-depth evaluator prompt:
+  `.ai-workspace/runtime/odd_sdlc/operator-runs/20260602T185447060Z_pid64209/design_depth_fp_evaluator_prompt.md`
+  ran under `Read,Write`, had explicit `Read limit <=80`, and exited cleanly.
+- Design review-grade prompt:
+  `.ai-workspace/runtime/odd_sdlc/operator-runs/20260602T185447060Z_pid64209/review_grade_edge_fulfillment_prompt.md`
+  ran under `Read,Write`, had no shell/Node helper guidance, and passed.
+- Component-code transform prompt:
+  `.ai-workspace/runtime/odd_sdlc/operator-runs/20260602T190642743Z_pid64209/worker_prompt.md`
+  was shell-capable, had command IO caps, materialized
+  `src/hello.js` and `test/hello.test.js`, and ran the declared test command
+  `node --test test/hello.test.js` with 1 pass / 0 fail.
+- Component-code review-grade prompt:
+  `.ai-workspace/runtime/odd_sdlc/operator-runs/20260602T190642743Z_pid64209/review_grade_edge_fulfillment_prompt.md`
+  ran under `Read,Write`, did not execute the product, and passed 5/5
+  obligations from admitted evidence.
+- Every inspected `agent_supervisor_request.json` in the clean proof used
+  topology `pty_terminal_agent_supervisor_local_spawn_worker` and did not
+  serialize an `env` object.
+
+Defects found during the live audit and fixed before the clean proof:
+
+- Old PTY topology could leave orphan worker/evaluator process trees after the
+  parent terminal was stopped.
+- The first supervisor request implementation archived environment values.
+- Evaluator prompts had profile contradictions: `Read,Write` workers were told
+  how to preserve env for child-process execution.
+- Transform non-shell prompts carried shell syntax and did not give the worker
+  explicit `Read limit <=80` discipline.
+- Review/evaluator prompt profile and actual tool constraints used duplicated
+  shell-profile predicates that could drift.
+- The framework-smoke graph could stop after design evidence without dispatching
+  the component-code edge.

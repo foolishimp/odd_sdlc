@@ -349,18 +349,27 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
     });
   }
   if (
+    code === "review_grade_assessment_missing" ||
+    code === "review_grade_assessment_invalid" ||
+    code === "review_grade_evaluator_process_failed" ||
+    code === "review_grade_evaluator_process_timeout" ||
+    code === "review_grade_evaluator_mutated_input"
+  ) {
+    return Object.freeze({
+      reasonClass: "assurance",
+      lawfulReentryPoint: "triage_gap",
+      message:
+        "Review-grade evaluator process or assessment admission failed and requires operator triage."
+    });
+  }
+  if (
     code === "obligation_unassessed" ||
     code === "obligation_status_unassessed" ||
     code === "obligation_blocked_without_evidence" ||
     code === "obligation_assessment_extra" ||
     code === "obligation_payload_insufficient" ||
     code === "obligation_fulfilled_without_output_coverage" ||
-    code === "review_grade_assessment_missing" ||
-    code === "review_grade_assessment_invalid" ||
     code === "review_grade_edge_fulfillment_blocked" ||
-    code === "review_grade_evaluator_process_failed" ||
-    code === "review_grade_evaluator_process_timeout" ||
-    code === "review_grade_evaluator_mutated_input" ||
     code === "source_asset_dependency_missing"
   ) {
     return Object.freeze({
