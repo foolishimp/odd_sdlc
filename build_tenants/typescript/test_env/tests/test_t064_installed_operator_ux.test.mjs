@@ -652,7 +652,7 @@ test("B-078 process-summary admission defects fail closed as typed evidence bloc
   );
 });
 
-test("T-064 worker provider rate limits stay inside same-edge retry law", () => {
+test("T-064 worker provider rate limits stop automatic retry as runtime backpressure", () => {
   const workspace = makeWorkspace();
   const contract = hookContractByEdgeName("prepare_test_execution_surface");
   const manifest = deriveWorkerHandoffManifest({
@@ -709,8 +709,9 @@ test("T-064 worker provider rate limits stay inside same-edge retry law", () => 
   assert.equal(postflight.blockingReasonCarriers[0].code, "worker_rate_limited");
   assert.equal(
     postflight.blockingReasonCarriers[0].lawfulReentryPoint,
-    "same_edge_retry"
+    "triage_gap"
   );
+  assert.equal(postflight.blockingReasonCarriers[0].reasonClass, "worker_runtime");
   assert(postflight.evidenceRefs.includes(pathToFileURL(finalOutputPath).href));
 });
 

@@ -771,7 +771,7 @@ test("T-182 wrong-stage review findings are downstream pressure, not same-edge r
       reviewGradeFindingsAreDownstreamStagePressure([downstreamExecutionFinding], {
         targetAssetType: "component_code_surface"
       }),
-      false
+      true
     );
     assert.deepEqual(
       reviewGradeEdgeFulfillmentAssessmentPressureRefs({
@@ -803,6 +803,50 @@ test("T-182 wrong-stage review findings are downstream pressure, not same-edge r
           acceptedAuthorityRefs: finding.acceptedAuthorityRefs,
           fulfillmentBinding: null
         }))
+      }),
+      []
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-188 component-code execution proof pressure is downstream, not retry churn", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_code_surface",
+      "t188-code-execution-proof-downstream"
+    );
+    const base = reviewGradeAssessment(manifest);
+    const requirementFinding = base.findings.find((finding) =>
+      finding.obligationId.startsWith("requirement:")
+    );
+    assert.notEqual(requirementFinding, undefined);
+    const executionProofFindings = [requirementFinding].map((finding) => ({
+      ...finding,
+      fulfillmentStatus: "partial",
+      failureClass: "execution_environment",
+      requiredAction:
+        "On the later test-execution edge (component_test_surface / node --test), return admitted worker_result_report.executionEvidence with process-exit-plus-stdout."
+    }));
+
+    assert.equal(
+      reviewGradeFindingsAreDownstreamStagePressure(executionProofFindings, {
+        targetAssetType: "component_code_surface"
+      }),
+      true
+    );
+    assert.deepEqual(
+      reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+        runRef: "run://t188/code-execution-proof",
+        targetAssetType: "component_code_surface",
+        assessment: {
+          ...base,
+          status: "blocked",
+          findings: executionProofFindings
+        }
       }),
       []
     );

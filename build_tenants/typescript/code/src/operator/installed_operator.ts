@@ -312,6 +312,11 @@ import {
 export const MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS = 100;
 export const MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS = 400;
 export const MAX_INSTALLED_CONVERGENCE_ATTEMPTS = 4000;
+export const MAX_INSTALLED_FRAMEWORK_SMOKE_RETRY_REENTRY_ATTEMPTS = 3;
+export const MAX_INSTALLED_COMPACT_RETRY_REENTRY_ATTEMPTS = 12;
+export const MAX_INSTALLED_FRAMEWORK_SMOKE_REPEATED_BLOCKER_ATTEMPTS = 3;
+export const MAX_INSTALLED_COMPACT_REPEATED_BLOCKER_ATTEMPTS = 6;
+export const MAX_INSTALLED_BROAD_REPEATED_BLOCKER_ATTEMPTS = 20;
 const MAX_INSTALLED_OTHER_REENTRY_ATTEMPTS = 100;
 const EMPTY_SCOPE_PATH: readonly string[] = Object.freeze([]);
 
@@ -545,6 +550,80 @@ export function installedReentryAttemptLimit(
     return MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS;
   }
   return MAX_INSTALLED_OTHER_REENTRY_ATTEMPTS;
+}
+
+function installedRuntimeControlProfile(
+  outcome: Pick<SdlcInstalledOperatorStartOutcome, "manifest" | "summary">
+): "framework_smoke" | "compact" | "broad" {
+  const profile = outcome.manifest?.proportionalityProfile ?? null;
+  if (
+    outcome.summary.graphFunctionName === "framework_smoke_min_fp" ||
+    profile?.outcomeClass === "framework_smoke" ||
+    profile?.profileClass === "degenerate"
+  ) {
+    return "framework_smoke";
+  }
+  if (profile?.profileClass === "compact") {
+    return "compact";
+  }
+  return "broad";
+}
+
+export function installedReentryAttemptLimitForOutcome(input: {
+  readonly disposition: SdlcInstalledReentryDisposition;
+  readonly outcome: Pick<SdlcInstalledOperatorStartOutcome, "manifest" | "summary">;
+}): number {
+  if (input.disposition !== "retry") {
+    return installedReentryAttemptLimit(input.disposition);
+  }
+  switch (installedRuntimeControlProfile(input.outcome)) {
+    case "framework_smoke":
+      return MAX_INSTALLED_FRAMEWORK_SMOKE_RETRY_REENTRY_ATTEMPTS;
+    case "compact":
+      return MAX_INSTALLED_COMPACT_RETRY_REENTRY_ATTEMPTS;
+    case "broad":
+      return MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS;
+  }
+}
+
+export function installedRepeatedBlockerAttemptLimitForOutcome(
+  outcome: Pick<SdlcInstalledOperatorStartOutcome, "manifest" | "summary">
+): number {
+  switch (installedRuntimeControlProfile(outcome)) {
+    case "framework_smoke":
+      return MAX_INSTALLED_FRAMEWORK_SMOKE_REPEATED_BLOCKER_ATTEMPTS;
+    case "compact":
+      return MAX_INSTALLED_COMPACT_REPEATED_BLOCKER_ATTEMPTS;
+    case "broad":
+      return MAX_INSTALLED_BROAD_REPEATED_BLOCKER_ATTEMPTS;
+  }
+}
+
+function installedReentryBlockerSignature(
+  outcome: SdlcInstalledOperatorStartOutcome
+): string | null {
+  const disposition =
+    outcome.traversalConsequence?.edgeClosureDecision.disposition ?? null;
+  if (disposition === null || disposition === "close") {
+    return null;
+  }
+  const reasonRefs =
+    outcome.traversalConsequence?.edgeClosureDecision.reasonRefs ?? Object.freeze([]);
+  const reasonKeys = outcome.summary.blockingReasons.map((reason) =>
+    [
+      reason.code,
+      reason.reasonClass,
+      reason.lawfulReentryPoint,
+      reason.detail ?? ""
+    ].join(":")
+  );
+  const signatureRows = uniqueSorted([
+    `edge:${outcome.summary.currentEdge ?? "none"}`,
+    `disposition:${disposition}`,
+    ...reasonRefs.map((ref) => `reasonRef:${ref}`),
+    ...reasonKeys.map((ref) => `reason:${ref}`)
+  ]);
+  return signatureRows.length === 0 ? null : signatureRows.join("\n");
 }
 
 function activePostflightBlockingReasonCarriers(
@@ -7994,8 +8073,11 @@ function workerRunRateLimited(workerRun: SdlcWorkerRunResult): boolean {
     readOptionalWorkerTextPath(workerRun.stderrPath)
   ].join("\n");
   return (
-    /api_error_status["']?\s*:?\s*429/u.test(text) ||
-    /monthly usage limit|quota exhausted|quota exceeded|rate limit exceeded|rate[- ]limited/u.test(
+    /api_error_status["']?\s*:?\s*429/iu.test(text) ||
+    /429 Too Many Requests|Too Many Requests|exceeded retry limit|last status:\s*429|request id:/iu.test(
+      text
+    ) ||
+    /monthly usage limit|quota exhausted|quota exceeded|rate limit exceeded|rate[- ]limited/iu.test(
       text
     ) ||
     /"type"\s*:\s*"rate_limit_event"[\s\S]*"rate_limit_info"\s*:\s*\{[\s\S]*"status"\s*:\s*"rejected"/u.test(
@@ -8159,6 +8241,7 @@ export function constructWorkerProcessFailurePostflight(input: {
           `outcome=${input.workerRun.outcome?.kind ?? "unknown"}`,
           `executorProfile=${input.workerRun.executorProfile ?? "unknown"}`,
           `streamModel=${input.workerRun.streamModel ?? "unknown"}`,
+          `apiRetryCount=${String(input.workerRun.apiRetryCount ?? "unknown")}`,
           `finalOutputRef=${input.workerRun.finalOutputRef ?? "none"}`,
           `traceResultRef=${input.workerRun.traceResultRef ?? "unknown"}`
         ].join(";"),
@@ -9755,6 +9838,7 @@ export async function executeInstalledOperatorStartWithReentry(input: {
   let exhaustedDisposition: SdlcInstalledReentryDisposition | null = null;
   let retryContextOverride: SdlcWorkerRetryContext | undefined;
   const reentryDispositionCountsByScope = new Map<string, number>();
+  const reentryBlockerCountsBySignature = new Map<string, number>();
   const maxLoopAttempts =
     input.requestedUntil === "converged"
       ? MAX_INSTALLED_CONVERGENCE_ATTEMPTS
@@ -9816,11 +9900,28 @@ export async function executeInstalledOperatorStartWithReentry(input: {
         (reentryDispositionCountsByScope.get(guardScope) ?? 0) + 1;
       reentryDispositionCountsByScope.set(guardScope, reentryDispositionCount);
       if (
-        reentryDispositionCount >= installedReentryAttemptLimit(reentryDisposition)
+        reentryDispositionCount >=
+        installedReentryAttemptLimitForOutcome({
+          disposition: reentryDisposition,
+          outcome: latest
+        })
       ) {
         retryGuardExhausted = true;
         exhaustedDisposition = reentryDisposition;
         break;
+      }
+      const blockerSignature = installedReentryBlockerSignature(latest);
+      if (blockerSignature !== null) {
+        const blockerCount =
+          (reentryBlockerCountsBySignature.get(blockerSignature) ?? 0) + 1;
+        reentryBlockerCountsBySignature.set(blockerSignature, blockerCount);
+        if (
+          blockerCount >= installedRepeatedBlockerAttemptLimitForOutcome(latest)
+        ) {
+          retryGuardExhausted = true;
+          exhaustedDisposition = reentryDisposition;
+          break;
+        }
       }
     }
     if (attemptIndex + 1 >= maxLoopAttempts) {

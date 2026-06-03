@@ -654,3 +654,49 @@ node --test test_env/tests/test_t187_fp_evaluator_prompt_boundary.test.mjs \
 ```
 
 - Result: build passed; focused prompt/depth/live-boundary pack passed, 53/53.
+
+Runtime brake follow-up from hello-world 429 incident:
+
+- Incident run:
+  `build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260603T035724527Z_pid64577`.
+- Observed failure mode: the smoke lane retried `component_code_surface` 19
+  times over missing execution proof before eventually closing. The archive
+  shows 42 worker/evaluator process starts, 650 unique worker-provider request
+  IDs, 782 worker turns, and 56 provider rate-limit telemetry events. A
+  hello-world smoke lane must not be able to consume data_mapper-scale retry
+  budget.
+- Root cause: automatic re-entry treated code-edge execution-proof pressure as
+  same-edge retry pressure, and the installed retry guard used broad retry
+  constants for all profiles (`100` retry re-entries / `4000` convergence
+  attempts). Provider 429/backpressure also classified as same-edge retry.
+- Classification: SDLC runtime/admission brake bug. This is not generated
+  product code and not an F_P worksite repair.
+- Fix:
+  - component-code `execution_environment` findings that point to downstream
+    test-execution / execution-evidence proof now classify as downstream-stage
+    pressure, not current-edge retry pressure.
+  - provider 429, quota, or `Too Many Requests` failures classify as
+    `worker_runtime` + `triage_gap`, stopping automatic retry.
+  - installed re-entry now uses profile-aware retry caps:
+    framework-smoke/degenerate retry cap `3`, compact retry cap `12`, broad
+    retry cap retains `100`.
+  - repeated identical blocker signatures now stop naturally:
+    framework-smoke `3`, compact `6`, broad `20`.
+- Focused proof:
+
+```bash
+npm run build:semantic
+node --test test_env/tests/test_t064_installed_operator_ux.test.mjs \
+  test_env/tests/test_t143_product_materialization_authority_targets.test.mjs \
+  test_env/tests/test_t182_fp_review_grade_edge_fulfillment.test.mjs
+npm run test:t188
+git diff --check
+```
+
+- Result: build passed; retry/review-grade focused pack passed, 55/55;
+  `test:t188` passed, 21/21; `git diff --check` clean.
+- Note: `npm run lint:semantic` still fails on existing repo-wide lint debt
+  unrelated to this patch (`codecs.ts`, `compute_subworkstreams.ts`,
+  pre-existing assertions in `installed_operator.ts`, `launch_contract.ts`,
+  `tool_environment.ts`, `worker_tool_profile.ts`). It is not a valid closure
+  gate for this incident until that debt is separately cleaned.

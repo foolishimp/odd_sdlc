@@ -496,8 +496,9 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
   if (code === "worker_rate_limited") {
     return Object.freeze({
       reasonClass: "worker_runtime",
-      lawfulReentryPoint: "same_edge_retry",
-      message: "Worker provider rate limit or quota exhaustion prevented the actor from completing."
+      lawfulReentryPoint: "triage_gap",
+      message:
+        "Worker provider rate limit or quota exhaustion is runtime backpressure and must stop automatic retry."
     });
   }
   if (code === "worker_output_limit_exceeded") {

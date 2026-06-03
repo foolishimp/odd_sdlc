@@ -149,12 +149,17 @@ function reviewGradeFindingIsDownstreamStagePressure(input: {
   const action = input.finding.requiredAction?.toLowerCase() ?? "";
   if (
     input.targetAssetType === "component_code_surface" &&
-    input.finding.failureClass === "test_overlap_missing"
+    (input.finding.failureClass === "test_overlap_missing" ||
+      input.finding.failureClass === "execution_environment")
   ) {
     return (
       action.includes("component_test_surface") ||
       action.includes("test-execution") ||
       action.includes("test execution") ||
+      action.includes("execution evidence") ||
+      action.includes("executionevidence") ||
+      action.includes("process-exit-plus-stdout") ||
+      action.includes("node --test") ||
       action.includes("npm test") ||
       action.includes("generated test")
     );
