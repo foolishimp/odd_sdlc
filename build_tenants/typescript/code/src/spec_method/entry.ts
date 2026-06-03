@@ -1774,6 +1774,7 @@ function selectedArchiveMatchesRequestedStart(input: {
   if (
     input.request.target.kind === "graph_function" &&
     input.request.until === "converged" &&
+    input.selected.completedGraphFunctionName !== null &&
     input.selected.overlayRef !== null
   ) {
     const catalog = constructSdlcTraversalOverlayCatalog({
@@ -1783,13 +1784,23 @@ function selectedArchiveMatchesRequestedStart(input: {
       catalog,
       overlayRef: input.selected.overlayRef
     });
-    const requestedGraphFunction = input.module.graphFunctions.find(
-      (graphFunction) => graphFunction.name === input.request.target.handle
-    );
-    if (selectedOverlay !== null && requestedGraphFunction !== undefined) {
-      return selectedOverlay.graphFunctionRefs.includes(
-        sdlcGraphFunctionBoundaryRef(requestedGraphFunction)
+    if (selectedOverlay !== null) {
+      const requestedIndex = selectedOverlay.graphFunctionRefs.indexOf(
+        input.request.target.handle
       );
+      const completedIndex = selectedOverlay.graphFunctionRefs.indexOf(
+        input.selected.completedGraphFunctionName
+      );
+      const nextIndex = selectedOverlay.graphFunctionRefs.indexOf(
+        input.selected.graphFunctionName
+      );
+      if (
+        requestedIndex >= 0 &&
+        completedIndex > requestedIndex &&
+        nextIndex > completedIndex
+      ) {
+        return true;
+      }
     }
   }
   if (

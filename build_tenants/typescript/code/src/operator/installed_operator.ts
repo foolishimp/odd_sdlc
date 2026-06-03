@@ -175,7 +175,10 @@ import {
   writeProductMaterializationManifest,
   type SdlcStagedConstructionAuditCarrier
 } from "./plugins/transform/launch_contract.js";
-import { writeDeclaredEdgeProjectionOutput } from "./plugins/consequence/edge_projection.js";
+import {
+  admittedTestExecutionResultOutput,
+  writeDeclaredEdgeProjectionOutput
+} from "./plugins/consequence/edge_projection.js";
 import {
   sdlcInstalledOperatorProjectsOutput
 } from "./edge_output_policy.js";
@@ -301,6 +304,10 @@ import {
 } from "./component_depth_register.js";
 import { admitTestDesignRegisterFromArtifact } from "./test_design_register.js";
 import { admitTestExecutionSurfaceRegisterFromArtifact } from "./test_execution_surface_register.js";
+import {
+  deriveSdlcPostflightGapActions,
+  sdlcPostflightGapRetryEligible
+} from "../postflight/gap_dossier_plan.js";
 
 export const MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS = 100;
 export const MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS = 400;
@@ -712,11 +719,58 @@ function archivedGapDossierForManifest(
 
 function repairReasonFromClosurePressureRef(reasonRef: string): string {
   const decoded = decodedArchiveRefForScope(reasonRef);
+  const repairRowPrefix = "component_repair_schedule_row:";
+  const repairRowIndex = decoded.lastIndexOf(repairRowPrefix);
+  if (repairRowIndex >= 0) {
+    return `component_repair_row_open:${decoded.slice(
+      repairRowIndex + repairRowPrefix.length
+    )}`;
+  }
+  if (decoded.includes("component_repair_schedule_repair_required")) {
+    return "component_repair_schedule_repair_required";
+  }
+  if (decoded.includes("component_repair_schedule_triage_gap")) {
+    return "component_repair_schedule_triage_gap";
+  }
   const componentDepthIndex = decoded.indexOf("/component_depth_register_invalid:");
   if (componentDepthIndex >= 0) {
     return decoded.slice(componentDepthIndex + 1);
   }
   return `edge_closure_residual_pressure:${reasonRef}`;
+}
+
+function closurePressureRefRequiresTriageGap(reasonRef: string): boolean {
+  return decodedArchiveRefForScope(reasonRef).includes("triage_gap");
+}
+
+function closurePressureRefRequiresRepairReentry(reasonRef: string): boolean {
+  const decoded = decodedArchiveRefForScope(reasonRef);
+  return (
+    decoded.includes("component_repair_schedule_repair_required") ||
+    decoded.includes("component_repair_schedule_row:")
+  );
+}
+
+function closurePressureRefLawfulReentryPoint(
+  reasonRef: string
+): SdlcBlockingReasonLawfulReentryPoint {
+  if (closurePressureRefRequiresTriageGap(reasonRef)) {
+    return "triage_gap";
+  }
+  if (closurePressureRefRequiresRepairReentry(reasonRef)) {
+    return "repair_worker_output";
+  }
+  return "same_edge_retry";
+}
+
+function closurePressureRefMessage(reasonRef: string): string {
+  if (closurePressureRefRequiresTriageGap(reasonRef)) {
+    return "Edge closure residual pressure requires triage rather than same-edge retry.";
+  }
+  if (closurePressureRefRequiresRepairReentry(reasonRef)) {
+    return "Component repair schedule residual pressure requires repair re-entry.";
+  }
+  return "Edge closure residual pressure requires same-edge repair.";
 }
 
 function syntheticGapDossierFromClosureRefs(input: {
@@ -743,16 +797,18 @@ function syntheticGapDossierFromClosureRefs(input: {
     input.decisionRef
   )}`;
   const reasons = input.reasonRefs.map(
-    (reasonRef): SdlcPostflightGapReason =>
-      Object.freeze({
+    (reasonRef): SdlcPostflightGapReason => {
+      const lawfulReentryPoint =
+        closurePressureRefLawfulReentryPoint(reasonRef);
+      return Object.freeze({
         kind: "sdlc_postflight_gap_reason" as const,
         reason: repairReasonFromClosurePressureRef(reasonRef),
         reasonClass: "assurance" as const,
         blockingReason: makeSdlcBlockingReason({
           code: "edge_closure_residual_pressure",
           reasonClass: "assurance",
-          lawfulReentryPoint: "same_edge_retry",
-          message: "Edge closure residual pressure requires same-edge repair.",
+          lawfulReentryPoint,
+          message: closurePressureRefMessage(reasonRef),
           detail: reasonRef,
           evidenceRefs: [
             input.decisionRef,
@@ -760,8 +816,11 @@ function syntheticGapDossierFromClosureRefs(input: {
             reasonRef
           ]
         })
-      })
+      });
+    }
   );
+  const blockingReasons = reasons.map((reason) => reason.blockingReason);
+  const retryEligible = sdlcPostflightGapRetryEligible(blockingReasons);
   return Object.freeze({
     kind: "sdlc_postflight_gap_dossier" as const,
     status: "open" as const,
@@ -779,8 +838,8 @@ function syntheticGapDossierFromClosureRefs(input: {
       join(input.manifest.archiveRoot, "handoff_manifest.json")
     ).href,
     currentGapDossierRef,
-    retryEligible: true,
-    nextLawfulActions: Object.freeze(["retry_same_edge" as const])
+    retryEligible,
+    nextLawfulActions: deriveSdlcPostflightGapActions(blockingReasons)
   });
 }
 
@@ -2124,6 +2183,31 @@ function writeDeclaredEdgeProjectionFromConsequence(input: {
       join(input.manifest.archiveRoot, "declared_edge_projection_artifact.json")
     ).href
   ]);
+}
+
+function stateWithConsequenceProjectedExecutionEvidence(input: {
+  readonly state: SdlcAbgOwnedFpDispatchState;
+}): SdlcAbgOwnedFpDispatchState {
+  const report = input.state.workerReport;
+  if (
+    report === null ||
+    report.executionEvidence !== null ||
+    input.state.manifest.targetAssetType !== "test_execution_result_surface"
+  ) {
+    return input.state;
+  }
+  const executionEvidence = admittedTestExecutionResultOutput(input.state.manifest);
+  if (executionEvidence === null) {
+    return input.state;
+  }
+  return Object.freeze({
+    ...input.state,
+    workerReport: Object.freeze({
+      ...report,
+      executionEvidence,
+      executionEvidenceErrors: Object.freeze([])
+    })
+  });
 }
 
 function manifestCapabilityValue(
@@ -4550,6 +4634,7 @@ function writeDesignDepthFpEvaluatorRuleOutcomeProof(input: {
 function workerReportWithReviewGradeAssessment(input: {
   readonly report: SdlcWorkerResultReport;
   readonly assessment: SdlcReviewGradeEdgeFulfillmentAssessment;
+  readonly targetAssetType: string;
 }): SdlcWorkerResultReport {
   const existingById = new Map(
     input.report.obligationAssessments.map((assessment) => [
@@ -4587,9 +4672,9 @@ function workerReportWithReviewGradeAssessment(input: {
     }
     const existing = existingById.get(obligationId);
     const isDownstreamStagePressure =
-      obligationId.startsWith("requirement:") &&
-      finding.fulfillmentStatus === "partial" &&
-      finding.failureClass === "wrong_stage";
+      reviewGradeFindingsAreDownstreamStagePressure([finding], {
+        targetAssetType: input.targetAssetType
+      });
     const existingStatus =
       existing === undefined
         ? "fulfilled"
@@ -5044,7 +5129,11 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
   const openFindings = admission.assessment.findings.filter(
     (finding) => finding.fulfillmentStatus !== "fulfilled"
   );
-  if (reviewGradeFindingsAreDownstreamStagePressure(openFindings)) {
+  if (
+    reviewGradeFindingsAreDownstreamStagePressure(openFindings, {
+      targetAssetType: input.manifest.targetAssetType
+    })
+  ) {
     const downstreamPressureRefs = uniqueSorted(
       openFindings.map(
         (finding) =>
@@ -5492,6 +5581,7 @@ function reviewGradeResidualPressureRefsForState(
   }
   return reviewGradeEdgeFulfillmentAssessmentPressureRefs({
     runRef,
+    targetAssetType: state.manifest.targetAssetType,
     assessment: admission.assessment
   });
 }
@@ -6836,6 +6926,7 @@ function postActionCandidates(input: {
   readonly basis: ExecutionBasis;
   readonly module: Module;
   readonly state: SdlcAbgOwnedFpDispatchState;
+  readonly gapDossier: SdlcPostflightGapDossier | null;
   readonly closureDecisionDisposition: string;
   readonly nextVectorIndex: number | null;
   readonly activeOverlayRef: string | null;
@@ -6934,12 +7025,13 @@ function postActionCandidates(input: {
     ]);
   }
   if (input.closureDecisionDisposition === "repair") {
+    const repairGapDossier = input.gapDossier;
     const repairReentryPlans =
-      input.state.gapDossier === null
+      repairGapDossier === null
         ? Object.freeze([])
         : componentRepairReentryPlansForGapDossier({
             manifest: input.state.manifest,
-            dossier: input.state.gapDossier
+            dossier: repairGapDossier
           });
     const repairReentryVectorIndexes = repairReentryPlans
       .map((plan) =>
@@ -7487,10 +7579,22 @@ function deriveInstalledTraversalConsequence(input: {
     gain: edgeGain,
     residualPressure: edgeResidualPressure
   });
-  const rawAbgTerminalRetryRefs = abgTerminalRetryReasonRefs({
-    runRef,
-    terminal: input.engineTerminal
-  });
+  const triageGapResidualPressureRefs =
+    selectedEvaluationResidualPressureRefs.filter(
+      closurePressureRefRequiresTriageGap
+    );
+  const repairReentryResidualPressureRefs =
+    selectedEvaluationResidualPressureRefs.filter(
+      closurePressureRefRequiresRepairReentry
+    );
+  const rawAbgTerminalRetryRefs =
+    triageGapResidualPressureRefs.length > 0 ||
+    repairReentryResidualPressureRefs.length > 0
+      ? Object.freeze([])
+      : abgTerminalRetryReasonRefs({
+          runRef,
+          terminal: input.engineTerminal
+        });
   const repairReasonRefs = blockingReasonRefsForReentry({
     state: input.state,
     lawfulReentryPoint: "repair_worker_output"
@@ -7576,15 +7680,27 @@ function deriveInstalledTraversalConsequence(input: {
     edgeAssuranceCloseDecision,
     currentEdgeLawful,
     retryReasonRefs,
-    repairReasonRefs,
+    repairReasonRefs: uniqueSorted([
+      ...repairReasonRefs,
+      ...repairReentryResidualPressureRefs
+    ]),
     repriceReasonRefs,
     yieldResumeBasis,
     blockReasonRefs: uniqueSorted([
       ...blockReasonRefsForState(input.state),
+      ...triageGapResidualPressureRefs,
       ...fulfillmentProjection.nonConvergedReasonRefs,
       ...postActionBlockingReasonRefs
     ])
   });
+  const postActionGapDossier =
+    input.state.gapDossier ??
+    syntheticGapDossierFromClosureRefs({
+      manifest: input.state.manifest,
+      decisionRef: closureDecision.decisionRef,
+      reasonRefs: closureDecision.reasonRefs,
+      sourceProjectionRef: plannedNextActionProjectionRef
+    });
   const overlayCatalog = constructSdlcTraversalOverlayCatalog({ module });
   const activeOverlay = overlayCatalog.overlays.find(
     (overlay) => overlay.overlayRef === input.start.executionContract?.overlayRef
@@ -7631,6 +7747,7 @@ function deriveInstalledTraversalConsequence(input: {
     basis: input.basis,
     module,
     state: input.state,
+    gapDossier: postActionGapDossier,
     closureDecisionDisposition: closureDecision.disposition,
     nextVectorIndex: input.nextVectorIndex,
     activeOverlayRef: activeOverlay?.overlayRef ?? null,
@@ -8925,18 +9042,9 @@ function compactRuntimeEventArchivePayload(
         }
         let workerReport: SdlcWorkerResultReport | null = null;
         try {
-          const systemTransformOutput = writeDeclaredEdgeProjectionOutput({
-            manifest
-          });
           workerReport = noDispatchReport({
             manifest,
-            report:
-              systemTransformOutput === null
-                ? buildDeclaredEdgeProjectionPendingReport({ manifest })
-                : buildPostTransformWorkerResultReport({
-                    manifest,
-                    before: beforeMaterialization
-                  })
+            report: buildDeclaredEdgeProjectionPendingReport({ manifest })
           });
           writeSdlcSystemArtifact({
             archiveRoot: manifest.archiveRoot,
@@ -8950,9 +9058,7 @@ function compactRuntimeEventArchivePayload(
               kind: "sdlc_post_transform_observation",
               sourceFunction: "system.edge_policy_projection",
               generatedFunction:
-                systemTransformOutput === null
-                  ? "consequence.edge_projection.writeDeclaredEdgeProjectionOutput"
-                  : "consequence.edge_projection.writeDeclaredEdgeProjectionOutput",
+                "consequence.edge_projection.writeDeclaredEdgeProjectionOutput",
               previousReportAdmissionError: null,
               materializedFileCount: workerReport.materializedFiles.length,
               outputFile: workerReport.outputFile,
@@ -9193,10 +9299,14 @@ function compactRuntimeEventArchivePayload(
               : "declared edge-output projection failed"
         });
       }
+      const consequenceState = stateWithConsequenceProjectedExecutionEvidence({
+        state: dispatchState.current
+      });
+      dispatchState.current = consequenceState;
       const consequence = deriveInstalledTraversalConsequence({
         basis,
         start: input.start,
-        state: dispatchState.current,
+        state: consequenceState,
         replayEvents: effectiveReplayEvents,
         admittedAssetEvents: input.eventGraphEvents ?? input.replayEvents,
         emittedEvents: emitted,
@@ -9207,7 +9317,7 @@ function compactRuntimeEventArchivePayload(
             : null
       });
       writeTraversalConsequenceArchive({
-        manifest: dispatchState.current.manifest,
+        manifest: consequenceState.manifest,
         consequence
       });
       return constructConsequenceProjectionOutcome({
@@ -9399,7 +9509,8 @@ function compactRuntimeEventArchivePayload(
         if (admission.status === "admitted" && admission.assessment !== null) {
           const workerReport = workerReportWithReviewGradeAssessment({
             report: dispatchState.current.workerReport,
-            assessment: admission.assessment
+            assessment: admission.assessment,
+            targetAssetType: dispatchState.current.manifest.targetAssetType
           });
           dispatchState.current = Object.freeze({
             ...dispatchState.current,

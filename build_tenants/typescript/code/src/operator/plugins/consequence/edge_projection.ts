@@ -73,6 +73,7 @@ const REPORT_FIELDS = Object.freeze([
   "executionEvidence",
   "executionEvidenceErrors",
   "obligationAssessments",
+  "subworkstreamManifest",
   "fpTransformRequestRef",
   "fpTransformResultRef",
   "fpTransformStatusSnapshot",
@@ -1365,7 +1366,7 @@ function writeTestExecutionResultProjection(
   });
 }
 
-function admittedTestExecutionResultOutput(
+export function admittedTestExecutionResultOutput(
   manifest: SdlcWorkerHandoffManifest
 ): SdlcWorkerExecutionEvidence | null {
   if (

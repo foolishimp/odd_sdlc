@@ -156,7 +156,8 @@ ${JSON.stringify(
   });
 
   assert.equal(admission.status, "rejected");
-  assert.match(admission.blockingReasons.join("\n"), /component_depth_register_missing/u);
+  assert.match(admission.blockingReasons.join("\n"), /component_depth_register_invalid/u);
+  assert.match(admission.blockingReasons.join("\n"), /materializedFiles: unexpected field/u);
 });
 
 test("T-183 rejects exact component-depth payload with extra semantic surfaces", () => {

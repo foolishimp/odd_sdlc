@@ -122,6 +122,8 @@ function codexArgs(input: {
   return Object.freeze([
     "exec",
     "--ignore-user-config",
+    "--disable",
+    "image_generation",
     ...modelArgs,
     ...effortArgs,
     "-c",

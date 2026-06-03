@@ -190,8 +190,10 @@ test("T-181 worker prompts prevent whole-file Write drift in live PTY execution"
     });
     const prompt = promptForHandoff(manifest);
 
-    assert.match(prompt, /Tool-profile contract: this planning transform process/u);
-    assert.match(prompt, /must set limit <=80/u);
+    assert.match(prompt, /Tool-profile contract: this planning edge has a no-execution SDLC profile/u);
+    assert.match(prompt, /use it only for bounded workspace-relative read-only inspection/u);
+    assert.match(prompt, /never for product execution, build\/test commands, framework\/traversal commands, background jobs, or artifact writes/u);
+    assert.match(prompt, /must inspect <=80 lines/u);
     assert.doesNotMatch(prompt, /jq\/rg\/cat\/git diff\/status end `\| head -80`/u);
     assert.doesNotMatch(prompt, /sed is inclusive: end-start\+1<=80/u);
     assert.doesNotMatch(prompt, /no bare jq\/rg\/cat/u);
@@ -1685,7 +1687,22 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(evaluatorPromptSource, /Do not deterministically construct later semantic register rows/u);
   assert.match(evaluatorPromptSource, /Do not spend the run enumerating every requirement id before writing the register/u);
   assert.match(evaluatorPromptSource, /Draft-row timeout is worse than an admitted pressure map/u);
-  assert.match(evaluatorPromptSource, /Command-helper output budget before first evaluator update: command helpers are unavailable/u);
+  assert.match(
+    evaluatorPromptSource,
+    /Command-helper output budget before first evaluator update: if the active tool profile exposes command helpers/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /the only pre-update helper allowed is the named carrier-helper update or equivalent same-path temp-then-rename implementation/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /it may print only compact row counts/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /do not run product, build, test, framework, traversal, or background commands/u
+  );
   assert.match(evaluatorPromptSource, /named carrier-helper update/u);
   assert.match(evaluatorPromptSource, /First-update carrier helper contract/u);
   assert.match(evaluatorPromptSource, /DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_REF/u);
@@ -1737,7 +1754,7 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(evaluatorPromptSource, /verdictVersion must be exactly "ts-design-depth-v1"/u);
   assert.match(evaluatorPromptSource, /designCompletenessVerdict is a closed object with exactly kind, verdictVersion, entity, attribute, flow/u);
   assert.match(evaluatorPromptSource, /Do not emit entityAxis, attributeAxis, flowAxis, axisVerdicts/u);
-  assert.match(evaluatorPromptSource, /Each designCompletenessVerdict axis object is closed with exactly kind, axis, status, reasons, evidenceRefs/u);
+  assert.match(evaluatorPromptSource, /Each designCompletenessVerdict axis object is closed with exactly kind \\"sdlc_design_completeness_axis_verdict\\", axis, status, reasons, evidenceRefs/u);
   assert.match(evaluatorPromptSource, /Allowed designCompletenessVerdict\.\*\.status values/u);
   assert.match(evaluatorPromptSource, /Use "satisfied" for a complete axis; never use "complete"/u);
   assert.match(evaluatorPromptSource, /re-open the JSON you wrote and verify that every typed nested item above is an object/u);

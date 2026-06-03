@@ -709,6 +709,82 @@ test("T-182 wrong-stage review findings are downstream pressure, not same-edge r
       }),
       []
     );
+    const downstreamTestFinding = {
+      ...wrongStageFindings[0],
+      failureClass: "test_overlap_missing",
+      requiredAction:
+        "Materialize the downstream component_test_surface proof target and capture npm test execution evidence."
+    };
+    assert.equal(
+      reviewGradeFindingsAreDownstreamStagePressure([downstreamTestFinding], {
+        targetAssetType: "component_code_surface"
+      }),
+      true
+    );
+    assert.equal(
+      reviewGradeFindingsAreDownstreamStagePressure([downstreamTestFinding], {
+        targetAssetType: "component_test_surface"
+      }),
+      false
+    );
+    assert.equal(
+      reviewGradeFindingsAreDownstreamStagePressure([downstreamTestFinding]),
+      false
+    );
+    assert.deepEqual(
+      reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+        runRef: "t182-code-downstream-test-pressure",
+        targetAssetType: "component_code_surface",
+        assessment: {
+          ...base,
+          status: "blocked",
+          findings: [downstreamTestFinding]
+        }
+      }),
+      []
+    );
+    assert.notDeepEqual(
+      reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+        runRef: "t182-test-edge-open-test-pressure",
+        targetAssetType: "component_test_surface",
+        assessment: {
+          ...base,
+          status: "blocked",
+          findings: [downstreamTestFinding]
+        }
+      }),
+      []
+    );
+    const downstreamExecutionFinding = {
+      ...wrongStageFindings[0],
+      failureClass: "execution_environment",
+      requiredAction:
+        "Produce admitted test-execution edge execution evidence for the generated test shards."
+    };
+    assert.equal(
+      reviewGradeFindingsAreDownstreamStagePressure([downstreamExecutionFinding], {
+        targetAssetType: "component_test_surface"
+      }),
+      true
+    );
+    assert.equal(
+      reviewGradeFindingsAreDownstreamStagePressure([downstreamExecutionFinding], {
+        targetAssetType: "component_code_surface"
+      }),
+      false
+    );
+    assert.deepEqual(
+      reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+        runRef: "t182-test-downstream-execution-pressure",
+        targetAssetType: "component_test_surface",
+        assessment: {
+          ...base,
+          status: "blocked",
+          findings: [downstreamExecutionFinding]
+        }
+      }),
+      []
+    );
     assert.deepEqual(
       reviewGradeEdgeFulfillmentOpenPressureRefs({
         runRef: "t182-wrong-stage-pressure",
@@ -894,7 +970,11 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
     );
     assert.match(
       promptSource,
-      /default review-grade evaluator process exposes only Read and Write/u
+      /Tool-profile contract: obey the active tool list/u
+    );
+    assert.match(
+      promptSource,
+      /bounded workspace-relative read-only inspection/u
     );
     assert.match(
       promptSource,

@@ -179,6 +179,30 @@ function digestForValue(input: unknown): string {
   return `sha256:${createHash("sha256").update(stableJson(input)).digest("hex")}`;
 }
 
+function decodedRefForPressureClassification(input: string): string {
+  let decoded = input;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) {
+        return decoded;
+      }
+      decoded = next;
+    } catch {
+      return decoded;
+    }
+  }
+  return decoded;
+}
+
+function refRequiresRepairReentry(ref: string): boolean {
+  const decoded = decodedRefForPressureClassification(ref);
+  return (
+    decoded.includes("component_repair_schedule_repair_required") ||
+    decoded.includes("component_repair_schedule_row:")
+  );
+}
+
 function edgeScopedRef(input: {
   readonly prefix: string;
   readonly edgeRef: string;
@@ -519,8 +543,11 @@ export function deriveSdlcEdgeAssuranceCloseDecision(input: {
     input.gain.obligationsAndLedgersComplete && input.residualPressure.clear;
   const hasBlockingProtocolPressure =
     input.gain.missingLedgerInputKinds.length > 0 ||
-    input.residualPressure.requiredPressureRefs.some((ref) =>
-      ref.startsWith("pressure://odd-sdlc/target-carrier/")
+    input.residualPressure.requiredPressureRefs.some(
+      (ref) =>
+        ref.startsWith("pressure://odd-sdlc/target-carrier/") ||
+        ref.includes("triage_gap") ||
+        refRequiresRepairReentry(ref)
     );
   const disposition =
     closeReady ? "close" : hasBlockingProtocolPressure ? "block" : "retry";

@@ -170,6 +170,34 @@ test("T-188 data_mapper live harness worker binding comes from runtime policy", 
   }
 });
 
+test("T-188 explicit graph-function resume is not hijacked by overlay replay", () => {
+  const source = readFileSync(
+    path.join(PACKAGE_ROOT, "code/src/spec_method/entry.ts"),
+    "utf8"
+  );
+  const start = source.indexOf("function selectedArchiveMatchesRequestedStart");
+  const end = source.indexOf("function startOutcomeForObservedReplay");
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const body = source.slice(start, end);
+  assert.match(
+    body,
+    /input\.request\.target\.handle === input\.selected\.graphFunctionName/u
+  );
+  assert.match(
+    body,
+    /input\.request\.target\.handle === input\.selected\.completedGraphFunctionName/u
+  );
+  assert.doesNotMatch(
+    body,
+    /selectedOverlay\.graphFunctionRefs\.includes/u
+  );
+  assert.doesNotMatch(
+    body,
+    /requestedGraphFunction/u
+  );
+});
+
 test("T-188 repo-local agent instructions carry the data_mapper live-run boundary", () => {
   for (const fileName of ["AGENTS.md", "CLAUDE.md"]) {
     const content = readFileSync(path.join(REPO_ROOT, fileName), "utf8");

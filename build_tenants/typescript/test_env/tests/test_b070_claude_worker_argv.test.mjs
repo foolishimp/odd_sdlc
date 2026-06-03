@@ -306,6 +306,9 @@ test("B-070 process://codex?model=... lowers to codex exec --model", () => {
 
   assert.equal(args[0], "exec");
   assert.ok(args.includes("--ignore-user-config"));
+  assert.ok(args.includes("--disable"));
+  const disabledFeatureIndex = args.indexOf("--disable");
+  assert.equal(args[disabledFeatureIndex + 1], "image_generation");
   assert.ok(args.includes("--model"));
   const modelIndex = args.indexOf("--model");
   assert.equal(args[modelIndex + 1], "gpt-5.3-codex-spark");

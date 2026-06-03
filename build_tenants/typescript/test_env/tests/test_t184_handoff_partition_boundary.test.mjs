@@ -321,7 +321,7 @@ test("T-184 ABG terminal truth controls non-close traversal", () => {
   assert.match(installedOperatorSource, /abg-terminal/u);
   assert.match(
     installedOperatorSource,
-    /const rawAbgTerminalRetryRefs = abgTerminalRetryReasonRefs/u
+    /const rawAbgTerminalRetryRefs =\s*triageGapResidualPressureRefs\.length > 0 \|\|\s*repairReentryResidualPressureRefs\.length > 0\s*\?\s*Object\.freeze\(\[\]\)\s*:\s*abgTerminalRetryReasonRefs/u
   );
   assert.match(
     installedOperatorSource,

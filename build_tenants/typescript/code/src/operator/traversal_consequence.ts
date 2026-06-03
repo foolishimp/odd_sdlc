@@ -626,6 +626,30 @@ function dispositionFromPolicy(input: {
   return "block";
 }
 
+function decodedRefForClosureClassification(input: string): string {
+  let decoded = input;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) {
+        return decoded;
+      }
+      decoded = next;
+    } catch {
+      return decoded;
+    }
+  }
+  return decoded;
+}
+
+function edgeAssuranceReasonSupportsRepairReentry(ref: string): boolean {
+  const decoded = decodedRefForClosureClassification(ref);
+  return (
+    decoded.includes("component_repair_schedule_repair_required") ||
+    decoded.includes("component_repair_schedule_row:")
+  );
+}
+
 function assertYieldProgressNotOnlyLiveness(input: {
   readonly admittedProgressRefs: readonly string[];
   readonly livenessProjectionRef: string | null;
@@ -1070,8 +1094,10 @@ export function deriveSdlcEdgeClosureDecision(input: {
     }
     if (
       repairReasonRefs.length > 0 &&
-      edgeAssuranceCloseDecision.reasonRefs.some((ref) =>
-        ref.includes("/target-carrier/")
+      edgeAssuranceCloseDecision.reasonRefs.some(
+        (ref) =>
+          ref.includes("/target-carrier/") ||
+          edgeAssuranceReasonSupportsRepairReentry(ref)
       )
     ) {
       candidates.add("repair");

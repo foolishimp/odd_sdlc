@@ -133,16 +133,58 @@ export function reviewGradeEdgeFulfillmentAssessmentRequired(
   return sdlcReviewGradeEdgeFulfillmentAssessmentRequired(manifest);
 }
 
+function reviewGradeFindingIsDownstreamStagePressure(input: {
+  readonly finding: SdlcReviewGradeObligationFinding;
+  readonly targetAssetType?: string | undefined;
+}): boolean {
+  if (
+    !input.finding.obligationId.startsWith("requirement:") ||
+    input.finding.fulfillmentStatus !== "partial"
+  ) {
+    return false;
+  }
+  if (input.finding.failureClass === "wrong_stage") {
+    return true;
+  }
+  const action = input.finding.requiredAction?.toLowerCase() ?? "";
+  if (
+    input.targetAssetType === "component_code_surface" &&
+    input.finding.failureClass === "test_overlap_missing"
+  ) {
+    return (
+      action.includes("component_test_surface") ||
+      action.includes("test-execution") ||
+      action.includes("test execution") ||
+      action.includes("npm test") ||
+      action.includes("generated test")
+    );
+  }
+  if (
+    input.targetAssetType === "component_test_surface" &&
+    input.finding.failureClass === "execution_environment"
+  ) {
+    return (
+      action.includes("test-execution") ||
+      action.includes("test execution") ||
+      action.includes("execution evidence") ||
+      action.includes("execution_result_surface") ||
+      action.includes("runtime_execution_surface")
+    );
+  }
+  return false;
+}
+
 export function reviewGradeFindingsAreDownstreamStagePressure(
-  findings: readonly SdlcReviewGradeObligationFinding[]
+  findings: readonly SdlcReviewGradeObligationFinding[],
+  input: { readonly targetAssetType?: string | undefined } = {}
 ): boolean {
   return (
     findings.length > 0 &&
-    findings.every(
-      (finding) =>
-        finding.obligationId.startsWith("requirement:") &&
-        finding.fulfillmentStatus === "partial" &&
-        finding.failureClass === "wrong_stage"
+    findings.every((finding) =>
+      reviewGradeFindingIsDownstreamStagePressure({
+        finding,
+        targetAssetType: input.targetAssetType
+      })
     )
   );
 }
@@ -169,12 +211,17 @@ export function reviewGradeEdgeFulfillmentOpenPressureRefs(input: {
 
 export function reviewGradeEdgeFulfillmentAssessmentPressureRefs(input: {
   readonly runRef: string;
+  readonly targetAssetType?: string | undefined;
   readonly assessment: SdlcReviewGradeEdgeFulfillmentAssessment;
 }): readonly string[] {
   const openFindings = input.assessment.findings.filter(
     (finding) => finding.fulfillmentStatus !== "fulfilled"
   );
-  if (reviewGradeFindingsAreDownstreamStagePressure(openFindings)) {
+  if (
+    reviewGradeFindingsAreDownstreamStagePressure(openFindings, {
+      targetAssetType: input.targetAssetType
+    })
+  ) {
     return Object.freeze([]);
   }
   if (openFindings.length === 0 && input.assessment.status === "passed") {

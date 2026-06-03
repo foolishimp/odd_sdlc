@@ -530,9 +530,13 @@ test("T-002 worker package and prompt carry declared product file targets", () =
     outcomeDirectives,
     /Declared product file targets are the exact product surface/u
   );
-  assert.match(outcomeDirectives, /one exact id per line/u);
+  assert.match(outcomeDirectives, /one exact canonical id per line/u);
   assert.match(outcomeDirectives, /do not rely on the report alone/u);
-  assert.match(outcomeDirectives, /Cargo\.lock, target\//u);
+  assert.match(
+    outcomeDirectives,
+    /Build\/test byproducts not listed as declared product targets must not be listed as materialized product files/u
+  );
+  assert.doesNotMatch(outcomeDirectives, /Cargo\.lock, target\//u);
   assert.doesNotMatch(prompt, /README\.md/u);
 });
 
@@ -739,7 +743,11 @@ test("T-157 product materialization prompt leaves execution evidence to evaluato
     outcomeDirectives,
     /Declared product file targets are the exact product surface/u
   );
-  assert.match(outcomeDirectives, /Cargo\.lock, target\//u);
+  assert.match(
+    outcomeDirectives,
+    /Build\/test byproducts not listed as declared product targets must not be listed as materialized product files/u
+  );
+  assert.doesNotMatch(outcomeDirectives, /Cargo\.lock, target\//u);
   assert.doesNotMatch(outcomeDirectives, /sdlc_worker_execution_evidence/u);
   assert.doesNotMatch(outcomeDirectives, /shardEvidence/u);
   assert.doesNotMatch(outcomeDirectives, /Prior defect:/u);

@@ -1127,7 +1127,7 @@ test("T-129 substrate boundary fails closed without ABG temporal identity fields
   );
 });
 
-test("T-129 consumes ABG liveness projection for activity reset without odd_sdlc liveness wrapper", () => {
+test("T-129 consumes ABG liveness projection without treating ledger writes as progress", () => {
   const { basis } = buildOddSdlcAbg37Basis({
     name: "liveness_reset",
     declarations: attrs()
@@ -1165,8 +1165,8 @@ test("T-129 consumes ABG liveness projection for activity reset without odd_sdlc
   assert.equal(expired.kind, "runtime_liveness_observer_projection");
   assert.equal(expired.leaseState, "inactivity_exceeded");
   assert.equal(expired.disposition.action, "retry");
-  assert.equal(reset.leaseState, "active");
-  assert.equal(reset.disposition.action, "continue_waiting");
+  assert.equal(reset.leaseState, "inactivity_exceeded");
+  assert.equal(reset.disposition.action, "retry");
   assert.equal(
     reset.lastActivity.activityRef,
     "ledger://odd-sdlc/t129/liveness-reset/reset"

@@ -537,8 +537,8 @@ function transformWorkerIoDisciplineLines(
     ]);
   }
   return Object.freeze([
-    "- Tool-profile contract: this planning transform process exposes bounded file tools rather than shell command helpers. Do not plan around jq, rg, cat, sed, head, tail, grep, git, Node, or shell pipelines unless the active tool list explicitly exposes command execution.",
-    "- Read cap: every Read tool call over JSON, Markdown, report, manifest, or source artifacts must set limit <=80; inspect only the lines needed for the current checklist row."
+    "- Tool-profile contract: this planning edge has a no-execution SDLC profile. Obey the active tool list; if command execution is visible in the worker runtime, use it only for bounded workspace-relative read-only inspection and never for product execution, build/test commands, framework/traversal commands, background jobs, or artifact writes.",
+    "- Read cap: every Read tool call or read-only command over JSON, Markdown, report, manifest, or source artifacts must inspect <=80 lines and only the lines needed for the current checklist row. Do not run unbounded recursive scans."
   ]);
 }
 
@@ -6740,8 +6740,15 @@ function componentRepairRowsForFailure(input: {
   readonly preferredTargetAssetType: string;
   readonly failureId: string;
   readonly evidenceRefs: readonly string[];
+  readonly currentOutputFile?: string | null;
 }): readonly SdlcComponentRepairScheduleRow[] {
   const paths = uniqueSorted([
+    ...(input.currentOutputFile !== undefined &&
+    input.currentOutputFile !== null &&
+    existsSync(input.currentOutputFile) &&
+    statSync(input.currentOutputFile).isFile()
+      ? [input.currentOutputFile]
+      : []),
     ...existingEvidencePaths({
       workspaceRoot: input.workspaceRoot,
       refs: input.evidenceRefs
@@ -6848,7 +6855,8 @@ function componentRepairReentryPlanForReason(input: {
     workspaceRoot: input.manifest.workspaceRoot,
     preferredTargetAssetType: input.dossier.targetAssetType,
     failureId,
-    evidenceRefs
+    evidenceRefs,
+    currentOutputFile: input.manifest.outputFile
   })[0];
   if (row === undefined) {
     return null;
@@ -6920,6 +6928,101 @@ function retryGapReasonDiagnosticText(reason: SdlcPostflightGapReason): string {
   return reason.blockingReason.detail ?? reason.reason;
 }
 
+function isCurrentEdgeDownstreamTestPressure(input: {
+  readonly manifest: Pick<SdlcWorkerHandoffManifest, "targetAssetType">;
+  readonly text: string;
+}): boolean {
+  const text = decodedScopeRef(input.text).toLowerCase();
+  if (input.manifest.targetAssetType === "component_code_surface") {
+    return (
+      text.includes("test_overlap_missing") &&
+      (text.includes("component_test_surface") ||
+        text.includes("test-execution") ||
+        text.includes("test execution") ||
+        text.includes("npm test") ||
+        text.includes("generated test"))
+    );
+  }
+  if (input.manifest.targetAssetType === "component_test_surface") {
+    return (
+      text.includes("execution_environment") &&
+      (text.includes("execution evidence") ||
+        text.includes("execution_result_surface") ||
+        text.includes("runtime_execution_surface") ||
+        text.includes("test-execution") ||
+        text.includes("test execution") ||
+        text.includes("npm test"))
+    );
+  }
+  return false;
+}
+
+function downstreamStagePressurePromptBoundaryLine(
+  manifest: Pick<SdlcWorkerHandoffManifest, "targetAssetType">
+): string {
+  if (manifest.targetAssetType === "component_code_surface") {
+    return "- Continue with this edge's declared product targets only. Do not materialize downstream test or execution artifacts on component_code_surface.";
+  }
+  if (manifest.targetAssetType === "component_test_surface") {
+    return "- Continue with this edge's declared product targets only. Do not materialize downstream execution-result or runtime-execution artifacts on component_test_surface.";
+  }
+  return "- Continue with this edge's declared product targets only. Do not materialize downstream-stage artifacts on this edge.";
+}
+
+function isComponentCodeDownstreamTestPressure(input: {
+  readonly manifest: Pick<SdlcWorkerHandoffManifest, "targetAssetType">;
+  readonly text: string;
+}): boolean {
+  return (
+    input.manifest.targetAssetType === "component_code_surface" &&
+    isCurrentEdgeDownstreamTestPressure(input)
+  );
+}
+
+function isComponentCodeDownstreamTestGapReason(input: {
+  readonly manifest: Pick<SdlcWorkerHandoffManifest, "targetAssetType">;
+  readonly reason: SdlcPostflightGapReason;
+}): boolean {
+  return (
+    input.manifest.targetAssetType === "component_code_surface" &&
+    isComponentCodeDownstreamTestPressure({
+      manifest: input.manifest,
+      text: [
+        input.reason.reason,
+        input.reason.blockingReason.message,
+        input.reason.blockingReason.detail ?? ""
+      ].join(" ")
+    })
+  );
+}
+
+function isComponentTestDownstreamExecutionPressure(input: {
+  readonly manifest: Pick<SdlcWorkerHandoffManifest, "targetAssetType">;
+  readonly text: string;
+}): boolean {
+  return (
+    input.manifest.targetAssetType === "component_test_surface" &&
+    isCurrentEdgeDownstreamTestPressure(input)
+  );
+}
+
+function isComponentTestDownstreamExecutionGapReason(input: {
+  readonly manifest: Pick<SdlcWorkerHandoffManifest, "targetAssetType">;
+  readonly reason: SdlcPostflightGapReason;
+}): boolean {
+  return (
+    input.manifest.targetAssetType === "component_test_surface" &&
+    isComponentTestDownstreamExecutionPressure({
+      manifest: input.manifest,
+      text: [
+        input.reason.reason,
+        input.reason.blockingReason.message,
+        input.reason.blockingReason.detail ?? ""
+      ].join(" ")
+    })
+  );
+}
+
 function shouldConsolidateRetryGapReason(reason: SdlcPostflightGapReason): boolean {
   return (
     reason.reasonClass === "assurance" &&
@@ -6968,11 +7071,24 @@ function consolidatedResidualPressureReason(
 }
 
 function retryPromptGapReasonsForDossier(
+  manifest: SdlcWorkerHandoffManifest,
   dossier: SdlcPostflightGapDossier
 ): readonly SdlcPostflightGapReason[] {
   const residualPressureReasons: SdlcPostflightGapReason[] = [];
   const passthroughReasons: SdlcPostflightGapReason[] = [];
   for (const reason of dossier.reasons) {
+    if (
+      isComponentCodeDownstreamTestGapReason({
+        manifest,
+        reason
+      }) ||
+      isComponentTestDownstreamExecutionGapReason({
+        manifest,
+        reason
+      })
+    ) {
+      continue;
+    }
     if (shouldConsolidateRetryGapReason(reason)) {
       residualPressureReasons.push(reason);
     } else {
@@ -6980,7 +7096,10 @@ function retryPromptGapReasonsForDossier(
     }
   }
   if (residualPressureReasons.length <= 1) {
-    return dossier.reasons;
+    return Object.freeze([
+      ...residualPressureReasons,
+      ...passthroughReasons
+    ]);
   }
   return Object.freeze([
     consolidatedResidualPressureReason(dossier, residualPressureReasons),
@@ -7011,7 +7130,7 @@ function retryRepairInstructionsForContext(
 ): readonly SdlcWorkerRetryRepairInstruction[] {
   const instructions: SdlcWorkerRetryRepairInstruction[] = [];
   for (const dossier of manifest.retryContext.priorGapDossiers) {
-    for (const reason of retryPromptGapReasonsForDossier(dossier)) {
+    for (const reason of retryPromptGapReasonsForDossier(manifest, dossier)) {
       const repairReentryPlan = componentRepairReentryPlanForReason({
         manifest,
         dossier,
@@ -7155,6 +7274,8 @@ function compactComponentDepthDirective(
         `repairRows[].repairTarget must be one of: ${SDLC_COMPONENT_REPAIR_TARGETS.join(", ")}.`,
         `repairRows[].attributionConfidence must be one of: ${SDLC_COMPONENT_ATTRIBUTION_CONFIDENCE.join(", ")}.`,
         "Use admitted component test qualification rows, component execution failure rows, test execution evidence, and component realization evidence to bind each repair row to the smallest owned component/test/source subsurface.",
+        "For component_repair_schedule_surface, represent non-repair component-depth fields as payload.componentTopologyRows=[], payload.componentRealizationRows=[], payload.testComponentTopologyRows=[], payload.componentTestRows=[], payload.componentTestQualificationRows=[], payload.componentExecutionFailureRegister=null, and payload.releaseDepthParity=null.",
+        "Do not copy topology, realization, test-topology, test-realization, or qualification rows from source authority surfaces into this repair-schedule payload; cite those surfaces only through schedule evidenceRefs or repair row refs.",
         "Set attributionConfidence=high only when the row binds concrete failed testcaseIds, componentIds, requirementIds, sourceRefs or testRefs, and execution evidence refs. If that evidence is absent or contradictory, use scheduleStatus=triage_gap with evidenceRefs that name the missing authority instead of emitting medium-confidence repair rows.",
         "On re-entry after component_repair_schedule_not_high_confidence or component_repair_schedule_triage_gap, treat the gap as the work queue: bind the row to concrete evidence and emit high-confidence repair rows when the evidence exists; otherwise preserve explicit residual pressure instead of pretending closure.",
         "Do not infer ecosystem-specific root cause as framework law. The schedule owns generic repair depth: failed executable obligation -> component/test/source ownership -> bounded repair target -> evidence refs."
@@ -7225,7 +7346,7 @@ function compactWorkspaceSpecSurfaceDirective(
     manifest.targetAssetType !== "uat_testcases_surface" &&
     manifest.targetAssetType !== "testcase_authority_surface"
   ) {
-    return "Use evaluator-supplied construction hints as shape guidance for the workspace specification surface; write the Markdown authority surface at the declared output path. The construction hints are construction/disambiguation support, not product-closure authority, and their protocol metadata must not be rendered into the artifact.";
+    return "Use evaluator-supplied construction hints only as shape guidance; write the Markdown authority surface at the declared output path and omit protocol metadata.";
   }
   const trivialProductDirective =
     manifestRequiresTrivialDegenerateProduct(manifest) &&
@@ -7337,16 +7458,13 @@ function tenantStackAuthorityRepairDirectives(input: {
   );
   return Object.freeze([
     `Tenant-stack authority repair target: ${target}.`,
-    "When tenant_stack_authority_missing or tenant_stack_authority_invalid is present, use the generic stack reconciliation protocol before product-file edits or tenant-stack repairs.",
-    "Stack reconciliation protocol: inspect tenant stack authority surfaces, accepted bootstrap/design/ADR refs that mention stack/runtime/file targets/execution, declared product file targets and roles, declared build/test/proof commands, and current worksite execution-context files that affect how those commands run.",
-    "Record a compact stack reconciliation decision in the returned artifact or evidence: declared stack, relevant product targets, declared command, observed conflict or underdefinition, chosen repair surface as tenant authority, product files, both, or blocked/re-entry, and proof command or bounded probe result when executable.",
-    "Do not repair tenant-stack authority from an untested local assumption when the declared command can be run or probed; run the declared command or bounded probe first, or record why execution is unavailable.",
-    "Do not create undeclared build/config files merely to make an inferred ecosystem default true; repair the tenant authority surface when this edge permits it, or report blocked/re-entry pressure.",
-    "Do not embed tenant-stack authority inside component_depth_register, target-carrier payloads, worker reports, or runtime archives; the evaluator reads it from the tenant spec authority surface.",
-    "If the initial bootstrap names or implies stack-specific construction pressure and the tenant stack is missing or underdefined, create or repair the tenant TECH_STACK/TESTING_TECH_STACK authority from bootstrap facts and ADR/design decisions before materializing executable product files.",
-    "Populate the tenant stack authority from current product/context/bootstrap facts and ADR/design decisions such as language, runtime/module system, build tool, build execution contract, test runner, test syntax, and test execution contract; declare buildConfigTargets or testBuildConfigTargets only when those config files are declared or materialized.",
-    "If bootstrap or ADR context implies concrete tool execution assumptions, put them in TECH_STACK.json or TESTING_TECH_STACK.json as tenant-owned executionEnvironment/toolEnvironment declarations: host/cache policy, workspaceLocalDirectories, and environmentVariables. Core SDLC consumes those declarations generically; it must not supply ecosystem-specific hidden defaults.",
-    "Tenant workspaceLocalDirectories are transient tool/cache/work directories only. Do not list declared product source, test, build_config, design, or documentation target directories as tool-local/byproduct directories."
+    "Tenant-stack reconciliation: before product-file edits, inspect stack authority, bootstrap/design/ADR refs, declared product targets/roles, commands, and execution-context files.",
+    "Apply the generic stack reconciliation protocol before product-file edits or tenant-stack repairs: inspect tenant stack authority surfaces, accepted bootstrap/design/ADR refs, declared product targets/roles, commands, and execution-context files.",
+    "If the initial bootstrap names or implies stack-specific construction pressure, create or repair the tenant TECH_STACK/TESTING_TECH_STACK authority from bootstrap facts and ADR/design decisions.",
+    "Record a compact stack reconciliation decision: declared stack, conflict/underdefinition, repair surface (tenant authority, product files, both, or blocked), and proof command/probe result when executable.",
+    "Do not repair tenant-stack authority from an untested local assumption. Do not rely on ecosystem defaults; repair TECH_STACK/TESTING_TECH_STACK from current authority when this edge permits it, otherwise report blocked/re-entry pressure.",
+    "Do not embed tenant-stack authority inside component_depth_register, target carriers, worker reports, or runtime archives; keep tenant-stack authority in tenant spec files only.",
+    "Execution-environment facts such as host/cache policy, workspaceLocalDirectories, and environmentVariables belong in TECH_STACK/TESTING_TECH_STACK; workspaceLocalDirectories are transient tool/cache/work dirs, not product target dirs."
   ]);
 }
 
@@ -7354,7 +7472,7 @@ function retryDefectDirectivesForWorker(
   manifest: SdlcWorkerHandoffManifest
 ): readonly string[] {
   const reasons = manifest.retryContext.priorGapDossiers.flatMap((dossier) =>
-    dossier.reasons.map((reason) => {
+    retryPromptGapReasonsForDossier(manifest, dossier).map((reason) => {
       const detail = workerFacingDiagnosticText(
         manifest,
         reason.blockingReason.detail ?? reason.reason
@@ -7409,7 +7527,7 @@ function outcomeDirectivesForWorker(
           `Target carrier construction template ref: ${manifest.targetCarrierProjection.constructionTemplateRef}; exact carrier admission remains evaluator-owned.`
         ]
       : [
-          "Target-carrier protocol is evaluator-owned for this edge; do not render kind, contractRef, contractDigest, payload path, construction-template refs, targetCarrierProjection, or selected-target-carrier metadata in the output artifact."
+          "Target-carrier protocol is evaluator-owned; do not render carrier kind/contract/digest/template/projection metadata."
         ];
   const directives: string[] = [
     `Outcome: ${manifest.graphFunctionName} -> ${manifest.targetAssetType}.`,
@@ -7423,7 +7541,7 @@ function outcomeDirectivesForWorker(
           `Write output artifact: ${workerFacingPath(manifest, manifest.outputFile)}.`,
           ...(manifest.outputFile.toLowerCase().endsWith(".md")
             ? [
-                "Markdown output artifact: materialize target file with bounded editor ops. Read listed refs first. If the file exists, do not use the Claude Write tool for whole-file replacement; use targeted edits. Keep narration compact; use stable refs instead of copied authority text."
+                "Markdown output artifact: read listed refs first, use bounded targeted edits for existing files, and cite stable refs instead of copied authority text."
               ]
             : [])
         ]),
@@ -7550,7 +7668,7 @@ function outcomeDirectivesForWorker(
       "Do not use /tmp or any outside-workspace path for temporary build/test evidence; write transient logs under allowed write roots.",
       "Allowed write roots are workspace-root-relative unless already absolute; if you change cwd into a tenant or shard directory, resolve allowed write roots to workspace-root absolute paths before writing logs.",
       "Do not create or modify product files outside the declared product file targets and allowed shared build roots for this edge.",
-      "Before executable product materialization or repair, read the tenant technology-stack authority under the selected output root. If bootstrap names or implies a stack but the stack authority is absent or underdefined, create or repair TECH_STACK/TESTING_TECH_STACK from bootstrap facts and ADR/design decisions. If the stack, ADRs, or bootstrap facts do not define required tool execution assumptions, repair the tenant authority surface instead of relying on hidden SDLC defaults.",
+      "Before executable product materialization or repair, read tenant stack authority under the selected output root; if missing, invalid, or underdefined, use the generic stack reconciliation protocol and repair tenant authority instead of hidden SDLC defaults.",
       "Apply requirementTraceObligationIds as the prompt-visible required product-file requirement tag set for this edge.",
       "On retry, requirement ids named by Current evaluated gaps are also admissible repair tags even when they are omitted from the prompt-limited requirementTraceObligationIds list; do not remove a current evaluated gap id solely because it is absent from that list.",
       "Do not expand product file tags from traversal_intent_package alone; it is audit context for the broader graph.",
@@ -7961,7 +8079,8 @@ export function constructWorkerConstructionBrief(input: {
     currentState: Object.freeze({
       workspaceRoot: workerFacingPath(input.manifest, input.manifest.workspaceRoot),
       archiveRoot: workerFacingPath(input.manifest, input.manifest.archiveRoot),
-      authorityRefs,
+      authorityRefs: promptSourceRefs(authorityRefs),
+      omittedAuthorityRefCount: omittedPromptSourceRefCount(authorityRefs),
       authorityIndex,
       tenantStackAuthorityRefs: tenantToolEnvironment.sourceRefs,
       tenantToolEnvironment,
@@ -8532,7 +8651,17 @@ function currentEvaluatedGapPromptLines(
   if (dossier === undefined) {
     return Object.freeze([]);
   }
-  const promptReasons = retryPromptGapReasonsForDossier(dossier);
+  const promptReasons = retryPromptGapReasonsForDossier(manifest, dossier);
+  if (promptReasons.length === 0 && dossier.reasons.length > 0) {
+    return Object.freeze([
+      "",
+      "Current evaluated gaps:",
+      "- Prior gap reasons are downstream-stage pressure for a later graph edge; no current-edge repair work items are assigned from that dossier.",
+      `- gapDossierRef: ${workerFacingRef(manifest, dossier.currentGapDossierRef)}`,
+      `- evaluated edge=${dossier.edgeName}; target=${dossier.targetAssetType}; retryEligible=${dossier.retryEligible}; reasonCount=0; rawReasonCount=${dossier.reasons.length}`,
+      downstreamStagePressurePromptBoundaryLine(manifest)
+    ]);
+  }
   const promptDossier = Object.freeze({
     ...dossier,
     reasons: promptReasons
@@ -8680,7 +8809,7 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     "- obligations.inlineRequirementPressureRows typed requirement work queue.",
     "- obligations.requirementTraceObligationIds.",
     "- retry/gap/repair rows when present.",
-    "- computeSubworkstreamPolicy: Phase 1 parent-agent subworkstream permission and non-authority rules.",
+    "- computeSubworkstreamPolicy permission and non-authority rules.",
     "- traversalIntentPackage ref."
   ];
   const workerPackageFieldLines = [
@@ -8737,24 +8866,23 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     "",
     "Terse axioms:",
     "- Apply worker_construction_brief.json as the single prompt source carrier.",
-    "- Archive package files and manifests are replay/audit projections. Evaluated gaps cite needed diagnostics.",
+    "- Archive package files and manifests are replay/audit projections.",
     "- Build a Requirement/Authority/Asset Checklist from requirements, target rows, expected artifacts, and evaluated gaps.",
-    "- Do not return success while required checklist rows are unmapped. Keep Markdown proportional: grouped counts plus high-signal samples for broad sets by source/domain; do not list every id unless the target is a requirement-surface Trace Index or another admitted traceability/register surface that explicitly requires exact id rows.",
+    "- Do not return success while required checklist rows are unmapped. Keep Markdown proportional: use grouped counts plus high-signal samples, and do not list every id unless the target is a requirement-surface Trace Index or admitted traceability/register surface requiring exact rows.",
     ...requirementSurfaceTraceAxiomLines,
     ...ioDisciplineLines,
-    "- For existing output, use targeted Edit/small operations; no full old/new artifact dumps.",
+    "- For existing output, use targeted Edit operations; do not use the Claude Write tool for whole-file replacement.",
     "- Apply tenantToolEnvironment; do not run tools the tenant disables.",
-    "- You may use agent-internal subagents or parallel workstreams as optional local compute strategy; split only from admitted work-plan, dependency, target-carrier, tranche, authority, and obligation refs.",
+    "- You may use agent-internal subagents or parallel workstreams from admitted work-plan, dependency, target-carrier, tranche, authority, and obligation refs.",
     `- If used, update ${workerFacingPath(manifest, manifest.subworkstreamManifestFile)}; otherwise leave the default not-started manifest honest.`,
-    "- Subworkstreams are not ABG branches. They are observation only: no ABG events, ledgers, closure, traversal, consequence, or branch leases; parent owns merge.",
-    "- Do not inspect odd_sdlc framework source code or installed runtime source to infer carrier schemas.",
-    "- Do not render target-carrier protocol fields unless an outcome directive asks for a structured carrier.",
-    "- Read boundary: use only workspace-relative paths; do not read/cite/copy sibling sandboxes, historical test_runs, home memory, /tmp, or outside-workspace absolute paths.",
-    "- Control boundary: do not run odd-sdlc-ts/abiogenesis-ts/genesis-ts/start/gaps/analyze-run/install/traversal/resume.",
-    "- Do not spawn an odd_sdlc/ABG worker, start another traversal, or leave child processes running; subworkstreams stay under this parent transform turn.",
+    "- Subworkstreams are not ABG branches; observation only; parent merges.",
+    "- Do not inspect odd_sdlc framework source code to infer carrier schemas.",
+    "- Do not render target-carrier protocol fields unless asked for a structured carrier.",
+    "- Read boundary: use only workspace-relative paths; no sibling sandboxes, historical test_runs, home memory, /tmp, or outside-workspace absolute paths.",
+    "- Control boundary: do not run odd-sdlc-ts, abiogenesis-ts, genesis-ts, start, gaps, analyze-run, install, traversal, or resume.",
+    "- Do not spawn an odd_sdlc/ABG worker, start another traversal, or leave child processes running; stay under this parent transform turn.",
     "- Write only the contracted output/product artifacts, then exit; the framework evaluates the artifact after this process exits.",
-    "- Do not inspect or act on sibling operator-run directories.",
-    "- Do not add local axiom variants from this launch frame.",
+    "- Do not inspect sibling operator-run dirs or add local axiom variants.",
     "",
     "Outcome directives:",
     ...outcomeDirectives,

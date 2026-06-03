@@ -261,8 +261,8 @@ Result:
 
 ### 2026-06-02 T-189 Runtime-Authority Carry-Forward
 
-Status: landed source + focused proof against ABG 3.9.0-rc.6; T-189 is
-completed with proof passed.
+Status: landed source + focused proof against the ABG 3.9.0 release-candidate
+line; T-189 is completed with proof passed.
 
 Final data_mapper-lite proof archive:
 
@@ -277,7 +277,8 @@ Bug ledger disposition:
 - SDLC-owned fixed bugs remain in T-189: worker tool boundary, component-depth
   carrier shape, bootstrap runtime/control path exclusion, and downstream
   obligation role filtering.
-- ABG-shaped bugs are linked to ABG T-147 and carried forward through RC6:
+- ABG-shaped bugs are linked to ABG T-147 and carried forward through the
+  release-candidate line:
   fresh retry context projection, target-carrier output admission before
   closure/transition, and admitted output-authority projection for source
   assets.
@@ -417,9 +418,9 @@ Result:
 ### 2026-06-03 PTY Supervisor And Prompt-Profile Hardening
 
 Status: landed source + focused proof + clean PTY hello-world integration proof
-plus ABG release carry-forward. ABG `3.9.0-rc.8` is cut and tagged
-`v3.9.0-rc.8`; odd_sdlc now pins the RC8 release snapshot tarball that contains
-the supervisor and owner-exit cleanup changes.
+plus ABG release carry-forward. ABG `3.9.0-rc.9` is cut and tagged
+`v3.9.0-rc.9`; odd_sdlc now pins the RC9 release snapshot tarball that contains
+the supervisor, owner-exit cleanup, and retry-frontier coverage fixes.
 
 ABG/runtime fixes:
 
@@ -460,11 +461,72 @@ SDLC fixes:
   - shell-capable transform edges receive the command IO cap;
   - non-shell transform edges receive explicit `Read limit <=80` discipline and
     no shell/JQ/sed/cat guidance.
-- Evaluator prompts are profile-aware:
-  - default review-grade/design-depth evaluator workers are `Read,Write`;
-  - they receive explicit `Read limit <=80` discipline;
-  - they are not told to spawn child processes, execute local commands, or use
-    shell helpers.
+- Evaluator prompts are active-tool-list aware:
+  - when command execution is unavailable, review-grade/design-depth evaluators
+    use bounded file reads/writes;
+  - when command execution is visible in the worker runtime, it is bounded to
+    workspace-relative read-only inspection unless an execution probe is
+    explicitly named;
+  - evaluators are not told to run product, build, test, framework, traversal,
+    background, or mutation commands.
+
+### 2026-06-03 Data-Mapper Lite Resume And ABG RC9 Carry-Forward
+
+Status: same-sandbox data_mapper-lite resume converged after one SDLC prompt
+bug and one ABG retry-frontier replay bug were fixed. ABG `3.9.0-rc.9` is cut
+and tagged `v3.9.0-rc.9`; odd_sdlc now pins the RC9 release snapshot tarball.
+
+Active sandbox preserved and resumed:
+
+`build_tenants/typescript/test_env/test_runs/t188_data_mapper_lite_lifecycle_live/20260602T194859322Z_pid79502/workspace`
+
+Final observed operator run:
+
+`.ai-workspace/runtime/odd_sdlc/operator-runs/20260603T023630429Z_pid54357`
+
+Final observed state:
+
+- `operator_summary.status=converged`
+- edge: `prepare_release_surface`
+- residual pressure: clear
+- closure decision: `close`
+- postflight: `passed`
+- assurance: `close_allowed`
+- next action: `disposition://close`
+
+Bug classifications and fixes:
+
+- SDLC prompt/tenant-authority bug: `component_repair_schedule_surface` prompt
+  did not explicitly force non-repair component-depth fields empty/null, so the
+  worker copied unrelated topology, realization, test, and qualification rows
+  into a no-repair schedule. Fixed in `plugins/transform/launch_contract.ts`;
+  regression added in `test_t066_product_materialization_contract.test.mjs`.
+- ABG/GTL runtime bug: a `retry_attempt_stopped` event with
+  `observedAttemptCount=0` was replayed as retry attempt coverage. ABG RC9 now
+  treats zero-attempt stop/escalation events as admitted retry evidence with
+  `attemptIndex=null`, not fake attempt coverage. Fixed in ABG
+  `retry_frontier.ts`; regression added in ABG
+  `test_t098_retry_frontier_projection.test.mjs`.
+
+Proof run:
+
+```bash
+npm run build:semantic
+node --test \
+  test_env/tests/test_t066_product_materialization_contract.test.mjs \
+  test_env/tests/test_t115_component_execution_failure_repair_flow.test.mjs \
+  test_env/tests/test_b070_claude_worker_argv.test.mjs \
+  test_env/tests/test_t182_fp_review_grade_edge_fulfillment.test.mjs \
+  test_env/tests/test_t187_fp_evaluator_prompt_boundary.test.mjs \
+  test_env/tests/test_t188_data_mapper_live_boundary_guard.test.mjs \
+  test_env/tests/test_t188_fp_depth_iteration_closure.test.mjs
+```
+
+Result:
+
+- `build:semantic`: passed.
+- Focused SDLC regression pack: passed, 161/161.
+- Live data_mapper-lite same-sandbox resume: converged.
 - Framework-smoke overlay now routes the terminal product target through the
   component-code producer edge so the smoke lane must dispatch code
   materialization instead of stopping after design evidence.
@@ -565,3 +627,30 @@ Defects found during the live audit and fixed before the clean proof:
   shell-profile predicates that could drift.
 - The framework-smoke graph could stop after design evidence without dispatching
   the component-code edge.
+
+Additional data_mapper-lite prompt-tool finding:
+
+- The corrected GPT-5.5/Codex data_mapper-lite run showed that Codex exposes
+  command execution even on edges whose SDLC profile is no-execution or
+  evaluator read/write. The old prompt text therefore created a second surface
+  of truth: it claimed `Read,Write` or bounded file tools while the active tool
+  list exposed shell execution.
+- Classification: prompt/runtime tool-profile honesty bug, not a generated
+  data_mapper product defect.
+- Fix: transform prompts now say no-execution planning edges may use visible
+  commands only for bounded workspace-relative read-only inspection, never for
+  product execution, build/test, framework/traversal, background jobs, or
+  artifact writes. Evaluator prompts now say to obey the active tool list and
+  bound visible command execution to read-only inspection unless an explicit
+  execution probe is named.
+- Focused proof:
+
+```bash
+npm run build:semantic
+node --test test_env/tests/test_t187_fp_evaluator_prompt_boundary.test.mjs \
+  test_env/tests/test_t182_fp_review_grade_edge_fulfillment.test.mjs \
+  test_env/tests/test_t188_data_mapper_live_boundary_guard.test.mjs \
+  test_env/tests/test_t188_fp_depth_iteration_closure.test.mjs
+```
+
+- Result: build passed; focused prompt/depth/live-boundary pack passed, 53/53.

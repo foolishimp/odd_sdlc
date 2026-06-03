@@ -41,6 +41,12 @@ const launchContractSource = readFileSync(
   ),
   "utf8"
 );
+const designDepthRegisterSource = readFileSync(
+  fileURLToPath(
+    new URL("../../code/src/operator/design_depth_register.ts", import.meta.url)
+  ),
+  "utf8"
+);
 const installedOperatorSource = readFileSync(
   fileURLToPath(
     new URL("../../code/src/operator/installed_operator.ts", import.meta.url)
@@ -315,11 +321,11 @@ test("T-187 transform prompts bound terminal output for large authority reads", 
   );
   assert.match(
     launchContractSource,
-    /Tool-profile contract: this planning transform process exposes bounded file tools/u
+    /Tool-profile contract: this planning edge has a no-execution SDLC profile/u
   );
   assert.match(
     launchContractSource,
-    /every Read tool call over JSON, Markdown, report, manifest, or source artifacts must set limit <=80/u
+    /every Read tool call or read-only command over JSON, Markdown, report, manifest, or source artifacts must inspect <=80 lines/u
   );
   assert.match(
     launchContractSource,
@@ -424,7 +430,7 @@ test("T-187 review-grade evaluator prompt projects tenant-declared tool boundari
   );
   assert.match(
     evaluatorPromptSource,
-    /Under the default Read\/Write evaluator profile, treat tenant environment variables as declared context only/u
+    /When the active evaluator profile is read\/write-only, treat tenant environment variables as declared context only/u
   );
   assert.match(
     evaluatorPromptSource,
@@ -440,7 +446,7 @@ test("T-187 review-grade evaluator prompt projects tenant-declared tool boundari
   );
   assert.match(
     evaluatorPromptSource,
-    /Under the default Read\/Write evaluator profile/u
+    /if command execution is visible, use it only under the explicit execution-capable rules/u
   );
   assert.match(
     evaluatorPromptSource,
@@ -489,7 +495,8 @@ test("T-187 review-grade prompt renders tenant execution environment details", (
   assert.match(prompt, /Tenant environment variables[^:]*: SBT_OPTS, COURSIER_CACHE/u);
   assert.match(prompt, /Tenant-declared environment variables are authority metadata/u);
   assert.match(prompt, /inherit the process environment unchanged/u);
-  assert.match(prompt, /Under the default Read\/Write evaluator profile/u);
+  assert.match(prompt, /When the active evaluator profile is read\/write-only/u);
+  assert.match(prompt, /if command execution is visible, use it only under the explicit execution-capable rules/u);
   assert.match(
     prompt,
     /do not assign any name listed in currentState\.tenantToolEnvironment\.environmentVariableNames/u
@@ -552,12 +559,50 @@ test("T-188 evaluator prompts keep generated clauses line-inspectable", () => {
 
   assert.equal(maxLineLength(prompt) <= 1000, true);
   assert.doesNotMatch(prompt, /At minimum, verify every contentRows/u);
-  assert.match(prompt, /default design-depth evaluator process exposes only Read and Write/u);
+  assert.match(prompt, /Tool-profile contract: obey the active tool list/u);
+  assert.match(prompt, /bounded workspace-relative read-only inspection/u);
+  assert.match(prompt, /do not run product, build, test, framework, traversal, or background commands/u);
   assert.match(prompt, /must set limit <=80/u);
   assert.doesNotMatch(prompt, /Prefer bounded Node summaries/u);
   assert.doesNotMatch(prompt, /summarize selected keys with Node/u);
   assert.doesNotMatch(prompt, /run Node snippets/u);
   assert.doesNotMatch(prompt, /run a local JSON check/u);
+});
+
+test("T-188 design-depth evaluator prompt publishes validator row-kind literals", () => {
+  const prompt = designDepthFpEvaluatorPrompt({
+    manifest: {
+      outputFile:
+        "build_tenants/hello_world_javascript/design/adrs/ADR-002-implementation-design-surface.md"
+    },
+    manifestPath: "handoff_manifest.json",
+    governanceRef: "config://test",
+    governancePath: "config/work-category-governance/design_build.md",
+    constructionBriefPath: "worker_construction_brief.json",
+    invocationPackagePath: "worker_invocation_package.json",
+    workerReportPath: "worker_result_report.json",
+    workerReportSummaryLines: ["status=passed", "obligations=5"],
+    contentRegisterPath: "design_depth_fp_evaluator_content_register.json",
+    registerProjectionPath: "design_depth_fp_evaluator_register.json",
+    subworkstreamManifestPath: "evaluate_compute_subworkstream_manifest.json",
+    selectedCompositionRef: "composition://t188/selected",
+    selectedCompositionDigest: "sha256:t188",
+    selectedCompositionSelectionRef: "selection://t188",
+    selectedRegimeBindingRef: null,
+    tenantToolEnvironment: null
+  });
+  const validatorKindLiterals = [
+    ...designDepthRegisterSource.matchAll(/if \(kind !== "([^"]+)"\)/gu)
+  ].map((match) => match[1]);
+
+  assert.notEqual(validatorKindLiterals.length, 0);
+  for (const literal of validatorKindLiterals) {
+    assert.match(
+      prompt,
+      new RegExp(literal.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"),
+      `missing design-depth validator kind literal ${literal}`
+    );
+  }
 });
 
 test("T-188 implementation-design prompt keeps design-depth directive sectioned", () => {
@@ -627,7 +672,38 @@ test("T-188 worker prompt distinguishes current-edge materialization from downst
   );
 });
 
-test("T-187 review-grade evaluator prompt matches the Read/Write tool profile", () => {
+test("T-188 retry prompt filters downstream test and execution pressure", () => {
+  assert.match(
+    launchContractSource,
+    /function isComponentCodeDownstreamTestPressure/u
+  );
+  assert.match(
+    launchContractSource,
+    /function isComponentTestDownstreamExecutionPressure/u
+  );
+  assert.match(
+    launchContractSource,
+    /Prior gap reasons are downstream-stage pressure for a later graph edge/u
+  );
+  assert.match(
+    launchContractSource,
+    /Do not materialize downstream test or execution artifacts on component_code_surface/u
+  );
+  assert.match(
+    launchContractSource,
+    /Do not materialize downstream execution-result or runtime-execution artifacts on component_test_surface/u
+  );
+  assert.match(
+    launchContractSource,
+    /retryPromptGapReasonsForDossier\(manifest, dossier\)/u
+  );
+  assert.match(
+    launchContractSource,
+    /return Object\.freeze\(\[\s*\.\.\.residualPressureReasons,\s*\.\.\.passthroughReasons\s*\]\)/u
+  );
+});
+
+test("T-187 review-grade evaluator prompt matches the active tool-list contract", () => {
   const prompt = reviewGradeEdgeFulfillmentPrompt({
     manifest: {
       graphFunctionName: "derive_component_code_surface",
@@ -652,7 +728,21 @@ test("T-187 review-grade evaluator prompt matches the Read/Write tool profile", 
   });
 
   assert.equal(maxLineLength(prompt) <= 1000, true);
-  assert.match(prompt, /default review-grade evaluator process exposes only Read and Write/u);
+  assert.match(prompt, /Tool-profile contract: obey the active tool list/u);
+  assert.match(prompt, /bounded workspace-relative read-only inspection/u);
+  assert.match(prompt, /do not run product, build, test, framework, traversal, background, or mutation commands/u);
+  assert.match(
+    prompt,
+    /On component_code_surface, do not mark downstream test files or npm test execution as test_overlap_missing/u
+  );
+  assert.match(
+    prompt,
+    /On component_test_surface, do not make admitted test-execution evidence a same-edge blocker/u
+  );
+  assert.match(
+    prompt,
+    /mark those requirement findings partial with failureClass wrong_stage/u
+  );
   assert.match(prompt, /must set limit <=80/u);
   assert.doesNotMatch(prompt, /short local script/u);
   assert.doesNotMatch(prompt, /Node sidecar script/u);

@@ -524,3 +524,95 @@ test("T-173 release-depth parity retires stale repair schedule after newer passi
   });
   assert.equal(gate.blockingPostflight ?? null, null);
 });
+
+test("T-188 current execution reports feed testcase-bound qualification projection", () => {
+  const root = workspace();
+  const componentTestHandoff = manifest(root, "derive_component_test_surface");
+  writeRegister(componentTestHandoff, {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_test_surface",
+    componentTopologyRows: [],
+    componentRealizationRows: [],
+    testComponentTopologyRows: [],
+    componentTestRows: [
+      {
+        kind: "sdlc_component_test_realization_row",
+        testClassId: "CoreSpec",
+        relativePath: "src/test/scala/cdme/CoreSpec.scala",
+        testcaseIds: ["TC-DM-001"],
+        componentIds: ["cdme-core"],
+        requirementIds: ["REQ-T115-001"],
+        shardId: "test-shard-01-cdme-core"
+      }
+    ],
+    componentTestQualificationRows: [],
+    componentExecutionFailureRegister: null,
+    componentRepairSchedule: null,
+    releaseDepthParity: null
+  });
+
+  const executionHandoff = manifest(root, "derive_test_execution_result_surface");
+  const executionEvidence = {
+    kind: "sdlc_worker_execution_evidence",
+    lane: "test",
+    command: "sbt test",
+    status: "succeeded",
+    reportRefs: [
+      `file://${executionHandoff.archiveRoot}/installed_operator_execution/passed.summary.json`
+    ],
+    testsObserved: 1,
+    passedCount: 1,
+    failedCount: 0,
+    shardEvidence: [
+      {
+        kind: "sdlc_worker_execution_shard_evidence",
+        shardId: "test-shard-01-cdme-core",
+        moduleName: "cdme-core",
+        lane: "test",
+        command: "sbt \"cdme-core/test\"",
+        status: "succeeded",
+        reportRefs: [
+          `file://${executionHandoff.archiveRoot}/installed_operator_execution/passed.summary.json`
+        ],
+        testsObserved: 1,
+        passedCount: 1,
+        failedCount: 0
+      }
+    ]
+  };
+  mkdirSync(path.dirname(executionHandoff.reportFile), { recursive: true });
+  writeFileSync(
+    path.join(executionHandoff.archiveRoot, "handoff_manifest.json"),
+    `${JSON.stringify(executionHandoff, null, 2)}\n`,
+    "utf8"
+  );
+  writeFileSync(
+    executionHandoff.reportFile,
+    `${JSON.stringify({
+      ...reportFor(executionHandoff, "# test_execution_result_surface\n"),
+      projectionRole: "typed_fp_stage_projection",
+      authoritativeStageResultRef: pathToFileURL(executionHandoff.fpEvaluateResultFile).href,
+      executionEvidence,
+      executionEvidenceErrors: [],
+      subworkstreamManifest: {
+        kind: "sdlc_compute_subworkstream_manifest",
+        manifestVersion: "ts-compute-subworkstream-v1",
+        status: "not_started"
+      }
+    }, null, 2)}\n`,
+    "utf8"
+  );
+
+  const qualificationHandoff = manifest(root, "qualify_component_test_execution_surface");
+  writeDeclaredEdgeProjectionOutput({ manifest: qualificationHandoff });
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: qualificationHandoff.targetAssetType,
+    outputFile: qualificationHandoff.outputFile
+  });
+
+  assert.equal(admission.status, "admitted");
+  assert.equal(admission.register.componentTestQualificationRows.length, 1);
+  assert.equal(admission.register.componentTestQualificationRows[0].status, "passed");
+  assert.equal(admission.register.componentExecutionFailureRegister, null);
+});

@@ -453,13 +453,28 @@ test("T-172 installed operator executes no-dispatch edges without worker_run", a
     assert.equal(report.fpTransformResultRef, null, edgeName);
     assert.equal(report.fpTransformStatusSnapshot, null, edgeName);
     if (edgeName === "derive_test_execution_result_surface") {
+      assert.equal(report.executionEvidence, null, edgeName);
+      const projectedEvidence = JSON.parse(
+        readFileSync(outcome.manifest.outputFile, "utf8")
+      );
       assert.equal(
-        report.executionEvidence?.kind,
+        projectedEvidence.kind,
         "sdlc_worker_execution_evidence",
         edgeName
       );
-      assert.notEqual(report.executionEvidence?.status, "pending", edgeName);
+      assert.notEqual(projectedEvidence.status, "pending", edgeName);
       assert.equal(report.executionEvidenceErrors?.length ?? 0, 0, edgeName);
+      const declaredProjectionArtifact = JSON.parse(
+        readFileSync(
+          path.join(outcome.archiveRoot, "declared_edge_projection_artifact.json"),
+          "utf8"
+        )
+      );
+      assert.equal(
+        declaredProjectionArtifact.sourceFunction,
+        "consequence.edge_projection.writeDeclaredEdgeProjectionOutput",
+        edgeName
+      );
     }
 
     const closureDecision = JSON.parse(

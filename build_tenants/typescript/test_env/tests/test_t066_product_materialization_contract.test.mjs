@@ -8580,6 +8580,9 @@ test("T-171 repair schedule carrier is F_P-owned and ledger-evaluated", () => {
   const prompt = readFileSync(handoffFiles.promptPath, "utf8");
   assert.doesNotMatch(prompt, /Edge-policy projection output/u);
   assert.match(prompt, /Emit payload\.componentRepairSchedule/u);
+  assert.match(prompt, /payload\.componentTopologyRows=\[\]/u);
+  assert.match(prompt, /payload\.componentExecutionFailureRegister=null/u);
+  assert.match(prompt, /Do not copy topology, realization, test-topology/u);
   assert.match(prompt, /attributionConfidence=high only when/u);
   assert.match(prompt, /scheduleStatus=triage_gap/u);
   assert.match(prompt, /generic repair depth/u);
