@@ -1291,7 +1291,9 @@ function postActionGapDossiersFromProjection(input: {
       byRef.set(dossier.currentGapDossierRef, dossier);
     }
   }
-  return compactSdlcPriorGapDossiersForRetryContext([...byRef.values()]);
+  return compactSdlcPriorGapDossiersForRetryContext(
+    [...byRef.values()].filter((dossier) => dossier.retryEligible === true)
+  );
 }
 
 export function deriveSdlcWorkerRetryContextFromPostActionProjection(input: {
@@ -1496,6 +1498,84 @@ function retryContextHasOlderRuntimeAttemptForGap(input: {
   );
 }
 
+function gapDossierHasComponentRepairSchedulePressure(
+  dossier: SdlcPostflightGapDossier
+): boolean {
+  return (
+    dossier.targetAssetType === "component_repair_schedule_surface" &&
+    dossier.reasons.some(
+      (reason) =>
+        reason.reason === "component_repair_schedule_repair_required" ||
+        reason.reason.startsWith("component_repair_row_open:")
+    )
+  );
+}
+
+function currentComponentTestQualificationClearsRepairPressure(
+  workspaceRoot: string
+): boolean {
+  let selectedOutputRoot: string;
+  try {
+    selectedOutputRoot =
+      deriveSdlcConformProjectProfileFromWorkspace(workspaceRoot).selectedOutputRoot;
+  } catch {
+    return false;
+  }
+  const outputFile = join(
+    workspaceRoot,
+    selectedOutputRoot,
+    "design/component_test_qualification_surface.md"
+  );
+  if (!existsSync(outputFile) || !statSync(outputFile).isFile()) {
+    return false;
+  }
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: "component_test_qualification_surface",
+    outputFile
+  });
+  if (admission.status !== "admitted" || admission.register === null) {
+    return false;
+  }
+  const register = admission.register;
+  return (
+    register.componentExecutionFailureRegister === null &&
+    register.componentTestQualificationRows.length > 0 &&
+    register.componentTestQualificationRows.every(
+      (row) => row.status === "passed"
+    )
+  );
+}
+
+function gapDossierSupersededByCurrentWorkspace(input: {
+  readonly workspaceRoot: string;
+  readonly dossier: SdlcPostflightGapDossier;
+}): boolean {
+  return (
+    gapDossierHasComponentRepairSchedulePressure(input.dossier) &&
+    currentComponentTestQualificationClearsRepairPressure(input.workspaceRoot)
+  );
+}
+
+function retryContextWithoutSupersededGapDossiers(input: {
+  readonly retryContext: SdlcWorkerRetryContext;
+  readonly workspaceRoot: string;
+}): SdlcWorkerRetryContext {
+  const priorGapDossiers = input.retryContext.priorGapDossiers.filter(
+    (dossier) =>
+      !gapDossierSupersededByCurrentWorkspace({
+        workspaceRoot: input.workspaceRoot,
+        dossier
+      })
+  );
+  if (priorGapDossiers.length === input.retryContext.priorGapDossiers.length) {
+    return input.retryContext;
+  }
+  return Object.freeze({
+    ...input.retryContext,
+    priorGapDossiers: Object.freeze(priorGapDossiers)
+  });
+}
+
 export function mergeSdlcWorkerRetryContextWithRuntimeGapRegister(input: {
   readonly projected: SdlcWorkerRetryContext;
   readonly workspaceRoot: string;
@@ -1503,43 +1583,55 @@ export function mergeSdlcWorkerRetryContextWithRuntimeGapRegister(input: {
   readonly edgeName: string;
   readonly targetAssetType: string;
 }): SdlcWorkerRetryContext {
+  const projected = retryContextWithoutSupersededGapDossiers({
+    retryContext: input.projected,
+    workspaceRoot: input.workspaceRoot
+  });
   const latestGapDossier = latestRuntimeGapDossierForRetryContext(input);
-  if (latestGapDossier === null) {
-    return input.projected;
+  if (latestGapDossier === null || latestGapDossier.retryEligible !== true) {
+    return projected;
+  }
+  if (
+    gapDossierSupersededByCurrentWorkspace({
+      workspaceRoot: input.workspaceRoot,
+      dossier: latestGapDossier
+    })
+  ) {
+    return projected;
   }
   const projectedHasOlderRuntimeAttempt = retryContextHasOlderRuntimeAttemptForGap({
-    retryContext: input.projected,
+    retryContext: projected,
     gapDossier: latestGapDossier
   });
   if (
-    !retryContextCarriesGapAuthority(input.projected) &&
-    (input.projected.retryAttemptRefs.length === 0 ||
+    !retryContextCarriesGapAuthority(projected) &&
+    (projected.retryAttemptRefs.length === 0 ||
       (!latestGapDossier.currentGapDossierRef.startsWith(
         "closure-gap-dossier://"
       ) &&
         !projectedHasOlderRuntimeAttempt))
   ) {
-    return input.projected;
+    return projected;
   }
   if (
-    input.projected.priorGapDossiers.some((dossier) =>
+    projected.priorGapDossiers.some((dossier) =>
       dossier.reasons.some(
         (reason) =>
           reason.blockingReason.lawfulReentryPoint === "repair_worker_output"
       )
     )
   ) {
-    return input.projected;
+    return projected;
   }
   const dossierByRef = new Map<string, SdlcPostflightGapDossier>();
   for (const dossier of [
-    ...input.projected.priorGapDossiers,
+    ...projected.priorGapDossiers,
     latestGapDossier
   ]) {
     dossierByRef.set(dossier.currentGapDossierRef, dossier);
   }
   return Object.freeze({
-    ...input.projected,
+    ...projected,
     priorGapDossiers: compactSdlcPriorGapDossiersForRetryContext([
       ...dossierByRef.values()
     ])
@@ -3014,6 +3106,20 @@ function designDepthFpEvaluatorTimeoutMs(): number {
 
 function designDepthFpEvaluatorStdoutBudgetBytes(): number {
   return sdlcOperatorRuntimePolicy().designDepthFpEvaluatorStdoutBudgetBytes;
+}
+
+function reviewGradeEdgeFulfillmentEvaluatorTimeoutMs(): number {
+  return sdlcOperatorRuntimePolicy().reviewGradeEdgeFulfillmentEvaluatorTimeoutMs;
+}
+
+function reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs(): number {
+  return sdlcOperatorRuntimePolicy()
+    .reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs;
+}
+
+function reviewGradeEdgeFulfillmentEvaluatorStdoutBudgetBytes(): number {
+  return sdlcOperatorRuntimePolicy()
+    .reviewGradeEdgeFulfillmentEvaluatorStdoutBudgetBytes;
 }
 
 function constrainPlanningTransformWorkerTools(input: {
@@ -4844,8 +4950,10 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
     ])
   });
   const inactivityPolicy = workerInactivityPolicy();
-  const evaluatorTimeoutMs = designDepthFpEvaluatorTimeoutMs();
-  const stdoutBudgetBytes = designDepthFpEvaluatorStdoutBudgetBytes();
+  const evaluatorTimeoutMs = reviewGradeEdgeFulfillmentEvaluatorTimeoutMs();
+  const evaluatorInactivityTimeoutMs =
+    reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs();
+  const stdoutBudgetBytes = reviewGradeEdgeFulfillmentEvaluatorStdoutBudgetBytes();
   const traceRoot = `${processEventsPath}.trace`;
   const reviewGradeRunStartedPayload = Object.freeze({
     kind: "sdlc_review_grade_edge_fulfillment_run",
@@ -4860,6 +4968,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
     error: null,
     timeoutMs: evaluatorTimeoutMs,
     workerTimeoutMs: inactivityPolicy.timeoutMs,
+    inactivityTimeoutMs: evaluatorInactivityTimeoutMs,
     stdoutBudgetBytes,
     stdoutByteCount: 0,
     stderrByteCount: 0,
@@ -4913,7 +5022,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
     parser: parserForWorkerTransport(input.transport),
     executorProfile,
     timeoutMs: evaluatorTimeoutMs,
-    inactivityTimeoutMs: inactivityPolicy.inactivityTimeoutMs,
+    inactivityTimeoutMs: evaluatorInactivityTimeoutMs,
     terminationGraceMs: inactivityPolicy.terminationGraceMs,
     heartbeatMs: inactivityPolicy.heartbeatMs,
     eventSink: input.eventSink
@@ -4942,6 +5051,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       error: processResult.error,
       timeoutMs: evaluatorTimeoutMs,
       workerTimeoutMs: inactivityPolicy.timeoutMs,
+      inactivityTimeoutMs: evaluatorInactivityTimeoutMs,
       stdoutBudgetBytes,
       stdoutByteCount,
       stderrByteCount,
@@ -5596,6 +5706,14 @@ function fpEvaluationCloseDispositionForState(
 function componentDepthResidualPressureRefsForState(
   state: SdlcAbgOwnedFpDispatchState
 ): readonly string[] {
+  if (
+    sdlcInstalledOperatorProjectsOutput(state.manifest.targetAssetType) &&
+    !existsSync(
+      join(state.manifest.archiveRoot, "declared_edge_projection_artifact.json")
+    )
+  ) {
+    return Object.freeze([]);
+  }
   const admission = admitComponentDepthRegisterFromArtifact({
     targetAssetType: state.manifest.targetAssetType,
     outputFile: state.manifest.outputFile
@@ -9252,7 +9370,18 @@ function compactRuntimeEventArchivePayload(
       const consequenceState = stateWithConsequenceProjectedExecutionEvidence({
         state: dispatchState.current
       });
+      const previousWorkerReport = dispatchState.current.workerReport;
       dispatchState.current = consequenceState;
+      if (
+        consequenceState.workerReport !== null &&
+        consequenceState.workerReport !== previousWorkerReport
+      ) {
+        writeSdlcSystemArtifact({
+          archiveRoot: consequenceState.manifest.archiveRoot,
+          relativePath: "worker_result_report.json",
+          payload: consequenceState.workerReport
+        });
+      }
       const consequence = deriveInstalledTraversalConsequence({
         basis,
         start: input.start,

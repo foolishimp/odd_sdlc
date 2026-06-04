@@ -3,8 +3,8 @@ id: T-188
 title: Force F_P depth through same-sandbox iteration and prompt control
 type: bug
 ticket_category: implementation_migration
-status: active
-proof_status: pending
+status: completed
+proof_status: passed
 build_tenant: typescript
 owner: odd_sdlc
 goal: make data-mapper-scale depth emerge from repeated F_P construct/evaluate/repair turns instead of one-shot closure or F_D compensation
@@ -36,9 +36,12 @@ affected_boundary:
   - build_tenants/typescript/code/src/operator/plugins/evaluate/prompts.ts
   - build_tenants/typescript/code/src/operator/closure_state_machine.ts
   - build_tenants/typescript/code/src/operator/installed_operator.ts
+  - build_tenants/typescript/code/src/operator/runtime_policy.ts
   - build_tenants/typescript/code/src/operator/traversal_consequence.ts
   - build_tenants/typescript/code/src/operator/component_depth_register.ts
   - build_tenants/typescript/code/src/operator/plugins/consequence/edge_projection.ts
+  - build_tenants/typescript/code/src/analysis/edge_attempts.ts
+  - build_tenants/typescript/config/operator-runtime-policy.json
   - build_tenants/typescript/test_env/tests/
   - build_tenants/typescript/test_env/fixtures/
   - build_tenants/typescript/test_env/sandbox/
@@ -862,8 +865,111 @@ Result:
 - `test:t188`: passed, guard 7/7 and T-188 21/21.
 - `git diff --check`: clean.
 
-Remaining:
+### 2026-06-04 Data-Mapper Lite Same-Sandbox Completion
 
-- Keep T-188 active until the data_mapper-lite or broader data_mapper proof
-  demonstrates depth pressure forcing F_P iteration without F_D semantic
-  compensation or external product-code patches.
+Status: completed with same-sandbox live proof, focused proof, and no external
+generated product-code patching.
+
+Live proof archive:
+
+`build_tenants/typescript/test_env/test_runs/t188_data_mapper_lite_lifecycle_live/20260604T032736430Z_pid79366`
+
+Live workspace:
+
+`build_tenants/typescript/test_env/test_runs/t188_data_mapper_lite_lifecycle_live/20260604T032736430Z_pid79366/workspace`
+
+Worker:
+
+`process://codex?model=gpt-5.5&effort=high`
+
+Final observed operator run:
+
+`.ai-workspace/runtime/odd_sdlc/operator-runs/20260604T095217499Z_pid84983`
+
+Lifecycle proof:
+
+- Required edge order completed with all 22 lifecycle edges present from
+  `derive_intent_surface` through `prepare_release_surface`.
+- Final closure disposition: `close`.
+- Generated product files were materialized by F_P inside the sandbox:
+  `src/topology.js`, `test/topology.test.js`, and `package.json`.
+- The generated tests ran through the installed operator
+  `derive_test_execution_result_surface` path with graph-generated execution
+  evidence: command `npm test`, status `succeeded`, observed tests `1`, passed
+  `1`, failed `0`.
+- The component-test transform did not pass in one shallow shot. Review-grade
+  findings forced a same-sandbox F_P retry over missing aggregate lifecycle /
+  package/test proof; the worker then added the missing package/test proof and
+  ran the declared test command inside the F_P worksite.
+- After the framework execution-evidence fix and explicit same-sandbox
+  requalification, `component_test_qualification_surface.md` passed all
+  component rows and carried `componentExecutionFailureRegister: null`.
+- The final component repair schedule was `scheduleStatus:
+  "no_repair_required"` with `repairRows: []`.
+- Prompts for the final system/no-dispatch edges were directly inspectable,
+  compact, no-execution, and carried no stale repair pressure.
+
+Assertion artifacts:
+
+- Analysis report:
+  `build_tenants/typescript/test_env/test_runs/t188_data_mapper_lite_lifecycle_live/20260604T032736430Z_pid79366/t188_data_mapper_lite_lifecycle_analysis.md`
+- Lifecycle assertion:
+  `build_tenants/typescript/test_env/test_runs/t188_data_mapper_lite_lifecycle_live/20260604T032736430Z_pid79366/t188_data_mapper_lite_lifecycle_assertion.json`
+
+Same-sandbox bug ledger from the live run:
+
+- SDLC runtime-policy configuration bug: review-grade evaluator timeout,
+  inactivity timeout, and stdout budget were not configurable for the live
+  harness. Added config/env propagation through
+  `config/operator-runtime-policy.json`, `runtime_policy.ts`,
+  `operator_runtime_policy.mjs`, and the T-188 live runner.
+- SDLC retry-control bug: non-retryable triage-gap dossiers could still enter
+  worker retry context and retry prompts. Retry context and retry prompt
+  projection now filter `retryEligible !== true`.
+- SDLC no-dispatch projection bug: system-projected component-depth edges could
+  calculate missing-output residual pressure before the consequence projection
+  wrote the declared edge output. Component-depth residual pressure now waits
+  for the declared projection artifact on system-projected outputs.
+- SDLC execution-evidence publication bug: no-dispatch test execution wrote a
+  valid `sdlc_worker_execution_evidence` output while
+  `worker_result_report.executionEvidence` stayed null. The installed operator
+  now writes the enriched report, and consequence/transform readers fall back
+  to the declared execution output when the report mirror is stale.
+- SDLC stale retry-context bug: component-repair schedule pressure from an
+  older failed qualification remained in the next prompt after a newer current
+  qualification had passed. Runtime gap merge now drops component-repair
+  pressure when current component-test qualification rows are all passed and
+  `componentExecutionFailureRegister` is null.
+- SDLC analysis/proof bug: the archive analyzer only read execution evidence
+  from the report mirror, so resumed archives with stale report mirrors failed
+  proof even though the declared edge output was admitted execution evidence.
+  `edge_attempts.ts` now reads the declared output fallback for
+  `sdlc_worker_execution_evidence`.
+
+Focused proof:
+
+```bash
+npm run build:semantic
+node --test test_env/tests/test_t115_component_execution_failure_repair_flow.test.mjs \
+  test_env/tests/test_t120_retry_local_repair_prompt.test.mjs \
+  test_env/tests/test_t140_no_local_forced_iteration_authority.test.mjs \
+  test_env/tests/test_t161_fd_run_analysis_linter.test.mjs \
+  test_env/tests/test_t172_edge_accounting.test.mjs \
+  test_env/tests/test_t184_handoff_partition_boundary.test.mjs
+npm run test:t188
+git diff --check
+```
+
+Result:
+
+- `build:semantic`: passed.
+- Focused patched-area pack: passed, 113/113.
+- `test:t188`: passed; data-mapper boundary guard 7/7 and T-188 tests 21/21.
+- `git diff --check`: clean.
+
+Closure:
+
+T-188 is closed. The lite lifecycle proof demonstrates the intended boundary:
+depth pressure was created and repaired by F_P inside the same sandbox; SDLC
+patched only framework/runtime/prompt/admission/proof bugs; ABG/F_D admitted,
+folded, routed, and projected typed truth without semantic product-code repair.

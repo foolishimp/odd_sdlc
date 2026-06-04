@@ -7076,6 +7076,9 @@ function retryPromptGapReasonsForDossier(
   manifest: SdlcWorkerHandoffManifest,
   dossier: SdlcPostflightGapDossier
 ): readonly SdlcPostflightGapReason[] {
+  if (dossier.retryEligible !== true) {
+    return Object.freeze([]);
+  }
   const residualPressureReasons: SdlcPostflightGapReason[] = [];
   const passthroughReasons: SdlcPostflightGapReason[] = [];
   for (const reason of dossier.reasons) {
@@ -8699,10 +8702,14 @@ function currentEvaluatedGapPromptLines(
   }
   const promptReasons = retryPromptGapReasonsForDossier(manifest, dossier);
   if (promptReasons.length === 0 && dossier.reasons.length > 0) {
+    const reasonLabel =
+      dossier.retryEligible === true
+        ? "downstream-stage pressure for a later graph edge"
+        : "non-retryable control-plane or operator-triage pressure";
     return Object.freeze([
       "",
       "Current evaluated gaps:",
-      "- Prior gap reasons are downstream-stage pressure for a later graph edge; no current-edge repair work items are assigned from that dossier.",
+      `- Prior gap reasons are ${reasonLabel}; no current-edge repair work items are assigned from that dossier.`,
       `- gapDossierRef: ${workerFacingRef(manifest, dossier.currentGapDossierRef)}`,
       `- evaluated edge=${dossier.edgeName}; target=${dossier.targetAssetType}; retryEligible=${dossier.retryEligible}; reasonCount=0; rawReasonCount=${dossier.reasons.length}`,
       downstreamStagePressurePromptBoundaryLine(manifest)
@@ -10137,11 +10144,36 @@ function readExecutionResultEvidenceFromReportRef(ref: string): {
         record["executionEvidenceErrors"] ?? [],
         "SourceWorkerResultReport.executionEvidenceErrors"
       );
+      const outputFile = parseNonEmptyString(
+        record["outputFile"],
+        "SourceWorkerResultReport.outputFile"
+      );
+      let outputArtifactError: string | null = null;
+      if (
+        resolve(outputFile) === resolve(sourceManifest.outputFile) &&
+        existsSync(outputFile) &&
+        statSync(outputFile).isFile()
+      ) {
+        try {
+          return Object.freeze({
+            executionEvidence: admitWorkerExecutionEvidence(
+              JSON.parse(readFileSync(outputFile, "utf8")),
+              "SourceWorkerResultReport.outputFile.executionEvidence"
+            ),
+            sourceManifest,
+            error: null
+          });
+        } catch (error) {
+          outputArtifactError = error instanceof Error ? error.message : String(error);
+        }
+      }
       return Object.freeze({
         executionEvidence: null,
         sourceManifest: null,
         error: executionEvidenceErrors.length > 0
           ? `execution evidence invalid: ${executionEvidenceErrors.join("; ")}`
+          : outputArtifactError !== null
+            ? `execution evidence output invalid: ${outputArtifactError}`
           : "execution evidence missing"
       });
     }

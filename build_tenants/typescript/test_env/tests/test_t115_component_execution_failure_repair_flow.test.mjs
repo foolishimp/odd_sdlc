@@ -582,9 +582,15 @@ test("T-188 current execution reports feed testcase-bound qualification projecti
     ]
   };
   mkdirSync(path.dirname(executionHandoff.reportFile), { recursive: true });
+  mkdirSync(path.dirname(executionHandoff.outputFile), { recursive: true });
   writeFileSync(
     path.join(executionHandoff.archiveRoot, "handoff_manifest.json"),
     `${JSON.stringify(executionHandoff, null, 2)}\n`,
+    "utf8"
+  );
+  writeFileSync(
+    executionHandoff.outputFile,
+    `${JSON.stringify(executionEvidence, null, 2)}\n`,
     "utf8"
   );
   writeFileSync(
@@ -593,7 +599,7 @@ test("T-188 current execution reports feed testcase-bound qualification projecti
       ...reportFor(executionHandoff, "# test_execution_result_surface\n"),
       projectionRole: "typed_fp_stage_projection",
       authoritativeStageResultRef: pathToFileURL(executionHandoff.fpEvaluateResultFile).href,
-      executionEvidence,
+      executionEvidence: null,
       executionEvidenceErrors: [],
       subworkstreamManifest: {
         kind: "sdlc_compute_subworkstream_manifest",

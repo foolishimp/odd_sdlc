@@ -164,6 +164,9 @@ function main() {
   const env = {
     ...process.env,
     ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT: DATA_MAPPER_LITE_FIXTURE_ROOT,
+    ODD_SDLC_TS_DATA_MAPPER_COMMAND_TIMEOUT_MS:
+      process.env["ODD_SDLC_TS_DATA_MAPPER_COMMAND_TIMEOUT_MS"] ??
+      String(RUNTIME_POLICY.liveHarnessLifecycleCommandTimeoutMs),
     ODD_SDLC_TS_DATA_MAPPER_LANE_NAME:
       process.env["ODD_SDLC_TS_DATA_MAPPER_LANE_NAME"] ??
       "t188_data_mapper_lite_lifecycle_live",
@@ -210,4 +213,3 @@ function main() {
 }
 
 main();
-

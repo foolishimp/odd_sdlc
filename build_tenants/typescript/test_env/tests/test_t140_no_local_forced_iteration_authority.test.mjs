@@ -153,6 +153,70 @@ test("T-164 post-action retry context restores current gap dossier from pressure
   assert.equal(retryContext.priorGapDossiers[0].reasons[0].reason, reason);
 });
 
+test("T-188 post-action retry context ignores non-retryable triage dossiers", () => {
+  const archiveRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t188-triage-"));
+  const gapDossierRef = pathToFileURL(path.join(archiveRoot, "gap_dossier.json"))
+    .href;
+  const blockingReason = {
+    kind: "sdlc_blocking_reason",
+    code: "review_grade_evaluator_process_timeout",
+    reasonClass: "assurance",
+    lawfulReentryPoint: "triage_gap",
+    message:
+      "Review-grade evaluator process or assessment admission failed and requires operator triage.",
+    detail: "review_grade_evaluator_process_timeout:SIGTERM",
+    evidenceRefs: [pathToFileURL(path.join(archiveRoot, "review_grade_run.json")).href]
+  };
+  const gapDossier = {
+    kind: "sdlc_postflight_gap_dossier",
+    status: "open",
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: "derive_uat_testcases_surface",
+    vectorIndex: 0,
+    targetAssetType: "uat_testcases_surface",
+    reasons: [
+      {
+        kind: "sdlc_postflight_gap_reason",
+        reason: "review_grade_evaluator_process_timeout:SIGTERM",
+        reasonClass: "assurance",
+        blockingReason
+      }
+    ],
+    evidenceRefs: [pathToFileURL(path.join(archiveRoot, "review_grade_run.json")).href],
+    priorManifestId: pathToFileURL(path.join(archiveRoot, "handoff_manifest.json"))
+      .href,
+    currentGapDossierRef: gapDossierRef,
+    retryEligible: false,
+    nextLawfulActions: ["triage_gap"]
+  };
+  mkdirSync(archiveRoot, { recursive: true });
+  writeFileSync(
+    path.join(archiveRoot, "gap_dossier.json"),
+    JSON.stringify(gapDossier),
+    "utf8"
+  );
+
+  const retryContext = deriveSdlcWorkerRetryContextFromPostActionProjection({
+    vectorIndex: 0,
+    nextActionProjection: {
+      nextActionBasisKind: "post_repair",
+      choosesNextTraversal: true,
+      selectedActionRef:
+        "construction-action://odd-sdlc/post-action/derive_uat_testcases_surface/post_repair/derive_uat_testcases_surface",
+      nextActionProjectionRef:
+        "construction-priority-projection://odd-sdlc/post-action/derive_uat_testcases_surface",
+      gapPressureRefs: [
+        `pressure://odd-sdlc/post-action/${encodeURIComponent(
+          pathToFileURL(archiveRoot).href
+        )}/triage`
+      ]
+    }
+  });
+
+  assert(retryContext);
+  assert.deepEqual(retryContext.priorGapDossiers, []);
+});
+
 test("T-189 retry context consumes ABG fresh retry projection rows", () => {
   const archiveRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t189-abg-retry-"));
   const gapDossierRef = pathToFileURL(path.join(archiveRoot, "gap_dossier.json"))
@@ -454,6 +518,86 @@ test("T-188 runtime gap merge restores latest closure residual for same-edge ret
   assert.equal(retryContext.priorGapDossiers[0].reasons[0].reason, reason);
 });
 
+test("T-188 runtime gap merge does not promote non-retryable triage dossiers", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t188-runtime-triage-"));
+  const archiveRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs/20260604T035229784Z_pid72875"
+  );
+  mkdirSync(archiveRoot, { recursive: true });
+  const gapDossierRef = pathToFileURL(path.join(archiveRoot, "gap_dossier.json"))
+    .href;
+  writeFileSync(
+    path.join(archiveRoot, "gap_dossier.json"),
+    JSON.stringify({
+      kind: "sdlc_postflight_gap_dossier",
+      status: "open",
+      graphFunctionName: "bootstrap_release_self_test",
+      edgeName: "derive_uat_testcases_surface",
+      vectorIndex: 0,
+      targetAssetType: "uat_testcases_surface",
+      reasons: [
+        {
+          kind: "sdlc_postflight_gap_reason",
+          reason: "review_grade_evaluator_process_timeout:SIGTERM",
+          reasonClass: "assurance",
+          blockingReason: {
+            kind: "sdlc_blocking_reason",
+            code: "review_grade_evaluator_process_timeout",
+            reasonClass: "assurance",
+            lawfulReentryPoint: "triage_gap",
+            message:
+              "Review-grade evaluator process or assessment admission failed and requires operator triage.",
+            detail: "review_grade_evaluator_process_timeout:SIGTERM",
+            evidenceRefs: [
+              pathToFileURL(
+                path.join(archiveRoot, "review_grade_edge_fulfillment_run.json")
+              ).href
+            ]
+          }
+        }
+      ],
+      evidenceRefs: [
+        pathToFileURL(
+          path.join(archiveRoot, "review_grade_edge_fulfillment_run.json")
+        ).href
+      ],
+      priorManifestId: pathToFileURL(path.join(archiveRoot, "handoff_manifest.json"))
+        .href,
+      currentGapDossierRef: gapDossierRef,
+      retryEligible: false,
+      nextLawfulActions: ["triage_gap"]
+    }),
+    "utf8"
+  );
+
+  const projected = {
+    kind: "sdlc_worker_retry_context",
+    retryAttemptRefs: [
+      {
+        vectorIndex: 0,
+        retryRunId: "post-action-reentry",
+        retryCallId: "construction-priority-projection://uat",
+        manifestId: "construction-priority-projection://uat",
+        priorAuthorityRef:
+          "construction-action://odd-sdlc/post-action/derive_uat_testcases_surface/post_repair/derive_uat_testcases_surface",
+        attemptIndex: 0,
+        sourceProjectionRef: "construction-priority-projection://uat"
+      }
+    ],
+    priorGapDossiers: []
+  };
+  const retryContext = mergeSdlcWorkerRetryContextWithRuntimeGapRegister({
+    workspaceRoot: workspace,
+    vectorIndex: 0,
+    edgeName: "derive_uat_testcases_surface",
+    targetAssetType: "uat_testcases_surface",
+    projected
+  });
+
+  assert.deepEqual(retryContext, projected);
+});
+
 test("T-164 retry context uses latest workspace runtime gap register", () => {
   const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t164-register-"));
   const runsRoot = path.join(
@@ -664,6 +808,125 @@ test("T-188 runtime gap merge restores newer real same-edge gap after stale retr
   assert.equal(retryContext.priorGapDossiers[0].reasons[0].reason, reason);
 });
 
+test("T-188 retry context drops stale component repair schedule pressure after current qualification passes", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t188-stale-repair-"));
+  mkdirSync(path.join(workspace, ".ai-workspace/context"), { recursive: true });
+  mkdirSync(
+    path.join(workspace, "build_tenants/data_mapper_lite_javascript/design"),
+    { recursive: true }
+  );
+  writeFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: t188_stale_repair",
+      "  active_tenant: data_mapper_lite_javascript",
+      "  selected_output_root: build_tenants/data_mapper_lite_javascript",
+      "  ambiguity_risk_appetite: medium",
+      "build_tenants:",
+      "  data_mapper_lite_javascript:",
+      "    output_dir: build_tenants/data_mapper_lite_javascript",
+      "    language: JavaScript",
+      "    build_tool: npm",
+      "    test_runner: npm test",
+      "    test_execution_contract: npm test"
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(
+      workspace,
+      "build_tenants/data_mapper_lite_javascript/design/component_test_qualification_surface.md"
+    ),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_component_depth_register",
+        registerVersion: "ts-component-depth-v1",
+        targetAssetType: "component_test_qualification_surface",
+        componentTopologyRows: [],
+        componentRealizationRows: [],
+        testComponentTopologyRows: [],
+        componentTestRows: [],
+        componentTestQualificationRows: [
+          {
+            kind: "sdlc_component_test_qualification_row",
+            testClassId: "test.topology.multigraph_identity",
+            testcaseIds: ["TC-T188-001"],
+            componentIds: ["topology.object_registry"],
+            requirementIds: ["REQ-T188-001"],
+            status: "passed",
+            evidenceRefs: ["file:///tmp/t188/current-execution-summary.json"]
+          }
+        ],
+        componentExecutionFailureRegister: null,
+        componentRepairSchedule: null,
+        releaseDepthParity: null
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+
+  const staleRef = "file:///tmp/t188-stale-repair/gap_dossier.json";
+  const staleDossier = {
+    kind: "sdlc_postflight_gap_dossier",
+    status: "open",
+    graphFunctionName: "derive_component_repair_schedule_surface",
+    edgeName: "derive_component_repair_schedule_surface",
+    vectorIndex: 0,
+    targetAssetType: "component_repair_schedule_surface",
+    reasons: [
+      {
+        kind: "sdlc_postflight_gap_reason",
+        reason: "component_repair_schedule_repair_required",
+        reasonClass: "assurance",
+        blockingReason: sdlcBlockingReasonFromLegacy({
+          reason: "component_repair_schedule_repair_required"
+        })
+      },
+      {
+        kind: "sdlc_postflight_gap_reason",
+        reason: "component_repair_row_open:failure:test.topology.multigraph_identity:node-test:topology",
+        reasonClass: "assurance",
+        blockingReason: sdlcBlockingReasonFromLegacy({
+          reason: "component_repair_row_open:failure:test.topology.multigraph_identity:node-test:topology"
+        })
+      }
+    ],
+    evidenceRefs: ["file:///tmp/t188-stale-repair/sdlc_edge_closure_decision.json"],
+    priorManifestId: "file:///tmp/t188-stale-repair/handoff_manifest.json",
+    currentGapDossierRef: staleRef,
+    retryEligible: true,
+    nextLawfulActions: ["repair_worker_output"]
+  };
+
+  const retryContext = mergeSdlcWorkerRetryContextWithRuntimeGapRegister({
+    workspaceRoot: workspace,
+    vectorIndex: 0,
+    edgeName: "derive_component_repair_schedule_surface",
+    targetAssetType: "component_repair_schedule_surface",
+    projected: {
+      kind: "sdlc_worker_retry_context",
+      retryAttemptRefs: [
+        {
+          vectorIndex: 0,
+          retryRunId: "post-action-reentry",
+          retryCallId: "construction-priority-projection://stale-repair",
+          manifestId: "construction-priority-projection://stale-repair",
+          priorAuthorityRef: staleRef,
+          attemptIndex: 0,
+          sourceProjectionRef: "construction-priority-projection://stale-repair"
+        }
+      ],
+      priorGapDossiers: [staleDossier]
+    }
+  });
+
+  assert.deepEqual(retryContext.priorGapDossiers, []);
+  assert.equal(retryContext.retryAttemptRefs[0].priorAuthorityRef, staleRef);
+});
+
 test("T-174 component-code closure carries test and execution requirements downstream", () => {
   assert.equal(
     sdlcRequirementObligationBelongsToDownstreamComponentSurface({
@@ -824,11 +1087,10 @@ test("T-140 installed operator does not dispatch from legacy gap action strings"
 test("T-140 closure reasons use typed blocking-reason reentry points", () => {
   const source = installedOperatorSource();
 
-  assert.equal(source.includes("blockingReasonRefsForReentry"), true);
-  assert.equal(source.includes('lawfulReentryPoint: "same_edge_retry"'), true);
-  assert.equal(source.includes('lawfulReentryPoint: "repair_worker_output"'), true);
+  assert.equal(source.includes("sdlcClosureBlockingReasonRefsForReentry"), true);
+  assert.equal(source.includes('reason.lawfulReentryPoint === "same_edge_retry"'), true);
   assert.equal(
-    source.includes('lawfulReentryPoint: "reprice_requirement_or_design"'),
+    source.includes('reason.blockingReason.lawfulReentryPoint === "repair_worker_output"'),
     true
   );
   assert.equal(source.includes('action: "retry_same_edge"'), false);

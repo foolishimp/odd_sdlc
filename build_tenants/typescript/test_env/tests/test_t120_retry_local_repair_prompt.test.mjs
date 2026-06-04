@@ -199,6 +199,56 @@ function retryManifest() {
   });
 }
 
+function nonRetryableReviewGradeTriageManifest() {
+  const contract = hookContractByEdgeName("derive_uat_testcases_surface");
+  const reason = "review_grade_evaluator_process_timeout:SIGTERM";
+  const blockingReason = {
+    kind: "sdlc_blocking_reason",
+    code: "review_grade_evaluator_process_timeout",
+    reasonClass: "assurance",
+    lawfulReentryPoint: "triage_gap",
+    message:
+      "Review-grade evaluator process or assessment admission failed and requires operator triage.",
+    detail: reason,
+    evidenceRefs: ["file:///tmp/t120/review_grade_edge_fulfillment_run.json"]
+  };
+  return deriveWorkerHandoffManifest({
+    workspaceRoot: workspaceRoot(),
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 4,
+    contract,
+    retryContext: {
+      kind: "sdlc_worker_retry_context",
+      retryAttemptRefs: [],
+      priorGapDossiers: [
+        {
+          kind: "sdlc_postflight_gap_dossier",
+          status: "open",
+          graphFunctionName: "bootstrap_release_self_test",
+          edgeName: contract.edgeName,
+          vectorIndex: 4,
+          targetAssetType: "uat_testcases_surface",
+          reasons: [
+            {
+              kind: "sdlc_postflight_gap_reason",
+              reason,
+              reasonClass: "assurance",
+              blockingReason
+            }
+          ],
+          evidenceRefs: ["file:///tmp/t120/review_grade_edge_fulfillment_run.json"],
+          priorManifestId: "file:///tmp/t120/handoff_manifest.json",
+          currentGapDossierRef: "file:///tmp/t120/gap_dossier.json",
+          retryEligible: false,
+          nextLawfulActions: ["triage_gap"]
+        }
+      ]
+    },
+    runId: "t120-non-retryable-review-grade-triage"
+  });
+}
+
 function outsidePathRetryManifest() {
   const contract = hookContractByEdgeName("derive_component_code_surface");
   const root = workspaceRoot();
@@ -551,6 +601,20 @@ test("T-120 retry prompt projects exact schema-local carrier repair pressure", (
   );
   assert.match(prompt, /retryRepairInstructions and repairReentryPlans when present/u);
   assert.match(prompt, /Worker package fields to apply/u);
+});
+
+test("T-188 retry prompt does not assign non-retryable triage gaps to F_P repair", () => {
+  const files = writeHandoffFiles(nonRetryableReviewGradeTriageManifest());
+  const invocationPackage = JSON.parse(
+    readFileSync(files.invocationPackagePath, "utf8")
+  );
+  const prompt = readFileSync(files.promptPath, "utf8");
+
+  assert.deepEqual(invocationPackage.retryRepairInstructions, []);
+  assert.doesNotMatch(prompt, /Evaluated residual pressure:/u);
+  assert.doesNotMatch(prompt, /Repair these concrete evaluator blockers/u);
+  assert.match(prompt, /non-retryable control-plane or operator-triage pressure/u);
+  assert.match(prompt, /retryEligible=false/u);
 });
 
 test("T-158 retry frontier drops stale blockers repaired by the latest dossier", () => {

@@ -452,8 +452,21 @@ test("T-172 installed operator executes no-dispatch edges without worker_run", a
     assert.equal(report.fpTransformRequestRef, null, edgeName);
     assert.equal(report.fpTransformResultRef, null, edgeName);
     assert.equal(report.fpTransformStatusSnapshot, null, edgeName);
+    if (edgeName === "qualify_component_realization_surface") {
+      assert.equal(existsSync(outcome.manifest.outputFile), true, edgeName);
+      const declaredProjectionArtifact = JSON.parse(
+        readFileSync(
+          path.join(outcome.archiveRoot, "declared_edge_projection_artifact.json"),
+          "utf8"
+        )
+      );
+      assert.equal(
+        declaredProjectionArtifact.sourceFunction,
+        "consequence.edge_projection.writeDeclaredEdgeProjectionOutput",
+        edgeName
+      );
+    }
     if (edgeName === "derive_test_execution_result_surface") {
-      assert.equal(report.executionEvidence, null, edgeName);
       const projectedEvidence = JSON.parse(
         readFileSync(outcome.manifest.outputFile, "utf8")
       );
@@ -462,6 +475,7 @@ test("T-172 installed operator executes no-dispatch edges without worker_run", a
         "sdlc_worker_execution_evidence",
         edgeName
       );
+      assert.deepEqual(report.executionEvidence, projectedEvidence, edgeName);
       assert.notEqual(projectedEvidence.status, "pending", edgeName);
       assert.equal(report.executionEvidenceErrors?.length ?? 0, 0, edgeName);
       const declaredProjectionArtifact = JSON.parse(
@@ -485,6 +499,15 @@ test("T-172 installed operator executes no-dispatch edges without worker_run", a
       "admitted",
       edgeName
     );
+    if (edgeName === "qualify_component_realization_surface") {
+      assert.equal(
+        closureDecision.edgeResidualPressureRefs.some((ref) =>
+          ref.includes("component_depth_output_missing")
+        ),
+        false,
+        edgeName
+      );
+    }
     if (edgeName === "derive_test_execution_result_surface") {
       assert.notEqual(closureDecision.disposition, "retry", edgeName);
     }

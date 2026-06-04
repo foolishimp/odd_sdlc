@@ -1,4 +1,4 @@
-// Validates: T-161
+// Validates: T-161, T-188
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -1149,6 +1149,86 @@ test("T-171 analyzer exposes prompt carrier, execution evidence, residual pressu
     assert.match(markdown, /graph_test_execution_result/u);
     assert.match(markdown, /## Test35 Conceptual Stage Coverage/u);
     assert.match(markdown, /derive_test_run_archive_surface/u);
+  } finally {
+    rmSync(archiveRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-188 analyzer reads declared execution output when worker report mirror is stale", () => {
+  const archiveRoot = makeTempDir("odd-sdlc-ts-t188-execution-fallback-");
+  try {
+    const synthetic = buildSyntheticT132Archive({ rootDir: archiveRoot });
+    const executionIndex = T132_EDGE_ORDER.findIndex(
+      (edge) => edge.target === "test_execution_result_surface"
+    );
+    assert.ok(executionIndex >= 0);
+    const operatorRunRoot = synthetic.operatorRunRoots[executionIndex];
+    const declaredOutputFile = path.join(
+      operatorRunRoot,
+      "declared_test_execution_result_surface.json"
+    );
+    writeJson(declaredOutputFile, {
+      kind: "sdlc_worker_execution_evidence",
+      lane: "test",
+      command: "npm test",
+      status: "succeeded",
+      reportRefs: [
+        `file://${path.join(operatorRunRoot, "test-execution.stdout.log")}`
+      ],
+      testsObserved: 3,
+      passedCount: 3,
+      failedCount: 0,
+      shardEvidence: [
+        {
+          kind: "sdlc_worker_execution_shard_evidence",
+          shardId: "node-test:topology",
+          lane: "test",
+          command: "npm test",
+          status: "succeeded",
+          reportRefs: [
+            `file://${path.join(operatorRunRoot, "test-execution.stdout.log")}`
+          ],
+          testsObserved: 3,
+          passedCount: 3,
+          failedCount: 0
+        }
+      ]
+    });
+    writeJson(path.join(operatorRunRoot, "worker_result_report.json"), {
+      kind: "odd_sdlc.worker_result_report",
+      graphFunctionName: "derive_test_execution_result_surface",
+      edgeName: "derive_test_execution_result_surface",
+      targetAssetType: "test_execution_result_surface",
+      outputFile: declaredOutputFile,
+      digest: "sha256:synthetic",
+      summary: "synthetic stale report mirror",
+      unresolvedReasons: [],
+      materializedFiles: [],
+      materializationDiagnostics: [],
+      executionEvidence: null,
+      executionEvidenceErrors: [],
+      obligationAssessments: []
+    });
+
+    const result = analyzeSdlcFdRunArchive({
+      inspectedRoot: archiveRoot,
+      profile: "hello_world"
+    });
+    const executionResultEdge = result.edgeTraversal.find(
+      (attempt) => attempt.targetAssetType === "test_execution_result_surface"
+    );
+    assert.ok(executionResultEdge !== undefined);
+    assert.equal(
+      executionResultEdge.executionEvidenceSource,
+      "graph_test_execution_result"
+    );
+    assert.equal(executionResultEdge.executionEvidenceStatus, "succeeded");
+    assert.equal(executionResultEdge.executionEvidenceCommand, "npm test");
+    assert.equal(executionResultEdge.executionEvidenceReportCount, 1);
+    assert.equal(executionResultEdge.executionEvidenceShardCount, 1);
+    assert.equal(executionResultEdge.executionEvidenceTestsObserved, 3);
+    assert.equal(executionResultEdge.executionEvidencePassedCount, 3);
+    assert.equal(executionResultEdge.executionEvidenceFailedCount, 0);
   } finally {
     rmSync(archiveRoot, { recursive: true, force: true });
   }

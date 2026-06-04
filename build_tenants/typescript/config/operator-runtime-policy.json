@@ -13,6 +13,11 @@
     "timeoutMs": 3600000,
     "stdoutBudgetBytes": 1048576
   },
+  "reviewGradeEdgeFulfillmentEvaluator": {
+    "timeoutMs": 43200000,
+    "inactivityTimeoutMs": 1800000,
+    "stdoutBudgetBytes": 1048576
+  },
   "executionShard": {
     "timeoutMs": 3600000,
     "inactivityTimeoutMs": 3600000

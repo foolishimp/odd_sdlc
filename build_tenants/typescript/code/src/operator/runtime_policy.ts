@@ -14,6 +14,9 @@ export interface SdlcOperatorRuntimePolicy {
   readonly workerTerminationGraceMs: number;
   readonly designDepthFpEvaluatorTimeoutMs: number;
   readonly designDepthFpEvaluatorStdoutBudgetBytes: number;
+  readonly reviewGradeEdgeFulfillmentEvaluatorTimeoutMs: number;
+  readonly reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs: number;
+  readonly reviewGradeEdgeFulfillmentEvaluatorStdoutBudgetBytes: number;
   readonly executionShardTimeoutMs: number;
   readonly executionShardInactivityTimeoutMs: number;
   readonly installedOperatorShardTimeoutCapMs: number | null;
@@ -48,6 +51,11 @@ interface SdlcOperatorRuntimePolicyConfig {
   };
   readonly designDepthFpEvaluator: {
     readonly timeoutMs: number;
+    readonly stdoutBudgetBytes: number;
+  };
+  readonly reviewGradeEdgeFulfillmentEvaluator: {
+    readonly timeoutMs: number;
+    readonly inactivityTimeoutMs: number;
     readonly stdoutBudgetBytes: number;
   };
   readonly executionShard: {
@@ -163,6 +171,11 @@ function readSdlcOperatorRuntimePolicyConfig(): SdlcOperatorRuntimePolicyConfig 
     "designDepthFpEvaluator",
     "operator-runtime-policy.json"
   );
+  const reviewGradeEdgeFulfillmentEvaluator = recordField(
+    raw,
+    "reviewGradeEdgeFulfillmentEvaluator",
+    "operator-runtime-policy.json"
+  );
   const executionShard = recordField(
     raw,
     "executionShard",
@@ -225,6 +238,23 @@ function readSdlcOperatorRuntimePolicyConfig(): SdlcOperatorRuntimePolicyConfig 
         designDepthFpEvaluator,
         "stdoutBudgetBytes",
         "operator-runtime-policy.json.designDepthFpEvaluator"
+      )
+    }),
+    reviewGradeEdgeFulfillmentEvaluator: Object.freeze({
+      timeoutMs: positiveIntegerField(
+        reviewGradeEdgeFulfillmentEvaluator,
+        "timeoutMs",
+        "operator-runtime-policy.json.reviewGradeEdgeFulfillmentEvaluator"
+      ),
+      inactivityTimeoutMs: positiveIntegerField(
+        reviewGradeEdgeFulfillmentEvaluator,
+        "inactivityTimeoutMs",
+        "operator-runtime-policy.json.reviewGradeEdgeFulfillmentEvaluator"
+      ),
+      stdoutBudgetBytes: positiveIntegerField(
+        reviewGradeEdgeFulfillmentEvaluator,
+        "stdoutBudgetBytes",
+        "operator-runtime-policy.json.reviewGradeEdgeFulfillmentEvaluator"
       )
     }),
     executionShard: Object.freeze({
@@ -351,6 +381,19 @@ export function sdlcOperatorRuntimePolicy(): SdlcOperatorRuntimePolicy {
     designDepthFpEvaluatorStdoutBudgetBytes: configuredPositiveInteger(
       "ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_STDOUT_BUDGET_BYTES",
       config.designDepthFpEvaluator.stdoutBudgetBytes
+    ),
+    reviewGradeEdgeFulfillmentEvaluatorTimeoutMs: configuredTimeoutMs(
+      "ODD_SDLC_REVIEW_GRADE_EDGE_FULFILLMENT_EVALUATOR_TIMEOUT_MS",
+      config.reviewGradeEdgeFulfillmentEvaluator.timeoutMs,
+      minimumOperatorTimeoutMs
+    ),
+    reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs: configuredPositiveInteger(
+      "ODD_SDLC_REVIEW_GRADE_EDGE_FULFILLMENT_EVALUATOR_INACTIVITY_TIMEOUT_MS",
+      config.reviewGradeEdgeFulfillmentEvaluator.inactivityTimeoutMs
+    ),
+    reviewGradeEdgeFulfillmentEvaluatorStdoutBudgetBytes: configuredPositiveInteger(
+      "ODD_SDLC_REVIEW_GRADE_EDGE_FULFILLMENT_EVALUATOR_STDOUT_BUDGET_BYTES",
+      config.reviewGradeEdgeFulfillmentEvaluator.stdoutBudgetBytes
     ),
     executionShardTimeoutMs: configuredTimeoutMs(
       "ODD_SDLC_EXECUTION_SHARD_TIMEOUT_MS",

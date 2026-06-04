@@ -66,6 +66,11 @@ function policyConfig() {
     "designDepthFpEvaluator",
     "operator-runtime-policy.json"
   );
+  const reviewGradeEdgeFulfillmentEvaluator = recordField(
+    config,
+    "reviewGradeEdgeFulfillmentEvaluator",
+    "operator-runtime-policy.json"
+  );
   const executionShard = recordField(
     config,
     "executionShard",
@@ -92,6 +97,22 @@ function policyConfig() {
       designDepthFpEvaluator,
       "timeoutMs",
       "operator-runtime-policy.json.designDepthFpEvaluator"
+    ),
+    reviewGradeEdgeFulfillmentEvaluatorTimeoutMs: positiveIntegerFromRecord(
+      reviewGradeEdgeFulfillmentEvaluator,
+      "timeoutMs",
+      "operator-runtime-policy.json.reviewGradeEdgeFulfillmentEvaluator"
+    ),
+    reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs:
+      positiveIntegerFromRecord(
+        reviewGradeEdgeFulfillmentEvaluator,
+        "inactivityTimeoutMs",
+        "operator-runtime-policy.json.reviewGradeEdgeFulfillmentEvaluator"
+      ),
+    reviewGradeEdgeFulfillmentEvaluatorStdoutBudgetBytes: positiveIntegerFromRecord(
+      reviewGradeEdgeFulfillmentEvaluator,
+      "stdoutBudgetBytes",
+      "operator-runtime-policy.json.reviewGradeEdgeFulfillmentEvaluator"
     ),
     executionShardTimeoutMs: positiveIntegerFromRecord(
       executionShard,
@@ -144,6 +165,19 @@ export function liveOperatorRuntimePolicy() {
       "ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_TIMEOUT_MS",
       config.designDepthFpEvaluatorTimeoutMs,
       minimumOperatorTimeoutMs
+    ),
+    reviewGradeEdgeFulfillmentEvaluatorTimeoutMs: timeoutMs(
+      "ODD_SDLC_REVIEW_GRADE_EDGE_FULFILLMENT_EVALUATOR_TIMEOUT_MS",
+      config.reviewGradeEdgeFulfillmentEvaluatorTimeoutMs,
+      minimumOperatorTimeoutMs
+    ),
+    reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs: positiveInteger(
+      "ODD_SDLC_REVIEW_GRADE_EDGE_FULFILLMENT_EVALUATOR_INACTIVITY_TIMEOUT_MS",
+      config.reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs
+    ),
+    reviewGradeEdgeFulfillmentEvaluatorStdoutBudgetBytes: positiveInteger(
+      "ODD_SDLC_REVIEW_GRADE_EDGE_FULFILLMENT_EVALUATOR_STDOUT_BUDGET_BYTES",
+      config.reviewGradeEdgeFulfillmentEvaluatorStdoutBudgetBytes
     ),
     executionShardTimeoutMs: timeoutMs(
       "ODD_SDLC_EXECUTION_SHARD_TIMEOUT_MS",

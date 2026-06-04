@@ -315,17 +315,29 @@ test("T-184 ABG terminal truth controls non-close traversal", () => {
   const installedOperatorSource = readRepoFile(
     "build_tenants/typescript/code/src/operator/installed_operator.ts"
   );
+  const closureStateMachineSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/closure_state_machine.ts"
+  );
 
   assert.match(installedOperatorSource, /function abgTerminalRetryReasonRefs/u);
   assert.match(installedOperatorSource, /terminalKind === "yielded"/u);
   assert.match(installedOperatorSource, /abg-terminal/u);
   assert.match(
     installedOperatorSource,
-    /const rawAbgTerminalRetryRefs =\s*triageGapResidualPressureRefs\.length > 0 \|\|\s*repairReentryResidualPressureRefs\.length > 0\s*\?\s*Object\.freeze\(\[\]\)\s*:\s*abgTerminalRetryReasonRefs/u
+    /deriveSdlcClosureStateTransition\(\{\s*abgRuntimeTransitionContext:/u
   );
   assert.match(
     installedOperatorSource,
-    /ledger\.edgeConverged && edgeAssuranceCloseDecision\.disposition === "close"\s*\?\s*Object\.freeze\(\[\]\)\s*:\s*rawAbgTerminalRetryRefs/u
+    /abgTerminalRetryRefs:\s*ledger\.edgeConverged && edgeAssuranceCloseDecision\.disposition === "close"\s*\?\s*Object\.freeze\(\[\]\)\s*:\s*abgTerminalRetryReasonRefs/u
+  );
+  assert.match(
+    closureStateMachineSource,
+    /terminalRetryRefs: input\.abgTerminalRetryRefs/u
+  );
+  assert.ok(
+    closureStateMachineSource.indexOf("if (blockReasonRefs.length > 0)") <
+      closureStateMachineSource.indexOf("if (input.abgTerminalRetryRefs.length > 0)"),
+    "typed block and triage reasons must outrank ABG terminal retry fallback"
   );
   assert.match(
     installedOperatorSource,
@@ -424,6 +436,18 @@ test("T-184 operator timeout policy is tenant configuration, not handoff glue", 
     runtimePolicy.minimumOperatorTimeoutMs
   );
   assert.equal(
+    runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.timeoutMs,
+    runtimePolicy.worker.timeoutMs
+  );
+  assert.equal(
+    typeof runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.inactivityTimeoutMs,
+    "number"
+  );
+  assert.ok(
+    runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.inactivityTimeoutMs <
+      runtimePolicy.worker.inactivityTimeoutMs
+  );
+  assert.equal(
     runtimePolicy.executionShard.timeoutMs,
     runtimePolicy.minimumOperatorTimeoutMs
   );
@@ -438,6 +462,14 @@ test("T-184 operator timeout policy is tenant configuration, not handoff glue", 
     "build_tenants/typescript/code/src/operator/runtime_policy.ts"
   );
   assert.match(installedOperatorSource, /sdlcOperatorRuntimePolicy/u);
+  assert.match(
+    installedOperatorSource,
+    /reviewGradeEdgeFulfillmentEvaluatorTimeoutMs/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs/u
+  );
   assert.match(launchContractSource, /sdlcOperatorRuntimePolicy/u);
   assert.match(runtimePolicySource, /operator-runtime-policy\.json/u);
   assert.doesNotMatch(installedOperatorSource, /1000 \* 60 \* (15|30|60)/u);

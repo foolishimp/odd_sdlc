@@ -412,11 +412,36 @@ function readExecutionResultEvidenceFromReportRef(ref: string): {
         record["executionEvidenceErrors"] ?? [],
         "SourceWorkerResultReport.executionEvidenceErrors"
       );
+      const outputFile = parseNonEmptyString(
+        record["outputFile"],
+        "SourceWorkerResultReport.outputFile"
+      );
+      let outputArtifactError: string | null = null;
+      if (
+        resolve(outputFile) === resolve(sourceManifest.outputFile) &&
+        existsSync(outputFile) &&
+        statSync(outputFile).isFile()
+      ) {
+        try {
+          return Object.freeze({
+            executionEvidence: admitWorkerExecutionEvidence(
+              JSON.parse(readFileSync(outputFile, "utf8")),
+              "SourceWorkerResultReport.outputFile.executionEvidence"
+            ),
+            sourceManifest,
+            error: null
+          });
+        } catch (error) {
+          outputArtifactError = error instanceof Error ? error.message : String(error);
+        }
+      }
       return Object.freeze({
         executionEvidence: null,
         sourceManifest: null,
         error: executionEvidenceErrors.length > 0
           ? `execution evidence invalid: ${executionEvidenceErrors.join("; ")}`
+          : outputArtifactError !== null
+            ? `execution evidence output invalid: ${outputArtifactError}`
           : "execution evidence missing"
       });
     }

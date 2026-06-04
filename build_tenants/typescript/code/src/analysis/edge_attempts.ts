@@ -1,5 +1,6 @@
 // Implements: T-161
 
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { isRecord } from "../admission/codecs.js";
 
@@ -137,7 +138,8 @@ function fileRef(operatorRunRoot: string, relativePath: string): string | null {
 
 function executionEvidenceStatusFromReport(
   report: WorkerResultReportRecord | null,
-  targetAssetType: string | null
+  targetAssetType: string | null,
+  operatorRunRoot: string
 ): {
   readonly status: string | null;
   readonly reportCount: number;
@@ -150,8 +152,11 @@ function executionEvidenceStatusFromReport(
   readonly reportRefs: readonly string[];
   readonly source: "none" | "component_smoke" | "graph_test_execution_result";
 } {
-  const evidence = report?.executionEvidence ?? null;
-  if (evidence === null || typeof evidence !== "object") {
+  const reportEvidence = report?.executionEvidence ?? null;
+  const evidence = isRecord(reportEvidence)
+    ? reportEvidence
+    : executionEvidenceFromReportOutputFile(report, operatorRunRoot);
+  if (evidence === null) {
     return Object.freeze({
       status: null,
       reportCount: 0,
@@ -186,6 +191,47 @@ function executionEvidenceStatusFromReport(
     reportRefs: Object.freeze(reportRefs),
     source
   });
+}
+
+function executionEvidenceFromReportOutputFile(
+  report: WorkerResultReportRecord | null,
+  operatorRunRoot: string
+): Readonly<Record<string, unknown>> | null {
+  const outputFile = typeof report?.outputFile === "string" ? report.outputFile : null;
+  if (outputFile === null) {
+    return null;
+  }
+  const workspaceRoot = workspaceRootForOperatorRun(operatorRunRoot);
+  if (
+    workspaceRoot === null ||
+    !pathIsInside(path.resolve(outputFile), workspaceRoot)
+  ) {
+    return null;
+  }
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(outputFile, "utf8"));
+    if (
+      isRecord(parsed) &&
+      parsed["kind"] === "sdlc_worker_execution_evidence"
+    ) {
+      return parsed;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function workspaceRootForOperatorRun(operatorRunRoot: string): string | null {
+  const marker = `${path.sep}.ai-workspace${path.sep}runtime${path.sep}odd_sdlc${path.sep}operator-runs${path.sep}`;
+  const normalized = path.resolve(operatorRunRoot);
+  const markerIndex = normalized.lastIndexOf(marker);
+  return markerIndex < 0 ? null : normalized.slice(0, markerIndex);
+}
+
+function pathIsInside(childPath: string, parentPath: string): boolean {
+  const relative = path.relative(path.resolve(parentPath), path.resolve(childPath));
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 function residualPressureRefs(carriers: OperatorRunCarriers): readonly string[] {
@@ -469,7 +515,8 @@ export function deriveEdgeAttempt(
     carriers.fileSizes.workerConstructionBrief;
   const executionEvidence = executionEvidenceStatusFromReport(
     workerReport,
-    targetAssetType
+    targetAssetType,
+    carriers.operatorRunRoot
   );
   const residualRefs = residualPressureRefs(carriers);
   const closureDisposition = edgeClosure?.disposition ?? null;
