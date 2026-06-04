@@ -190,9 +190,9 @@ test("T-181 worker prompts prevent whole-file Write drift in live PTY execution"
     });
     const prompt = promptForHandoff(manifest);
 
-    assert.match(prompt, /Tool-profile contract: this planning edge has a no-execution SDLC profile/u);
-    assert.match(prompt, /use it only for bounded workspace-relative read-only inspection/u);
-    assert.match(prompt, /never for product execution, build\/test commands, framework\/traversal commands, background jobs, or artifact writes/u);
+    assert.match(prompt, /Tool-profile contract: no-execution SDLC profile/u);
+    assert.match(prompt, /use only bounded workspace-relative read-only inspection/u);
+    assert.match(prompt, /never run product, build\/test, framework\/traversal, background, or artifact-write commands/u);
     assert.match(prompt, /must inspect <=80 lines/u);
     assert.doesNotMatch(prompt, /jq\/rg\/cat\/git diff\/status end `\| head -80`/u);
     assert.doesNotMatch(prompt, /sed is inclusive: end-start\+1<=80/u);

@@ -150,6 +150,12 @@ import {
   oddSdlcRuntimeEventsPath
 } from "./event_store.js";
 import {
+  deriveSdlcClosureStateTransition,
+  sdlcClosureBlockingReasonRefsForReentry,
+  syntheticGapDossierFromClosureRefs,
+  syntheticGapDossiersFromClosureDecision
+} from "./closure_state_machine.js";
+import {
   defaultComputeSubworkstreamManifest,
   SDLC_EVALUATE_COMPUTE_SUBWORKSTREAM_MANIFEST_FILE
 } from "./compute_subworkstreams.js";
@@ -295,8 +301,7 @@ import {
   sdlcBlockingReasonFromLegacy,
   summarizeBlockingReasons,
   type SdlcBlockingReason,
-  type SdlcBlockingReasonCode,
-  type SdlcBlockingReasonLawfulReentryPoint
+  type SdlcBlockingReasonCode
 } from "../shared/blocking_reason.js";
 import {
   admitComponentDepthRegisterFromArtifact,
@@ -304,20 +309,6 @@ import {
 } from "./component_depth_register.js";
 import { admitTestDesignRegisterFromArtifact } from "./test_design_register.js";
 import { admitTestExecutionSurfaceRegisterFromArtifact } from "./test_execution_surface_register.js";
-import {
-  deriveSdlcPostflightGapActions,
-  sdlcPostflightGapRetryEligible
-} from "../postflight/gap_dossier_plan.js";
-
-export const MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS = 100;
-export const MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS = 400;
-export const MAX_INSTALLED_CONVERGENCE_ATTEMPTS = 4000;
-export const MAX_INSTALLED_FRAMEWORK_SMOKE_RETRY_REENTRY_ATTEMPTS = 3;
-export const MAX_INSTALLED_COMPACT_RETRY_REENTRY_ATTEMPTS = 12;
-export const MAX_INSTALLED_FRAMEWORK_SMOKE_REPEATED_BLOCKER_ATTEMPTS = 3;
-export const MAX_INSTALLED_COMPACT_REPEATED_BLOCKER_ATTEMPTS = 6;
-export const MAX_INSTALLED_BROAD_REPEATED_BLOCKER_ATTEMPTS = 20;
-const MAX_INSTALLED_OTHER_REENTRY_ATTEMPTS = 100;
 const EMPTY_SCOPE_PATH: readonly string[] = Object.freeze([]);
 
 export type SdlcInstalledReentryDisposition = "retry" | "yield" | "other";
@@ -543,13 +534,14 @@ export function installedReentryDispositionForOutcome(
 export function installedReentryAttemptLimit(
   disposition: SdlcInstalledReentryDisposition
 ): number {
+  const policy = sdlcOperatorRuntimePolicy();
   if (disposition === "yield") {
-    return MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS;
+    return policy.installedYieldReentryAttemptLimit;
   }
   if (disposition === "retry") {
-    return MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS;
+    return policy.installedRetryReentryAttemptLimits.broad;
   }
-  return MAX_INSTALLED_OTHER_REENTRY_ATTEMPTS;
+  return policy.installedOtherReentryAttemptLimit;
 }
 
 function installedRuntimeControlProfile(
@@ -576,26 +568,28 @@ export function installedReentryAttemptLimitForOutcome(input: {
   if (input.disposition !== "retry") {
     return installedReentryAttemptLimit(input.disposition);
   }
+  const policy = sdlcOperatorRuntimePolicy();
   switch (installedRuntimeControlProfile(input.outcome)) {
     case "framework_smoke":
-      return MAX_INSTALLED_FRAMEWORK_SMOKE_RETRY_REENTRY_ATTEMPTS;
+      return policy.installedRetryReentryAttemptLimits.frameworkSmoke;
     case "compact":
-      return MAX_INSTALLED_COMPACT_RETRY_REENTRY_ATTEMPTS;
+      return policy.installedRetryReentryAttemptLimits.compact;
     case "broad":
-      return MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS;
+      return policy.installedRetryReentryAttemptLimits.broad;
   }
 }
 
 export function installedRepeatedBlockerAttemptLimitForOutcome(
   outcome: Pick<SdlcInstalledOperatorStartOutcome, "manifest" | "summary">
 ): number {
+  const policy = sdlcOperatorRuntimePolicy();
   switch (installedRuntimeControlProfile(outcome)) {
     case "framework_smoke":
-      return MAX_INSTALLED_FRAMEWORK_SMOKE_REPEATED_BLOCKER_ATTEMPTS;
+      return policy.installedRepeatedBlockerAttemptLimits.frameworkSmoke;
     case "compact":
-      return MAX_INSTALLED_COMPACT_REPEATED_BLOCKER_ATTEMPTS;
+      return policy.installedRepeatedBlockerAttemptLimits.compact;
     case "broad":
-      return MAX_INSTALLED_BROAD_REPEATED_BLOCKER_ATTEMPTS;
+      return policy.installedRepeatedBlockerAttemptLimits.broad;
   }
 }
 
@@ -632,6 +626,63 @@ function activePostflightBlockingReasonCarriers(
   return postflight.status === "passed"
     ? Object.freeze([])
     : postflight.blockingReasonCarriers;
+}
+
+function readReviewGradePostflightForManifest(
+  manifest: SdlcWorkerHandoffManifest
+): SdlcPostflightResult | null {
+  const filePath = join(manifest.archiveRoot, "review_grade_postflight.json");
+  if (!existsSync(filePath)) {
+    return null;
+  }
+  try {
+    const payload = JSON.parse(readFileSync(filePath, "utf8")) as Partial<
+      SdlcPostflightResult
+    >;
+    if (
+      payload.kind !== "sdlc_operator_postflight_result" ||
+      !Array.isArray(payload.blockingReasons) ||
+      !Array.isArray(payload.blockingReasonCarriers) ||
+      !Array.isArray(payload.evidenceRefs) ||
+      (payload.status !== "passed" &&
+        payload.status !== "blocked" &&
+        payload.status !== "diagnostic")
+    ) {
+      return null;
+    }
+    return Object.freeze({
+      kind: "sdlc_operator_postflight_result" as const,
+      status: payload.status,
+      blockingReasons: Object.freeze([...payload.blockingReasons]),
+      blockingReasonCarriers: Object.freeze([
+        ...payload.blockingReasonCarriers
+      ]),
+      evidenceRefs: Object.freeze([...payload.evidenceRefs])
+    });
+  } catch {
+    return null;
+  }
+}
+
+function stateWithReviewGradePostflight(
+  state: SdlcAbgOwnedFpDispatchState
+): SdlcAbgOwnedFpDispatchState {
+  const reviewGradePostflight = readReviewGradePostflightForManifest(
+    state.manifest
+  );
+  if (reviewGradePostflight === null || reviewGradePostflight.status === "passed") {
+    return state;
+  }
+  const blockingReasonCarriers = Object.freeze([
+    ...activePostflightBlockingReasonCarriers(reviewGradePostflight),
+    ...state.blockingReasonCarriers
+  ]);
+  return Object.freeze({
+    ...state,
+    postflight: reviewGradePostflight,
+    blockingReason: summarizeBlockingReasons(blockingReasonCarriers),
+    blockingReasonCarriers
+  });
 }
 
 export function installedReentryGuardScopeForAttempt(input: {
@@ -735,7 +786,9 @@ export function deriveSdlcWorkerRetryContextFromTraversalConsequence(input: {
     input.outcome.gapDossier === null
       ? archivedGapDossier === null
         ? syntheticGapDossiersFromClosureDecision({
-            outcome: input.outcome,
+            manifest: input.outcome.manifest,
+            edgeClosureDecision:
+              input.outcome.traversalConsequence?.edgeClosureDecision ?? null,
             sourceProjectionRef
           })
         : Object.freeze([archivedGapDossier])
@@ -794,154 +847,6 @@ function archivedGapDossierForManifest(
   } catch {
     return null;
   }
-}
-
-function repairReasonFromClosurePressureRef(reasonRef: string): string {
-  const decoded = decodedArchiveRefForScope(reasonRef);
-  const repairRowPrefix = "component_repair_schedule_row:";
-  const repairRowIndex = decoded.lastIndexOf(repairRowPrefix);
-  if (repairRowIndex >= 0) {
-    return `component_repair_row_open:${decoded.slice(
-      repairRowIndex + repairRowPrefix.length
-    )}`;
-  }
-  if (decoded.includes("component_repair_schedule_repair_required")) {
-    return "component_repair_schedule_repair_required";
-  }
-  if (decoded.includes("component_repair_schedule_triage_gap")) {
-    return "component_repair_schedule_triage_gap";
-  }
-  const componentDepthIndex = decoded.indexOf("/component_depth_register_invalid:");
-  if (componentDepthIndex >= 0) {
-    return decoded.slice(componentDepthIndex + 1);
-  }
-  return `edge_closure_residual_pressure:${reasonRef}`;
-}
-
-function closurePressureRefRequiresTriageGap(reasonRef: string): boolean {
-  return decodedArchiveRefForScope(reasonRef).includes("triage_gap");
-}
-
-function closurePressureRefRequiresRepairReentry(reasonRef: string): boolean {
-  const decoded = decodedArchiveRefForScope(reasonRef);
-  return (
-    decoded.includes("component_repair_schedule_repair_required") ||
-    decoded.includes("component_repair_schedule_row:")
-  );
-}
-
-function closurePressureRefLawfulReentryPoint(
-  reasonRef: string
-): SdlcBlockingReasonLawfulReentryPoint {
-  if (closurePressureRefRequiresTriageGap(reasonRef)) {
-    return "triage_gap";
-  }
-  if (closurePressureRefRequiresRepairReentry(reasonRef)) {
-    return "repair_worker_output";
-  }
-  return "same_edge_retry";
-}
-
-function closurePressureRefMessage(reasonRef: string): string {
-  if (closurePressureRefRequiresTriageGap(reasonRef)) {
-    return "Edge closure residual pressure requires triage rather than same-edge retry.";
-  }
-  if (closurePressureRefRequiresRepairReentry(reasonRef)) {
-    return "Component repair schedule residual pressure requires repair re-entry.";
-  }
-  return "Edge closure residual pressure requires same-edge repair.";
-}
-
-function syntheticGapDossierFromClosureRefs(input: {
-  readonly manifest: Pick<
-    SdlcWorkerHandoffManifest,
-    "archiveRoot" | "edgeName" | "graphFunctionName" | "targetAssetType" | "vectorIndex"
-  >;
-  readonly decisionRef: string;
-  readonly reasonRefs: readonly string[];
-  readonly sourceProjectionRef: string;
-}): SdlcPostflightGapDossier | null {
-  if (input.reasonRefs.length === 0) {
-    return null;
-  }
-  if (
-    input.manifest.archiveRoot.length === 0 ||
-    input.manifest.edgeName.length === 0 ||
-    input.manifest.graphFunctionName.length === 0 ||
-    input.manifest.targetAssetType.length === 0
-  ) {
-    return null;
-  }
-  const currentGapDossierRef = `closure-gap-dossier://odd-sdlc/${encodeURIComponent(
-    input.decisionRef
-  )}`;
-  const reasons = input.reasonRefs.map(
-    (reasonRef): SdlcPostflightGapReason => {
-      const lawfulReentryPoint =
-        closurePressureRefLawfulReentryPoint(reasonRef);
-      return Object.freeze({
-        kind: "sdlc_postflight_gap_reason" as const,
-        reason: repairReasonFromClosurePressureRef(reasonRef),
-        reasonClass: "assurance" as const,
-        blockingReason: makeSdlcBlockingReason({
-          code: "edge_closure_residual_pressure",
-          reasonClass: "assurance",
-          lawfulReentryPoint,
-          message: closurePressureRefMessage(reasonRef),
-          detail: reasonRef,
-          evidenceRefs: [
-            input.decisionRef,
-            input.sourceProjectionRef,
-            reasonRef
-          ]
-        })
-      });
-    }
-  );
-  const blockingReasons = reasons.map((reason) => reason.blockingReason);
-  const retryEligible = sdlcPostflightGapRetryEligible(blockingReasons);
-  return Object.freeze({
-    kind: "sdlc_postflight_gap_dossier" as const,
-    status: "open" as const,
-    graphFunctionName: input.manifest.graphFunctionName,
-    edgeName: input.manifest.edgeName,
-    vectorIndex: input.manifest.vectorIndex,
-    targetAssetType: input.manifest.targetAssetType,
-    reasons: Object.freeze(reasons),
-    evidenceRefs: uniqueSorted([
-      input.decisionRef,
-      input.sourceProjectionRef,
-      ...input.reasonRefs
-    ]),
-    priorManifestId: pathToFileURL(
-      join(input.manifest.archiveRoot, "handoff_manifest.json")
-    ).href,
-    currentGapDossierRef,
-    retryEligible,
-    nextLawfulActions: deriveSdlcPostflightGapActions(blockingReasons)
-  });
-}
-
-function syntheticGapDossiersFromClosureDecision(input: {
-  readonly outcome: SdlcInstalledOperatorStartOutcome;
-  readonly sourceProjectionRef: string;
-}): readonly SdlcPostflightGapDossier[] {
-  const manifest = input.outcome.manifest;
-  const consequence = input.outcome.traversalConsequence;
-  if (
-    manifest === null ||
-    consequence === null ||
-    consequence.edgeClosureDecision.disposition === "close"
-  ) {
-    return Object.freeze([]);
-  }
-  const dossier = syntheticGapDossierFromClosureRefs({
-    manifest,
-    decisionRef: consequence.edgeClosureDecision.decisionRef,
-    reasonRefs: consequence.edgeClosureDecision.reasonRefs,
-    sourceProjectionRef: input.sourceProjectionRef
-  });
-  return dossier === null ? Object.freeze([]) : Object.freeze([dossier]);
 }
 
 function terminalReasonForInstalledStartLoop(input: {
@@ -1872,9 +1777,11 @@ function repairReentryGraphSpanRuntimeEvents(input: {
   const dossier = input.outcome.gapDossier;
   if (
     dossier === null ||
-    blockingReasonRefsForReentry({
-      state: input.outcome,
-      lawfulReentryPoint: "repair_worker_output"
+    sdlcClosureBlockingReasonRefsForReentry({
+      runRef: manifestRefSegment(input.outcome.manifest),
+      scope: "state",
+      blockingReasonCarriers: input.outcome.blockingReasonCarriers,
+      reentryPoint: "repair_worker_output"
     }).length === 0
   ) {
     return Object.freeze([]);
@@ -6556,41 +6463,10 @@ function edgeFulfillmentProjectionFor(input: {
   });
 }
 
-function blockingReasonRefsForReentry(input: {
-  readonly state: SdlcAbgOwnedFpDispatchState;
-  readonly lawfulReentryPoint: SdlcBlockingReasonLawfulReentryPoint;
-}): readonly string[] {
-  const runRef = manifestRefSegment(input.state.manifest);
-  return uniqueSorted(
-    input.state.blockingReasonCarriers.flatMap((reason, index) =>
-      reason.lawfulReentryPoint === input.lawfulReentryPoint
-        ? [
-            `blocking-reason://odd-sdlc/${runRef}/${String(index)}/${reason.code}`,
-            ...reason.evidenceRefs
-          ]
-        : []
-    )
-  );
-}
-
-function blockReasonRefsForState(
+function structuralBlockReasonRefsForState(
   state: SdlcAbgOwnedFpDispatchState
 ): readonly string[] {
-  if (
-    state.status === "worker_invoked" ||
-    blockingReasonRefsForReentry({
-      state,
-      lawfulReentryPoint: "same_edge_retry"
-    }).length > 0 ||
-    blockingReasonRefsForReentry({
-      state,
-      lawfulReentryPoint: "repair_worker_output"
-    }).length > 0 ||
-    blockingReasonRefsForReentry({
-      state,
-      lawfulReentryPoint: "reprice_requirement_or_design"
-    }).length > 0
-  ) {
+  if (state.status === "worker_invoked" || state.blockingReasonCarriers.length > 0) {
     return Object.freeze([]);
   }
   return uniqueSorted([
@@ -7658,30 +7534,6 @@ function deriveInstalledTraversalConsequence(input: {
     gain: edgeGain,
     residualPressure: edgeResidualPressure
   });
-  const triageGapResidualPressureRefs =
-    selectedEvaluationResidualPressureRefs.filter(
-      closurePressureRefRequiresTriageGap
-    );
-  const repairReentryResidualPressureRefs =
-    selectedEvaluationResidualPressureRefs.filter(
-      closurePressureRefRequiresRepairReentry
-    );
-  const rawAbgTerminalRetryRefs =
-    triageGapResidualPressureRefs.length > 0 ||
-    repairReentryResidualPressureRefs.length > 0
-      ? Object.freeze([])
-      : abgTerminalRetryReasonRefs({
-          runRef,
-          terminal: input.engineTerminal
-        });
-  const repairReasonRefs = blockingReasonRefsForReentry({
-    state: input.state,
-    lawfulReentryPoint: "repair_worker_output"
-  });
-  const repriceReasonRefs = blockingReasonRefsForReentry({
-    state: input.state,
-    lawfulReentryPoint: "reprice_requirement_or_design"
-  });
   const ledger = constructSdlcEdgeFulfillmentLedger({
     selectedComposition,
     ledgerRef,
@@ -7728,49 +7580,61 @@ function deriveInstalledTraversalConsequence(input: {
       ...input.start.executionContract.nextActionProjection.targetBindingRefs
     ])
   });
-  const abgTerminalRetryRefs =
-    ledger.edgeConverged && edgeAssuranceCloseDecision.disposition === "close"
-      ? Object.freeze([])
-      : rawAbgTerminalRetryRefs;
-  const retryReasonRefs = uniqueSorted([
-    ...blockingReasonRefsForReentry({
-      state: input.state,
-      lawfulReentryPoint: "same_edge_retry"
-    }),
-    ...abgTerminalRetryRefs
-  ]);
-  const currentEdgeLawful =
-    input.state.status !== "worker_report_rejected" &&
-    repriceReasonRefs.length === 0 &&
-    abgTerminalRetryRefs.length === 0;
-  const yieldResumeBasis = currentEdgeLawful
-    ? deriveSdlcProductLineageYieldResumeBasis({
-        runRef,
-        edgeRef: ledger.edgeRef,
-        blockingReasonCarriers: input.state.blockingReasonCarriers,
-        productEvidenceRefs: worksiteEvidence.productEvidenceRefs,
-        livenessProjectionRefs: worksiteEvidence.livenessProjectionRefs
-      })
-    : null;
+  const candidateYieldResumeBasis =
+    input.state.status === "worker_report_rejected"
+      ? null
+      : deriveSdlcProductLineageYieldResumeBasis({
+          runRef,
+          edgeRef: ledger.edgeRef,
+          blockingReasonCarriers: input.state.blockingReasonCarriers,
+          productEvidenceRefs: worksiteEvidence.productEvidenceRefs,
+          livenessProjectionRefs: worksiteEvidence.livenessProjectionRefs
+        });
+  const abgRuntimeTransitionProjectionSource = deriveRuntimeAggregateProjection(
+    input.basis,
+    Object.freeze([...input.replayEvents, ...input.emittedEvents])
+  );
+  const closureStateTransition = deriveSdlcClosureStateTransition({
+    abgRuntimeTransitionContext: {
+      basis: input.basis,
+      runtimeProjection: abgRuntimeTransitionProjectionSource,
+      vectorIndex: input.state.manifest.vectorIndex
+    },
+    runRef,
+    blockingReasonCarriers: input.state.blockingReasonCarriers,
+    residualPressureRefs: selectedEvaluationResidualPressureRefs,
+    abgTerminalRetryRefs:
+      ledger.edgeConverged && edgeAssuranceCloseDecision.disposition === "close"
+        ? Object.freeze([])
+        : abgTerminalRetryReasonRefs({
+            runRef,
+            terminal: input.engineTerminal
+          }),
+    structuralBlockReasonRefs: uniqueSorted([
+      ...structuralBlockReasonRefsForState(input.state),
+      ...fulfillmentProjection.nonConvergedReasonRefs
+    ]),
+    postActionBlockReasonRefs: postActionBlockingReasonRefs,
+    yieldResumeBasis: candidateYieldResumeBasis,
+    edgeCanClose:
+      ledger.edgeConverged && edgeAssuranceCloseDecision.disposition === "close",
+    edgeAssuranceDisposition: edgeAssuranceCloseDecision.disposition
+  });
   const closureDecision = deriveSdlcEdgeClosureDecision({
     decisionRef: closureDecisionRef,
     ledger,
     edgeClosureFunctionRef: edgeAssuranceContract.closureFunctionRef,
     edgeAssuranceCloseDecision,
-    currentEdgeLawful,
-    retryReasonRefs,
-    repairReasonRefs: uniqueSorted([
-      ...repairReasonRefs,
-      ...repairReentryResidualPressureRefs
-    ]),
-    repriceReasonRefs,
-    yieldResumeBasis,
-    blockReasonRefs: uniqueSorted([
-      ...blockReasonRefsForState(input.state),
-      ...triageGapResidualPressureRefs,
-      ...fulfillmentProjection.nonConvergedReasonRefs,
-      ...postActionBlockingReasonRefs
-    ])
+    currentEdgeLawful:
+      closureStateTransition.disposition !== "block" &&
+      closureStateTransition.disposition !== "reprice",
+    retryReasonRefs: closureStateTransition.retryReasonRefs,
+    repairReasonRefs: closureStateTransition.repairReasonRefs,
+    reenterReasonRefs: closureStateTransition.reenterReasonRefs,
+    repriceReasonRefs: closureStateTransition.repriceReasonRefs,
+    yieldResumeBasis: closureStateTransition.yieldResumeBasis,
+    blockReasonRefs: closureStateTransition.blockReasonRefs,
+    closurePolicy: closureStateTransition.closurePolicy
   });
   const postActionGapDossier =
     input.state.gapDossier ??
@@ -7778,7 +7642,10 @@ function deriveInstalledTraversalConsequence(input: {
       manifest: input.state.manifest,
       decisionRef: closureDecision.decisionRef,
       reasonRefs: closureDecision.reasonRefs,
-      sourceProjectionRef: plannedNextActionProjectionRef
+      sourceProjectionRef: plannedNextActionProjectionRef,
+      blockingReasonCarriers: input.state.blockingReasonCarriers,
+      runRef,
+      scope: "state"
     });
   const overlayCatalog = constructSdlcTraversalOverlayCatalog({ module });
   const activeOverlay = overlayCatalog.overlays.find(
@@ -9577,6 +9444,9 @@ function compactRuntimeEventArchivePayload(
           emitted.push(event);
         }
       });
+      if (dispatchState.current !== null) {
+        dispatchState.current = stateWithReviewGradePostflight(dispatchState.current);
+      }
       if (
         dispatchState.current !== null &&
         dispatchState.current.workerReport !== null
@@ -9839,10 +9709,11 @@ export async function executeInstalledOperatorStartWithReentry(input: {
   let retryContextOverride: SdlcWorkerRetryContext | undefined;
   const reentryDispositionCountsByScope = new Map<string, number>();
   const reentryBlockerCountsBySignature = new Map<string, number>();
+  const runtimePolicy = sdlcOperatorRuntimePolicy();
   const maxLoopAttempts =
     input.requestedUntil === "converged"
-      ? MAX_INSTALLED_CONVERGENCE_ATTEMPTS
-      : MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS;
+      ? runtimePolicy.installedConvergenceAttemptLimit
+      : runtimePolicy.installedYieldReentryAttemptLimit;
   for (
     let attemptIndex = 0;
     attemptIndex < maxLoopAttempts;

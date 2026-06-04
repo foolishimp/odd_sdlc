@@ -1,6 +1,6 @@
 # Typed Construction Algebra Requirements
 
-**Family**: REQ-F-ODDSDLC-074..085
+**Family**: REQ-F-ODDSDLC-074..086
 **Status**: Active
 **Category**: Governance, Runtime, Verification
 **Carries Forward From**:
@@ -554,3 +554,37 @@ authority, not through SDLC-core ecosystem semantics or hidden defaults.
   attempt, closure carries explicit residual pressure to the owning
   bootstrap/design/tenant-authority surface rather than treating deterministic
   execution failure, missing config, or worker prose as closure truth
+
+### REQ-F-ODDSDLC-086 - continuation is a total typed state transition
+
+Continuation after a worker-backed edge attempt shall be selected by one
+deterministic total state machine over typed admitted facts. It shall not be
+selected by scattered string heuristics, narrative pressure refs, worker prose,
+or ABG terminal status alone when typed SDLC blocking carriers exist.
+
+**Acceptance Criteria**:
+- AC-1: the state machine consumes typed inputs only: edge attempt status,
+  admitted blocking-reason carriers, admitted postflight/evaluator carriers,
+  edge assurance close decision, retry frontier, target-carrier admission,
+  downstream ownership refs, and declared runtime policy
+- AC-2: every admitted `SdlcBlockingReasonLawfulReentryPoint` maps to exactly
+  one transition bucket: `close`, `yield`, `reprice`, `repair`, `re-enter`,
+  `retry`, or `block`; unhandled or unsupported re-entry points fail closed as
+  `block`
+- AC-3: typed `triage_gap`, `operator_blocked`, runtime/process failure, or
+  evaluator-process failure facts shall not be normalized into same-edge
+  product transform retry by later residual-pressure or ABG terminal fallback
+  logic
+- AC-4: residual-pressure refs, reason refs, file refs, and terminal reason
+  strings are evidence for the selected transition; they are not the authority
+  that chooses the transition class when typed carriers are present
+- AC-5: ABG terminal retry pressure may request retry only when no typed
+  higher-priority block, triage, reprice, repair, re-enter, or yield basis is
+  present for the same edge attempt
+- AC-6: the realization exposes the transition state machine as a distinct
+  module with deterministic unit tests over the full transition table and at
+  least one integrated installed-operator regression for evaluator-process
+  failure
+- AC-7: live/sandbox proof of a prompt-bearing edge must show the selected
+  next action is derivable from the archived typed state-machine input, not
+  from replaying string matching over pressure refs

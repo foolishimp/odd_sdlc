@@ -14,11 +14,12 @@ re_entry_point: design
 priority: critical
 triaged_at: 2026-06-01
 created_at: 2026-06-01
-updated_at: 2026-06-03
+updated_at: 2026-06-04
 governance_scope: STDO Method
 source_documents:
   - specification/PRODUCT.md
   - specification/requirements/18-typed-construction-algebra.md
+  - .ai-workspace/comments/codex/20260603T160321Z_T188_typed_continuation_state_machine_design.md
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_ABG_3_9_RC3_COMPUTE_STAGE_BOUNDARY.md
   - .ai-workspace/tickets/active/T-184-partition-handoff-into-compute-stage-boundary-modules.md
   - .ai-workspace/tickets/completed/T-185-agent-internal-subworkstreams-for-compute-stage-acceleration.md
@@ -33,6 +34,7 @@ related_tickets:
 affected_boundary:
   - build_tenants/typescript/code/src/operator/plugins/transform/launch_contract.ts
   - build_tenants/typescript/code/src/operator/plugins/evaluate/prompts.ts
+  - build_tenants/typescript/code/src/operator/closure_state_machine.ts
   - build_tenants/typescript/code/src/operator/installed_operator.ts
   - build_tenants/typescript/code/src/operator/traversal_consequence.ts
   - build_tenants/typescript/code/src/operator/component_depth_register.ts
@@ -69,6 +71,8 @@ proof_surface:
   - consequence/closure tests proving downstream carry cannot erase open obligations without concrete downstream ownership
   - checked-in data_mapper-lite fixture generated from a documented subset of canonical data_mapper requirements, plus live/sandbox lifecycle runner that proves generated tests execute through the standard test lifecycle, not by a harness shortcut
   - same-sandbox live or sandbox data-mapper proof that shows multiple F_P iterations caused by admitted depth findings and no external product-code patching
+  - deterministic state-machine table proof for `REQ-F-ODDSDLC-086`, including evaluator-process failure, triage gaps, ABG terminal retry fallback, repair, re-enter, reprice, yield, and close
+  - installed-operator regression proving review-grade evaluator inactivity/process failure selects block/triage and never starts a same-edge `F_P.transform` retry when the product transform already produced admitted files
 non_closure_conditions:
   - F_D/core SDLC decides whether generated data_mapper code is behaviorally deep enough
   - a blocked/partial evaluator finding is accepted as closure because it has an evidence ref, source digest, or requirement marker
@@ -80,6 +84,8 @@ non_closure_conditions:
   - data_mapper-lite closes without generated tests being executed through admitted test-execution evidence
   - prompt text reintroduces exact semantic construction scripts or stack-specific product repair recipes
   - tenant-stack ambiguity is resolved by SDLC-core ecosystem defaults instead of a generic F_P reconciliation protocol over tenant/worksite authority
+  - continuation/retry/block selection is distributed across string pressure-ref heuristics instead of one typed state-machine module
+  - typed evaluator-process failure or `triage_gap` carriers are later converted into same-edge product transform retry by ABG terminal fallback pressure
 ---
 
 # T-188: Force F_P Depth Through Same-Sandbox Iteration And Prompt Control
@@ -418,9 +424,9 @@ Result:
 ### 2026-06-03 PTY Supervisor And Prompt-Profile Hardening
 
 Status: landed source + focused proof + clean PTY hello-world integration proof
-plus ABG release carry-forward. ABG `3.9.0-rc.9` is cut and tagged
-`v3.9.0-rc.9`; odd_sdlc now pins the RC9 release snapshot tarball that contains
-the supervisor, owner-exit cleanup, and retry-frontier coverage fixes.
+plus ABG release carry-forward. At this slice, ABG `3.9.0-rc.9` was cut and
+tagged `v3.9.0-rc.9`; odd_sdlc pinned the RC9 release snapshot tarball that
+contains the supervisor, owner-exit cleanup, and retry-frontier coverage fixes.
 
 ABG/runtime fixes:
 
@@ -473,8 +479,9 @@ SDLC fixes:
 ### 2026-06-03 Data-Mapper Lite Resume And ABG RC9 Carry-Forward
 
 Status: same-sandbox data_mapper-lite resume converged after one SDLC prompt
-bug and one ABG retry-frontier replay bug were fixed. ABG `3.9.0-rc.9` is cut
-and tagged `v3.9.0-rc.9`; odd_sdlc now pins the RC9 release snapshot tarball.
+bug and one ABG retry-frontier replay bug were fixed. At this slice, ABG
+`3.9.0-rc.9` was cut and tagged `v3.9.0-rc.9`; odd_sdlc pinned the RC9 release
+snapshot tarball.
 
 Active sandbox preserved and resumed:
 
@@ -492,7 +499,40 @@ Final observed state:
 - closure decision: `close`
 - postflight: `passed`
 - assurance: `close_allowed`
+
+### 2026-06-04 ABG RC10 Continuation-Transition Carry-Forward
+
+Status: ABG substrate half released; odd_sdlc package dependency bumped; SDLC
+consumption landed with focused proof.
+
+ABG `3.9.0-rc.10` is cut and tagged `v3.9.0-rc.10`. odd_sdlc now pins the RC10
+release snapshot tarball, which contains `REQ-R-ABG3-PROJECTION-019` and
+`RuntimeContinuationTransitionProjection`.
+
+Carry-forward requirement for this ticket:
+
+- SDLC closure must consume or map over the ABG runtime continuation-transition
+  projection.
+- Terminal retry fallback evidence must not outrank typed evaluator-process
+  failure, `triage_gap`, repair, re-enter, reprice, yield, or assurance facts.
+- Any local SDLC state-machine code must remain a domain adapter over ABG
+  transition truth, not a rival generic retry/block/yield authority.
 - next action: `disposition://close`
+
+Local carry-forward proof:
+
+- `closure_state_machine.ts` consumes
+  `deriveRuntimeContinuationTransitionProjection` and carries the ABG projection
+  ref into every local transition.
+- `installed_operator.ts` derives the ABG runtime aggregate projection from the
+  current replay/emitted event stream before selecting the SDLC closure
+  transition.
+- `test_t188_closure_state_machine.test.mjs` proves typed evaluator-process
+  failure plus terminal retry blocks; ABG terminal retry is only the no-typed
+  fallback; repair/re-enter adapters follow ABG typed-block priority; and the
+  old continuation decider helpers are not reintroduced outside the state
+  machine module.
+- `npm run test:t188` passed on 2026-06-04 after the RC10 bump.
 
 Bug classifications and fixes:
 
@@ -700,3 +740,130 @@ git diff --check
   pre-existing assertions in `installed_operator.ts`, `launch_contract.ts`,
   `tool_environment.ts`, `worker_tool_profile.ts`). It is not a valid closure
   gate for this incident until that debt is separately cleaned.
+
+Runtime state-machine follow-up from Sonnet-high hello-world run:
+
+- Incident run:
+  `build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260603T153222191Z_pid19186`.
+- Worker:
+  `process://claude?model=sonnet&effort=high` through PTY.
+- Observed good state: design and component-code transform reached the code
+  edge; `src/hello.js` and `test/hello.test.js` materialized; manual
+  `node src/hello.js` and `node --test test/hello.test.js` passed in the
+  sandbox.
+- Observed failure: the component-code review-grade evaluator was terminated by
+  the ABG inactivity brake after `180000ms` with `SIGTERM`. It wrote
+  `review_grade_postflight.json` containing typed
+  `review_grade_evaluator_process_failed`, `reasonClass: assurance`, and
+  `lawfulReentryPoint: triage_gap`.
+- Runtime bug: the closure/consequence path then still produced
+  `sdlc_edge_closure_decision.disposition: retry` and selected
+  `post_retry/derive_lite_component_code_surface`, starting a second product
+  transform attempt in the same sandbox.
+- Classification: SDLC typed-continuation policy-adapter bug over an
+  ABG-shaped runtime invariant. This is not generated hello-world product code
+  and not an F_P worksite repair. The generic event-calculus primitive belongs
+  in ABG; this T-188 slice owns the SDLC mapping from admitted SDLC blocking
+  reasons/residual pressure/yield basis/ABG terminal facts to one closure
+  disposition.
+- Requirement added:
+  `specification/requirements/18-typed-construction-algebra.md`
+  `REQ-F-ODDSDLC-086 - continuation is a total typed state transition`.
+- Design post:
+  `.ai-workspace/comments/codex/20260603T160321Z_T188_typed_continuation_state_machine_design.md`.
+- Required fix: implement one distinct SDLC continuation policy module that
+  consumes typed admitted facts and returns the transition bucket. It must not
+  implement generic ABG replay or event-ordering law. `installed_operator.ts`
+  may gather inputs and archive outputs, but it must not distribute transition
+  law across residual-pressure string helpers, ABG terminal fallback handling,
+  postflight gap dossier synthesis, and retry selection.
+- Review conditions accepted before implementation:
+  - migrate and remove scattered deciders; do not add an eighth transition
+    source of truth
+  - evaluator process failure blocks/triages in this slice; any evaluator-only
+    retry must be a future explicit typed transition and must never dispatch
+    `transform.C`
+  - ABG terminal retry is a fallback only and cannot outrank any typed
+    transition fact
+
+### 2026-06-04 Cumulative Stack Update
+
+Status: landed source + focused proof + same-sandbox hello-world convergence;
+ticket remains active pending broad/data-mapper-scale proof.
+
+ABG handoff:
+
+- ABG T-148 shipped in `@abiogenesis/typescript-tenant@3.9.0-rc.10`.
+- odd_sdlc now pins rc.10 and documents the substrate in
+  `specification/PRODUCT.md`.
+- `closure_state_machine.ts` consumes ABG's runtime continuation transition
+  projection and centralizes SDLC transition policy. Typed block/triage facts
+  outrank ABG terminal retry fallback; unknown states fail closed.
+- `installed_operator.ts` gathers typed SDLC facts and ABG runtime projection
+  inputs, but transition selection now goes through the state-machine module.
+
+Prompt/input contract fixes:
+
+- Transform prompts now distinguish execution-capable and no-execution worker
+  tool profiles, carry bounded Read discipline for both, and keep shell command
+  syntax out of no-execution profiles.
+- Worker prompt read order now points to the construction brief as the primary
+  source carrier, then treats worker brief, invocation package, traversal
+  intent, and manifest as bounded projections/read-on-demand carriers.
+- The design-depth evaluator prompt now pins every validator-required register
+  row `kind` literal, closing the prompt/validator API break that stopped
+  hello-world at design-depth admission.
+- Retry prompt lineage now filters current-gap requirement tags before they
+  enter `worker_invocation_package.requirementTraceObligationIds`: valid
+  requirement-shaped evaluated-gap IDs still flow, but runtime trace/archive
+  refs such as `worker_process_events.jsonl.trace` remain evidence only and
+  cannot become product-file requirement tags.
+
+Same-sandbox hello-world proof:
+
+- Run root:
+  `build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260604T021205875Z_pid87755`.
+- Worker:
+  `process://claude?model=sonnet&effort=high`, resumed in the same sandbox with
+  patched installed package after the prompt read-contract fix.
+- Initial component-code attempt failed by `silent_worker_inactivity`; ABG/SDLC
+  state-machine path selected `disposition: block`, proving evaluator/runtime
+  failure no longer becomes product transform retry.
+- After patch/resume, the lane reached `derive_lite_component_code_surface`,
+  generated `src/hello.js` and `test/hello.test.js`, ran the declared
+  `node --test test/hello.test.js`, and converged.
+- Final observed summary:
+  `status=converged`, `obligationReview.status=passed`, expected/fulfilled
+  `4/4`, `admittedSemantic.status=admitted`,
+  `targetCarrierAdmissionStatus=admitted`, `closureDisposition=close`.
+- One product-worksite retry occurred inside the sandbox for an invalid
+  component-depth enum value; the F_P worker repaired it on the next attempt.
+  No generated product code was patched from outside.
+
+Proof run:
+
+```bash
+npm run build:semantic
+node --test \
+  test_env/tests/test_t118_worker_invocation_package.test.mjs \
+  test_env/tests/test_t099_tranched_indexed_pressure.test.mjs \
+  test_env/tests/test_t088_traversal_intent_package.test.mjs \
+  test_env/tests/test_t187_fp_evaluator_prompt_boundary.test.mjs \
+  test_env/tests/test_t181_fp_evaluator_design_register.test.mjs \
+  test_env/tests/test_t120_retry_local_repair_prompt.test.mjs
+npm run test:t188
+git diff --check
+```
+
+Result:
+
+- `build:semantic`: passed.
+- Focused prompt/retry/design-depth pack: passed, 82/82.
+- `test:t188`: passed, guard 7/7 and T-188 21/21.
+- `git diff --check`: clean.
+
+Remaining:
+
+- Keep T-188 active until the data_mapper-lite or broader data_mapper proof
+  demonstrates depth pressure forcing F_P iteration without F_D semantic
+  compensation or external product-code patches.

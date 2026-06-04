@@ -387,6 +387,20 @@ export type {
 } from "./traversal_consequence.js";
 
 export {
+  deriveSdlcClosureStateTransition,
+  sdlcClosureBlockingReasonRefsForReentry,
+  sdlcClosureStateBucketForLawfulReentryPoint,
+  syntheticGapDossierFromClosureRefs,
+  syntheticGapDossiersFromClosureDecision
+} from "./closure_state_machine.js";
+export type {
+  SdlcClosureAbgRuntimeTransitionContext,
+  SdlcClosureStateMachineBucket,
+  SdlcClosureStateTransition,
+  SdlcClosureStateTransitionExplanation
+} from "./closure_state_machine.js";
+
+export {
   deriveLegacyReplayOnlySdlcSelectedAbgFnCompositionIdentity,
   deriveSdlcPreRuntimePlanningCompositionIdentity,
   deriveSdlcSelectedAbgFnCompositionIdentity,
@@ -541,13 +555,6 @@ export {
   installedRepeatedBlockerAttemptLimitForOutcome,
   installedStartRequestsYieldResume,
   installedStartShouldContinueForRequestedUntil,
-  MAX_INSTALLED_CONVERGENCE_ATTEMPTS,
-  MAX_INSTALLED_COMPACT_REPEATED_BLOCKER_ATTEMPTS,
-  MAX_INSTALLED_COMPACT_RETRY_REENTRY_ATTEMPTS,
-  MAX_INSTALLED_FRAMEWORK_SMOKE_REPEATED_BLOCKER_ATTEMPTS,
-  MAX_INSTALLED_FRAMEWORK_SMOKE_RETRY_REENTRY_ATTEMPTS,
-  MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS,
-  MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS,
   mergeSdlcWorkerRetryContextWithRuntimeGapRegister,
   normalizePostCloseContinuationVectorIndex,
   sdlcWorkerRetryContextFromAbgRetryContext,

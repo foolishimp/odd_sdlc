@@ -30,8 +30,8 @@ for the TypeScript line.
 
 The ABIogenesis TypeScript tenant is substrate evidence consumed through
 explicit release snapshots. The current TypeScript line consumes
-`@abiogenesis/typescript-tenant@3.9.0-rc.9` from
-`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.9.0-rc.9/`.
+`@abiogenesis/typescript-tenant@3.9.0-rc.10` from
+`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.9.0-rc.10/`.
 That cut proves GTL/ABG carriers, graph-function iteration, traversal probes,
 evented saga-frontier execution, no-compute-basis failure taxonomy,
 bootstrap-lineage slices, selected `abg.fn_composition` identity, canonical
@@ -42,7 +42,10 @@ projection, target-carrier output admission before closure, PTY-local-spawn
 worker supervision, heartbeat/progress lease separation, trace-visible
 inactivity cleanup, supervisor owner-exit cleanup for interrupted PTY workers,
 and retry-frontier replay that treats zero-attempt stops as evidence rather
-than fake attempt coverage. It is not itself `odd_sdlc.TS`, and it does not
+than fake attempt coverage. It also proves ABG's replay-derived runtime
+continuation-transition projection, where typed runtime facts and assurance
+fold outcomes outrank terminal retry fallback evidence. It is not itself
+`odd_sdlc.TS`, and it does not
 complete the SDLC product behavior.
 
 `odd_sdlc.TS` release evidence is rooted at

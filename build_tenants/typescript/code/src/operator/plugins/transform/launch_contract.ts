@@ -533,11 +533,13 @@ function transformWorkerIoDisciplineLines(
 ): readonly string[] {
   if (sdlcWorkerTargetUsesShellToolProfile(manifest)) {
     return Object.freeze([
-      "- IO cap: reads <=80 lines. jq/rg/cat/git diff/status end `| head -80`; no bare jq/rg/cat. sed is inclusive: end-start+1<=80; `200,299p` invalid (100), use `200,279p`."
+      "- Tool-profile contract: this execution-capable SDLC profile may use shell only when the active tool list exposes it; keep shell commands bounded, workspace-relative, foreground-only, and never launch framework, traversal, or background workers.",
+      "- Read cap: every Read tool call over JSON, Markdown, report, manifest, or source artifacts must set limit <=80 and inspect only the slice needed for the current checklist row.",
+      "- Shell IO cap: command output reads <=80 lines. jq/rg/cat/git diff/status end `| head -80`; no bare jq/rg/cat. sed is inclusive: end-start+1<=80; `200,299p` invalid (100), use `200,279p`."
     ]);
   }
   return Object.freeze([
-    "- Tool-profile contract: this planning edge has a no-execution SDLC profile. Obey the active tool list; if command execution is visible in the worker runtime, use it only for bounded workspace-relative read-only inspection and never for product execution, build/test commands, framework/traversal commands, background jobs, or artifact writes.",
+    "- Tool-profile contract: no-execution SDLC profile. Obey active tools; if command execution is visible, use only bounded workspace-relative read-only inspection; never run product, build/test, framework/traversal, background, or artifact-write commands.",
     "- Read cap: every Read tool call or read-only command over JSON, Markdown, report, manifest, or source artifacts must inspect <=80 lines and only the lines needed for the current checklist row. Do not run unbounded recursive scans."
   ]);
 }
@@ -8593,10 +8595,20 @@ function currentEvaluatedGapRequirementIds(
   manifest: SdlcWorkerHandoffManifest,
   dossier: SdlcPostflightGapDossier
 ): readonly string[] {
+  const activeRequirementObligationIds = new Set(
+    manifest.traversalObligationContext.obligations
+      .filter((obligation) => obligation.obligationKind === "requirement")
+      .map((obligation) => obligation.obligationId)
+  );
   const assessmentIds = currentEvaluatedGapAssessmentRequirementIds({
     manifest,
     dossier
-  });
+  }).filter((obligationId) =>
+    currentEvaluatedGapRequirementIdIsAdmissible({
+      activeRequirementObligationIds,
+      obligationId
+    })
+  );
   if (assessmentIds.length > 0) {
     return assessmentIds;
   }
@@ -8634,10 +8646,44 @@ function currentEvaluatedGapRequirementIds(
   for (const candidate of candidateTexts) {
     for (const match of candidate.matchAll(fallbackPattern)) {
       const raw = match[0];
-      ids.add(raw.startsWith("requirement:") ? raw : `requirement:${raw}`);
+      const obligationId = raw.startsWith("requirement:")
+        ? raw
+        : `requirement:${raw}`;
+      if (
+        currentEvaluatedGapRequirementIdIsAdmissible({
+          activeRequirementObligationIds,
+          obligationId
+        })
+      ) {
+        ids.add(obligationId);
+      }
     }
   }
   return uniqueSorted([...ids]);
+}
+
+function currentEvaluatedGapRequirementIdIsAdmissible(input: {
+  readonly activeRequirementObligationIds: ReadonlySet<string>;
+  readonly obligationId: string;
+}): boolean {
+  if (input.activeRequirementObligationIds.has(input.obligationId)) {
+    return true;
+  }
+  if (!input.obligationId.startsWith("requirement:")) {
+    return false;
+  }
+  const raw = input.obligationId.slice("requirement:".length).toLowerCase();
+  if (
+    raw.includes("/") ||
+    raw.includes("://") ||
+    raw.includes(".json") ||
+    raw.includes(".jsonl") ||
+    raw.endsWith(".trace") ||
+    raw.includes(".trace.")
+  ) {
+    return false;
+  }
+  return raw.includes("requirement") || /(?:^|[._-])req[._-]/u.test(raw);
 }
 
 function currentEvaluatedGapPromptLines(
@@ -8813,11 +8859,11 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     "- traversalIntentPackage ref."
   ];
   const workerPackageFieldLines = [
-    "- worker_invocation_package.outcomeDirectives.",
-    "- worker_invocation_package.computeSubworkstreamPolicy.",
-    "- retryRepairInstructions and repairReentryPlans when present.",
-    "- acceptedCarrierSchemaRef / acceptedCarrierFieldSet.",
-    "- traversalIntentPackageRef; do not inline JSON."
+    "- worker_invocation_package.outcomeDirectives if omitted.",
+    "- worker_invocation_package.computeSubworkstreamPolicy if omitted.",
+    "- retryRepairInstructions and repairReentryPlans when present; read only if named.",
+    "- acceptedCarrierSchemaRef / acceptedCarrierFieldSet only for structured carriers.",
+    "- traversalIntentPackageRef for citation; do not inline JSON."
   ];
   const requirementSurfaceTraceAxiomLines =
     manifest.targetAssetType === "requirement_surface"
@@ -8858,11 +8904,11 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     "Read in order:",
     `1. compressed work-category governance: ${governancePath}`,
     `2. construction brief: ${workerFacingPath(manifest, constructionBriefPath)}`,
-    `3. worker brief projection: ${workerFacingPath(manifest, workerBriefPath)}`,
-    `4. invocation package projection: ${workerFacingPath(manifest, invocationPackagePath)}`,
-    `5. traversal intent projection: ${workerFacingPath(manifest, traversalIntentPath)}`,
-    `6. forensic manifest only when a package ref requires it: ${workerFacingPath(manifest, manifestPath)}`,
-    "7. construction brief authority refs.",
+    `3. worker brief projection: locator only; ${workerFacingPath(manifest, workerBriefPath)}`,
+    "4. needed construction brief authority refs.",
+    `5. invocation package projection: only missing fields; ${workerFacingPath(manifest, invocationPackagePath)}`,
+    `6. traversal intent projection: stable refs only; ${workerFacingPath(manifest, traversalIntentPath)}`,
+    `7. forensic manifest only when a package ref requires it: ${workerFacingPath(manifest, manifestPath)}`,
     "",
     "Terse axioms:",
     "- Apply worker_construction_brief.json as the single prompt source carrier.",
@@ -8890,7 +8936,7 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     "Construction brief fields to apply:",
     ...constructionBriefFieldLines,
     "",
-    "Worker package fields to apply:",
+    "Worker package fields to apply only on demand:",
     ...workerPackageFieldLines,
     ...currentEvaluatedGaps,
     "",

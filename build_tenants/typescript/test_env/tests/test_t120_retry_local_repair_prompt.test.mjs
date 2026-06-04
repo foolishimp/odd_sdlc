@@ -713,6 +713,81 @@ test("T-164 retry prompt names current evaluated requirement gaps", () => {
   assert.match(prompt, /file:\/\/\/tmp\/t164\/fp_evaluate_result\.json/u);
 });
 
+test("T-188 retry trace evidence does not become product-file requirement lineage", () => {
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const traceRef =
+    "file:///tmp/t188/operator-runs/run/worker_process_events.jsonl.trace/result.json";
+  const detail = [
+    "materialized_product_requirement_lineage_missing:",
+    "src/hello.js: requirement:t120_retry_local_repair.requirements.req_t120_001;",
+    `traceResultRef=${traceRef}`
+  ].join("");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspaceRoot(),
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 14,
+    contract,
+    retryContext: {
+      kind: "sdlc_worker_retry_context",
+      retryAttemptRefs: [],
+      priorGapDossiers: [
+        {
+          kind: "sdlc_postflight_gap_dossier",
+          status: "open",
+          graphFunctionName: "bootstrap_release_self_test",
+          edgeName: contract.edgeName,
+          vectorIndex: 14,
+          targetAssetType: "component_code_surface",
+          reasons: [
+            {
+              kind: "sdlc_postflight_gap_reason",
+              reason: detail,
+              reasonClass: "missing_evidence",
+              blockingReason: {
+                ...sdlcBlockingReasonFromLegacy({
+                  reason: "materialized_product_requirement_lineage_missing"
+                }),
+                code: "materialized_product_requirement_lineage_missing",
+                reasonClass: "missing_evidence",
+                lawfulReentryPoint: "same_edge_retry",
+                message:
+                  "Materialized product evidence does not satisfy the product contract.",
+                detail,
+                evidenceRefs: [traceRef]
+              }
+            }
+          ],
+          evidenceRefs: [traceRef],
+          priorManifestId: "file:///tmp/t188/handoff_manifest.json",
+          currentGapDossierRef: "file:///tmp/t188/gap_dossier.json",
+          retryEligible: true,
+          nextLawfulActions: ["retry_same_edge"]
+        }
+      ]
+    },
+    runId: "t188-runtime-trace-not-requirement-lineage"
+  });
+  const files = writeHandoffFiles(manifest);
+  const invocationPackage = JSON.parse(
+    readFileSync(files.invocationPackagePath, "utf8")
+  );
+  const prompt = readFileSync(files.promptPath, "utf8");
+
+  assert(
+    invocationPackage.requirementTraceObligationIds.some((obligationId) =>
+      obligationId.endsWith(".req_t120_001")
+    )
+  );
+  assert(
+    !invocationPackage.requirementTraceObligationIds.includes(
+      "requirement:worker_process_events.jsonl.trace"
+    )
+  );
+  assert.match(prompt, /worker_process_events\.jsonl\.trace/u);
+  assert.doesNotMatch(prompt, /requirement:worker_process_events\.jsonl\.trace/u);
+});
+
 test("T-164 execution-environment retry prompt preserves test lineage", () => {
   const contract = hookContractByEdgeName("derive_component_test_surface");
   const manifest = deriveWorkerHandoffManifest({
@@ -1325,5 +1400,7 @@ test("T-120 Spec Method entry does not own installed retry control", () => {
   assert(!entry.includes("MAX_INSTALLED_START_SELF_HEAL_ATTEMPTS"));
   assert(!entry.includes("sdlc_installed_operator_start_loop_attempt"));
   assert.match(installedOperator, /executeInstalledOperatorStartWithReentry/u);
-  assert.match(installedOperator, /MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS/u);
+  assert.match(installedOperator, /sdlcOperatorRuntimePolicy/u);
+  assert.match(installedOperator, /installedRetryReentryAttemptLimits/u);
+  assert(!installedOperator.includes("MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS"));
 });

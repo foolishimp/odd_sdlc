@@ -17,13 +17,6 @@ import { pathToFileURL } from "node:url";
 
 import {
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
-  MAX_INSTALLED_CONVERGENCE_ATTEMPTS,
-  MAX_INSTALLED_COMPACT_REPEATED_BLOCKER_ATTEMPTS,
-  MAX_INSTALLED_COMPACT_RETRY_REENTRY_ATTEMPTS,
-  MAX_INSTALLED_FRAMEWORK_SMOKE_REPEATED_BLOCKER_ATTEMPTS,
-  MAX_INSTALLED_FRAMEWORK_SMOKE_RETRY_REENTRY_ATTEMPTS,
-  MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS,
-  MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS,
   buildPostTransformWorkerResultReport,
   constructWorkerInvocationPackage,
   declaredProductFileTargets,
@@ -40,6 +33,8 @@ import {
   readWorkerResultReport,
   reconcileSdlcProductMaterializationAuthority,
   sha256Text,
+  sdlcOperatorRuntimePolicy,
+  sdlcOperatorRuntimePolicyConfigPath,
   sdlcWorkspaceLocalToolEnvironment,
   snapshotProductMaterializationRoot,
   writeHandoffFiles,
@@ -597,13 +592,44 @@ function writeWorkerResultReport(input) {
   );
 }
 
-test("T-143 installed loop circuit breakers distinguish retry and yield", () => {
-  assert.equal(MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS, 100);
-  assert.equal(MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS, 400);
-  assert.equal(MAX_INSTALLED_CONVERGENCE_ATTEMPTS, 4000);
-  assert.equal(installedReentryAttemptLimit("retry"), 100);
-  assert.equal(installedReentryAttemptLimit("yield"), 400);
-  assert.equal(installedReentryAttemptLimit("other"), 100);
+test("T-143 installed loop circuit breakers come from runtime policy config", () => {
+  const policy = sdlcOperatorRuntimePolicy();
+  const config = JSON.parse(
+    readFileSync(sdlcOperatorRuntimePolicyConfigPath(), "utf8")
+  );
+
+  assert.equal(
+    policy.installedConvergenceAttemptLimit,
+    config.installedReentry.convergenceAttemptLimit
+  );
+  assert.equal(
+    policy.installedYieldReentryAttemptLimit,
+    config.installedReentry.yieldReentryAttemptLimit
+  );
+  assert.equal(
+    policy.installedOtherReentryAttemptLimit,
+    config.installedReentry.otherReentryAttemptLimit
+  );
+  assert.deepEqual(
+    policy.installedRetryReentryAttemptLimits,
+    config.installedReentry.retryReentryAttemptLimits
+  );
+  assert.deepEqual(
+    policy.installedRepeatedBlockerAttemptLimits,
+    config.installedReentry.repeatedBlockerAttemptLimits
+  );
+  assert.equal(
+    installedReentryAttemptLimit("retry"),
+    policy.installedRetryReentryAttemptLimits.broad
+  );
+  assert.equal(
+    installedReentryAttemptLimit("yield"),
+    policy.installedYieldReentryAttemptLimit
+  );
+  assert.equal(
+    installedReentryAttemptLimit("other"),
+    policy.installedOtherReentryAttemptLimit
+  );
 });
 
 test("T-188 installed retry brakes scale down for framework-smoke profiles", () => {
@@ -640,35 +666,36 @@ test("T-188 installed retry brakes scale down for framework-smoke profiles", () 
       graphFunctionName: "data_mapper_full"
     }
   };
+  const policy = sdlcOperatorRuntimePolicy();
 
   assert.equal(
     installedReentryAttemptLimitForOutcome({
       disposition: "retry",
       outcome: smokeOutcome
     }),
-    MAX_INSTALLED_FRAMEWORK_SMOKE_RETRY_REENTRY_ATTEMPTS
+    policy.installedRetryReentryAttemptLimits.frameworkSmoke
   );
   assert.equal(
     installedReentryAttemptLimitForOutcome({
       disposition: "retry",
       outcome: compactOutcome
     }),
-    MAX_INSTALLED_COMPACT_RETRY_REENTRY_ATTEMPTS
+    policy.installedRetryReentryAttemptLimits.compact
   );
   assert.equal(
     installedReentryAttemptLimitForOutcome({
       disposition: "retry",
       outcome: broadOutcome
     }),
-    MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS
+    policy.installedRetryReentryAttemptLimits.broad
   );
   assert.equal(
     installedRepeatedBlockerAttemptLimitForOutcome(smokeOutcome),
-    MAX_INSTALLED_FRAMEWORK_SMOKE_REPEATED_BLOCKER_ATTEMPTS
+    policy.installedRepeatedBlockerAttemptLimits.frameworkSmoke
   );
   assert.equal(
     installedRepeatedBlockerAttemptLimitForOutcome(compactOutcome),
-    MAX_INSTALLED_COMPACT_REPEATED_BLOCKER_ATTEMPTS
+    policy.installedRepeatedBlockerAttemptLimits.compact
   );
 });
 

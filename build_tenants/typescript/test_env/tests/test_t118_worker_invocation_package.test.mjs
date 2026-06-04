@@ -525,6 +525,20 @@ test("T-002 worker package and prompt carry declared product file targets", () =
     prompt,
     /Declared product file targets: build_tenants\/scala_spark\/build\.sbt, build_tenants\/scala_spark\/src\/main\/scala\/generated\/App\.scala\./u
   );
+  assert.match(
+    prompt,
+    /Tool-profile contract: this execution-capable SDLC profile may use shell only when the active tool list exposes it/u
+  );
+  assert.match(
+    prompt,
+    /Read cap: every Read tool call over JSON, Markdown, report, manifest, or source artifacts must set limit <=80/u
+  );
+  assert.match(prompt, /worker brief projection: locator only/u);
+  assert.match(
+    prompt,
+    /invocation package projection: only missing fields/u
+  );
+  assert.match(prompt, /Worker package fields to apply only on demand/u);
   const outcomeDirectives = invocationPackage.outcomeDirectives.join("\n");
   assert.match(
     outcomeDirectives,

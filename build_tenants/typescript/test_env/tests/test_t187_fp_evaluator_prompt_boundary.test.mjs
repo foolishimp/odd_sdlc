@@ -321,7 +321,7 @@ test("T-187 transform prompts bound terminal output for large authority reads", 
   );
   assert.match(
     launchContractSource,
-    /Tool-profile contract: this planning edge has a no-execution SDLC profile/u
+    /Tool-profile contract: no-execution SDLC profile/u
   );
   assert.match(
     launchContractSource,
@@ -329,7 +329,11 @@ test("T-187 transform prompts bound terminal output for large authority reads", 
   );
   assert.match(
     launchContractSource,
-    /IO cap: reads <=80 lines/u
+    /Read cap: every Read tool call over JSON, Markdown, report, manifest, or source artifacts must set limit <=80/u
+  );
+  assert.match(
+    launchContractSource,
+    /Shell IO cap: command output reads <=80 lines/u
   );
   assert.match(
     launchContractSource,
