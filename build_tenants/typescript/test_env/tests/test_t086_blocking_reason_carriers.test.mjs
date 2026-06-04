@@ -142,6 +142,8 @@ test("T-188 evaluator process failures do not route to product F_P repair", () =
   for (const code of [
     "review_grade_assessment_missing",
     "review_grade_assessment_invalid",
+    "design_depth_fp_evaluator_process_failed",
+    "design_depth_fp_evaluator_rule_blocked",
     "review_grade_evaluator_process_failed",
     "review_grade_evaluator_process_timeout",
     "review_grade_evaluator_mutated_input"

@@ -292,6 +292,8 @@ function sdlcClosurePressureRefRequiresTriage(reasonRef: string): boolean {
   const decoded = decodedRef(reasonRef);
   return (
     decoded.includes("triage_gap") ||
+    decoded.includes("design_depth_fp_evaluator_process_failed") ||
+    decoded.includes("design_depth_fp_evaluator_rule_blocked") ||
     decoded.includes("review_grade_assessment_invalid") ||
     decoded.includes("review_grade_assessment_missing") ||
     decoded.includes("review_grade_evaluator_mutated_input") ||

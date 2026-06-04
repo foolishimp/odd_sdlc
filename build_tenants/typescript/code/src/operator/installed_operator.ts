@@ -4722,6 +4722,76 @@ function writeDesignDepthFpEvaluatorRuleOutcomeProof(input: {
   ).href;
 }
 
+function designDepthFpEvaluatorBlockingReasonCode(
+  outcome: EvaluationRuleOutcome
+): SdlcBlockingReasonCode {
+  return outcome.reason === "design_depth_fp_evaluator_process_failed"
+    ? "design_depth_fp_evaluator_process_failed"
+    : "design_depth_fp_evaluator_rule_blocked";
+}
+
+function designDepthFpEvaluatorBlockedPostflight(input: {
+  readonly outcome: EvaluationRuleOutcome;
+  readonly ruleOutcomeRef: string;
+}): SdlcPostflightResult {
+  const code = designDepthFpEvaluatorBlockingReasonCode(input.outcome);
+  const evidenceRefs = uniqueSorted([
+    input.ruleOutcomeRef,
+    ...input.outcome.evidenceRefs,
+    ...input.outcome.diagnosticRefs,
+    ...input.outcome.residualPressureRefs
+  ]);
+  const carrier = makeSdlcBlockingReason({
+    code,
+    detail: input.outcome.reason ?? code,
+    evidenceRefs
+  });
+  return Object.freeze({
+    kind: "sdlc_operator_postflight_result" as const,
+    status: "blocked" as const,
+    blockingReasons: Object.freeze([legacyBlockingReasonCode(carrier)]),
+    blockingReasonCarriers: Object.freeze([carrier]),
+    evidenceRefs
+  });
+}
+
+function stateWithBlockedDesignDepthFpEvaluatorOutcome(input: {
+  readonly state: SdlcAbgOwnedFpDispatchState;
+  readonly outcome: EvaluationRuleOutcome;
+  readonly ruleOutcomeRef: string;
+}): SdlcAbgOwnedFpDispatchState {
+  const postflight = designDepthFpEvaluatorBlockedPostflight({
+    outcome: input.outcome,
+    ruleOutcomeRef: input.ruleOutcomeRef
+  });
+  writeSdlcSystemArtifact({
+    archiveRoot: input.state.manifest.archiveRoot,
+    relativePath: "design_depth_fp_evaluator_postflight.json",
+    payload: postflight
+  });
+  if (input.state.workerReport !== null) {
+    writeSdlcFpEvaluateResult({
+      manifest: input.state.manifest,
+      selectedComposition: input.state.selectedComposition,
+      report: input.state.workerReport,
+      postflight,
+      postflightRef: pathToFileURL(
+        join(input.state.manifest.archiveRoot, "design_depth_fp_evaluator_postflight.json")
+      ).href
+    });
+  }
+  const blockingReasonCarriers = Object.freeze([
+    ...postflight.blockingReasonCarriers,
+    ...input.state.blockingReasonCarriers
+  ]);
+  return Object.freeze({
+    ...input.state,
+    postflight,
+    blockingReason: summarizeBlockingReasons(blockingReasonCarriers),
+    blockingReasonCarriers
+  });
+}
+
 
 function workerReportWithReviewGradeAssessment(input: {
   readonly report: SdlcWorkerResultReport;
@@ -9499,6 +9569,12 @@ function compactRuntimeEventArchivePayload(
           dispatchState.current.manifest.archiveRoot,
           Object.freeze([ruleOutcomeRef])
         );
+      } else {
+        dispatchState.current = stateWithBlockedDesignDepthFpEvaluatorOutcome({
+          state: dispatchState.current,
+          outcome,
+          ruleOutcomeRef
+        });
       }
       return outcome;
   };

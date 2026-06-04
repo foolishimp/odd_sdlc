@@ -66,6 +66,8 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "review_grade_assessment_missing",
   "review_grade_assessment_invalid",
   "review_grade_edge_fulfillment_blocked",
+  "design_depth_fp_evaluator_process_failed",
+  "design_depth_fp_evaluator_rule_blocked",
   "review_grade_evaluator_process_failed",
   "review_grade_evaluator_process_timeout",
   "review_grade_evaluator_mutated_input",
@@ -205,6 +207,8 @@ const DETAIL_PRESERVING_LEGACY_REASON_CODES = Object.freeze([
   "review_grade_assessment_missing",
   "review_grade_assessment_invalid",
   "review_grade_edge_fulfillment_blocked",
+  "design_depth_fp_evaluator_process_failed",
+  "design_depth_fp_evaluator_rule_blocked",
   "review_grade_evaluator_process_failed",
   "review_grade_evaluator_process_timeout",
   "review_grade_evaluator_mutated_input",
@@ -349,6 +353,8 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
     });
   }
   if (
+    code === "design_depth_fp_evaluator_process_failed" ||
+    code === "design_depth_fp_evaluator_rule_blocked" ||
     code === "review_grade_assessment_missing" ||
     code === "review_grade_assessment_invalid" ||
     code === "review_grade_evaluator_process_failed" ||
@@ -359,7 +365,7 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       reasonClass: "assurance",
       lawfulReentryPoint: "triage_gap",
       message:
-        "Review-grade evaluator process or assessment admission failed and requires operator triage."
+        "F_P evaluator process or rule admission failed and requires operator triage."
     });
   }
   if (

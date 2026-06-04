@@ -12,7 +12,7 @@ import {
   sdlcSelectedAbgFnCompositionIdentityFromEnginePluginInput
 } from "../../build/semantic/code/src/index.js";
 
-const ABG_RC_VERSION = "3.9.0-rc.9";
+const ABG_RC_VERSION = "3.9.0-rc.10";
 const ABG_DEPENDENCY_REF = `file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/${ABG_RC_VERSION}/abiogenesis-typescript-tenant-${ABG_RC_VERSION}.tgz`;
 
 const PACKAGE_ROOT = process.cwd();

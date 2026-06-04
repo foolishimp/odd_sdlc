@@ -91,46 +91,49 @@ test("T-188 every lawful reentry point maps to one closure-state bucket", () => 
 });
 
 test("T-188 evaluator process failure blocks instead of product-transform retry", () => {
-  const transition = transitionFor({
-    blockingReasonCarriers: [
-      makeSdlcBlockingReason({
-        code: "review_grade_evaluator_process_failed",
-        detail: "exitCode=null;signal=SIGTERM",
-        evidenceRefs: [
-          "file:///tmp/review_grade_postflight.json",
-          "runtime-event://odd-sdlc/t188/abg-inactivity-timeout"
-        ]
-      })
-    ],
-    abgTerminalRetryRefs: [
-      "terminal-retry://odd-sdlc/t188/review_grade_evaluator_process_failed"
-    ],
-    edgeAssuranceDisposition: "retry"
-  });
+  for (const code of [
+    "design_depth_fp_evaluator_process_failed",
+    "review_grade_evaluator_process_failed"
+  ]) {
+    const transition = transitionFor({
+      blockingReasonCarriers: [
+        makeSdlcBlockingReason({
+          code,
+          detail: "exitCode=null;signal=SIGTERM",
+          evidenceRefs: [
+            `file:///tmp/${code}.json`,
+            "runtime-event://odd-sdlc/t188/abg-inactivity-timeout"
+          ]
+        })
+      ],
+      abgTerminalRetryRefs: [`terminal-retry://odd-sdlc/t188/${code}`],
+      edgeAssuranceDisposition: "retry"
+    });
 
-  assert.equal(transition.disposition, "block");
-  assert.equal(transition.explanationCode, "typed_block_or_triage");
-  assert.equal(
-    transition.abgRuntimeTransitionProjection.disposition,
-    "block"
-  );
-  assert.equal(
-    transition.abgRuntimeTransitionProjection.reason,
-    "typed_block"
-  );
-  assert.deepStrictEqual(transition.retryReasonRefs, []);
-  assert(
-    transition.blockReasonRefs.some((ref) =>
-      ref.includes("review_grade_evaluator_process_failed")
-    ),
-    transition.blockReasonRefs.join("\n")
-  );
-  assert(
-    transition.evidenceRefs.includes(
-      "runtime-event://odd-sdlc/t188/abg-inactivity-timeout"
-    ),
-    transition.evidenceRefs.join("\n")
-  );
+    assert.equal(transition.disposition, "block", code);
+    assert.equal(transition.explanationCode, "typed_block_or_triage", code);
+    assert.equal(
+      transition.abgRuntimeTransitionProjection.disposition,
+      "block",
+      code
+    );
+    assert.equal(
+      transition.abgRuntimeTransitionProjection.reason,
+      "typed_block",
+      code
+    );
+    assert.deepStrictEqual(transition.retryReasonRefs, [], code);
+    assert(
+      transition.blockReasonRefs.some((ref) => ref.includes(code)),
+      transition.blockReasonRefs.join("\n")
+    );
+    assert(
+      transition.evidenceRefs.includes(
+        "runtime-event://odd-sdlc/t188/abg-inactivity-timeout"
+      ),
+      transition.evidenceRefs.join("\n")
+    );
+  }
 });
 
 test("T-188 ABG terminal retry is only the no-typed-reason fallback", () => {
