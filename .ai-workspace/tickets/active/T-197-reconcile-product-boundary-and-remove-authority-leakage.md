@@ -392,7 +392,7 @@ A5 is partial and may not consume local transition refs as ABG runtime truth.
 | B2 | `component_depth_register.ts` local contract enums/protocols | GTL read model | risk parallel law | architectural | reframe as read model over GTL declarations | open |
 | B3 | `prompt_assets.ts` SDLC prompt registers + clause schema | GTL + policy | risk parallel law | architectural | keep overlay policy; delete structural duplication | open |
 | B4a | `review_grade_edge_fulfillment.ts` GTL contract-fulfillment binding constructor/admitter usage | abiogenesis | baseline lawful | **verified current** — imports `constructGtlContractFulfillmentBinding` and `admitGtlContractFulfillmentBinding` from `@abiogenesis/typescript-tenant`; `selectComponentRowForObligation(...)` returns `null` for unmatched module/requirement obligations instead of `rows[0]` | keep ABI constructors as sole binding surface; guard against local lookalike reintroduction | done |
-| B4b | `review_grade_edge_fulfillment.ts` L191–193 downstream command string match | horizontal | inert OR-clause | **verified low** per claude — typed `failureClass` gates real routing | drop redundant `"npm test"` / `"node --test"` OR-clauses | open |
+| B4b | `review_grade_edge_fulfillment.ts` downstream command string match | horizontal | inert OR-clause | **done 2026-06-09** — downstream pressure routing now ignores command-only grammar (`"npm test"`, `"node --test"`) and remains gated by typed `failureClass` plus downstream test/execution surface evidence language. | typed review-grade failure class plus downstream execution/test surface semantics are the routing carrier; tenant command strings are explanatory only | `test:t182` command-only negative; `test:t197` source guard | done |
 
 ---
 
@@ -500,7 +500,7 @@ Full list: claude GAP § "Rejected / Lawful-On-Inspection" (17 items).
 | REQ-F-RUNTIME-002 no shadow runtime | convergence loop + closure/consequence chain | partial — A5 installed-status leak fixed; A2 and first-class transition/ref consumption remain blocked on A5/T-154 boundary | A2, A5 |
 | REQ-F-RUNTIME-005 ABG owns frontier | SDLC compiles DAG/payload candidates and calls ABG evented saga frontier with literal authority/control carrier admission | **pass** | A3 done |
 | REQ-F-ODDSDLC-011 AC-3 tenant stack not generic law | H1 target filename fixed; `/src` append and path regex rows remain | partial | H1 done; D1, D5 open |
-| REQ-F-ODDSDLC-017 AC-2 declared validator evidence | npm test in classifiers | fail | H5, B4b |
+| REQ-F-ODDSDLC-017 AC-2 declared validator evidence | B4b review-grade command disjuncts removed; remaining tenant command grammar in framework classifiers is H5 scope | partial | B4b done; H5 open |
 | REQ-F-ODDSDLC-032 domain identity | CDME components as default gate; named profile enum | fail | H2, H3 |
 | REQ-F-ODDSDLC-046 AC-4 imported authority | H1 target filename no longer bypasses imported-sources; generic requirement surfaces remain | **pass** | H1 done |
 | REQ-F-ODDSDLC-082 evaluator-selected depth | deterministic method pick | fail | D2; D3 narrowed |
@@ -651,7 +651,7 @@ addendum `T-197 Owner Partition And Decommission Register`.
 | W-100 | Wave 1 design lock (A-rows) | A1-A5 statuses moved to `design_locked`; target owner dispositions are in staged-compute design addendum | done |
 | W-105 | Wave 1 pre-realization gate | staged-compute design § W-105 Construct-Site Sufficiency Inventory; ABG T-154 filed for explicit resume cursor and graph-span reentry consumer route; existing ABG runner routes identified for deterministic conformance F_D advance and F_D audit outcomes; construct-site source guard classifies every `construct*Event(...)` call under `code/src`, including excluded B-068 proof-fixture sites; `npm run test:t164` passed 22/22 edge-contract + 1/1 Rust-service sandbox on 2026-06-09 | done |
 | W-110 | Wave 1 realization | **partial/in_progress** — slice A rehomed conform-project F_D advance through ABG `runEngineIterateAsync(...)` and stopped traversal-hop audits from authoring local F_D runtime truth; slice B ratified A3 as thin caller over ABG evented saga frontier with literal authority/control carrier admission; slice C fixed A5 installed-status gating so SDLC consequence close cannot promote ABG `gap_stop` to convergence. Proof: `test:t197`, `test:t173`, `test:t174`, T-087/T-096 induction assertions, T-151 T-164 conformance assertion. A1 cursor, graph-span reentry families, and first-class transition/ref consumption remain blocked on ABG T-154 or equivalent route proof. | in_progress |
-| W-200 | Wave 2 B2-B3 plus B4b residual | T-153 audit tests | open |
+| W-200 | Wave 2 B2-B3 plus B4b residual | **partial** — B4b command-string OR-clauses removed from review-grade routing; B2/B3 remain open | in_progress |
 | W-300 | Wave 3 C1a/C1b | B-004 link; capability asset | open |
 | W-400 | Wave 4 D-rows | source tests | open |
 | W-500 | Wave 5 H-rows (R1–R7) | H1 done by `test:t197` H1 grep/classifier proof; remaining H2-H12 open | in_progress |

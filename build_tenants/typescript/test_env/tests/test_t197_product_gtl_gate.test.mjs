@@ -401,3 +401,16 @@ test("T-197 A5 gates installed convergence on ABG terminal convergence", () => {
     /terminal(?:\?\.terminalKind|Kind) === "gap_stop"[\s\S]{0,120}return "converged";/u
   );
 });
+
+test("T-197 B4b keeps review-grade routing off tenant command grammar", () => {
+  const source = repoFile(
+    "build_tenants/typescript/code/src/operator/review_grade_edge_fulfillment.ts"
+  );
+
+  assert.doesNotMatch(source, /action\.includes\("node --test"\)/u);
+  assert.doesNotMatch(source, /action\.includes\("npm test"\)/u);
+  assert.match(source, /\bfailureClass\s*===\s*"test_overlap_missing"/u);
+  assert.match(source, /\bfailureClass\s*===\s*"execution_environment"/u);
+  assert.match(source, /action\.includes\("component_test_surface"\)/u);
+  assert.match(source, /action\.includes\("execution evidence"\)/u);
+});

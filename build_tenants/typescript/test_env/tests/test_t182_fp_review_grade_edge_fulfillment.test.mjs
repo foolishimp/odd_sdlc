@@ -1537,6 +1537,38 @@ test("T-188 component-code execution proof pressure is downstream, not retry chu
   }
 });
 
+test("T-197 B4b review-grade downstream pressure ignores command-only grammar", () => {
+  const commandOnlyFinding = {
+    kind: "sdlc_review_grade_obligation_finding",
+    obligationId: "requirement:T197-B4B",
+    fulfillmentStatus: "partial",
+    failureClass: "test_overlap_missing",
+    requiredAction: "Run npm test.",
+    evidenceRefs: ["evidence://t197/b4b-command-only"],
+    acceptedAuthorityRefs: ["authority://t197/b4b"],
+    rationale:
+      "Tenant command grammar alone is not a downstream-stage pressure carrier."
+  };
+  assert.equal(
+    reviewGradeFindingsAreDownstreamStagePressure([commandOnlyFinding], {
+      targetAssetType: "component_code_surface"
+    }),
+    false
+  );
+
+  const typedDownstreamFinding = {
+    ...commandOnlyFinding,
+    requiredAction:
+      "Carry this to the downstream component_test_surface and capture admitted execution evidence."
+  };
+  assert.equal(
+    reviewGradeFindingsAreDownstreamStagePressure([typedDownstreamFinding], {
+      targetAssetType: "component_code_surface"
+    }),
+    true
+  );
+});
+
 test("T-182 review-grade prompt routes lawful downstream carryover through wrong_stage", () => {
   const source = readRepoFile(
     "build_tenants/typescript/code/src/operator/plugins/evaluate/prompts.ts"

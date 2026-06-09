@@ -189,8 +189,6 @@ function reviewGradeFindingIsDownstreamStagePressure(input: {
       action.includes("execution evidence") ||
       action.includes("executionevidence") ||
       action.includes("process-exit-plus-stdout") ||
-      action.includes("node --test") ||
-      action.includes("npm test") ||
       action.includes("generated test")
     );
   }
