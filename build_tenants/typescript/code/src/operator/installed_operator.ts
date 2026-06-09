@@ -292,6 +292,7 @@ import {
   constructSdlcWorksiteEvidence,
   deriveSdlcEdgeClosureDecision,
   deriveSdlcEdgeFulfillmentCountsFromAssessments,
+  type SdlcEdgeClosureDisposition,
   type SdlcEdgeFulfillmentCountProjection,
   type SdlcYieldResumeBasis
 } from "./traversal_consequence.js";
@@ -7736,6 +7737,35 @@ function abgTerminalRetryReasonRefs(input: {
   ]);
 }
 
+function abgTerminalAllowsInstalledConvergence(input: {
+  readonly stateStatus: SdlcInstalledOperatorStatus;
+  readonly closureDisposition: SdlcEdgeClosureDisposition;
+  readonly terminal: SdlcAbgTerminalTransitionProjection | null;
+}): boolean {
+  return (
+    input.stateStatus === "worker_invoked" &&
+    input.closureDisposition === "close" &&
+    input.terminal?.terminalKind === "converged"
+  );
+}
+
+function installedOperatorStatusFromAbgTerminal(input: {
+  readonly stateStatus: SdlcInstalledOperatorStatus;
+  readonly closureDisposition: SdlcEdgeClosureDisposition;
+  readonly terminal: SdlcAbgTerminalTransitionProjection | null;
+}): SdlcInstalledOperatorStatus {
+  if (input.stateStatus !== "worker_invoked") {
+    return input.stateStatus;
+  }
+  if (abgTerminalAllowsInstalledConvergence(input)) {
+    return "converged";
+  }
+  if (input.terminal?.terminalKind === "gap_stop") {
+    return "blocked";
+  }
+  return input.stateStatus;
+}
+
 function deriveInstalledTraversalConsequence(input: {
   readonly basis: ExecutionBasis;
   readonly start: SdlcPublicStartOutcome;
@@ -9935,10 +9965,6 @@ function compactRuntimeEventArchivePayload(
   );
   const terminal =
     engineResult.transition.kind === "terminal" ? engineResult.transition : null;
-  const nextVector =
-    engineResult.projection.nextVectorIndex === null
-      ? null
-      : basis.graph.vectors[engineResult.projection.nextVectorIndex]?.name ?? null;
   const traversalConsequence = deriveInstalledTraversalConsequence({
     basis,
     start: input.start,
@@ -9973,34 +9999,11 @@ function compactRuntimeEventArchivePayload(
     consequence: traversalConsequence
   });
   const closureDisposition = traversalConsequence.edgeClosureDecision.disposition;
-  const closedWithNextTraversal =
-    closureDisposition === "close" &&
-    traversalConsequence.nextActionProjection.choosesNextTraversal;
-  const closedWithoutNextTraversal =
-    closureDisposition === "close" &&
-    !traversalConsequence.nextActionProjection.choosesNextTraversal &&
-    traversalConsequence.nextActionProjection.selectedActionRef === null &&
-    traversalConsequence.nextActionProjection.nextGraphFunctionRef === null &&
-    traversalConsequence.nextActionProjection.nextGraphVectorRef === null;
-  const terminalReason =
-    typeof terminal?.reason === "string" ? terminal.reason : null;
-  const evaluationSetBlocked =
-    terminal?.terminalKind === "gap_stop" &&
-    terminalReason !== null &&
-    terminalReason.includes("evaluation_set_incomplete");
-  const status =
-    completedDispatchState.status === "worker_invoked" && evaluationSetBlocked
-      ? "blocked"
-      : completedDispatchState.status === "worker_invoked" &&
-    closureDisposition === "close" &&
-    (terminal?.terminalKind === "converged" ||
-      (terminal?.terminalKind === "gap_stop" && closedWithoutNextTraversal))
-      ? "converged"
-      : completedDispatchState.status === "worker_invoked" &&
-          terminal?.terminalKind === "gap_stop" &&
-          !closedWithNextTraversal
-        ? "blocked"
-        : completedDispatchState.status;
+  const status = installedOperatorStatusFromAbgTerminal({
+    stateStatus: completedDispatchState.status,
+    closureDisposition,
+    terminal
+  });
   const blockingReason =
     status === "blocked" && terminal?.reason !== null && terminal?.reason !== undefined
       ? terminal.reason
@@ -10009,15 +10012,11 @@ function compactRuntimeEventArchivePayload(
   const currentEdgeFromConsequence =
     traversalConsequence.nextActionProjection.nextGraphVectorRef ??
     completedDispatchState.manifest.edgeName;
-  const currentEdgeFromAcceptedClose =
-    nextVector ?? traversalConsequence.nextActionProjection.nextGraphVectorRef;
   const currentEdge =
     status === "converged"
       ? null
       : completedDispatchState.status === "worker_invoked"
-        ? closureDisposition === "close"
-          ? currentEdgeFromAcceptedClose
-          : currentEdgeFromConsequence
+        ? currentEdgeFromConsequence
         : completedDispatchState.currentEdge;
   const outcome = terminalOutcome({
     workspaceRoot: input.workspaceRoot,

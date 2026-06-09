@@ -343,3 +343,24 @@ test("T-197 A3 ratifies live parallel materialization as thin ABG frontier calle
     /parallelismControl:\s*oneOf\(\["abg_branch_execution_policy"\] as const\)/u
   );
 });
+
+test("T-197 A5 gates installed convergence on ABG terminal convergence", () => {
+  const source = repoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+
+  assert.match(source, /\bfunction abgTerminalAllowsInstalledConvergence\b/u);
+  assert.match(
+    source,
+    /input\.terminal\?\.terminalKind === "converged"/u
+  );
+  assert.match(
+    source,
+    /input\.terminal\?\.terminalKind === "gap_stop"[\s\S]*?return "blocked";/u
+  );
+  assert.doesNotMatch(source, /\bclosedWithoutNextTraversal\b/u);
+  assert.doesNotMatch(
+    source,
+    /terminal\?\.terminalKind === "gap_stop"[\s\S]{0,120}return "converged";/u
+  );
+});
