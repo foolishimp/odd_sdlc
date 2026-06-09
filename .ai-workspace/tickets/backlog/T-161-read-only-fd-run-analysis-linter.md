@@ -28,7 +28,7 @@ source_documents:
   - /Users/jim/src/apps/specification_methodology/specification/standards/ODD_METHOD.md
   - .ai-workspace/comments/codex/20260512T054127Z_POST_t132_live_performance_bloat_telemetry.md
 related_tickets:
-  - .ai-workspace/tickets/active/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md
+  - .ai-workspace/tickets/completed/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md
   - .ai-workspace/tickets/completed/T-158-replay-product-materialization-manifest-across-repair-attempts.md
   - .ai-workspace/tickets/completed/T-159-product-assets-carry-requirement-lineage.md
   - .ai-workspace/tickets/completed/T-160-first-class-traversal-overlays-for-guided-graph-passes.md

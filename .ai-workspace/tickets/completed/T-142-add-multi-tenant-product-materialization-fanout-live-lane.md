@@ -25,7 +25,7 @@ updated_at: 2026-05-13
 completed_at: 2026-05-13
 governance_scope: STDO Method
 closure_resolution: closed_as_absorbed_proof_obligation
-consolidated_into: .ai-workspace/tickets/active/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md
+consolidated_into: .ai-workspace/tickets/completed/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md
 dependencies:
   - T-132 single-tenant hello-world live lane proves the current selected-output-root materialization loop.
   - T-141 restores requirement-to-product materialization as a GTL transform boundary.

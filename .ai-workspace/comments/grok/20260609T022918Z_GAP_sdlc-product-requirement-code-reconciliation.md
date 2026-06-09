@@ -86,7 +86,13 @@ file append.
 | B1 | No `typecheckGtlProgram` / `admitGtlProgramConformanceInput` usage in `code/src/` (only `test_env/tests/test_t194_*`) | PRODUCT mandates programmatic gate before runtime/live proof | PRODUCT GTL/ABG Consumption; abiogenesis T-152/T-153 | **Wire ABG gate** into build/start/publish preflight in product code |
 | B2 | `component_depth_register.ts` local contract enums/protocols (`admitExactContractEnum`, envelope refs) | Risk of second target-carrier law if not traceable to GTL vector declarations | PRODUCT one-truth rule; T-153 owner classification | **Reframe as read model** over GTL declarations; reject local wrapper contract refs |
 | B3 | `prompt_assets.ts` SDLC prompt kind/version/family registers + clause schema | Structural literals parallel GTL `AssetSurface` law | REQ-F-ODDSDLC-087; PRODUCT prompt overlay boundary | **Keep overlay policy**; delete structural duplication beyond product policy validation |
-| B4 | `review_grade_edge_fulfillment.ts` local `constructGtlContractFulfillmentBinding` usage | PRODUCT forbids parallel local binding shape; must consume abiogenesis carrier | PRODUCT Handoff fulfillment binding row | **Consume only** published abiogenesis binding constructors |
+| B4 (historical) | `review_grade_edge_fulfillment.ts` contract-fulfillment binding path | Current T-197 disposition splits this: ABI constructor/admitter consumption is lawful; command-string residual remains B4b | PRODUCT Handoff fulfillment binding row | **Keep** published abiogenesis binding constructors as the only binding surface |
+
+Current disposition note, 2026-06-09: T-197 splits this historical B4 finding.
+The binding constructor/admitter path is now verified lawful because
+`review_grade_edge_fulfillment.ts` imports the ABI carrier from
+`@abiogenesis/typescript-tenant`; only the downstream command-string OR-clause
+residual remains open as T-197 B4b.
 
 ### C. odd_service-owned orchestration (debt / premature embedding)
 

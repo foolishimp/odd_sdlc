@@ -119,16 +119,19 @@ evaluation_criteria:
   - IACS names module roles without interface bleed across ABG/GTL/odd_service/target-identity borders
   - reference-to-target derivation maps each deleted surface to constitutional owner API
   - H1 mapper_requirements.md absent from lineage rankers and authority ingress
-  - H2 enterprise_core_inventory default gate consumes admitted tenant authority not frozen CDME names
+  - H3 enterprise_core_inventory default gate consumes admitted tenant authority not frozen CDME names
   - analysis profile space open to admitted tenant spec; only generic default in source
+  - B1 product-path preflight feeds the live SDLC graph/prompt/plugin inventory to `typecheckGtlProgram(...)`, not an empty, synthetic, or partial manifest
+  - P1-P3 transferred T-184 proof residuals are terminal with proof or explicit deferral
   - path regex lane classifier and deterministic traversal-method selection removed or projection-only
   - transport lawful as worker backend now; C1a carve-out or B-004 deferral documented; C1b grammar in declared capability asset
 proof_surface:
   - ratified design module addendum with IACS, structural carrier diagram, reference-to-target derivation, decommission register
   - focused source tests per ledger row rejecting deleted authority surfaces
-  - in-product GTL gate hook tests on build/start/publish path (B1)
+  - in-product GTL gate hook tests on build/start/publish path (B1) with non-trivial production inventory coverage
   - test:t194 remains green; T-195 hygiene closed; broader B1 product-code gate owned here
   - test:t184 boundary suite remains green after ABG-leakage removals
+  - P-series production-path proof rows inherited from T-184 are terminal
   - horizontal-axis grep tests (no mapper_requirements.md in framework rankers; no closed hello_world/data_mapper enum)
   - deterministic three-edge assurance chain (T-164) unchanged or strengthened
   - installed lite live proof with graph-owned sdlc_worker_execution_evidence
@@ -164,6 +167,11 @@ wave sequencing.
 | upstream pressure | T-184 closed handoff partition; constitutional and target-identity gaps remain |
 | downstream proof span | design assets → B1 product hook → verified deletions → semantic + installed proof |
 
+T-197 runs alongside the T-164 edge-assurance baseline. Wave 1 A5 (closure
+admission split) intersects T-164 runtime carriage; Wave 0 B1 and the H/D
+realization-refactor rows do not block the T-164 matrix/semantic proof, but
+must not claim runtime-carriage closure without the T-197 design lock.
+
 ## Supersession Hygiene - 2026-06-09
 
 T-197 is now the sole active cleanup authority for the T-184/T-195 residual
@@ -188,9 +196,9 @@ grok GAP + ledger A–E                        claude GAP + ledger H + R1–R7
 ─────────────────────────────────            ─────────────────────────────────
 ABG runtime synthesis (A1–A5)                mapper_requirements.md recurrence (H1)
 GTL gate + parallel law (B1–B4)            named-target enums/profiles (H2)
-odd_service trajectory (C1a)                 CDME subsystem default gate (H3)
-ecosystem heuristics (D1–D3)                 npm/Scala defect grammar (H4)
-                                             test35 branding (H5)
+odd_service trajectory (C1a)                 CDME default/sandbox gates (H3–H4)
+ecosystem heuristics (D1–D3)                 npm/Scala defect grammar (H5–H7)
+                                             test35 branding (H8–H9)
 ```
 
 Neither axis alone is complete. Together they are the full "what should not be
@@ -233,6 +241,28 @@ Read in this order before changing code:
 - worker transport backend (codex/claude CLI routing) is lawful F_P worker realization per REQ-F-ODDSDLC-051/052/053 (claude rejected list)
 
 **This ticket is not:** T-196, B-004 promotion, T-195 alone, or worker-backend deletion.
+
+## Activation Policy
+
+- Wave 0 B1 may start immediately as a `realization_refactor` because the ABG
+  conformance gate already exists and the product-code consumption gap is
+  verified.
+- B1 is not satisfied by invoking `typecheckGtlProgram(...)` over a caller-made
+  empty or partial manifest. It must feed the live TypeScript graph program,
+  target-carrier, edge-closure, overlay, public-start, prompt-asset,
+  plugin-contract, source-identity, and T-153 feature-coverage surfaces used by
+  the production catalog.
+- Wave 5 H1/H3 may start as bounded `realization_refactor` work where it routes
+  through existing generic authority channels (`importedSourceRelativePaths`,
+  admitted tenant profiles, and tenant capability carriers) and does not touch
+  A-row runtime authorship.
+- Wave 1 A-row realization must wait for W-006 plus W-010/W-020/W-030 design
+  assets. A1/A4 are verified defects, A3 is a verified owner-boundary tension,
+  and A2/A5 still require the same adversarial pass before design lock or
+  deletion.
+- If a wave becomes too large for one active slice, spawn child execution
+  tickets (`T-197-W0`, `T-197-H1`, etc.) that name this ticket as authority and
+  update the work ledger here.
 
 ## Constitutional Ownership (Vertical Frame)
 
@@ -290,7 +320,7 @@ or verification note).
 
 | id | code surface | axis | owner | verdict | verification | disposition | proof required | status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| **B1** | zero `typecheckGtlProgram` / `admitGtlProgramConformanceInput` usage in `code/src/` (only `test_env/tests/test_t194_*`) | vertical | GTL/ABG | **fail PRODUCT gate** | **verified** — grep `code/src`: 0 hits; consumer never invokes abiogenesis T-152/T-153 gate | wire ABG gate into build/start/publish preflight in product code | product-path test; T-195 baseline hygiene already closed | open |
+| **B1** | zero `typecheckGtlProgram` / `admitGtlProgramConformanceInput` usage in `code/src/` (only `test_env/tests/test_t194_*`) | vertical | GTL/ABG | **fail PRODUCT gate** | **verified** — grep `code/src`: 0 hits; consumer never invokes abiogenesis T-152/T-153 gate | wire ABG gate into build/start/publish preflight in product code using the same real inventory basis as T-194: `constructSdlcGraphFunctionCatalog()`, `constructSdlcGtlModule()`, `constructSdlcTargetCarrierRegistry(...)`, edge-closure contracts, overlay catalog, public starts, prompt assets, plugin contracts, source identities, and T-153 feature coverage | product-path test proves non-trivial coverage: graph functions and vectors > 0; target-carrier and edge-closure counts equal graph-vector count; prompt assets = 3; plugin contracts = 5; source identities > 0; issueCount = 0; empty/partial inventory fails | open |
 
 Closes the loop on abiogenesis T-150/T-152/T-153: gate built in substrate; SDLC
 consumer does not call it.
@@ -302,14 +332,15 @@ consumer does not call it.
 | id | code surface | owner | verdict | verification | disposition | proof required | status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | A1 | `installed_operator.ts` `replayEventsWithGraphContinuationCursor` (L1765–1840) | ABG | fail REQ-F-RUNTIME-001 | **verified synthesis** — for prior unclosed vector indexes, calls `constructVectorTraversalPlannedEvent`, `constructVectorEvaluatedEvent`, `constructVectorClosedEvent` (L1815–1830); merged into replay at L1836–1838; appended at L8990–8994. Also filters existing `vector_closed` (L1733/1797) — both read and synthesize. | require ABG continuation events; delete synthetic cursor construction | source test rejects `cursorEvents.length > 0` on conform path without ABG authorship | open |
-| A2 | `installed_operator.ts` `executeInstalledOperatorStartWithReentry` (L10170+) | ABG / UX | partial fail REQ-F-RUNTIME-002 | not re-verified in merge pass | reframe: one admitted ABG turn per invocation unless substrate owns `--until converged` | installed single-turn test | open |
-| A3 | `installed_operator.ts` inline `runEventedNativeSagaFrontier` (L2813+) live parallel materialization | ABG | fail REQ-F-RUNTIME-005 | **verified** — SDLC compiles DAG, builds policy/tasks locally, calls ABG frontier with local `eventSink` (L2813–2846). Uses ABG API but SDLC owns live scheduling invocation path. | move live parallel dispatch behind ABG-owned entry; SDLC keeps DAG compilation projection-only | source test; live path audit | open |
+| A2 | `installed_operator.ts` `executeInstalledOperatorStartWithReentry` (L10170+) | ABG / UX | unranked boundary question | not re-verified in merge pass; do not rank or remediate before W-006 | verify whether the multi-attempt convergence loop is unlawful shadow runtime or lawful installed UX over admitted ABG turns | adversarial note plus installed single-turn/until-converged ownership test | open |
+| A3 | `installed_operator.ts` inline `runEventedNativeSagaFrontier` (L2813+) live parallel materialization | ABG | design-lock needed | **verified tension** — SDLC compiles DAG, builds policy/tasks locally, and calls ABG frontier with local `eventSink` (L2813–2846). It uses an ABG frontier API, so Wave 1 must decide whether this is lawful orchestration of an ABG primitive or rival scheduler ownership before moving it. | design-lock target owner: either move live parallel dispatch behind an ABG-owned entry or explicitly ratify SDLC as a thin caller over ABG scheduling while keeping DAG compilation projection-only | source test; live path audit; design disposition | open |
 | A4 | `event_store.ts` + callers constructing events before `appendOddSdlcRuntimeEvents` | ABG | fail REQ-F-RUNTIME-001 AC-1 | **verified** — `constructVector*` / `constructGraphSpan*` / `constructFdAuthority*` at L1816+, L1924+, L5645+, L8991+, L9984+ before append. Sink lawful; authorship is defect. | move authorship to ABG/system APIs; enumerate and rehome each construct site | construct-site inventory test | open |
-| A5 | `traversal_consequence.ts` + `installed_operator.ts` closure chain | ABG + SDLC | partial fail REQ-074/076/086 | design review needed — product interpretation vs admission fold boundary | split: SDLC typed candidates; ABG admits fold/transition | three-edge chain admission boundary test | open |
+| A5 | `traversal_consequence.ts` + `installed_operator.ts` closure chain | ABG + SDLC | unranked boundary question | design review needed — product interpretation vs admission fold boundary; do not rank or remediate before W-006 | verify the exact boundary between SDLC product meaning candidates and ABG admission/fold/transition authority | adversarial note plus three-edge chain admission boundary test | open |
 
 **A-section gate:** do not delete A1/A3/A4 code until design locks target ABG
-API for each construct site. Verification confirms defects; disposition still
-needs design reframe, not blind deletion.
+API or owner boundary for each construct site. Verification confirms A1/A4
+defects and A3 tension; disposition still needs design reframe, not blind
+deletion.
 
 **Lawful sink note (A4):** `appendOddSdlcRuntimeEvents` through ABG `emit()`
 (T-184) is lawful. Defect is **who constructs events**.
@@ -322,7 +353,7 @@ needs design reframe, not blind deletion.
 | --- | --- | --- | --- | --- | --- | --- |
 | B2 | `component_depth_register.ts` local contract enums/protocols | GTL read model | risk parallel law | architectural | reframe as read model over GTL declarations | open |
 | B3 | `prompt_assets.ts` SDLC prompt registers + clause schema | GTL + policy | risk parallel law | architectural | keep overlay policy; delete structural duplication | open |
-| B4a | `review_grade_edge_fulfillment.ts` local `constructGtlContractFulfillmentBinding` | abiogenesis | fail one-truth | architectural | consume only published abiogenesis constructors | open |
+| B4a | `review_grade_edge_fulfillment.ts` GTL contract-fulfillment binding constructor/admitter usage | abiogenesis | baseline lawful | **verified current** — imports `constructGtlContractFulfillmentBinding` and `admitGtlContractFulfillmentBinding` from `@abiogenesis/typescript-tenant`; `selectComponentRowForObligation(...)` returns `null` for unmatched module/requirement obligations instead of `rows[0]` | keep ABI constructors as sole binding surface; guard against local lookalike reintroduction | done |
 | B4b | `review_grade_edge_fulfillment.ts` L191–193 downstream command string match | horizontal | inert OR-clause | **verified low** per claude — typed `failureClass` gates real routing | drop redundant `"npm test"` / `"node --test"` OR-clauses | open |
 
 ---
@@ -364,7 +395,7 @@ lawful worker-backend realization (claude rejected list).
 | --- | --- | --- | --- | --- | --- | --- |
 | H1 | R1 | `mapper_requirements.md` in `source_input.ts:41`, `project_profile.ts:954-956/1039-1041`, `launch_contract.ts:225/2621/5965`, `postflight_checks.ts:2347-2364`, `result_projection.ts:1552`, `spec_method/entry.ts:289-297` | **high** (1552 load-bearing rank) | claude 26/26 + grep 7 files | route all recognition through `specification/requirements/` + `importedSourceRelativePaths` / `00-imported-sources.md` | open |
 | H2 | R2 | `analysis/types.ts:19-26` closed enum `hello_world`/`data_mapper`/`generic`; `profiles.ts`, `analyze.ts:358-364` name switches | medium | claude confirmed | open profile id to admitted tenant spec; use `truthyCapability(profile,"trivial_product")` (pattern at `public_start.ts:355`) | open |
-| H3 | R3 | `qualification/enterprise_core_inventory.ts:5-108` `ENTERPRISE_CORE_COMPONENTS` + `ENTERPRISE_CORE_CAPABILITY_INVENTORY` as default gate | **high** | claude confirmed + read — CDME subsystem names as default blocking set | consume as admitted tenant authority; relocate B-068 proving to `test_env/` synthetic fixture | open |
+| H3 | R3 | `qualification/enterprise_core_inventory.ts:5-108` `ENTERPRISE_CORE_COMPONENTS` + `ENTERPRISE_CORE_CAPABILITY_INVENTORY` as default gate | **high if reachable; medium if probe-only** | claude confirmed + read — CDME subsystem names as default blocking set; reachability from active/live qualification path not yet pinned | first verify reachability; if live/default gate, consume as admitted tenant authority; if B-068 probe-only, relocate to `test_env/` synthetic fixture and downgrade | open |
 | H4 | R3 | `qualification/enterprise_core_iteration_sandbox.ts:425-462` scripted CDME constructor sequence | medium | claude confirmed | move to non-exported `test_env/` fixture with synthetic names | open |
 | H5 | R4 | `prompt_edge_policy.ts:226,238` `"npm test"` pressure classifier | medium | claude confirmed load-bearing (vs rejected `launch_contract.ts:4197` inert) | match neutral SDLC pressure ids; read grammar from `testExecutionContract` | open |
 | H6 | R4 | `repair_reentry.ts:575-578` Scala/SBT defect needles | medium | claude confirmed | tenant-declared diagnostic phrases in `TECH_STACK.*` | open |
@@ -386,6 +417,19 @@ lawful worker-backend realization (claude rejected list).
 | E3 | `closure_state_machine.ts` string-ref heuristics | weak vs REQ-086 | typed carrier inputs | open |
 | E4 | `feature_dependency_dag.ts` topological order | lawful if projection-only | audit callers | open |
 | E5 | `rc_qualification.ts`, non-exported sandbox paths | lawful self-qualification / fixtures | keep; claude rejected re-flag | done |
+
+---
+
+### Proof Residuals Transferred From T-184 (P-series)
+
+These rows prevent the T-184 partition proof debt from becoming orphaned after
+the supersession hygiene close.
+
+| id | source | transferred pressure | disposition | proof required | status |
+| --- | --- | --- | --- | --- | --- |
+| P1 | T-184 H-060 generated-asset production-path closure | generated-asset closure must require selected `evaluate.C` evidence and selected composition identity in all production paths, not only constructors | prove production closure cannot bypass selected F_P review through legacy writers, deterministic postflight, workspace file presence, or raw worker reports | source negative test plus generated-asset production-path proof | open |
+| P2 | T-184 H-140 data-mapper clean live gate | data-mapper breadth proof must close or block lawfully with PTY/process finalization and graph-owned execution evidence | run clean data-mapper live lane or archive a lawful block preserving immediate termination cause and `sdlc_worker_execution_evidence` | data-mapper live archive with final operator artifacts and process lifecycle evidence | open |
+| P3 | T-184 H-240 stale proof fixture hygiene | semantic tests must not keep deleted handoff/fenced-carrier/legacy writer surfaces alive | keep focused proof green and sweep semantic fixtures when they preserve deleted surfaces | semantic proof plus source grep for old imports/fenced bridge acceptance | partial |
 
 ---
 
@@ -415,8 +459,8 @@ Full list: claude GAP § "Rejected / Lawful-On-Inspection" (17 items).
 | --- | --- | --- | --- |
 | PRODUCT `typecheckGtlProgram` before runtime proof | not called from `code/src/` | **fail** | **B1** |
 | REQ-F-RUNTIME-001 ABG owns runtime facts | SDLC synthesizes vector cursor events | fail | A1, A4 |
-| REQ-F-RUNTIME-002 no shadow runtime | convergence loop + local closure engine | partial | A2, A5 |
-| REQ-F-RUNTIME-005 ABG owns frontier | SDLC invokes saga frontier on live parallel path | fail | A3 |
+| REQ-F-RUNTIME-002 no shadow runtime | convergence loop + local closure engine | unverified boundary | A2, A5 |
+| REQ-F-RUNTIME-005 ABG owns frontier | SDLC invokes ABG frontier from local live path | design-lock needed | A3 |
 | REQ-F-ODDSDLC-011 AC-3 tenant stack not generic law | mapper_requirements.md, /src append, path regexes | fail | H1, D1, D5 |
 | REQ-F-ODDSDLC-017 AC-2 declared validator evidence | npm test in classifiers | fail | H5, B4b |
 | REQ-F-ODDSDLC-032 domain identity | CDME components as default gate; named profile enum | fail | H2, H3 |
@@ -435,25 +479,30 @@ Full list: claude GAP § "Rejected / Lawful-On-Inspection" (17 items).
 
 1. Wire `typecheckGtlProgram(...)` into `code/src` build/start/publish preflight
 2. Preserve the T-195 proof-hygiene baseline and keep B1 product-code gate work in this ticket
-3. Proof: product-path test; `test:t194` 3/3 on closing revision
+3. Reuse or factor the production inventory builder proven by `test:t194`;
+   do not create a second test-only conformance manifest.
+4. Proof: product-path test with the live catalog inventory and non-trivial
+   coverage assertions; `test:t194` remains 3/3 on closing revision.
 
 **Change class:** `realization_refactor` with requirement trace to T-152/T-153.
 
 ### Wave 1 — ABG authority leakage (vertical; design lock required)
 
 1. A1: stop synthetic cursor event construction; require ABG continuation
-2. A3: rehome live parallel frontier invocation
-3. A4: enumerate construct-before-emit sites; rehome authorship
-4. A5: split closure chain admission boundary
-5. A2: reframe `--until converged` ownership
+2. A4: enumerate construct-before-emit sites; rehome authorship
+3. A3: resolve design-lock verdict before rehome/ratify live parallel frontier invocation
+4. A5: adversarially verify before splitting closure chain admission boundary
+5. A2: adversarially verify before reframing `--until converged` ownership
 
 **Change class:** `design_reframe` then `realization_refactor`.
 **Gate:** adversarial verification note on file for each A-row before merge.
 
 ### Wave 2 — GTL parallel law audit (vertical)
 
-1. B2–B4a: consume abiogenesis carriers; no parallel law
-2. B4b: drop inert command OR-clauses
+1. B2–B3: consume abiogenesis/GTL carriers; no parallel law
+2. B4a: keep the current ABI binding constructor/admitter path and guard
+   against local lookalikes
+3. B4b: drop inert command OR-clauses
 
 ### Wave 3 — odd_service trajectory (vertical; non-blocking)
 
@@ -467,7 +516,8 @@ Full list: claude GAP § "Rejected / Lawful-On-Inspection" (17 items).
 ### Wave 5 — Target-identity hygiene (horizontal; claude R1–R7)
 
 1. **H1 / R1** — eliminate `mapper_requirements.md` from framework law (highest horizontal priority)
-2. **H3 / R3** — lift CDME inventory from default gate
+2. **H3 / R3** — verify CDME inventory reachability, then lift it from default
+   gate if live/default or relocate it as probe fixture if probe-only
 3. **H2 / R2** — de-name analysis profile space
 4. **H5–H7, H6 / R4** — drop downstream grammar from classifiers
 5. **H8–H11 / R6–R7** — low-priority de-branding and alias cleanup
@@ -480,11 +530,14 @@ Full list: claude GAP § "Rejected / Lawful-On-Inspection" (17 items).
 
 1. **B1** — unwired ABG conformance gate (direct payoff of T-152/T-153)
 2. **H1** — `mapper_requirements.md` lineage/ingress recurrence (highest horizontal)
-3. **H3** — `ENTERPRISE_CORE_COMPONENTS` default blocking gate
+3. **H3 reachability audit** — confirm whether `ENTERPRISE_CORE_COMPONENTS` is live/default gate or probe-only before ranking remediation severity
 4. **A1, A4** — verified synthetic runtime event authorship
-5. **A3** — live saga frontier invocation path
+5. **A3 design-lock disposition** — ABG-owned entry vs lawful thin SDLC caller over ABG frontier
 6. **H2, H5–H7, D1, D4–D5** — remaining horizontal + ecosystem hygiene
-7. **A2, A5, B2–B4a, D2–D3, C1a–C1b, H8–H12** — design-locked or low-severity
+7. **B2–B3, D2–D3, C1a–C1b, H8–H12, P1–P3** — design-locked, proof-residual, or low-severity
+
+Unranked pending W-006: **A2** and **A5**. Do not assign severity or
+remediation order until their adversarial verification pass is recorded.
 
 ---
 
@@ -528,14 +581,17 @@ addendum `T-197 Owner Partition And Decommission Register`.
 | id | task | closure proof | status |
 | --- | --- | --- | --- |
 | W-000 | Merge grok + claude GAP into this ticket | ticket + peer links | done |
-| W-005 | Adversarial verify A-section (A1/A3/A4) | verification column in ledger | done |
+| W-005 | Initial adversarial pass for A-section (A1/A3/A4) | verification column in ledger | done |
+| W-006 | Adversarial verify A2/A5 before Wave-1 design lock | verification column updated with line-level proof | open |
+| W-007 | Resolve A3 owner verdict and H3 reachability before ranking/remediation | A3 design disposition and H3 reachability note | open |
 | W-010 | Publish IACS (dual-axis) | design § | open |
 | W-020 | Publish structural carrier diagram | design diagram | open |
 | W-030 | Publish reference-to-target for all ledger rows | design table | open |
-| W-050 | **Wave 0: B1 product GTL gate** | preflight test in `code/src` | open |
+| W-040 | Close transferred T-184 P1-P3 proof residuals | P-series rows terminal | open |
+| W-050 | **Wave 0: B1 product GTL gate** | preflight test in `code/src` feeds live production inventory and rejects empty/partial manifests | open |
 | W-100 | Wave 1 design lock (A-rows) | signed dispositions | open |
 | W-110 | Wave 1 realization | focused tests; semantic green | open |
-| W-200 | Wave 2 B2–B4 | T-153 audit tests | open |
+| W-200 | Wave 2 B2-B3 plus B4b residual | T-153 audit tests | open |
 | W-300 | Wave 3 C1a/C1b | B-004 link; capability asset | open |
 | W-400 | Wave 4 D-rows | source tests | open |
 | W-500 | Wave 5 H-rows (R1–R7) | grep + focused tests; no mapper_requirements in rankers | open |

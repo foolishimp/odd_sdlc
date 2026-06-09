@@ -38,7 +38,7 @@ source_documents:
 related_tickets:
   - .ai-workspace/tickets/completed/T-036-realize-typescript-gap-triage-homeostatic-loop-and-ticket-routing.md
   - .ai-workspace/tickets/completed/B-035-public-start-next-bypasses-published-constitutional-pending-fh-gate.md
-  - .ai-workspace/tickets/active/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md
+  - .ai-workspace/tickets/completed/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md
   - .ai-workspace/tickets/completed/T-158-replay-product-materialization-manifest-across-repair-attempts.md
   - .ai-workspace/tickets/completed/T-159-product-assets-carry-requirement-lineage.md
   - .ai-workspace/tickets/completed/T-160-first-class-traversal-overlays-for-guided-graph-passes.md

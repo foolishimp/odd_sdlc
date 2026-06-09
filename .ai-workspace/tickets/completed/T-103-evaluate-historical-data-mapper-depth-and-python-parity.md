@@ -18,7 +18,7 @@ dependencies:
   - T-041 active
 governance_scope: STDO Method
 closure_resolution: closed_as_absorbed_proof_obligation
-consolidated_into: .ai-workspace/tickets/active/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md
+consolidated_into: .ai-workspace/tickets/completed/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md
 intake_source: T-041 closure bar was narrowed to successful bounded live data_mapper build; the displaced future scope needs durable authority rather than informal memory.
 target_truth: If the product later wants to claim historical Python parity or multi-edge data_mapper depth beyond bounded RC, that claim must be evaluated in its own ticket with explicit product authority, evidence bars, and closure law.
 closure_law: this ticket closes only when the product either reprices away the wider parity/depth claim or proves it through explicit multi-edge evidence and governed comparison artifacts.

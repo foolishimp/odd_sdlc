@@ -43,6 +43,8 @@ focus into accidental constitutional law.
 - keep ABG ownership explicit: ABG owns traversal, events, continuation,
   replay, and raw runtime truth; `odd_sdlc` owns SDLC edge meaning, domain
   policy, proof interpretation, and query overlays
+- run T-197 as the active boundary-reconciliation surface for residual T-184 and
+  T-195 cleanup, without replacing the T-164 edge-assurance baseline
 
 ## Current Work-Wave Sequence
 
@@ -75,6 +77,12 @@ The current wave is:
    installed sandbox archive path.
 7. T-164 absorbed-proof closure: T-158, T-103, T-130, and T-142 close only when
    their failure classes are proven under the edge contract model.
+
+The active boundary-reconciliation slice is T-197. It runs alongside this
+edge-assurance baseline: Wave 0 B1 and horizontal H/D realization refactors may
+proceed without blocking the T-164 matrix/semantic proof, while Wave 1 A5
+intersects T-164 runtime carriage and must be design-locked before claiming
+closure-admission changes.
 
 ## Current Computational Target
 
@@ -134,7 +142,8 @@ This wave reads current invariant truth from:
 This wave also reads current operational sequencing and review evidence from:
 
 - `.ai-workspace/comments/codex/20260513T035126Z_data_mapper_test35_vs_ts_followup.md`
-- `.ai-workspace/tickets/active/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md`
+- `.ai-workspace/tickets/completed/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md`
+- `.ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md`
 - `/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/T-130-define-recorded-hook-action-typing-model-for-fp-evals.md`
 - `/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/T-131-declare-gtl-edge-assurance-contract-for-fp-gain-and-close.md`
 - `/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/T-132-prove-installed-gtl-edge-assurance-with-three-chain-live-sandbox.md`

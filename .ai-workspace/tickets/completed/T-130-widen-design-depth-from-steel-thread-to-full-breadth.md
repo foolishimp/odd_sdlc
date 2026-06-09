@@ -16,7 +16,7 @@ updated_at: 2026-05-13
 completed_at: 2026-05-13
 governance_scope: STDO Method
 closure_resolution: closed_as_absorbed_proof_obligation
-consolidated_into: .ai-workspace/tickets/active/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md
+consolidated_into: .ai-workspace/tickets/completed/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md
 depends_on:
   - T-116 completed steel-thread design-depth slice
   - T-122 completed feature scope carrier
