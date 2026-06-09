@@ -166,7 +166,10 @@ test("T-197 design ratifies owner partition assets before Wave 1 code", () => {
     "<<deferred>>",
     "### Reference-To-Target Derivation",
     "### Decommission Register",
+    "### W-105 Construct-Site Sufficiency Inventory",
     "ABG route / dependency",
+    "T-154-expose-runtime-authorship-routes-for-downstream-resume-and-span-reentry.md",
+    "22/22 edge-contract tests and 1/1 Rust-service sandbox proof",
     "must-not-name-governed-target",
     "Horizontal ingress rule:"
   ]) {
@@ -190,7 +193,8 @@ test("T-197 design ratifies owner partition assets before Wave 1 code", () => {
     ".ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md"
   );
   assert.match(ticket, /\| W-105 \| Wave 1 pre-realization gate \|/u);
-  assert.match(ticket, /T-164 baseline proof pinned before A5 changes/u);
+  assert.match(ticket, /ABG T-154 filed for explicit resume cursor/u);
+  assert.match(ticket, /npm run test:t164` passed 22\/22 edge-contract \+ 1\/1 Rust-service sandbox/u);
 });
 
 test("T-197 H1 keeps target-specific requirements filenames out of framework law", () => {

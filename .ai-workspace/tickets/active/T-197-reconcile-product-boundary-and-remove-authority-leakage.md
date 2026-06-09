@@ -50,6 +50,7 @@ related_tickets:
   - .ai-workspace/tickets/backlog/T-196-adaptive-high-capacity-agent-overlay-latitude.md
   - /Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/T-152-gtl-program-conformance-gate-for-typescript-tenant.md
   - /Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/T-153-consolidate-gtl-contract-law-api-requirement-surface.md
+  - /Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/backlog/T-154-expose-runtime-authorship-routes-for-downstream-resume-and-span-reentry.md
 affected_boundary:
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_STAGED_COMPUTE_BOUNDARY.md
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_EDGE_GAIN_CLOSURE_CONTRACT.md
@@ -539,9 +540,11 @@ Full list: claude GAP § "Rejected / Lawful-On-Inspection" (17 items).
 
 ### Wave 1 — ABG authority leakage (vertical; design lock required)
 
-0. A4 inventory gate: publish an exhaustive construct-before-emit inventory,
-   with one existing ABG/system route or successor ABG dependency per construct
-   family, before deleting any A1/A4 site.
+0. A4 inventory gate: **done 2026-06-09** in staged-compute design W-105
+   inventory. Existing ABG routes cover deterministic conformance F_D advance
+   and F_D audit outcomes; explicit graph-vector resume cursor plus graph-span
+   reentry application are blocked on upstream ABG T-154 or equivalent existing
+   route proof before deleting any A1/A4 site.
 1. A1: stop synthetic cursor event construction; require ABG continuation
 2. A4: enumerate construct-before-emit sites; rehome authorship
 3. A3: resolve design-lock verdict before rehome/ratify live parallel frontier invocation
@@ -644,7 +647,7 @@ addendum `T-197 Owner Partition And Decommission Register`.
 | W-040 | Close transferred T-184 P1-P3 proof residuals | P1/P3 terminal here; P2 explicitly deferred to T-198 | open |
 | W-050 | **Wave 0: B1 product GTL gate** | `test:t194` 2/2; `test:t197` 6/6; `test:t059` 10/10 installed-package proof; `build:semantic` runs `preflight:gtl` over the live production inventory and rejects missing target-carrier rows | done |
 | W-100 | Wave 1 design lock (A-rows) | A1-A5 statuses moved to `design_locked`; target owner dispositions are in staged-compute design addendum | done |
-| W-105 | Wave 1 pre-realization gate | A4 construct-site inventory published; each A1/A4 family has an existing ABG/system route or successor ABG dependency; each ABG/GTL insufficiency is filed or linked upstream instead of patched locally in SDLC; T-164 baseline proof pinned before A5 changes | open |
+| W-105 | Wave 1 pre-realization gate | staged-compute design § W-105 Construct-Site Sufficiency Inventory; ABG T-154 filed for explicit resume cursor and graph-span reentry consumer route; existing ABG runner routes identified for deterministic conformance F_D advance and F_D audit outcomes; `npm run test:t164` passed 22/22 edge-contract + 1/1 Rust-service sandbox on 2026-06-09 | done |
 | W-110 | Wave 1 realization | focused tests; semantic green | open |
 | W-200 | Wave 2 B2-B3 plus B4b residual | T-153 audit tests | open |
 | W-300 | Wave 3 C1a/C1b | B-004 link; capability asset | open |

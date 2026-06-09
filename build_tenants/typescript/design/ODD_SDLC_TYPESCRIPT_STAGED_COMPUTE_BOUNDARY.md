@@ -360,6 +360,24 @@ No decommission target may be replaced with a shim, alias, or fallback path
 that preserves the same authority under a new name. Deletion-first means the
 old authority path must fail closed before the row is marked done.
 
+### W-105 Construct-Site Sufficiency Inventory
+
+This inventory gates Wave 1 realization. Each row must either consume an
+existing ABG/GTL route or remain blocked on an upstream ABG/GTL dependency.
+SDLC shall not replace a missing route with local runtime-event assembly.
+
+Baseline before A5 edits: `npm run test:t164` passed on 2026-06-09 with
+22/22 edge-contract tests and 1/1 Rust-service sandbox proof.
+
+| family | current SDLC construct site | runtime facts assembled | ABG/GTL sufficiency disposition | Wave 1 action |
+| --- | --- | --- | --- | --- |
+| explicit graph-vector resume cursor | `installed_operator.ts` `replayEventsWithGraphContinuationCursor` constructs events at L1816-L1830; appended through `replayCursor.cursorEvents` on direct target paths | `vector_traversal_planned`, `vector_evaluated`, `vector_closed` for earlier vectors that were not actually replay-closed | **insufficient as a consumer route**: ABG has continuation projection and normal runner iteration, but no consumer-safe explicit graph-vector resume route that avoids synthetic closure of prior vectors; upstream dependency `/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/backlog/T-154-expose-runtime-authorship-routes-for-downstream-resume-and-span-reentry.md` | Do not delete A1 cursor synthesis until T-154 or an equivalent existing ABG route is proven; after route exists, consume ABG resume/continuation events and add a negative source test rejecting `cursorEvents` construction. |
+| deterministic conform-project F_D advance | `appendFdConformanceRuntimeEvents` constructs events at L5629-L5653 and appends at L5656; caller at L8996 | iteration decision events, `vector_evaluated`, `vector_closed` for `FG_CONFORM_PROJECT` | **existing route**: ABG `runEngineIterateAsync(...)` emits iteration decisions, F_D authority outcome, vector evaluation, and vector close through runner-owned `eventSink` when supplied an F_D evaluator plugin | Rework this path through runner/plugin input or a runner-owned helper; no ABG ticket required unless the runner cannot express the conformance report as F_D outcome. |
+| front-door traversal-hop audit | `writeFrontDoorTraversalSelectionAudit` returns `constructFdAuthorityOutcomeAdmittedEvent` at L3042; pushed into runner `emitted` at L9221 | `fd_authority_outcome_admitted` over public-start/decomposition selection | **existing route**: ABG runner already owns F_D authority outcome emission for `FdEvaluationOutcome`; SDLC should supply the audit as F_D outcome/candidate, not construct the event | Rehome through F_D evaluator/admission route or prove this is projection-only and stop emitting a runtime event. |
+| traversal-hop postflight audit | traversal selection audit returns `constructFdAuthorityOutcomeAdmittedEvent` at L2983 | `fd_authority_outcome_admitted` over hop selection/postflight evidence | **existing route**: same ABG F_D outcome route as above | Rehome through F_D evaluator/admission route or convert to non-runtime product artifact if it is only diagnostic. |
+| repair graph-span reentry | `repairReentryGraphSpanRuntimeEvents` constructs schedule/assessment/foldback events at L2063-L2078 plus plan/apply through `graphReentryPlanRuntimeEventsForSpanEvents`; appended at L10017 | `graph_span_evaluation_scheduled`, `graph_span_assessed`, `graph_span_foldback_evaluated`, `graph_reentry_planned`, `graph_reentry_applied` | **partially sufficient primitives, missing consumer route**: ABG T-103 owns graph-span law and exports schedule/fold/frontier/plan primitives, but SDLC still assembles runtime events and plan/apply locally; upstream dependency T-154 must expose or document a consumer-safe route | Until T-154 or equivalent proof exists, do not delete/rewrite this into another SDLC event assembler; after route exists, SDLC may submit product assessment candidates only. |
+| post-action graph-span reentry | `postActionReentryGraphSpanRuntimeEvents` constructs schedule/assessment/foldback events at L2191-L2206 plus plan/apply; appended at L10043 | same graph-span and graph-reentry runtime fact family as repair reentry | **partially sufficient primitives, missing consumer route**: same T-103/T-154 disposition | Same as repair graph-span reentry; preserve T-164 residual-pressure baseline before changing `traversal_consequence.ts`. |
+
 ## Canonical Prompt-Source Carrier
 
 `worker_construction_brief.json` is the canonical worker prompt-source carrier.
