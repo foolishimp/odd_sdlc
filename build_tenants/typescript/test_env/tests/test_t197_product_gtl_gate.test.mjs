@@ -15,6 +15,7 @@ import {
   assertCurrentSdlcGtlProgramConformance,
   admitSdlcProjectConstraints,
   constructCurrentSdlcGtlProgramConformanceInput,
+  deriveSdlcInstalledOperatorStatusFromAbgTerminal,
   deriveSdlcSourceInput,
   deriveSdlcWorkspaceIngressReport,
   typecheckCurrentSdlcGtlProgram,
@@ -349,18 +350,54 @@ test("T-197 A5 gates installed convergence on ABG terminal convergence", () => {
     "build_tenants/typescript/code/src/operator/installed_operator.ts"
   );
 
-  assert.match(source, /\bfunction abgTerminalAllowsInstalledConvergence\b/u);
+  assert.equal(
+    deriveSdlcInstalledOperatorStatusFromAbgTerminal({
+      stateStatus: "worker_invoked",
+      closureDisposition: "close",
+      terminalKind: "gap_stop"
+    }),
+    "blocked"
+  );
+  assert.equal(
+    deriveSdlcInstalledOperatorStatusFromAbgTerminal({
+      stateStatus: "worker_invoked",
+      closureDisposition: "close",
+      terminalKind: "converged"
+    }),
+    "converged"
+  );
+  assert.equal(
+    deriveSdlcInstalledOperatorStatusFromAbgTerminal({
+      stateStatus: "worker_invoked",
+      closureDisposition: "retry",
+      terminalKind: "converged"
+    }),
+    "worker_invoked"
+  );
+  assert.equal(
+    deriveSdlcInstalledOperatorStatusFromAbgTerminal({
+      stateStatus: "worker_invoked",
+      closureDisposition: "close",
+      terminalKind: null
+    }),
+    "worker_invoked"
+  );
+
   assert.match(
     source,
-    /input\.terminal\?\.terminalKind === "converged"/u
+    /\bfunction abgTerminalAllowsInstalledConvergence\b/u
   );
   assert.match(
     source,
-    /input\.terminal\?\.terminalKind === "gap_stop"[\s\S]*?return "blocked";/u
+    /input\.terminalKind === "converged"/u
+  );
+  assert.match(
+    source,
+    /input\.terminalKind === "gap_stop"[\s\S]*?return "blocked";/u
   );
   assert.doesNotMatch(source, /\bclosedWithoutNextTraversal\b/u);
   assert.doesNotMatch(
     source,
-    /terminal\?\.terminalKind === "gap_stop"[\s\S]{0,120}return "converged";/u
+    /terminal(?:\?\.terminalKind|Kind) === "gap_stop"[\s\S]{0,120}return "converged";/u
   );
 });

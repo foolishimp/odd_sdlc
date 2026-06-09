@@ -64,6 +64,7 @@ import {
   type RuntimeFailureClass,
   type RuntimeLivenessObserverProjection,
   type SupervisedProcessActorResult,
+  type TerminalKind,
   type TracedProcessExecutorProfile,
   type TracedProcessOutcome,
   type TracedProcessStreamModel
@@ -7740,19 +7741,19 @@ function abgTerminalRetryReasonRefs(input: {
 function abgTerminalAllowsInstalledConvergence(input: {
   readonly stateStatus: SdlcInstalledOperatorStatus;
   readonly closureDisposition: SdlcEdgeClosureDisposition;
-  readonly terminal: SdlcAbgTerminalTransitionProjection | null;
+  readonly terminalKind: TerminalKind | null;
 }): boolean {
   return (
     input.stateStatus === "worker_invoked" &&
     input.closureDisposition === "close" &&
-    input.terminal?.terminalKind === "converged"
+    input.terminalKind === "converged"
   );
 }
 
-function installedOperatorStatusFromAbgTerminal(input: {
+export function deriveSdlcInstalledOperatorStatusFromAbgTerminal(input: {
   readonly stateStatus: SdlcInstalledOperatorStatus;
   readonly closureDisposition: SdlcEdgeClosureDisposition;
-  readonly terminal: SdlcAbgTerminalTransitionProjection | null;
+  readonly terminalKind: TerminalKind | null;
 }): SdlcInstalledOperatorStatus {
   if (input.stateStatus !== "worker_invoked") {
     return input.stateStatus;
@@ -7760,7 +7761,7 @@ function installedOperatorStatusFromAbgTerminal(input: {
   if (abgTerminalAllowsInstalledConvergence(input)) {
     return "converged";
   }
-  if (input.terminal?.terminalKind === "gap_stop") {
+  if (input.terminalKind === "gap_stop") {
     return "blocked";
   }
   return input.stateStatus;
@@ -9999,10 +10000,10 @@ function compactRuntimeEventArchivePayload(
     consequence: traversalConsequence
   });
   const closureDisposition = traversalConsequence.edgeClosureDecision.disposition;
-  const status = installedOperatorStatusFromAbgTerminal({
+  const status = deriveSdlcInstalledOperatorStatusFromAbgTerminal({
     stateStatus: completedDispatchState.status,
     closureDisposition,
-    terminal
+    terminalKind: terminal?.terminalKind ?? null
   });
   const blockingReason =
     status === "blocked" && terminal?.reason !== null && terminal?.reason !== undefined

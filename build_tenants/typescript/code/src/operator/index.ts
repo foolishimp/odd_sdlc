@@ -593,6 +593,7 @@ export {
   deriveSdlcPostActionOverlayReentryActionInput,
   deriveSdlcPostProductMaterializationActionInput,
   deriveSdlcPostProductMaterializationActionResolution,
+  deriveSdlcInstalledOperatorStatusFromAbgTerminal,
   deriveSdlcProductLineageYieldResumeBasis,
   deriveSdlcPublishedProductMaterializationAction,
   deriveSdlcWorkerRetryContextFromPostActionProjection,

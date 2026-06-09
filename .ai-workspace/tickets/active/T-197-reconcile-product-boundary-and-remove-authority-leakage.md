@@ -261,9 +261,10 @@ Read in this order before changing code:
   admitted tenant profiles, and tenant capability carriers) and does not touch
   A-row runtime authorship.
 - Wave 1 A-row realization must wait for W-006 plus W-010/W-020/W-030 design
-  assets. A1/A4 are verified defects. A2/A3/A5 are verified owner-boundary
-  tensions and must not be deleted until the design lock names the target ABG
-  API or the lawful SDLC thin-caller/read-model role.
+  assets. A1/A4 are verified defects. A3 is done as a ratified thin caller over
+  ABG frontier execution. A2/A5 remain verified owner-boundary tensions and
+  must not be deleted or promoted until the design lock names the target ABG API
+  or the lawful SDLC read-model role.
 - If a wave becomes too large for one active slice, spawn child execution
   tickets (`T-197-W0`, `T-197-H1`, etc.) that name this ticket as authority and
   update the work ledger here.
@@ -295,8 +296,9 @@ Phase 0 dispositions recorded on 2026-06-09:
   this ticket's installed proof lane is the lite live lane with graph-owned
   `sdlc_worker_execution_evidence`. P2 is deferred to T-198 and does not block
   T-197 unless closure law is later repriced.
-- A2, A3, and A5 remain design-lock rows. Verification found real boundary
-  tension, not a safe immediate deletion target.
+- A3 is done as a ratified thin caller. A2 and A5 remain design-lock / partial
+  boundary rows; verification found real boundary tension, not a safe immediate
+  deletion target.
 - H3 is probe-only in current reachability and is downgraded from live/default
   gate severity; remediation is containment or relocation of the B-068 fixture
   surface.
@@ -374,10 +376,9 @@ consumer does not call it.
 | A4 | `event_store.ts` + callers constructing events before `appendOddSdlcRuntimeEvents` | ABG | fail REQ-F-RUNTIME-001 AC-1 | **verified** — `constructVector*` / `constructGraphSpan*` / `constructFdAuthority*` at L1816+, L1924+, L5645+, L8991+, L9984+ before append. Sink lawful; authorship is defect. | design-locked in staged-compute addendum: move authorship to ABG/system APIs; enumerate and rehome each construct site | construct-site inventory test | design_locked |
 | A5 | `traversal_consequence.ts` + `installed_operator.ts` closure chain | ABG + SDLC | partial split | **in progress 2026-06-09** — SDLC still constructs worksite evidence, edge gain, residual pressure, edge ledger, closure decision, next-action projection, admitted-state ref, and consequence projection as product candidate/read-model truth. W-110 slice C fixed the concrete runtime/reporting leak: installed `status: "converged"` now requires ABG `terminalKind: "converged"` plus SDLC close; ABG `gap_stop` reports `blocked` even if the SDLC consequence candidate has no next action. First-class ABG transition/ref consumption remains open under T-154 or equivalent route proof. | SDLC may construct product candidates/read models over admitted evidence; ABG owns final runtime fold, transition, continuation, and replay truth. Do not invent a local transition ref; consume an ABG route when available. | `test:t197` A5 terminal gate; T-164 baseline remains pinned before deeper traversal-consequence edits | in_progress |
 
-**A-section gate:** do not delete A1/A3/A4 code until design locks target ABG
-API or owner boundary for each construct site. Verification confirms A1/A4
-defects and A3 tension; disposition still needs design reframe, not blind
-deletion.
+**A-section gate:** do not delete A1/A4 code until design locks target ABG API
+or owner boundary for each construct site. A3 is done as a ratified thin caller.
+A5 is partial and may not consume local transition refs as ABG runtime truth.
 
 **Lawful sink note (A4):** `appendOddSdlcRuntimeEvents` through ABG `emit()`
 (T-184) is lawful. Defect is **who constructs events**.
@@ -496,8 +497,8 @@ Full list: claude GAP § "Rejected / Lawful-On-Inspection" (17 items).
 | --- | --- | --- | --- |
 | PRODUCT `typecheckGtlProgram` before runtime proof | `code/src/gtl_conformance/program.ts` builds the live inventory; public start, spec-method, release, and `build:semantic` preflight call the gate | **pass** | **B1 done** |
 | REQ-F-RUNTIME-001 ABG owns runtime facts | SDLC synthesizes vector cursor events | fail | A1, A4 |
-| REQ-F-RUNTIME-002 no shadow runtime | convergence loop + local closure engine | verified boundary tension; design-lock needed | A2, A5 |
-| REQ-F-RUNTIME-005 ABG owns frontier | SDLC invokes ABG frontier from local live path | verified boundary tension; design-lock needed | A3 |
+| REQ-F-RUNTIME-002 no shadow runtime | convergence loop + closure/consequence chain | partial — A5 installed-status leak fixed; A2 and first-class transition/ref consumption remain blocked on A5/T-154 boundary | A2, A5 |
+| REQ-F-RUNTIME-005 ABG owns frontier | SDLC compiles DAG/payload candidates and calls ABG evented saga frontier with literal authority/control carrier admission | **pass** | A3 done |
 | REQ-F-ODDSDLC-011 AC-3 tenant stack not generic law | H1 target filename fixed; `/src` append and path regex rows remain | partial | H1 done; D1, D5 open |
 | REQ-F-ODDSDLC-017 AC-2 declared validator evidence | npm test in classifiers | fail | H5, B4b |
 | REQ-F-ODDSDLC-032 domain identity | CDME components as default gate; named profile enum | fail | H2, H3 |
@@ -592,9 +593,8 @@ pin the current T-164 three-edge/residual-pressure proof before A5 edits
 1. **B1** — unwired ABG conformance gate (direct payoff of T-152/T-153)
 2. **H1** — `mapper_requirements.md` lineage/ingress recurrence (highest horizontal)
 3. **A1, A4** — verified synthetic runtime event authorship
-4. **A5 design-lock disposition** — closure candidate/read-model vs ABG fold/transition split; coupled to T-164 proof
-5. **A3 design-lock disposition** — ABG-owned entry vs lawful thin SDLC caller over ABG frontier
-6. **A2 design-lock disposition** — installed `--until converged` loop after A5 boundary is clear
+4. **A5 partial split** — closure candidate/read-model vs ABG fold/transition/ref split; coupled to T-154 and T-164 proof
+5. **A2 design-lock disposition** — installed `--until converged` loop after A5/T-154 boundary is clear
 7. **H2, H5–H7, D1, D4–D5** — remaining horizontal + ecosystem hygiene
 8. **B2–B3, D2–D3, C1a–C1b, H3–H12, P1/P3** — design-locked, probe-only, proof-residual, or low-severity
 
