@@ -38,8 +38,8 @@ export interface SdlcLiveFpParallelMaterializationFanInRow {
 export interface SdlcLiveFpParallelMaterializationFrontier {
   readonly kind: "sdlc_live_fp_parallel_materialization_frontier";
   readonly edgeName: string;
-  readonly executionAuthority: string;
-  readonly parallelismControl: string;
+  readonly executionAuthority: "abg_evented_saga_frontier";
+  readonly parallelismControl: "abg_branch_execution_policy";
   readonly graphTruthSource: "sdlc_feature_dependency_dag";
   readonly selectedMethod: SdlcDependencyTraversalMethod;
   readonly dependencyMapRef: string;
@@ -131,8 +131,8 @@ export const isSdlcLiveFpParallelMaterializationFrontier:
     kind: "sdlc_live_fp_parallel_materialization_frontier",
     fields: Object.freeze({
       edgeName: isTrimmedNonEmptyString,
-      executionAuthority: isTrimmedNonEmptyString,
-      parallelismControl: isTrimmedNonEmptyString,
+      executionAuthority: oneOf(["abg_evented_saga_frontier"] as const),
+      parallelismControl: oneOf(["abg_branch_execution_policy"] as const),
       graphTruthSource: oneOf(["sdlc_feature_dependency_dag"] as const),
       selectedMethod: oneOf(SDLC_DEPENDENCY_TRAVERSAL_METHODS),
       dependencyMapRef: isTrimmedNonEmptyString,

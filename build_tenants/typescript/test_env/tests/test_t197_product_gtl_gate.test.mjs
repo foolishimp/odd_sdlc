@@ -319,3 +319,27 @@ test("T-197 W-110 routes conform-project F_D advance through ABG runner ownershi
   assert.match(source, /until:\s*"first_traversal"/u);
   assert.doesNotMatch(source, /\bruntimeEventsForIterationDecision\b/u);
 });
+
+test("T-197 A3 ratifies live parallel materialization as thin ABG frontier caller", () => {
+  const source = repoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+  const frontierCarrier = repoFile(
+    "build_tenants/typescript/code/src/operator/live_fp_parallel_materialization_frontier.ts"
+  );
+
+  assert.match(source, /\bcompileSdlcFeatureDependencyDagToAbgFrontier\b/u);
+  assert.match(source, /\brunEventedNativeSagaFrontier\b/u);
+  assert.match(source, /\bconstructBranchExecutionPolicy\b/u);
+  assert.match(source, /executionAuthority:\s*"abg_evented_saga_frontier"/u);
+  assert.match(source, /parallelismControl:\s*"abg_branch_execution_policy"/u);
+  assert.doesNotMatch(source, /\brunNativeSagaFrontier\b/u);
+  assert.match(
+    frontierCarrier,
+    /executionAuthority:\s*oneOf\(\["abg_evented_saga_frontier"\] as const\)/u
+  );
+  assert.match(
+    frontierCarrier,
+    /parallelismControl:\s*oneOf\(\["abg_branch_execution_policy"\] as const\)/u
+  );
+});

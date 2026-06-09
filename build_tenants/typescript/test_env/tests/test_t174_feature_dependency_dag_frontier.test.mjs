@@ -1083,6 +1083,20 @@ test("T-174 synthetic hello-world multilane proof derives live frontier artifact
     replayEventCount: run.replayEvents.length
   });
   assert.equal(isSdlcLiveFpParallelMaterializationFrontier(frontier), true);
+  assert.equal(
+    isSdlcLiveFpParallelMaterializationFrontier({
+      ...frontier,
+      executionAuthority: "sdlc_local_parallel_scheduler"
+    }),
+    false
+  );
+  assert.equal(
+    isSdlcLiveFpParallelMaterializationFrontier({
+      ...frontier,
+      parallelismControl: "sdlc_local_batch_loop"
+    }),
+    false
+  );
   assert.equal(frontier.laneCount, 4);
   assert.equal(frontier.maxActive, 4);
   assert.deepEqual(frontier.batchSizes, [4, 1]);
