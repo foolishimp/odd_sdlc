@@ -27,6 +27,7 @@ can prove:
 - `.ai-workspace/context/project_constraints.yml`
 - `specification/INTENT.md`
 - `specification/REQUIREMENTS.md`
+- `specification/requirements/00-imported-sources.md`
 - `specification/mapper_requirements.md`
 - `specification/appendices/APPENDIX_A_FROBENIUS_ALGEBRAS.md`
 

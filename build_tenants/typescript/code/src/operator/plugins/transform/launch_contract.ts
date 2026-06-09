@@ -222,7 +222,6 @@ const TRAVERSAL_AUTHORITY_PATHS = Object.freeze([
   "specification/PRODUCT.md",
   "specification/GOALS.md",
   "specification/REQUIREMENTS.md",
-  "specification/mapper_requirements.md",
   "bootstrap.md",
   ".ai-workspace/context/project_bootstrap.md",
   ".ai-workspace/context/project_constraints.yml"
@@ -2618,7 +2617,6 @@ function expandedRequirementAuthorityRefs(
     const isRequirementSurface =
       filePath.includes("/specification/requirements/") ||
       filePath.endsWith("/specification/REQUIREMENTS.md") ||
-      filePath.endsWith("/specification/mapper_requirements.md") ||
       filePath.endsWith(`/${PROJECT_BOOTSTRAP_RELATIVE_PATH}`);
     const lowerFilePath = filePath.toLowerCase();
     const isTestOrProofDesignSurface =
@@ -5961,8 +5959,7 @@ function requirementLineageAuthorityRank(obligation: SdlcTraversalObligation): n
   if (
     refs.some(
       (ref) =>
-        ref.endsWith("/specification/REQUIREMENTS.md") ||
-        ref.endsWith("/specification/mapper_requirements.md")
+        ref.endsWith("/specification/REQUIREMENTS.md")
     )
   ) {
     return 1;

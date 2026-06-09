@@ -19,9 +19,33 @@ import {
   type SdlcWorkspaceIngressReport
 } from "./carriers.js";
 import {
+  SDLC_IMPORTED_SOURCE_MARKER_PREFIX,
   requirementAuthorityIdentityForMarker,
   uniqueSorted
 } from "./source_input.js";
+
+function importedSourceRelativePaths(
+  sourceInputs: readonly SdlcSourceInput[]
+): ReadonlySet<string> {
+  const paths = new Set<string>();
+  for (const sourceInput of sourceInputs) {
+    for (const marker of sourceInput.authorityMarkers) {
+      if (!marker.startsWith(SDLC_IMPORTED_SOURCE_MARKER_PREFIX)) {
+        continue;
+      }
+      const encodedPath = marker.slice(SDLC_IMPORTED_SOURCE_MARKER_PREFIX.length);
+      try {
+        const relativePath = decodeURIComponent(encodedPath);
+        if (relativePath.length > 0) {
+          paths.add(relativePath);
+        }
+      } catch {
+        continue;
+      }
+    }
+  }
+  return paths;
+}
 
 function importedRequirementAuthorities(
   input: {
@@ -30,12 +54,16 @@ function importedRequirementAuthorities(
   }
 ): readonly SdlcImportedRequirementAuthority[] {
   const authorities: SdlcImportedRequirementAuthority[] = [];
+  const importedRelativePaths = importedSourceRelativePaths(input.sourceInputs);
   const seenAuthorityRefs = new Map<
     string,
     { readonly sourceUri: string; readonly authorityMarkerRef: string }
   >();
   for (const sourceInput of input.sourceInputs) {
-    if (sourceInput.detectedRole !== "requirement_surface") {
+    const contributesRequirementAuthority =
+      sourceInput.detectedRole === "requirement_surface" ||
+      importedRelativePaths.has(sourceInput.relativePath);
+    if (!contributesRequirementAuthority) {
       continue;
     }
     for (const marker of sourceInput.authorityMarkers) {

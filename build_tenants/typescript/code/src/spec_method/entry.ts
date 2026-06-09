@@ -293,7 +293,6 @@ const DEFAULT_SOURCE_PATHS = Object.freeze([
   "specification/INTENT.md",
   "specification/PRODUCT.md",
   "specification/REQUIREMENTS.md",
-  "specification/mapper_requirements.md",
   ".ai-workspace/context/project_constraints.yml"
 ] as const);
 

@@ -951,8 +951,7 @@ function workspaceAuthorityRelativePaths(workspaceRoot: string): readonly string
     INTENT_RELATIVE_PATH,
     PRODUCT_RELATIVE_PATH,
     GOALS_RELATIVE_PATH,
-    "specification/REQUIREMENTS.md",
-    "specification/mapper_requirements.md"
+    "specification/REQUIREMENTS.md"
   ] as const);
   const preferredOrder = new Map<string, number>(
     preferred.map((relativePath, index) => [relativePath, index])
@@ -1037,7 +1036,6 @@ function readOrderLines(input: {
   const primary = [
     INTENT_RELATIVE_PATH,
     "specification/REQUIREMENTS.md",
-    "specification/mapper_requirements.md",
     IMPORTED_SOURCES_RELATIVE_PATH
   ].filter((relativePath) => existsFile(relativePath));
   const supplemental = input.sourceRelativePaths.filter(

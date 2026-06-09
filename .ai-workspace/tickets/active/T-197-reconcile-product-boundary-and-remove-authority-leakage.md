@@ -354,7 +354,7 @@ or verification note).
 
 | id | code surface | axis | owner | verdict | verification | disposition | proof required | status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| **B1** | zero `typecheckGtlProgram` / `admitGtlProgramConformanceInput` usage in `code/src/` (only `test_env/tests/test_t194_*`) | vertical | GTL/ABG | **fixed** | **done 2026-06-09** — `gtl_conformance/program.ts` builds the live SDLC graph/prompt/plugin/source inventory and calls ABG `admitGtlProgramConformanceInput(...)` + `typecheckGtlProgram(...)`; `start/public_start.ts`, `spec_method/entry.ts`, `release/release_cut.ts`, `release/release_snapshot.ts`, and `build:semantic` call `assertCurrentSdlcGtlProgramConformance(...)` | product-code ABG gate now uses `constructSdlcGraphFunctionCatalog()`, `constructSdlcGtlModule()`, `constructSdlcTargetCarrierRegistry(...)`, edge-closure contracts, overlay catalog, public starts, prompt assets, plugin contracts, source identities, and T-153 feature coverage | `test:t194` 2/2 and `test:t197` 3/3 prove non-trivial production coverage: graph functions/vectors > 0; target-carrier and edge-closure counts equal graph-vector count; prompt assets = 3; plugin contracts = 5; source identities > 0; issueCount = 0; missing target-carrier rows fail closed | done |
+| **B1** | zero `typecheckGtlProgram` / `admitGtlProgramConformanceInput` usage in `code/src/` (only `test_env/tests/test_t194_*`) | vertical | GTL/ABG | **fixed** | **done 2026-06-09** — `gtl_conformance/program.ts` builds the live SDLC graph/prompt/plugin/source inventory and calls ABG `admitGtlProgramConformanceInput(...)` + `typecheckGtlProgram(...)`; `start/public_start.ts`, `spec_method/entry.ts`, `release/release_cut.ts`, `release/release_snapshot.ts`, and `build:semantic` call `assertCurrentSdlcGtlProgramConformance(...)` | product-code ABG gate now uses `constructSdlcGraphFunctionCatalog()`, `constructSdlcGtlModule()`, `constructSdlcTargetCarrierRegistry(...)`, edge-closure contracts, overlay catalog, public starts, prompt assets, plugin contracts, source identities, and T-153 feature coverage; installed packages use a packaged source-identity row when source-tree scan roots are absent | `test:t194` 2/2 and `test:t197` 5/5 prove non-trivial production coverage: graph functions/vectors > 0; target-carrier and edge-closure counts equal graph-vector count; prompt assets = 3; plugin contracts = 5; source identities > 0; installed-package source identity = 1; issueCount = 0; missing target-carrier rows fail closed | done |
 
 Closes the loop on abiogenesis T-150/T-152/T-153: gate built in substrate; SDLC
 consumer does not call it.
@@ -427,7 +427,7 @@ lawful worker-backend realization (claude rejected list).
 
 | id | cluster | code surface | severity | verification | disposition | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| H1 | R1 | `mapper_requirements.md` in `source_input.ts:41`, `project_profile.ts:954-956/1039-1041`, `launch_contract.ts:225/2621/5965`, `postflight_checks.ts:2347-2364`, `result_projection.ts:1552`, `spec_method/entry.ts:289-297` | **high** (1552 load-bearing rank) | claude 26/26 + grep 7 files | route all recognition through `specification/requirements/` + `importedSourceRelativePaths` / `00-imported-sources.md` | open |
+| H1 | R1 | `mapper_requirements.md` in `source_input.ts:41`, `project_profile.ts:954-956/1039-1041`, `launch_contract.ts:225/2621/5965`, `postflight_checks.ts:2347-2364`, `result_projection.ts:1552`, `spec_method/entry.ts:289-297` | **high** (1552 load-bearing rank) | **done 2026-06-09** — code/src grep has zero `specification/mapper_requirements.md`; `deriveSdlcSourceInput(...)` no longer classifies the target-specific filename as `requirement_surface`; generic `specification/requirements/*` remains classified as requirement authority | recognition now routes through `specification/requirements/`, `specification/REQUIREMENTS.md`, and imported-source discovery; target-specific filename remains valid only as tenant data/fixture text, not framework law | done |
 | H2 | R2 | `analysis/types.ts:19-26` closed enum `hello_world`/`data_mapper`/`generic`; `profiles.ts`, `analyze.ts:358-364` name switches | medium | claude confirmed | open profile id to admitted tenant spec; use `truthyCapability(profile,"trivial_product")` (pattern at `public_start.ts:355`) | open |
 | H3 | R3 | `qualification/enterprise_core_inventory.ts:5-108` `ENTERPRISE_CORE_COMPONENTS` + `ENTERPRISE_CORE_CAPABILITY_INVENTORY` as default gate | **medium, probe-only current reachability** | **verified probe-only** — current `code/src` usage is `qualification/enterprise_core_iteration_sandbox.ts`, a B-068 probe graph (`function_kind: "odd_outcome_iteration_probe"` at L286–288) whose evaluator calls `evaluateEnterpriseCoreInventory(...)` (L467–474); `test_env/sandbox/test_b068_*` is the only active test consumer. No public-start/operator live default gate caller found in active source grep. | contain as B-068 proof fixture or relocate to `test_env/`; do not treat as live default gate until a production caller is proven | open |
 | H4 | R3 | `qualification/enterprise_core_iteration_sandbox.ts:425-462` scripted CDME constructor sequence | medium | claude confirmed | move to non-exported `test_env/` fixture with synthetic names | open |
@@ -525,12 +525,15 @@ Full list: claude GAP § "Rejected / Lawful-On-Inspection" (17 items).
 - Production inventory builder: `build_tenants/typescript/code/src/gtl_conformance/program.ts`
 - Product hooks: `start/public_start.ts`, `spec_method/entry.ts` start ignition, `release/release_cut.ts`,
   `release/release_snapshot.ts`, and package `build:semantic` via `preflight:gtl`
-- Proof: `npm run test:t194` passed 2/2; `npm run test:t197` passed 3/3
+- Proof: `npm run test:t194` passed 2/2; `npm run test:t197` passed 5/5
 - Runtime counts on this revision: graph vectors = target-carrier rows =
   edge-closure rows; prompt assets = 3; plugin contracts = 5; source identity
   surfaces > 0; issueCount = 0
 - Negative proof: `test:t197` removes target-carrier rows and ABG reports a
   failed conformance report with `target_carrier_contract` issues.
+- Installed-package proof: `test:t197` forces a missing active source checkout
+  and still requires one packaged source-identity surface; `test:t059` proves
+  installed `odd-sdlc-ts gaps` runs through the same gate instead of bypassing it.
 
 ### Wave 1 — ABG authority leakage (vertical; design lock required)
 
@@ -632,13 +635,13 @@ addendum `T-197 Owner Partition And Decommission Register`.
 | W-020 | Publish structural carrier diagram | design diagram | open |
 | W-030 | Publish reference-to-target for all ledger rows | design table | open |
 | W-040 | Close transferred T-184 P1-P3 proof residuals | P1/P3 terminal here; P2 explicitly deferred to T-198 | open |
-| W-050 | **Wave 0: B1 product GTL gate** | `test:t194` 2/2; `test:t197` 3/3; `build:semantic` runs `preflight:gtl` over the live production inventory and rejects missing target-carrier rows | done |
+| W-050 | **Wave 0: B1 product GTL gate** | `test:t194` 2/2; `test:t197` 5/5; `test:t059` 10/10 installed-package proof; `build:semantic` runs `preflight:gtl` over the live production inventory and rejects missing target-carrier rows | done |
 | W-100 | Wave 1 design lock (A-rows) | signed dispositions | open |
 | W-110 | Wave 1 realization | focused tests; semantic green | open |
 | W-200 | Wave 2 B2-B3 plus B4b residual | T-153 audit tests | open |
 | W-300 | Wave 3 C1a/C1b | B-004 link; capability asset | open |
 | W-400 | Wave 4 D-rows | source tests | open |
-| W-500 | Wave 5 H-rows (R1–R7) | grep + focused tests; no mapper_requirements in rankers | open |
+| W-500 | Wave 5 H-rows (R1–R7) | H1 done by `test:t197` H1 grep/classifier proof; remaining H2-H12 open | in_progress |
 | W-600 | Closure post; refresh both GAP comments | all rows terminal | open |
 
 ---

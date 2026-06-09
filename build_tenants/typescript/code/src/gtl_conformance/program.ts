@@ -237,6 +237,7 @@ export function activeSdlcSourceIdentitySurfaces(
   input: SdlcGtlProgramConformanceInputOptions = {}
 ) {
   const repoRoot = repoRootFromOptions(input);
+  const packageRoot = packageRootFromOptions(input);
   const excludedScanSurfaces = new Set<string>([
     ...SDLC_GTL_PROGRAM_CONFORMANCE_EXCLUDED_SCAN_SURFACES,
     ...(input.excludedScanSurfaces ?? [])
@@ -258,6 +259,31 @@ export function activeSdlcSourceIdentitySurfaces(
         })
       );
     }
+  }
+  if (rows.length === 0) {
+    const packageJsonPath = path.join(packageRoot, "package.json");
+    const packageJsonText = existsSync(packageJsonPath)
+      ? readFileSync(packageJsonPath, "utf8")
+      : "{}";
+    rows.push(
+      Object.freeze({
+        surfaceRef: "package://@odd-sdlc/typescript-tenant/current",
+        text: [
+          "# Packaged SDLC Source Identity",
+          "",
+          `subjectRef: ${SDLC_GTL_PROGRAM_CONFORMANCE_SUBJECT_REF}`,
+          `abiPackageVersion: ${ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.packageVersion}`,
+          "",
+          "```json",
+          packageJsonText,
+          "```"
+        ].join("\n"),
+        evidenceRefs: Object.freeze([
+          "package://@odd-sdlc/typescript-tenant",
+          "workspace://build_tenants/typescript/package.json"
+        ])
+      })
+    );
   }
   return Object.freeze(rows);
 }

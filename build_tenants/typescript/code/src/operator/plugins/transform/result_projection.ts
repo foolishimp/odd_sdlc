@@ -1548,8 +1548,7 @@ function requirementLineageAuthorityRank(obligation: SdlcTraversalObligation): n
   if (
     refs.some(
       (ref) =>
-        ref.endsWith("/specification/REQUIREMENTS.md") ||
-        ref.endsWith("/specification/mapper_requirements.md")
+        ref.endsWith("/specification/REQUIREMENTS.md")
     )
   ) {
     return 1;

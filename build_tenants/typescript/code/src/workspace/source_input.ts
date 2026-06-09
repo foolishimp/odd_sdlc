@@ -38,7 +38,6 @@ function detectRole(relativePath: string): SdlcSourceInputRole {
   }
   if (
     relativePath === "specification/REQUIREMENTS.md" ||
-    relativePath === "specification/mapper_requirements.md" ||
     relativePath.startsWith("specification/requirements/")
   ) {
     return "requirement_surface";
@@ -57,6 +56,11 @@ function detectRole(relativePath: string): SdlcSourceInputRole {
 
 export const SDLC_LOCAL_REQUIREMENT_MARKER_PREFIX =
   "requirement-local://odd-sdlc/" as const;
+export const SDLC_IMPORTED_SOURCE_MARKER_PREFIX =
+  "source-import://odd-sdlc/" as const;
+
+const IMPORTED_SOURCES_RELATIVE_PATH =
+  "specification/requirements/00-imported-sources.md" as const;
 
 export interface SdlcRequirementAuthorityIdentity {
   readonly requirementDisplayId: string;
@@ -282,9 +286,49 @@ function detectLocalRequirementMarkers(content: string): readonly string[] {
   );
 }
 
+function normalizeImportedSourceRelativePath(rawRef: string): string | null {
+  const trimmed = rawRef.trim();
+  const workspacePath = trimmed.startsWith("workspace://")
+    ? trimmed.slice("workspace://".length).trim().replace(/^\/+/u, "")
+    : trimmed;
+  if (
+    workspacePath.length === 0 ||
+    workspacePath.startsWith("file://") ||
+    workspacePath.startsWith("http://") ||
+    workspacePath.startsWith("https://") ||
+    workspacePath.startsWith("/") ||
+    workspacePath.includes("\0") ||
+    workspacePath.split("/").includes("..")
+  ) {
+    return null;
+  }
+  return workspacePath;
+}
+
+function importedSourceMarkers(
+  content: string,
+  relativePath: string
+): readonly string[] {
+  if (relativePath !== IMPORTED_SOURCES_RELATIVE_PATH) {
+    return Object.freeze([]);
+  }
+  return uniqueSorted(
+    content.split("\n").flatMap((line) => {
+      const bulletMatch = /^-\s+`?([^`]+?)`?\s*$/u.exec(line.trim());
+      const importedRelativePath = bulletMatch?.[1] === undefined
+        ? null
+        : normalizeImportedSourceRelativePath(bulletMatch[1]);
+      return importedRelativePath === null
+        ? []
+        : [`${SDLC_IMPORTED_SOURCE_MARKER_PREFIX}${encodeURIComponent(importedRelativePath)}`];
+    })
+  );
+}
+
 function detectAuthorityMarkers(
   content: string,
-  role: SdlcSourceInputRole
+  role: SdlcSourceInputRole,
+  relativePath: string
 ): readonly string[] {
   const markerExpression = /\b(?:INT-\d{3}|RF-[A-Z0-9]+(?:-[A-Z0-9]+)*|REQ-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b(?!-)/g;
   const transformRefExpression =
@@ -305,7 +349,8 @@ function detectAuthorityMarkers(
     ...markers,
     ...localRequirementMarkers,
     ...transformRefs,
-    ...projectMarkers
+    ...projectMarkers,
+    ...importedSourceMarkers(content, relativePath)
   ]);
 }
 
@@ -330,7 +375,11 @@ export function deriveSdlcSourceInput(
   snapshot: SdlcSourceInputSnapshot
 ): SdlcSourceInput {
   const role = detectRole(snapshot.relativePath);
-  const authorityMarkers = detectAuthorityMarkers(snapshot.content, role);
+  const authorityMarkers = detectAuthorityMarkers(
+    snapshot.content,
+    role,
+    snapshot.relativePath
+  );
   return Object.freeze({
     kind: "sdlc_source_input",
     uri: snapshot.uri,

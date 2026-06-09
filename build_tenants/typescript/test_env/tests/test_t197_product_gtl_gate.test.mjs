@@ -3,7 +3,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  readFileSync
+  readdirSync,
+  readFileSync,
+  statSync
 } from "node:fs";
 import path from "node:path";
 import {
@@ -11,7 +13,10 @@ import {
 } from "@abiogenesis/typescript-tenant";
 import {
   assertCurrentSdlcGtlProgramConformance,
+  admitSdlcProjectConstraints,
   constructCurrentSdlcGtlProgramConformanceInput,
+  deriveSdlcSourceInput,
+  deriveSdlcWorkspaceIngressReport,
   typecheckCurrentSdlcGtlProgram,
   typecheckSdlcGtlProgramConformanceInput
 } from "../../build/semantic/code/src/index.js";
@@ -21,6 +26,29 @@ const REPO_ROOT = path.resolve(PACKAGE_ROOT, "../..");
 
 function repoFile(relativePath) {
   return readFileSync(path.join(REPO_ROOT, relativePath), "utf8");
+}
+
+function repoFilesUnder(relativePath) {
+  const root = path.join(REPO_ROOT, relativePath);
+  const files = [];
+  const stack = [root];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    const stat = statSync(current);
+    if (stat.isDirectory()) {
+      for (const entry of readdirSync(current)) {
+        if (entry === "build" || entry === "node_modules") {
+          continue;
+        }
+        stack.push(path.join(current, entry));
+      }
+      continue;
+    }
+    if (stat.isFile()) {
+      files.push(current);
+    }
+  }
+  return files.sort();
 }
 
 function assertConformancePassed(report) {
@@ -101,5 +129,78 @@ test("T-197 product entry points call the GTL conformance gate", () => {
   assert.match(
     packageJson.scripts["preflight:gtl"],
     /\bassertCurrentSdlcGtlProgramConformance\b/u
+  );
+});
+
+test("T-197 product gate keeps installed-package source identity nonempty", () => {
+  const input = constructCurrentSdlcGtlProgramConformanceInput({
+    packageRoot: path.join(REPO_ROOT, "build_tenants/typescript"),
+    repoRoot: path.join(REPO_ROOT, "test_env/no-source-checkout"),
+    activeScanRoots: ["missing-active-source-root"]
+  });
+  const report = typecheckSdlcGtlProgramConformanceInput(input);
+
+  assertConformancePassed(report);
+  assert.equal(input.expectedCoverage.sourceIdentitySurfaceCount, 1);
+  assert.equal(
+    input.sourceIdentitySurfaces[0]?.surfaceRef,
+    "package://@odd-sdlc/typescript-tenant/current"
+  );
+});
+
+test("T-197 H1 keeps target-specific requirements filenames out of framework law", () => {
+  const forbiddenPath = "specification/mapper_requirements.md";
+  const sourceHits = repoFilesUnder("build_tenants/typescript/code/src")
+    .filter((filePath) => path.extname(filePath) === ".ts")
+    .filter((filePath) => readFileSync(filePath, "utf8").includes(forbiddenPath))
+    .map((filePath) => path.relative(REPO_ROOT, filePath).split(path.sep).join("/"));
+
+  assert.deepEqual(sourceHits, []);
+
+  const sourceInput = deriveSdlcSourceInput({
+    uri: "file:///workspace/specification/mapper_requirements.md",
+    relativePath: forbiddenPath,
+    content: "# Target-specific requirements filename\nREQ-X Target-local truth."
+  });
+  assert.equal(sourceInput.detectedRole, "unstructured");
+
+  const genericRequirement = deriveSdlcSourceInput({
+    uri: "file:///workspace/specification/requirements/01-domain.md",
+    relativePath: "specification/requirements/01-domain.md",
+    content: "# Requirements\nREQ-X Generic requirement truth."
+  });
+  assert.equal(genericRequirement.detectedRole, "requirement_surface");
+
+  const importedSources = deriveSdlcSourceInput({
+    uri: "file:///workspace/specification/requirements/00-imported-sources.md",
+    relativePath: "specification/requirements/00-imported-sources.md",
+    content: [
+      "# Imported Sources",
+      "",
+      "- `workspace://specification/mapper_requirements.md`"
+    ].join("\n")
+  });
+  const importedRequirement = deriveSdlcSourceInput({
+    uri: "file:///workspace/specification/mapper_requirements.md",
+    relativePath: forbiddenPath,
+    content: "# Target-specific requirements filename\nREQ-X Target-local truth."
+  });
+  const report = deriveSdlcWorkspaceIngressReport({
+    workspaceRootUri: "file:///workspace",
+    projectConstraints: admitSdlcProjectConstraints({
+      kind: "sdlc_project_constraints",
+      projectSlug: "target_specific_fixture",
+      activeTenant: "typescript",
+      selectedOutputRoot: "build_tenants/typescript",
+      ambiguityRiskAppetite: "medium",
+      capabilityContracts: []
+    }),
+    sourceInputs: [importedSources, importedRequirement]
+  });
+  assert.equal(importedRequirement.detectedRole, "unstructured");
+  assert(
+    report.importedRequirementAuthorities.some(
+      (authority) => authority.requirementId === "REQ-X"
+    )
   );
 });

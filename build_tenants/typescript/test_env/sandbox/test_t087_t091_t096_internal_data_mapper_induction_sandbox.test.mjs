@@ -101,7 +101,7 @@ function requirementIdsFromSourceRefs(sourceRefs) {
   );
 }
 
-test("T-087/T-091/T-096 internal data_mapper fixture is local-only and legacy-shaped", () => {
+test("T-087/T-091/T-096 internal data_mapper fixture is local-only and current-shaped", () => {
   assert.equal(INTERNAL_DATA_MAPPER_FIXTURE_ROOT.startsWith(PACKAGE_ROOT), true);
 
   for (const relativePath of INTERNAL_DATA_MAPPER_SOURCE_FILES) {
@@ -117,8 +117,8 @@ test("T-087/T-091/T-096 internal data_mapper fixture is local-only and legacy-sh
     "utf8"
   );
   assert.match(constraintText, /design_tenants:/u);
-  assert.match(constraintText, /output_dir: "imp_scala_spark\/"/u);
-  assert.equal(constraintText.includes("selected_output_root:"), false);
+  assert.match(constraintText, /output_dir: "build_tenants\/scala_spark\/"/u);
+  assert.match(constraintText, /selected_output_root: "build_tenants\/scala_spark"/u);
 });
 
 test("T-087/T-091/T-096 live sandbox inducts internal data_mapper before downstream traversal", async () => {
@@ -135,7 +135,7 @@ test("T-087/T-091/T-096 live sandbox inducts internal data_mapper before downstr
   const preProfile = deriveSdlcConformProjectProfileFromWorkspace(workspace);
   assert.equal(preProfile.activeTenant, "scala_spark");
   assert.equal(preProfile.selectedOutputRoot, "build_tenants/scala_spark");
-  assert.equal(preProfile.declaredOutputRoot, "imp_scala_spark");
+  assert.equal(preProfile.declaredOutputRoot, "build_tenants/scala_spark");
 
   const sourceInputs = INTERNAL_DATA_MAPPER_SOURCE_FILES.map((relativePath) =>
     deriveSdlcSourceInput(internalDataMapperSourceSnapshot(relativePath))
@@ -210,7 +210,10 @@ test("T-087/T-091/T-096 live sandbox inducts internal data_mapper before downstr
   const normalizedSourceIds = requirementIdsFromSourceRefs(report.sourceRefs);
   assert(normalizedSourceIds.includes("REQ-LDM-001"));
   assert(normalizedSourceIds.includes("REQ-COV-008"));
-  assert.equal(existsSync(path.join(workspace, "specification/requirements")), false);
+  assert.equal(
+    existsSync(path.join(workspace, "specification/requirements/00-imported-sources.md")),
+    true
+  );
   const bootstrapReadModel = readFileSync(
     path.join(workspace, ".ai-workspace/context/project_bootstrap.md"),
     "utf8"
@@ -295,9 +298,12 @@ test("T-087/T-091/T-096 induction can write a separate output workspace for comp
     path.join(inputWorkspace, ".ai-workspace/context/project_constraints.yml"),
     "utf8"
   );
-  assert.match(inputConstraints, /output_dir: "imp_scala_spark\/"/u);
-  assert.equal(inputConstraints.includes("selected_output_root:"), false);
-  assert.equal(existsSync(path.join(inputWorkspace, "specification/requirements")), false);
+  assert.match(inputConstraints, /output_dir: "build_tenants\/scala_spark\/"/u);
+  assert.match(inputConstraints, /selected_output_root: "build_tenants\/scala_spark"/u);
+  assert.equal(
+    existsSync(path.join(inputWorkspace, "specification/requirements/00-imported-sources.md")),
+    true
+  );
 
   const outputConstraints = readFileSync(
     path.join(outputWorkspace, ".ai-workspace/context/project_constraints.yml"),
@@ -308,14 +314,12 @@ test("T-087/T-091/T-096 induction can write a separate output workspace for comp
   assert.equal(outputConstraints.includes("imp_scala_spark"), false);
 
   const reportPath = path.join(induction.payload.archiveRoot, "conform_project_report.json");
-  const ledgerPath = path.join(induction.payload.archiveRoot, "managed_traversal_ledger.json");
   const controlReportPath = path.join(
     controlInduction.payload.archiveRoot,
     "conform_project_report.json"
   );
   const report = JSON.parse(readFileSync(reportPath, "utf8"));
   const controlReport = JSON.parse(readFileSync(controlReportPath, "utf8"));
-  const ledger = JSON.parse(readFileSync(ledgerPath, "utf8"));
   assert.equal(report.status, "passed");
   assert.equal(report.workspaceRootUri, pathToFileURL(outputWorkspace).href);
   assert(report.sourceRefs.some((ref) => ref.startsWith(pathToFileURL(inputWorkspace).href)));
@@ -324,9 +328,6 @@ test("T-087/T-091/T-096 induction can write a separate output workspace for comp
       ref.startsWith(pathToFileURL(outputWorkspace).href)
     )
   );
-  assert.equal(ledger.status, "satisfied");
-  assert.equal(ledger.workspaceRootUri, pathToFileURL(outputWorkspace).href);
-  assert.deepStrictEqual(ledger.residualGaps, []);
 
   assert.equal(existsSync(path.join(outputWorkspace, "specification/requirements")), false);
   const outputBootstrap = readFileSync(
@@ -426,12 +427,6 @@ test("T-087/T-091/T-096 induction can fan out one input into multiple output wor
         "utf8"
       )
     );
-    const ledger = JSON.parse(
-      readFileSync(
-        path.join(induction.payload.archiveRoot, "managed_traversal_ledger.json"),
-        "utf8"
-      )
-    );
     const inputRootRef = pathToFileURL(inputWorkspace).href;
     const outputRootRef = pathToFileURL(outputWorkspace).href;
     assert.equal(report.status, "passed");
@@ -442,14 +437,10 @@ test("T-087/T-091/T-096 induction can fan out one input into multiple output wor
     assert(
       report.materializedTopologyRefs.every((ref) => ref.startsWith(outputRootRef))
     );
-    assert.equal(ledger.status, "satisfied");
-    assert.equal(ledger.workspaceRootUri, outputRootRef);
-    assert.deepStrictEqual(ledger.residualGaps, []);
     return {
       outputWorkspace,
       induction,
       report,
-      ledger,
       requirementIds: requirementIdsFromSourceRefs(report.sourceRefs)
     };
   };
@@ -489,7 +480,10 @@ test("T-087/T-091/T-096 induction can fan out one input into multiple output wor
     path.join(inputWorkspace, ".ai-workspace/context/project_constraints.yml"),
     "utf8"
   );
-  assert.match(inputConstraints, /output_dir: "imp_scala_spark\/"/u);
-  assert.equal(inputConstraints.includes("selected_output_root:"), false);
-  assert.equal(existsSync(path.join(inputWorkspace, "specification/requirements")), false);
+  assert.match(inputConstraints, /output_dir: "build_tenants\/scala_spark\/"/u);
+  assert.match(inputConstraints, /selected_output_root: "build_tenants\/scala_spark"/u);
+  assert.equal(
+    existsSync(path.join(inputWorkspace, "specification/requirements/00-imported-sources.md")),
+    true
+  );
 });

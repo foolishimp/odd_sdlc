@@ -6,7 +6,7 @@ This is the canonical template for the **Categorical Data Mapping & Computation 
 The project is mathematically grounded in Category Theory and requires strict adherence to invariants such as path validation, grain safety, and type unification.
 
 ## Contents
-- `specification/`: the inherited project truth. Contains `INTENT.md`, `REQUIREMENTS.md`, and the domain-specific `mapper_requirements.md`.
+- `specification/`: the inherited project truth. Contains `INTENT.md`, `REQUIREMENTS.md`, the generic imported-source ledger, and the domain-specific `mapper_requirements.md`.
 - `.ai-workspace/context/project_constraints.yml`: project-local constraints carried into new test runs.
 
 ## RC Validation Operating Model
