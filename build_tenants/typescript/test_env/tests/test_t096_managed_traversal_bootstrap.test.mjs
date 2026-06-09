@@ -98,11 +98,18 @@ test("T-096 proves Fg_conform_project as managed traversal from unordered source
   assert.equal(induction.payload.summary.graphFunctionName, FG_CONFORM_PROJECT);
   assert.equal(induction.payload.status, "converged");
   assert.deepStrictEqual(induction.payload.emittedRuntimeEventKinds, [
+    "basis_admitted",
     "graph_call_opened",
     "frame_opened",
     "vector_traversal_planned",
+    "payload_observed",
+    "payload_validated",
+    "fd_authority_outcome_admitted",
     "vector_evaluated",
-    "vector_closed"
+    "vector_closed",
+    "fd_advance_ready",
+    "payload_observed",
+    "payload_validated"
   ]);
 
   for (const relativePath of [

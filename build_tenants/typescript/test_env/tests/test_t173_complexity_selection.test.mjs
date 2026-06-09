@@ -621,7 +621,7 @@ test("T-173 analyze-run rejects malformed archived traversal selection carrier",
   }
 });
 
-test("T-173 installed operator archives traversal selection and emits typed audit event", () => {
+test("T-173 installed operator archives traversal selection without local F_D runtime authorship", () => {
   const source = readFileSync(
     path.join(PACKAGE_ROOT, "code/src/operator/installed_operator.ts"),
     "utf8"
@@ -633,8 +633,8 @@ test("T-173 installed operator archives traversal selection and emits typed audi
   assert.match(source, /sdlc_frontdoor_traversal_hop_selection\.json/u);
   assert.match(source, /readArchivedFrontDoorTraversalSelection/u);
   assert.match(source, /sdlc_frontdoor_traversal_hop_selection/u);
-  assert.match(source, /constructFdAuthorityOutcomeAdmittedEvent/u);
-  assert.match(source, /odd-sdlc-frontdoor-traversal-hop-selection/u);
-  assert.match(source, /emitted\.push\(frontDoorTraversalAuditEvent\)/u);
-  assert.match(source, /input\.eventSink\(traversalAuditEvent\)/u);
+  assert.doesNotMatch(source, /constructFdAuthorityOutcomeAdmittedEvent/u);
+  assert.doesNotMatch(source, /odd-sdlc-frontdoor-traversal-hop-selection/u);
+  assert.doesNotMatch(source, /emitted\.push\(frontDoorTraversalAuditEvent\)/u);
+  assert.doesNotMatch(source, /input\.eventSink\(traversalAuditEvent\)/u);
 });

@@ -24,8 +24,8 @@ import {
   admitGraphSpanAssessment,
   constructGraphReentryAppliedEvent,
   constructGraphReentryPlannedEvent,
-  constructFdAuthorityOutcomeAdmittedEvent,
   constructConsequenceProjectionOutcome,
+  constructFdEvaluationOutcome,
   constructGraphSpanAssessedEvent,
   constructGraphSpanEvaluationScheduledEvent,
   constructGraphSpanFoldbackEvaluatedEvent,
@@ -37,6 +37,7 @@ import {
   constructVectorClosedEvent,
   constructVectorEvaluatedEvent,
   constructVectorTraversalPlannedEvent,
+  defaultFdEvaluatorPlugin,
   foldGraphSpanAssessments,
   deriveAdvancementTransition,
   deriveGraphReentryFrontierProjection,
@@ -48,7 +49,6 @@ import {
   materializeGraphFunction,
   runEngineIterateAsync,
   runtimeEventsForFpTransformResult,
-  runtimeEventsForIterationDecision,
   type ActorInvocation,
   type EnginePluginInput,
   type EvaluationRuleOutcome,
@@ -2420,21 +2420,6 @@ function canonicalSummaryForManifest(input: {
   return preferred?.payload ?? summaries[0]?.payload ?? null;
 }
 
-function traversalAuditRoutingDecision(
-  selection: SdlcTraversalHopSelection
-): "continue" | "block" | "preserve_pressure" | "route_to_fp" {
-  if (selection.hopClass === "blocked") {
-    return "block";
-  }
-  if (
-    selection.hopClass === "zoom_required" ||
-    selection.pressurePreservation.mechanism !== "none"
-  ) {
-    return "preserve_pressure";
-  }
-  return "continue";
-}
-
 type LiveParallelLaneKind = "dev" | "test";
 
 interface LiveParallelMaterializationLane {
@@ -2907,7 +2892,7 @@ async function writeTraversalSelectionAudit(input: {
   readonly edgeAccountingRow: SdlcExecutiveEdgeAccountingRow | null;
   readonly eventSink: (event: RuntimeEvent) => void;
   readonly fpEvaluatorAdmissionEvidenceRefs?: readonly string[] | undefined;
-}): Promise<RuntimeEvent | null> {
+}): Promise<void> {
   const auditCarriers = deriveSdlcStagedConstructionAuditCarriers(
     input.manifest,
     input.fpEvaluatorAdmissionEvidenceRefs ?? Object.freeze([])
@@ -2956,7 +2941,7 @@ async function writeTraversalSelectionAudit(input: {
     !projectionOnlyEligible &&
     input.manifest.targetCarrierProjection.constructionDepthRole === "none"
   ) {
-    return null;
+    return;
   }
   const frontDoorSelection =
     canonicalSummary === null
@@ -2977,37 +2962,6 @@ async function writeTraversalSelectionAudit(input: {
     relativePath: "sdlc_traversal_hop_selection.json",
     payload: selection
   });
-  const selectionRef = pathToFileURL(
-    join(input.manifest.archiveRoot, "sdlc_traversal_hop_selection.json")
-  ).href;
-  return constructFdAuthorityOutcomeAdmittedEvent({
-    basis: input.basis,
-    vectorIndex: input.manifest.vectorIndex,
-    status: selection.hopClass === "blocked" ? "blocked" : "accepted",
-    severityClass: selection.hopClass === "blocked" ? "construction_context_invalid" : null,
-    routingDecision: traversalAuditRoutingDecision(selection),
-    affectedFieldRefs: Object.freeze([
-      "sdlc_traversal_hop_selection.hopClass",
-      "sdlc_traversal_hop_selection.pressurePreservation.mechanism"
-    ]),
-    consumedFieldRefs: Object.freeze([
-      ...(canonicalSummary === null
-        ? frontDoorSelection === null
-          ? []
-          : ["sdlc_frontdoor_traversal_hop_selection"]
-        : ["sdlc_decomposition_summary"]),
-      "sdlc_operator_postflight_result"
-    ]),
-    pressureRefs: selection.blockingReasons,
-    diagnosticRefs: selection.blockingReasons,
-    evidenceRefs: uniqueSorted([selectionRef, ...selection.evidenceRefs]),
-    causationEventRefs: input.postflight.evidenceRefs,
-    correlationId: [
-      "odd-sdlc-traversal-hop-selection",
-      input.basis.id,
-      String(input.manifest.vectorIndex)
-    ].join(":")
-  });
 }
 
 function writeFrontDoorTraversalSelectionAudit(input: {
@@ -3015,13 +2969,13 @@ function writeFrontDoorTraversalSelectionAudit(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly summary: SdlcDecompositionSummary | null;
   readonly selection: SdlcTraversalHopSelection | null;
-}): RuntimeEvent | null {
+}): void {
   if (
     input.manifest.vectorIndex !== 0 ||
     input.summary === null ||
     input.selection === null
   ) {
-    return null;
+    return;
   }
   writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
@@ -3032,46 +2986,6 @@ function writeFrontDoorTraversalSelectionAudit(input: {
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "sdlc_frontdoor_traversal_hop_selection.json",
     payload: input.selection
-  });
-  const summaryRef = pathToFileURL(
-    join(input.manifest.archiveRoot, "sdlc_frontdoor_decomposition_summary.json")
-  ).href;
-  const selectionRef = pathToFileURL(
-    join(input.manifest.archiveRoot, "sdlc_frontdoor_traversal_hop_selection.json")
-  ).href;
-  return constructFdAuthorityOutcomeAdmittedEvent({
-    basis: input.basis,
-    vectorIndex: input.manifest.vectorIndex,
-    status: input.selection.hopClass === "blocked" ? "blocked" : "accepted",
-    severityClass:
-      input.selection.hopClass === "blocked"
-        ? "construction_context_invalid"
-        : null,
-    routingDecision: traversalAuditRoutingDecision(input.selection),
-    affectedFieldRefs: Object.freeze([
-      "sdlc_public_start.executionContract.targetGraphFunction",
-      "sdlc_public_start.executionContract.overlayRef",
-      "sdlc_traversal_hop_selection.hopClass",
-      "sdlc_traversal_hop_selection.pressurePreservation.mechanism"
-    ]),
-    consumedFieldRefs: Object.freeze([
-      "sdlc_public_start_request",
-      "sdlc_conform_project_profile.capabilityContracts",
-      "sdlc_decomposition_summary"
-    ]),
-    pressureRefs: input.selection.pressurePreservation.preservedPressureRefs,
-    diagnosticRefs: input.selection.blockingReasons,
-    evidenceRefs: uniqueSorted([
-      summaryRef,
-      selectionRef,
-      ...input.selection.evidenceRefs
-    ]),
-    causationEventRefs: Object.freeze([]),
-    correlationId: [
-      "odd-sdlc-frontdoor-traversal-hop-selection",
-      input.basis.id,
-      String(input.manifest.vectorIndex)
-    ].join(":")
   });
 }
 
@@ -5630,29 +5544,32 @@ async function appendFdConformanceRuntimeEvents(input: {
   readonly workspaceRoot: string;
   readonly basis: ExecutionBasis;
   readonly replayEvents: readonly RuntimeEvent[];
-  readonly vectorIndex: number;
+  readonly reportRef: string;
 }): Promise<readonly RuntimeEvent[]> {
-  const projection = deriveRuntimeAggregateProjection(input.basis, input.replayEvents);
-  const decision = deriveIterationAdvanceDecision(input.basis, projection);
-  if (
-    decision.kind !== "advance_vector" ||
-    decision.vectorIndex !== input.vectorIndex
-  ) {
-    return Object.freeze([]);
-  }
-  const emitted = Object.freeze([
-    ...runtimeEventsForIterationDecision(decision),
-    constructVectorEvaluatedEvent({
-      basis: input.basis,
-      vectorIndex: input.vectorIndex,
-      status: "accepted"
-    }),
-    constructVectorClosedEvent({
-      basis: input.basis,
-      vectorIndex: input.vectorIndex,
-      closureKind: "advanced"
+  const firstTraversalBasis: ExecutionBasis = Object.freeze({
+    ...input.basis,
+    startIntent: Object.freeze({
+      ...input.basis.startIntent,
+      until: "first_traversal" as const
     })
-  ]);
+  });
+  const runner = await runEngineIterateAsync({
+    basis: firstTraversalBasis,
+    runtimeEvents: input.replayEvents,
+    eventSink: () => undefined,
+    plugins: Object.freeze({
+      fdEvaluator: Object.freeze({
+        contract: defaultFdEvaluatorPlugin.contract,
+        evaluate: () =>
+          constructFdEvaluationOutcome({
+            status: "accepted",
+            evidenceRefs: [input.reportRef],
+            reason: "project conformance materialized by SDLC; ABG owns F_D traversal event authorship"
+          })
+      })
+    })
+  });
+  const emitted = Object.freeze([...runner.emittedEvents]);
   await appendOddSdlcRuntimeEvents({
     workspaceRoot: input.workspaceRoot,
     events: emitted
@@ -6050,7 +5967,7 @@ async function runSdlcPostTransformDiagnosticFlow(input: {
       join(input.state.manifest.archiveRoot, input.postflightRelativePath)
     ).href
   });
-  const traversalAuditEvent = await writeTraversalSelectionAudit({
+  await writeTraversalSelectionAudit({
     basis: input.basis,
     manifest: input.state.manifest,
     postflight,
@@ -6059,9 +5976,6 @@ async function runSdlcPostTransformDiagnosticFlow(input: {
     fpEvaluatorAdmissionEvidenceRefs:
       input.fpEvaluatorAdmissionEvidenceRefs ?? Object.freeze([])
   });
-  if (traversalAuditEvent !== null) {
-    input.eventSink(traversalAuditEvent);
-  }
   const assuranceGate = deriveSdlcOperatorAssuranceGate({
     manifest: input.state.manifest,
     report: input.state.workerReport,
@@ -8987,6 +8901,7 @@ function compactRuntimeEventArchivePayload(
       relativePath: "conform_project_report.json",
       payload: report
     });
+    const reportRef = pathToFileURL(join(archiveRoot, "conform_project_report.json")).href;
     if (replayCursor.cursorEvents.length > 0) {
       await appendOddSdlcRuntimeEvents({
         workspaceRoot: input.workspaceRoot,
@@ -8997,7 +8912,7 @@ function compactRuntimeEventArchivePayload(
       workspaceRoot: input.workspaceRoot,
       basis,
       replayEvents: effectiveReplayEvents,
-      vectorIndex: transition.vectorIndex
+      reportRef
     });
     const emitted = Object.freeze([
       ...replayCursor.cursorEvents,
@@ -9211,15 +9126,12 @@ function compactRuntimeEventArchivePayload(
         manifest.productMaterialization
       );
       const handoffFiles = writeHandoffFiles(manifest);
-      const frontDoorTraversalAuditEvent = writeFrontDoorTraversalSelectionAudit({
+      writeFrontDoorTraversalSelectionAudit({
         basis,
         manifest,
         summary: executionContract.traversalDecompositionSummary,
         selection: executionContract.traversalHopSelection
       });
-      if (frontDoorTraversalAuditEvent !== null) {
-        emitted.push(frontDoorTraversalAuditEvent);
-      }
       const expectedAssessmentIds =
         pluginInput.expectedAssessmentIds.length === 0
           ? vectorEvaluatorNames({ basis, vectorIndex: pluginInput.vectorIndex })

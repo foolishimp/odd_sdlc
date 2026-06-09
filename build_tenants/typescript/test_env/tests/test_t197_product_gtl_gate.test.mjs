@@ -253,3 +253,29 @@ test("T-197 H1 keeps target-specific requirements filenames out of framework law
     )
   );
 });
+
+test("T-197 W-110 keeps traversal selection as projection, not SDLC-authored F_D runtime truth", () => {
+  const source = repoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+
+  assert.match(source, /sdlc_traversal_hop_selection\.json/u);
+  assert.match(source, /sdlc_frontdoor_traversal_hop_selection\.json/u);
+  assert.doesNotMatch(source, /\bconstructFdAuthorityOutcomeAdmittedEvent\b/u);
+  assert.doesNotMatch(source, /odd-sdlc-frontdoor-traversal-hop-selection/u);
+  assert.doesNotMatch(source, /emitted\.push\(frontDoorTraversalAuditEvent\)/u);
+  assert.doesNotMatch(source, /input\.eventSink\(traversalAuditEvent\)/u);
+});
+
+test("T-197 W-110 routes conform-project F_D advance through ABG runner ownership", () => {
+  const source = repoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+
+  assert.match(source, /\bappendFdConformanceRuntimeEvents\b/u);
+  assert.match(source, /\brunEngineIterateAsync\b/u);
+  assert.match(source, /\bconstructFdEvaluationOutcome\b/u);
+  assert.match(source, /\bdefaultFdEvaluatorPlugin\.contract\b/u);
+  assert.match(source, /until:\s*"first_traversal"/u);
+  assert.doesNotMatch(source, /\bruntimeEventsForIterationDecision\b/u);
+});

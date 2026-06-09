@@ -541,8 +541,10 @@ Full list: claude GAP § "Rejected / Lawful-On-Inspection" (17 items).
 ### Wave 1 — ABG authority leakage (vertical; design lock required)
 
 0. A4 inventory gate: **done 2026-06-09** in staged-compute design W-105
-   inventory. Existing ABG routes cover deterministic conformance F_D advance
-   and F_D audit outcomes; explicit graph-vector resume cursor plus graph-span
+   inventory. W-110 slice A consumed existing ABG routes for deterministic
+   conform-project F_D advance and converted traversal-hop audit carriers to
+   projection-only artifacts with negative source guards. Explicit graph-vector
+   resume cursor plus graph-span
    reentry application are blocked on upstream ABG T-154 or equivalent existing
    route proof before deleting any A1/A4 site.
 1. A1: stop synthetic cursor event construction; require ABG continuation
@@ -648,7 +650,7 @@ addendum `T-197 Owner Partition And Decommission Register`.
 | W-050 | **Wave 0: B1 product GTL gate** | `test:t194` 2/2; `test:t197` 6/6; `test:t059` 10/10 installed-package proof; `build:semantic` runs `preflight:gtl` over the live production inventory and rejects missing target-carrier rows | done |
 | W-100 | Wave 1 design lock (A-rows) | A1-A5 statuses moved to `design_locked`; target owner dispositions are in staged-compute design addendum | done |
 | W-105 | Wave 1 pre-realization gate | staged-compute design § W-105 Construct-Site Sufficiency Inventory; ABG T-154 filed for explicit resume cursor and graph-span reentry consumer route; existing ABG runner routes identified for deterministic conformance F_D advance and F_D audit outcomes; `npm run test:t164` passed 22/22 edge-contract + 1/1 Rust-service sandbox on 2026-06-09 | done |
-| W-110 | Wave 1 realization | focused tests; semantic green | open |
+| W-110 | Wave 1 realization | **partial/in_progress** — slice A rehomed conform-project F_D advance through ABG `runEngineIterateAsync(...)` and stopped traversal-hop audits from authoring local F_D runtime truth; proof: `test:t197`, `test:t173`, T-087/T-096 induction assertions, T-151 T-164 conformance assertion. A1 cursor and graph-span reentry families remain blocked on ABG T-154. | in_progress |
 | W-200 | Wave 2 B2-B3 plus B4b residual | T-153 audit tests | open |
 | W-300 | Wave 3 C1a/C1b | B-004 link; capability asset | open |
 | W-400 | Wave 4 D-rows | source tests | open |

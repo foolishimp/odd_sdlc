@@ -760,18 +760,32 @@ test("T-164 converged start follows deterministic conformance to downstream grap
     "rerun_start_for_downstream_graph"
   );
   assert.deepStrictEqual(outcome.loop.attempts[0].emittedRuntimeEventKinds, [
+    "basis_admitted",
     "graph_call_opened",
     "frame_opened",
     "vector_traversal_planned",
+    "payload_observed",
+    "payload_validated",
+    "fd_authority_outcome_admitted",
     "vector_evaluated",
-    "vector_closed"
+    "vector_closed",
+    "fd_advance_ready",
+    "payload_observed",
+    "payload_validated"
   ]);
   assert.deepStrictEqual(outcome.emittedRuntimeEventKinds, [
+    "basis_admitted",
     "graph_call_opened",
     "frame_opened",
     "vector_traversal_planned",
+    "payload_observed",
+    "payload_validated",
+    "fd_authority_outcome_admitted",
     "vector_evaluated",
-    "vector_closed"
+    "vector_closed",
+    "fd_advance_ready",
+    "payload_observed",
+    "payload_validated"
   ]);
 });
 
