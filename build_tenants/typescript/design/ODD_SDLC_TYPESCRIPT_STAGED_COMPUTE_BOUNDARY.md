@@ -301,8 +301,8 @@ target filename, ecosystem command, scenario brand, or downstream product name
 | A1 | `replayEventsWithGraphContinuationCursor` synthesizes vector lifecycle events | ABG continuation and replay projection | delete SDLC synthetic cursor events; consume ABG-emitted continuation facts | source negative test plus installed continuation replay |
 | A2 | `executeInstalledOperatorStartWithReentry` owns multi-attempt loop | installed UX over admitted ABG turns, or ABG continuation API after A5 | keep UX loop projection-only until A5 split; no local closure authority | single-turn/until-converged ownership test |
 | A3 | SDLC compiles DAG and calls `runEventedNativeSagaFrontier` inline | ABG frontier runtime with SDLC as thin caller, or ABG-owned entry API | ratify thin caller only if branch policy/tasks are admitted carrier inputs; otherwise move entry | source test and live path audit |
-| A4 | SDLC callers construct runtime events before `appendOddSdlcRuntimeEvents` | ABG/system event constructors and `emit()` | `appendOddSdlcRuntimeEvents` remains sink only; construct sites rehome | construct-site inventory test |
-| A5 | `traversal_consequence.ts` builds gain, ledger, close, next-action chain | SDLC consequence candidate/read model; ABG final fold, transition, continuation | split candidate construction from final runtime admission/fold/transition | three-edge chain admission-boundary test |
+| A4 | SDLC callers construct runtime events before `appendOddSdlcRuntimeEvents` | ABG/system event constructors and `emit()` | first Wave 1 deliverable is the exhaustive construct-site inventory; `appendOddSdlcRuntimeEvents` remains sink only; construct sites rehome | construct-site inventory test |
+| A5 | `traversal_consequence.ts` builds gain, ledger, close, next-action chain | SDLC consequence candidate/read model; ABG final fold, transition, continuation | split candidate construction from final runtime admission/fold/transition after pinning the T-164 three-edge baseline | three-edge chain admission-boundary test |
 | B2 | `component_depth_register.ts` local protocol enums | GTL target-carrier and declaration read model | reframe local rows as projections over GTL declarations | T-153/T-197 conformance test |
 | B3 | `prompt_assets.ts` prompt registers and clause schema | GTL AssetSurface plus SDLC overlay policy | retain SDLC policy only where GTL owns structure | prompt asset conformance tests |
 | B4a | review-grade binding constructor/admitter | ABG GTL contract-fulfillment binding API | keep imported ABI constructors/admitters | `test:t194`, review-grade binding tests |
@@ -340,21 +340,21 @@ target filename, ecosystem command, scenario brand, or downstream product name
 
 ### Decommission Register
 
-| id | decommission target | action | prerequisite | proof |
-| --- | --- | --- | --- | --- |
-| A1 | synthetic cursor event rows | delete SDLC construction; consume ABG continuation events | ABG continuation source identified | source negative test |
-| A4 | `constructVector*`, `constructGraphSpan*`, `constructFdAuthority*` before append | rehome runtime fact authorship to ABG/system APIs | construct-site inventory complete | construct-site test |
-| A3 | local live frontier ownership ambiguity | ratify thin caller or move entry to ABG API | A3 disposition test | live frontier audit |
-| A5 | mixed closure candidate/fold/transition chain | split SDLC candidates from ABG final fold/transition | T-164 three-edge proof preserved | three-edge chain test |
-| A2 | installed multi-attempt loop authority ambiguity | keep UX projection-only or move convergence to ABG continuation | A5 split clear | until-converged ownership test |
-| B2 | local component-depth contract protocol law | reframe as GTL read model | T-153 coverage row present | conformance test |
-| B3 | prompt structural schema duplication | retain only SDLC overlay policy | GTL AssetSurface row present | prompt asset tests |
-| B4b | command-string OR clauses | delete | typed failure class covers route | review-grade tests |
-| C1a/C1b | session/flag grammar in SDLC core | keep thin transport now; move capability grammar to declared asset | no odd_service registry in SDLC | transport tests |
-| D1-D6 | ecosystem/path defaults | replace with tenant stack and admitted evidence | tenant profile/source carrier available | authority tests |
-| H1 | target-specific requirement filename recognition | done; keep removed | generic imported-source route proven | T-197 H1 test |
-| H2-H12 | target names, scenario brands, ecosystem phrases | replace with neutral ids or tenant-declared data | row-specific source identified | row-specific grep/tests |
-| P1/P3 | stale proof bypasses | prove selected review path and remove stale fixture imports | B1/H1 stable | semantic proof |
+| id | decommission target | action | ABG route / dependency | prerequisite | proof |
+| --- | --- | --- | --- | --- | --- |
+| A1 | synthetic cursor event rows | delete SDLC construction; consume ABG continuation events | existing ABG continuation/replay projection, or successor ABG dependency before deletion | ABG continuation source identified | source negative test |
+| A4 | `constructVector*`, `constructGraphSpan*`, `constructFdAuthority*` before append | rehome runtime fact authorship to ABG/system APIs | existing ABG/system constructor plus `emit()` route, or successor ABG dependency per construct family | construct-site inventory complete | construct-site test |
+| A3 | local live frontier ownership ambiguity | ratify thin caller or move entry to ABG API | `runEventedNativeSagaFrontier` only if all branch policy/tasks are admitted carrier inputs; otherwise successor ABG entry API | A3 disposition test | live frontier audit |
+| A5 | mixed closure candidate/fold/transition chain | split SDLC candidates from ABG final fold/transition | existing ABG fold/transition/projection helpers, measured against pinned T-164 baseline | T-164 three-edge proof preserved | three-edge chain test |
+| A2 | installed multi-attempt loop authority ambiguity | keep UX projection-only or move convergence to ABG continuation | depends on A5 boundary; loop may only invoke admitted ABG starts/continuations | A5 split clear | until-converged ownership test |
+| B2 | local component-depth contract protocol law | reframe as GTL read model | ABG `typecheckGtlProgram(...)` feature coverage plus GTL target-carrier law | T-153 coverage row present | conformance test |
+| B3 | prompt structural schema duplication | retain only SDLC overlay policy | GTL AssetSurface constructor/admitter and ABG program conformance row | GTL AssetSurface row present | prompt asset tests |
+| B4b | command-string OR clauses | delete | ABG-admitted review-grade binding plus typed failure class | typed failure class covers route | review-grade tests |
+| C1a/C1b | session/flag grammar in SDLC core | keep thin transport now; move capability grammar to declared asset | none for runtime authorship; B-004 owns future odd_service promotion | no odd_service registry in SDLC | transport tests |
+| D1-D6 | ecosystem/path defaults | replace with tenant stack and admitted evidence | no ABG dependency; tenant stack/source carriers own evidence | tenant profile/source carrier available | authority tests |
+| H1 | target-specific requirement filename recognition | done; keep removed | no ABG dependency; generic imported-source route proven | generic imported-source route proven | T-197 H1 test |
+| H2-H12 | target names, scenario brands, ecosystem phrases | replace with neutral ids or tenant-declared data | no ABG dependency unless row feeds runtime truth | row-specific source identified | row-specific grep/tests |
+| P1/P3 | stale proof bypasses | prove selected review path and remove stale fixture imports | ABG admission/evaluate.C path for generated-asset proof | B1/H1 stable | semantic proof |
 
 No decommission target may be replaced with a shim, alias, or fallback path
 that preserves the same authority under a new name. Deletion-first means the

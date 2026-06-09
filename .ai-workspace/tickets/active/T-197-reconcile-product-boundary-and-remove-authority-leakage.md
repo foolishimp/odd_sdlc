@@ -491,14 +491,14 @@ Full list: claude GAP § "Rejected / Lawful-On-Inspection" (17 items).
 
 | requirement | code reality | verdict | ledger |
 | --- | --- | --- | --- |
-| PRODUCT `typecheckGtlProgram` before runtime proof | not called from `code/src/` | **fail** | **B1** |
+| PRODUCT `typecheckGtlProgram` before runtime proof | `code/src/gtl_conformance/program.ts` builds the live inventory; public start, spec-method, release, and `build:semantic` preflight call the gate | **pass** | **B1 done** |
 | REQ-F-RUNTIME-001 ABG owns runtime facts | SDLC synthesizes vector cursor events | fail | A1, A4 |
 | REQ-F-RUNTIME-002 no shadow runtime | convergence loop + local closure engine | verified boundary tension; design-lock needed | A2, A5 |
 | REQ-F-RUNTIME-005 ABG owns frontier | SDLC invokes ABG frontier from local live path | verified boundary tension; design-lock needed | A3 |
-| REQ-F-ODDSDLC-011 AC-3 tenant stack not generic law | mapper_requirements.md, /src append, path regexes | fail | H1, D1, D5 |
+| REQ-F-ODDSDLC-011 AC-3 tenant stack not generic law | H1 target filename fixed; `/src` append and path regex rows remain | partial | H1 done; D1, D5 open |
 | REQ-F-ODDSDLC-017 AC-2 declared validator evidence | npm test in classifiers | fail | H5, B4b |
 | REQ-F-ODDSDLC-032 domain identity | CDME components as default gate; named profile enum | fail | H2, H3 |
-| REQ-F-ODDSDLC-046 AC-4 imported authority | mapper_requirements.md bypasses imported-sources channel | fail | H1 |
+| REQ-F-ODDSDLC-046 AC-4 imported authority | H1 target filename no longer bypasses imported-sources; generic requirement surfaces remain | **pass** | H1 done |
 | REQ-F-ODDSDLC-082 evaluator-selected depth | deterministic method pick | fail | D2; D3 narrowed |
 | REQ-F-ODDSDLC-063..068 edge assurance | matrix + kernels | pass | — |
 | REQ-F-ODDSDLC-077 execution evidence | graph-bound lite live | pass (stage debt) | E1 |
@@ -537,6 +537,9 @@ Full list: claude GAP § "Rejected / Lawful-On-Inspection" (17 items).
 
 ### Wave 1 — ABG authority leakage (vertical; design lock required)
 
+0. A4 inventory gate: publish an exhaustive construct-before-emit inventory,
+   with one existing ABG/system route or successor ABG dependency per construct
+   family, before deleting any A1/A4 site.
 1. A1: stop synthetic cursor event construction; require ABG continuation
 2. A4: enumerate construct-before-emit sites; rehome authorship
 3. A3: resolve design-lock verdict before rehome/ratify live parallel frontier invocation
@@ -544,7 +547,9 @@ Full list: claude GAP § "Rejected / Lawful-On-Inspection" (17 items).
 5. A2: reframe `--until converged` ownership after A5 boundary is clear
 
 **Change class:** `design_reframe` then `realization_refactor`.
-**Gate:** adversarial verification note on file for each A-row before merge.
+**Gate:** adversarial verification note on file for each A-row before merge;
+pin the current T-164 three-edge/residual-pressure proof before A5 edits
+`traversal_consequence.ts`.
 
 ### Wave 2 — GTL parallel law audit (vertical)
 
@@ -637,6 +642,7 @@ addendum `T-197 Owner Partition And Decommission Register`.
 | W-040 | Close transferred T-184 P1-P3 proof residuals | P1/P3 terminal here; P2 explicitly deferred to T-198 | open |
 | W-050 | **Wave 0: B1 product GTL gate** | `test:t194` 2/2; `test:t197` 6/6; `test:t059` 10/10 installed-package proof; `build:semantic` runs `preflight:gtl` over the live production inventory and rejects missing target-carrier rows | done |
 | W-100 | Wave 1 design lock (A-rows) | A1-A5 statuses moved to `design_locked`; target owner dispositions are in staged-compute design addendum | done |
+| W-105 | Wave 1 pre-realization gate | A4 construct-site inventory published; each A1/A4 family has an existing ABG/system route or successor ABG dependency; T-164 baseline proof pinned before A5 changes | open |
 | W-110 | Wave 1 realization | focused tests; semantic green | open |
 | W-200 | Wave 2 B2-B3 plus B4b residual | T-153 audit tests | open |
 | W-300 | Wave 3 C1a/C1b | B-004 link; capability asset | open |

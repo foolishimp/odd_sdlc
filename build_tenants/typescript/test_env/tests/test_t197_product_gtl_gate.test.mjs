@@ -166,6 +166,7 @@ test("T-197 design ratifies owner partition assets before Wave 1 code", () => {
     "<<deferred>>",
     "### Reference-To-Target Derivation",
     "### Decommission Register",
+    "ABG route / dependency",
     "must-not-name-governed-target",
     "Horizontal ingress rule:"
   ]) {
@@ -184,6 +185,12 @@ test("T-197 design ratifies owner partition assets before Wave 1 code", () => {
   ]) {
     assert.match(design, new RegExp(`\\| ${rowId} \\|`, "u"));
   }
+
+  const ticket = repoFile(
+    ".ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md"
+  );
+  assert.match(ticket, /\| W-105 \| Wave 1 pre-realization gate \|/u);
+  assert.match(ticket, /T-164 baseline proof pinned before A5 changes/u);
 });
 
 test("T-197 H1 keeps target-specific requirements filenames out of framework law", () => {
