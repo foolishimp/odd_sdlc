@@ -99,6 +99,7 @@ import {
   type SdlcSourceInput,
   type SdlcWorkspaceIngressReport
 } from "../workspace/index.js";
+import { assertCurrentSdlcGtlProgramConformance } from "../gtl_conformance/index.js";
 import { isRecord } from "../admission/codecs.js";
 
 export const ODD_SDLC_SPEC_METHOD_COMMAND_VALUES = Object.freeze([
@@ -2277,6 +2278,7 @@ async function commandPayloadAsync(request: OddSdlcSpecMethodRequest): Promise<u
     return analyzeRunPayload(request);
   }
   if (request.command === "start") {
+    assertCurrentSdlcGtlProgramConformance();
     return installedStartPayloadFor(request);
   }
   return commandPayload(request);

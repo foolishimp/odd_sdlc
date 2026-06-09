@@ -410,7 +410,10 @@ test("T-184 selected evaluate.C residual pressure enters consequence closure", (
 
 test("T-184 ticket carries the partition inventory and deletion gates", () => {
   const ticket = readRepoFile(
-    ".ai-workspace/tickets/active/T-184-partition-handoff-into-compute-stage-boundary-modules.md"
+    ".ai-workspace/tickets/completed/T-184-partition-handoff-into-compute-stage-boundary-modules.md"
+  );
+  const successorTicket = readRepoFile(
+    ".ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md"
   );
   for (const row of ["H-001", "H-030", "H-060", "H-090", "H-100", "H-120", "H-130"]) {
     assert.match(ticket, new RegExp(`\\| ${row} \\|`, "u"), `${row} is tracked`);
@@ -418,6 +421,8 @@ test("T-184 ticket carries the partition inventory and deletion gates", () => {
   assert.match(ticket, /operator\/plugins\/transform\/launch_contract\.ts/u);
   assert.match(ticket, /operator\/system_artifacts\.ts/u);
   assert.match(ticket, /No framework helper writes a transform output/u);
+  assert.match(successorTicket, /T-197 is now the sole active cleanup authority/u);
+  assert.match(successorTicket, /Proof Residuals Transferred From T-184/u);
 });
 
 test("T-153 outward contract-law audit is backed by GTL and ABG surfaces", () => {

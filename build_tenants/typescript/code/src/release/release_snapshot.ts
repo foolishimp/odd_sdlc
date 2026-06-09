@@ -14,6 +14,7 @@ import {
 } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { isRecord } from "../admission/codecs.js";
+import { assertCurrentSdlcGtlProgramConformance } from "../gtl_conformance/index.js";
 import type {
   OddSdlcTypescriptReleaseSnapshotAbgSubstrate,
   OddSdlcTypescriptReleaseSnapshotArtifactKind,
@@ -599,6 +600,9 @@ export async function deriveOddSdlcTypescriptReleaseSnapshot(
   input: unknown
 ): Promise<OddSdlcTypescriptReleaseSnapshotOutcome> {
   const requestBase = admitRequest(input);
+  assertCurrentSdlcGtlProgramConformance({
+    packageRoot: requestBase.packageSourceRoot
+  });
   const request = Object.freeze({
     ...requestBase,
     sourceRef: requestBase.sourceRef ?? sourceRef(requestBase.packageSourceRoot),

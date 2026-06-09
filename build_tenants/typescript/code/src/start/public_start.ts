@@ -48,6 +48,7 @@ import {
   deriveOddSdlcEvaluateNextReport,
   type OddSdlcEvaluateNextActionInput
 } from "../runtime/index.js";
+import { assertCurrentSdlcGtlProgramConformance } from "../gtl_conformance/index.js";
 import {
   constructSdlcConstructionIntent,
   constructSdlcNextActionProjection,
@@ -1298,6 +1299,7 @@ export function publicStartOnce(input: {
   readonly conformedProject: SdlcConformProjectProfile;
   readonly workerAttachment: SdlcWorkerAttachment;
 }): SdlcPublicStartOutcome {
+  assertCurrentSdlcGtlProgramConformance();
   const targetResolution = evaluateInitialPublicStartAction({
     request: input.request,
     module: input.module,

@@ -66,3 +66,4 @@ export * from "./postflight/index.js";
 export * from "./assurance/index.js";
 export * from "./release/index.js";
 export * from "./spec_method/index.js";
+export * from "./gtl_conformance/index.js";

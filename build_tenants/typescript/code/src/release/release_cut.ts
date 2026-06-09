@@ -7,6 +7,7 @@ import {
   readNodePackageIdentity
 } from "../package_binding/index.js";
 import { isRecord as isPlainRecord } from "../admission/codecs.js";
+import { assertCurrentSdlcGtlProgramConformance } from "../gtl_conformance/index.js";
 import type {
   OddSdlcTypescriptReleaseCutManifest,
   OddSdlcTypescriptReleaseCutOutcome,
@@ -73,6 +74,9 @@ export async function deriveOddSdlcTypescriptReleaseCut(
   input: unknown
 ): Promise<OddSdlcTypescriptReleaseCutOutcome> {
   const request = admitOddSdlcTypescriptReleaseCutRequest(input);
+  assertCurrentSdlcGtlProgramConformance({
+    packageRoot: request.packageSourceRoot
+  });
   const identity = await readNodePackageIdentity(request.packageSourceRoot);
   const relativePackageCommandPath = identity.bin["odd-sdlc-ts"];
   if (relativePackageCommandPath === undefined) {

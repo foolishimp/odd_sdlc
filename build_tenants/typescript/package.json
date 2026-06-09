@@ -33,7 +33,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "build:semantic": "tsc -p tsconfig.semantic-strict.json",
+    "build:semantic": "tsc -p tsconfig.semantic-strict.json && npm run preflight:gtl",
+    "preflight:gtl": "node -e \"import('./build/semantic/code/src/index.js').then((m) => { m.assertCurrentSdlcGtlProgramConformance(); })\"",
     "lint:semantic": "eslint --max-warnings=0 \"code/src/**/*.ts\"",
     "lint:test-harness": "eslint --max-warnings=0 \"test_env/{tests,sandbox,live}/**/*.mjs\"",
     "guard:data-mapper-boundary": "node --test test_env/tests/test_t188_data_mapper_live_boundary_guard.test.mjs",
@@ -161,6 +162,7 @@
     "test:t192": "npm run build:semantic && node --test test_env/tests/test_t192_evaluation_grid_prompt_contract.test.mjs",
     "test:t188:data-mapper-lite-lifecycle-live": "npm run build:semantic && npm run guard:data-mapper-boundary && node test_env/live/run_t188_data_mapper_lite_lifecycle.mjs",
     "test:t194": "npm run build:semantic && node --test test_env/tests/test_t194_gtl_program_conformance.test.mjs",
+    "test:t197": "npm run build:semantic && node --test test_env/tests/test_t197_product_gtl_gate.test.mjs",
     "live:data-mapper-sandbox": "npm run build:semantic && npm run guard:data-mapper-boundary && node test_env/live/run_full_external_data_mapper_sandbox.mjs",
     "live:data-mapper-steel-thread-sandbox": "ODD_SDLC_TS_DATA_MAPPER_LANE_NAME=data_mapper_steel_thread_sandbox ODD_SDLC_TS_TRAVERSAL_STRATEGY_PROFILE=steel_thread_after_requirements npm run live:data-mapper-sandbox",
     "test:scenario-sandbox": "npm run build:semantic && node --test test_env/sandbox/test_scenario_sandbox.test.mjs",

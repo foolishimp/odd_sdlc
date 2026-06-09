@@ -354,7 +354,7 @@ or verification note).
 
 | id | code surface | axis | owner | verdict | verification | disposition | proof required | status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| **B1** | zero `typecheckGtlProgram` / `admitGtlProgramConformanceInput` usage in `code/src/` (only `test_env/tests/test_t194_*`) | vertical | GTL/ABG | **fail PRODUCT gate** | **verified** — grep `code/src`: 0 hits; consumer never invokes abiogenesis T-152/T-153 gate | wire ABG gate into build/start/publish preflight in product code using the same real inventory basis as T-194: `constructSdlcGraphFunctionCatalog()`, `constructSdlcGtlModule()`, `constructSdlcTargetCarrierRegistry(...)`, edge-closure contracts, overlay catalog, public starts, prompt assets, plugin contracts, source identities, and T-153 feature coverage | product-path test proves non-trivial coverage: graph functions and vectors > 0; target-carrier and edge-closure counts equal graph-vector count; prompt assets = 3; plugin contracts = 5; source identities > 0; issueCount = 0; empty/partial inventory fails | open |
+| **B1** | zero `typecheckGtlProgram` / `admitGtlProgramConformanceInput` usage in `code/src/` (only `test_env/tests/test_t194_*`) | vertical | GTL/ABG | **fixed** | **done 2026-06-09** — `gtl_conformance/program.ts` builds the live SDLC graph/prompt/plugin/source inventory and calls ABG `admitGtlProgramConformanceInput(...)` + `typecheckGtlProgram(...)`; `start/public_start.ts`, `spec_method/entry.ts`, `release/release_cut.ts`, `release/release_snapshot.ts`, and `build:semantic` call `assertCurrentSdlcGtlProgramConformance(...)` | product-code ABG gate now uses `constructSdlcGraphFunctionCatalog()`, `constructSdlcGtlModule()`, `constructSdlcTargetCarrierRegistry(...)`, edge-closure contracts, overlay catalog, public starts, prompt assets, plugin contracts, source identities, and T-153 feature coverage | `test:t194` 2/2 and `test:t197` 3/3 prove non-trivial production coverage: graph functions/vectors > 0; target-carrier and edge-closure counts equal graph-vector count; prompt assets = 3; plugin contracts = 5; source identities > 0; issueCount = 0; missing target-carrier rows fail closed | done |
 
 Closes the loop on abiogenesis T-150/T-152/T-153: gate built in substrate; SDLC
 consumer does not call it.
@@ -516,9 +516,21 @@ Full list: claude GAP § "Rejected / Lawful-On-Inspection" (17 items).
 3. Reuse or factor the production inventory builder proven by `test:t194`;
    do not create a second test-only conformance manifest.
 4. Proof: product-path test with the live catalog inventory and non-trivial
-   coverage assertions; `test:t194` remains 3/3 on closing revision.
+   coverage assertions; `test:t194` remains green on closing revision.
 
 **Change class:** `realization_refactor` with requirement trace to T-152/T-153.
+
+**W-050 implementation evidence — 2026-06-09:**
+
+- Production inventory builder: `build_tenants/typescript/code/src/gtl_conformance/program.ts`
+- Product hooks: `start/public_start.ts`, `spec_method/entry.ts` start ignition, `release/release_cut.ts`,
+  `release/release_snapshot.ts`, and package `build:semantic` via `preflight:gtl`
+- Proof: `npm run test:t194` passed 2/2; `npm run test:t197` passed 3/3
+- Runtime counts on this revision: graph vectors = target-carrier rows =
+  edge-closure rows; prompt assets = 3; plugin contracts = 5; source identity
+  surfaces > 0; issueCount = 0
+- Negative proof: `test:t197` removes target-carrier rows and ABG reports a
+  failed conformance report with `target_carrier_contract` issues.
 
 ### Wave 1 — ABG authority leakage (vertical; design lock required)
 
@@ -620,7 +632,7 @@ addendum `T-197 Owner Partition And Decommission Register`.
 | W-020 | Publish structural carrier diagram | design diagram | open |
 | W-030 | Publish reference-to-target for all ledger rows | design table | open |
 | W-040 | Close transferred T-184 P1-P3 proof residuals | P1/P3 terminal here; P2 explicitly deferred to T-198 | open |
-| W-050 | **Wave 0: B1 product GTL gate** | preflight test in `code/src` feeds live production inventory and rejects empty/partial manifests | open |
+| W-050 | **Wave 0: B1 product GTL gate** | `test:t194` 2/2; `test:t197` 3/3; `build:semantic` runs `preflight:gtl` over the live production inventory and rejects missing target-carrier rows | done |
 | W-100 | Wave 1 design lock (A-rows) | signed dispositions | open |
 | W-110 | Wave 1 realization | focused tests; semantic green | open |
 | W-200 | Wave 2 B2-B3 plus B4b residual | T-153 audit tests | open |
