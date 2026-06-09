@@ -37,11 +37,11 @@ const ABG_TYPESCRIPT_ROOT = resolve(
   REPO_ROOT,
   "../abiogenesis/build_tenants/abiogenesis/typescript"
 );
-const ABG_RELEASE_VERSION = "4.0.0-rc.5";
+const ABG_RELEASE_VERSION = "4.0.0-rc.6";
 const ABG_RELEASE_SOURCE_REF = "HEAD";
-const ABG_RELEASE_SOURCE_COMMIT = "f25780f39f556387eaf8a90a437725248bdd2cc6";
+const ABG_RELEASE_SOURCE_COMMIT = "8a82be76d9c957dc2b427ca15aa850d4ef46f1b9";
 const ABG_RELEASE_TARBALL_SHA256 =
-  "c65a333d1daa2139e0d22a6b5dfda76ba3736f901dece0213ed1c56ae3dcb055";
+  "6e67842357671d6fa86686279b6cd123a70904c301f0ec8aa5124971aa551fb7";
 const ABG_RELEASE_SNAPSHOT_REF = "latest";
 const ABG_RELEASE_SNAPSHOT_ROOT = resolve(
   REPO_ROOT,

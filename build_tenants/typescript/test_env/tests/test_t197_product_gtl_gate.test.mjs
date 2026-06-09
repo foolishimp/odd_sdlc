@@ -220,17 +220,6 @@ test("T-197 design ratifies owner partition assets before Wave 1 code", () => {
 
 test("T-197 W-105 classifies every source runtime event constructor site", () => {
   assert.deepEqual(constructEventSites(), [
-    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructGraphReentryAppliedEvent",
-    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructGraphReentryPlannedEvent",
-    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructGraphSpanAssessedEvent",
-    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructGraphSpanAssessedEvent",
-    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructGraphSpanEvaluationScheduledEvent",
-    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructGraphSpanEvaluationScheduledEvent",
-    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructGraphSpanFoldbackEvaluatedEvent",
-    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructGraphSpanFoldbackEvaluatedEvent",
-    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructVectorClosedEvent",
-    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructVectorEvaluatedEvent",
-    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructVectorTraversalPlannedEvent",
     "build_tenants/typescript/code/src/qualification/enterprise_core_iteration_sandbox.ts:constructRetryProgressRecordedEvent",
     "build_tenants/typescript/code/src/qualification/enterprise_core_iteration_sandbox.ts:constructVectorClosedEvent",
     "build_tenants/typescript/code/src/qualification/enterprise_core_iteration_sandbox.ts:constructVectorEvaluatedEvent",
@@ -319,6 +308,24 @@ test("T-197 W-110 routes conform-project F_D advance through ABG runner ownershi
   assert.match(source, /\bdefaultFdEvaluatorPlugin\.contract\b/u);
   assert.match(source, /until:\s*"first_traversal"/u);
   assert.doesNotMatch(source, /\bruntimeEventsForIterationDecision\b/u);
+});
+
+test("T-197 W-110 consumes ABI runtime authorship routes for cursor and graph-span reentry", () => {
+  const source = repoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+
+  assert.match(source, /\bapplyExplicitGraphVectorResumeCursor\b/u);
+  assert.match(source, /\bapplyGraphSpanReentryRoute\b/u);
+  assert.match(source, /reason:\s*"odd_sdlc_post_close_graph_continuation_cursor"/u);
+  assert.doesNotMatch(source, /\bconstructVectorTraversalPlannedEvent\b/u);
+  assert.doesNotMatch(source, /\bconstructVectorEvaluatedEvent\b/u);
+  assert.doesNotMatch(source, /\bconstructVectorClosedEvent\b/u);
+  assert.doesNotMatch(source, /\bconstructGraphSpanEvaluationScheduledEvent\b/u);
+  assert.doesNotMatch(source, /\bconstructGraphSpanAssessedEvent\b/u);
+  assert.doesNotMatch(source, /\bconstructGraphSpanFoldbackEvaluatedEvent\b/u);
+  assert.doesNotMatch(source, /\bconstructGraphReentryPlannedEvent\b/u);
+  assert.doesNotMatch(source, /\bconstructGraphReentryAppliedEvent\b/u);
 });
 
 test("T-197 A3 ratifies live parallel materialization as thin ABG frontier caller", () => {

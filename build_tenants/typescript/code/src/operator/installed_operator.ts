@@ -22,26 +22,15 @@ import { uniqueSorted } from "../shared/collections.js";
 import { sdlcWorkerTargetUsesShellToolProfile } from "./worker_tool_profile.js";
 import {
   admitGraphSpanAssessment,
-  constructGraphReentryAppliedEvent,
-  constructGraphReentryPlannedEvent,
   constructConsequenceProjectionOutcome,
   constructFdEvaluationOutcome,
-  constructGraphSpanAssessedEvent,
-  constructGraphSpanEvaluationScheduledEvent,
-  constructGraphSpanFoldbackEvaluatedEvent,
   constructFpDispatchOutcome,
   constructFpEvaluationFinding,
   constructFpEvaluationOutcome,
   constructEvaluationRuleOutcome,
   constructRuntimeWatchdogPolicy,
-  constructVectorClosedEvent,
-  constructVectorEvaluatedEvent,
-  constructVectorTraversalPlannedEvent,
   defaultFdEvaluatorPlugin,
-  foldGraphSpanAssessments,
   deriveAdvancementTransition,
-  deriveGraphReentryFrontierProjection,
-  deriveGraphReentryPlan,
   deriveIterationAdvanceDecision,
   deriveRuntimeAggregateProjection,
   deriveRuntimeLivenessObserverProjection,
@@ -50,6 +39,7 @@ import {
   runEngineIterateAsync,
   runtimeEventsForFpTransformResult,
   type ActorInvocation,
+  type CanonicalRuntimeEvent,
   type EnginePluginInput,
   type EvaluationRuleOutcome,
   type ExecutionBasis,
@@ -70,6 +60,8 @@ import {
   type TracedProcessStreamModel
 } from "@abiogenesis/typescript-tenant";
 import {
+  applyExplicitGraphVectorResumeCursor,
+  applyGraphSpanReentryRoute,
   constructBranchExecutionPolicy,
   runEventedNativeSagaFrontier,
   type FreshRetryContextProjection,
@@ -1729,6 +1721,11 @@ interface GraphContinuationReplayCursor {
   readonly cursorEvents: readonly RuntimeEvent[];
 }
 
+function collectAbgAuthoredRuntimeEvent(_event: CanonicalRuntimeEvent): void {
+  // The ABG route returns emitted events; SDLC persists them through its append sink.
+  void _event;
+}
+
 function replayEventVectorClosureKey(
   event: RuntimeEvent
 ): string | null {
@@ -1786,59 +1783,17 @@ function replayEventsWithGraphContinuationCursor(input: {
       cursorEvents: Object.freeze([])
     });
   }
-  const closedIndexes = new Set<number>();
-  try {
-    for (const vectorIndex of deriveRuntimeAggregateProjection(
-      input.basis,
-      replayEvents
-    ).closedVectorIndexes) {
-      closedIndexes.add(vectorIndex);
-    }
-  } catch {
-    for (const event of replayEvents) {
-      if (event.kind !== "vector_closed") {
-        continue;
-      }
-      const vectorIndex = Reflect.get(event, "vectorIndex");
-      if (
-        typeof vectorIndex === "number" &&
-        (event.basisId === input.basis.id ||
-          input.basis.graph.vectors[vectorIndex]?.name === event.edge)
-      ) {
-        closedIndexes.add(vectorIndex);
-      }
-    }
-  }
-  const cursorEvents: RuntimeEvent[] = [];
-  for (let vectorIndex = 0; vectorIndex < targetIndex; vectorIndex += 1) {
-    if (closedIndexes.has(vectorIndex)) {
-      continue;
-    }
-    cursorEvents.push(
-      constructVectorTraversalPlannedEvent({
-        basis: input.basis,
-        vectorIndex
-      }),
-      constructVectorEvaluatedEvent({
-        basis: input.basis,
-        vectorIndex,
-        status: "accepted"
-      }),
-      constructVectorClosedEvent({
-        basis: input.basis,
-        vectorIndex,
-        closureKind: "advanced"
-      })
-    );
-  }
+  const cursor = applyExplicitGraphVectorResumeCursor({
+    basis: input.basis,
+    runtimeEvents: replayEvents,
+    eventSink: collectAbgAuthoredRuntimeEvent,
+    targetVectorIndex: targetIndex,
+    reason: "odd_sdlc_post_close_graph_continuation_cursor",
+    causationEventRefs: Object.freeze([input.nextGraphVectorRef])
+  });
   return Object.freeze({
-    replayEvents:
-      cursorEvents.length === 0
-        ? replayEvents
-        : replayEventsWithoutDuplicateVectorClosures(
-            Object.freeze([...replayEvents, ...cursorEvents])
-          ),
-    cursorEvents: Object.freeze(cursorEvents)
+    replayEvents: cursor.replayEvents,
+    cursorEvents: cursor.emittedEvents
   });
 }
 
@@ -1896,44 +1851,6 @@ function graphSpanRefForOperatorReentry(input: {
       input.terminalVectorIndex
     )
   });
-}
-
-function graphReentryPlanRuntimeEventsForSpanEvents(input: {
-  readonly basis: ExecutionBasis;
-  readonly replayEvents: readonly RuntimeEvent[];
-  readonly emittedEvents: readonly RuntimeEvent[];
-  readonly spanEvents: readonly RuntimeEvent[];
-  readonly causationEventRefs: readonly string[];
-}): readonly RuntimeEvent[] {
-  const events = Object.freeze([
-    ...input.replayEvents,
-    ...input.emittedEvents,
-    ...input.spanEvents
-  ]);
-  const frontier = deriveGraphReentryFrontierProjection({
-    basis: input.basis,
-    events
-  });
-  const plan = deriveGraphReentryPlan({
-    basis: input.basis,
-    runtimeProjection: deriveRuntimeAggregateProjection(input.basis, events),
-    frontier
-  });
-  if (plan === null) {
-    return Object.freeze([]);
-  }
-  return Object.freeze([
-    constructGraphReentryPlannedEvent({
-      basis: input.basis,
-      plan,
-      causationEventRefs: input.causationEventRefs
-    }),
-    constructGraphReentryAppliedEvent({
-      basis: input.basis,
-      plan,
-      causationEventRefs: Object.freeze([plan.planRef])
-    })
-  ]);
 }
 
 function repairReentryGraphSpanRuntimeEvents(input: {
@@ -1995,21 +1912,6 @@ function repairReentryGraphSpanRuntimeEvents(input: {
     terminalVectorIndex,
     scope: "repair"
   });
-  const schedule = Object.freeze({
-    kind: "graph_span_evaluation_schedule" as const,
-    scheduleRef: `graph-span-schedule:odd-sdlc-repair:${JSON.stringify({
-      basisId: input.basis.id,
-      sourceVectorIndex: targetVectorIndex,
-      terminalVectorIndex,
-      gapDossierRef: dossier.currentGapDossierRef,
-      generation
-    })}`,
-    basisId: input.basis.id,
-    graphFunctionId: input.basis.graphFunction.id,
-    terminalVectorIndex,
-    spanRefs: Object.freeze([span]),
-    generation
-  });
   const evidenceRefs = uniqueSorted([
     dossier.currentGapDossierRef,
     ...dossier.evidenceRefs,
@@ -2054,40 +1956,18 @@ function repairReentryGraphSpanRuntimeEvents(input: {
     detail: "odd_sdlc component repair schedule requires graph-span repair reentry",
     generation
   });
-  const foldback = foldGraphSpanAssessments({
+  return applyGraphSpanReentryRoute({
     basis: input.basis,
+    runtimeEvents: Object.freeze([
+      ...input.replayEvents,
+      ...input.emittedEvents
+    ]),
+    eventSink: collectAbgAuthoredRuntimeEvent,
     terminalVectorIndex,
-    schedule,
     assessments: Object.freeze([assessment]),
+    causationEventRefs: evidenceRefs,
     generation
-  });
-  const spanEvents = Object.freeze([
-    constructGraphSpanEvaluationScheduledEvent({
-      basis: input.basis,
-      schedule,
-      causationEventRefs: Object.freeze([dossier.currentGapDossierRef])
-    }),
-    constructGraphSpanAssessedEvent({
-      basis: input.basis,
-      assessment,
-      causationEventRefs: evidenceRefs
-    }),
-    constructGraphSpanFoldbackEvaluatedEvent({
-      basis: input.basis,
-      foldback,
-      causationEventRefs: Object.freeze([assessment.assessmentId])
-    })
-  ]);
-  return Object.freeze([
-    ...spanEvents,
-    ...graphReentryPlanRuntimeEventsForSpanEvents({
-      basis: input.basis,
-      replayEvents: input.replayEvents,
-      emittedEvents: input.emittedEvents,
-      spanEvents,
-      causationEventRefs: evidenceRefs
-    })
-  ]);
+  }).emittedEvents;
 }
 
 function postActionReentryGraphSpanRuntimeEvents(input: {
@@ -2129,21 +2009,6 @@ function postActionReentryGraphSpanRuntimeEvents(input: {
     ...closure.reasonRefs,
     ...nextAction.gapPressureRefs
   ]);
-  const schedule = Object.freeze({
-    kind: "graph_span_evaluation_schedule" as const,
-    scheduleRef: `graph-span-schedule:odd-sdlc-post-action:${JSON.stringify({
-      basisId: input.basis.id,
-      targetVectorIndex,
-      terminalVectorIndex: input.currentVectorIndex,
-      closureDecisionRef: closure.decisionRef,
-      generation
-    })}`,
-    basisId: input.basis.id,
-    graphFunctionId: input.basis.graphFunction.id,
-    terminalVectorIndex: input.currentVectorIndex,
-    spanRefs: Object.freeze([span]),
-    generation
-  });
   const obligationRef =
     evidenceRefs[0] ?? `post-action-reentry:${closure.disposition}`;
   const assessment = admitGraphSpanAssessment({
@@ -2182,40 +2047,18 @@ function postActionReentryGraphSpanRuntimeEvents(input: {
     detail: "odd_sdlc post-action closure requires graph reentry",
     generation
   });
-  const foldback = foldGraphSpanAssessments({
+  return applyGraphSpanReentryRoute({
     basis: input.basis,
+    runtimeEvents: Object.freeze([
+      ...input.replayEvents,
+      ...input.emittedEvents
+    ]),
+    eventSink: collectAbgAuthoredRuntimeEvent,
     terminalVectorIndex: input.currentVectorIndex,
-    schedule,
     assessments: Object.freeze([assessment]),
+    causationEventRefs: evidenceRefs,
     generation
-  });
-  const spanEvents = Object.freeze([
-    constructGraphSpanEvaluationScheduledEvent({
-      basis: input.basis,
-      schedule,
-      causationEventRefs: Object.freeze([closure.decisionRef])
-    }),
-    constructGraphSpanAssessedEvent({
-      basis: input.basis,
-      assessment,
-      causationEventRefs: evidenceRefs
-    }),
-    constructGraphSpanFoldbackEvaluatedEvent({
-      basis: input.basis,
-      foldback,
-      causationEventRefs: Object.freeze([assessment.assessmentId])
-    })
-  ]);
-  return Object.freeze([
-    ...spanEvents,
-    ...graphReentryPlanRuntimeEventsForSpanEvents({
-      basis: input.basis,
-      replayEvents: input.replayEvents,
-      emittedEvents: input.emittedEvents,
-      spanEvents,
-      causationEventRefs: evidenceRefs
-    })
-  ]);
+  }).emittedEvents;
 }
 
 function dispatchResultRef(manifest: SdlcWorkerHandoffManifest): string {

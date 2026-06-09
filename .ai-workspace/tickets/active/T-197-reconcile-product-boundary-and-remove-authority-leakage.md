@@ -371,20 +371,18 @@ consumer does not call it.
 
 | id | code surface | owner | verdict | verification | disposition | proof required | status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| A1 | `installed_operator.ts` `replayEventsWithGraphContinuationCursor` (L1765–1840) | ABG | fail REQ-F-RUNTIME-001 | **verified synthesis** — for prior unclosed vector indexes, calls `constructVectorTraversalPlannedEvent`, `constructVectorEvaluatedEvent`, `constructVectorClosedEvent` (L1815–1830); merged into replay at L1836–1838; appended at L8990–8994. Also filters existing `vector_closed` (L1733/1797) — both read and synthesize. | **ready for SDLC consumption via ABI 4.0.0-rc.5 / active ABI T-154**: require ABG explicit graph-vector resume/cursor route; SDLC must not replace this with another local lifecycle assembler | source test rejects `cursorEvents.length > 0` on conform path without ABG authorship after ABI route is consumed | ready_for_consumption_abg_4_0_0_rc_5 |
+| A1 | `installed_operator.ts` `replayEventsWithGraphContinuationCursor` (L1765–1810) | ABG | fixed REQ-F-RUNTIME-001 | **done 2026-06-10** — prior synthetic vector lifecycle cursor events were removed. `replayEventsWithGraphContinuationCursor(...)` now calls ABI 4.0.0-rc.6 `applyExplicitGraphVectorResumeCursor(...)` with basis/replay/target intent and receives ABG-authored cursor events plus replay projection. | SDLC consumes the ABG explicit graph-vector resume cursor route; SDLC must not reintroduce a local lifecycle assembler | `test:t197` source guard rejects local vector lifecycle constructors and verifies `applyExplicitGraphVectorResumeCursor(...)` consumption | done |
 | A2 | `installed_operator.ts` `executeInstalledOperatorStartWithReentry` (L10170+) | ABG / UX | design-lock needed | **verified tension** — bounded loop selects max attempts from runtime policy (L10195–10199), re-runs `executeInstalledOperatorStart(...)` (L10205–10218), evaluates closure/re-entry blockers (L10238–10280), derives retry context (L10286–10292), and refreshes replay state through the supplied callback (L10293–10296). This is a real multi-attempt installed loop, but not enough evidence to call it rival ABG runtime before the A5 closure boundary is locked. | design-locked in staged-compute addendum: ratify as installed UX over admitted ABG turns or move convergence ownership into an ABG continuation API after A5 defines the fold/transition boundary | adversarial note plus installed single-turn/until-converged ownership test | design_locked |
 | A3 | `installed_operator.ts` inline `runEventedNativeSagaFrontier` live parallel materialization | ABG | lawful thin caller | **done 2026-06-09** — SDLC compiles `sdlc_feature_dependency_dag` and branch payload candidates, then calls ABG `runEventedNativeSagaFrontier(...)` with `constructBranchExecutionPolicy(...)`; `SdlcLiveFpParallelMaterializationFrontier` now admits only `executionAuthority: "abg_evented_saga_frontier"` and `parallelismControl: "abg_branch_execution_policy"`; source guard rejects `runNativeSagaFrontier` in the production path. | ratified in staged-compute addendum: SDLC owns DAG/read-model truth; ABG owns frontier scheduling, branch leases, payload admission, fan-in projection, emitted runtime events, and replay visibility | `test:t197` A3 guard; `test:t174` carrier negative tests; T-173 saga frontier stress remains green | done |
-| A4 | `event_store.ts` + callers constructing events before `appendOddSdlcRuntimeEvents` | ABG | fail REQ-F-RUNTIME-001 AC-1 | **verified** — `constructVector*` / `constructGraphSpan*` / `constructFdAuthority*` at L1816+, L1924+, L5645+, L8991+, L9984+ before append. Sink lawful; authorship is defect. | **ready for SDLC consumption via ABI 4.0.0-rc.5 / active ABI T-154 for vector lifecycle plus graph-span/reentry families**; existing-runner F_D audit subsets are already rehomed, but remaining construct sites must move to ABG/system routes rather than SDLC-local event assembly | construct-site inventory test remains the guard; allowlist must shrink when ABI route is consumed | ready_for_consumption_abg_4_0_0_rc_5 |
-| A5 | `traversal_consequence.ts` + `installed_operator.ts` closure chain | ABG + SDLC | partial split | **in progress 2026-06-09** — SDLC still constructs worksite evidence, edge gain, residual pressure, edge ledger, closure decision, next-action projection, admitted-state ref, and consequence projection as product candidate/read-model truth. W-110 slice C fixed the concrete runtime/reporting leak: installed `status: "converged"` now requires ABG `terminalKind: "converged"` plus SDLC close; ABG `gap_stop` reports `blocked` even if the SDLC consequence candidate has no next action. First-class ABG transition/ref consumption remains open under active ABI T-154. | SDLC may construct product candidates/read models over admitted evidence; ABG owns final runtime fold, transition, continuation, and replay truth. Do not invent a local transition ref; consume the ABI T-154 route published in ABI 4.0.0-rc.5. | `test:t197` A5 terminal gate; T-164 baseline remains pinned before deeper traversal-consequence edits | in_progress_ready_for_consumption_abg_4_0_0_rc_5 |
+| A4 | `event_store.ts` + callers constructing events before `appendOddSdlcRuntimeEvents` | ABG | fixed REQ-F-RUNTIME-001 AC-1 for production runtime authorship | **done 2026-06-10** — F_D audit rows are projection-only from W-110 slice A; W-110 slice D rehomes cursor and graph-span/reentry authorship to ABI 4.0.0-rc.6 `applyExplicitGraphVectorResumeCursor(...)` and `applyGraphSpanReentryRoute(...)`. `appendOddSdlcRuntimeEvents` remains a lawful sink; production `construct*Event(...)` sites under `code/src` are now empty. | SDLC may submit product assessment candidates, but ABG owns runtime event authorship and ordering for cursor and graph-span/reentry facts | construct-site inventory test shrank to the B-068 proof fixture only; `test:t197` source guard rejects local graph-span, graph-reentry, and vector lifecycle constructors | done |
+| A5 | `traversal_consequence.ts` + `installed_operator.ts` closure chain | ABG + SDLC | partial split | **in progress 2026-06-09** — SDLC still constructs worksite evidence, edge gain, residual pressure, edge ledger, closure decision, next-action projection, admitted-state ref, and consequence projection as product candidate/read-model truth. W-110 slice C fixed the concrete runtime/reporting leak: installed `status: "converged"` now requires ABG `terminalKind: "converged"` plus SDLC close; ABG `gap_stop` reports `blocked` even if the SDLC consequence candidate has no next action. First-class ABG transition/ref consumption remains open under active ABI T-154 pressure. | SDLC may construct product candidates/read models over admitted evidence; ABG owns final runtime fold, transition, continuation, and replay truth. Do not invent a local transition ref; consume an ABI transition/ref route only through a typed SDLC consequence carrier binding. | `test:t197` A5 terminal gate; T-164 baseline remains pinned before deeper traversal-consequence edits | in_progress_transition_ref_open |
 
-**A-section gate:** A1, remaining A4 construct sites, and first-class A5
-transition/ref consumption are moved upstream to active ABI T-154. SDLC must not
-implement another local runtime-event assembler, synthetic cursor, graph-span
-reentry author, or transition-ref substitute. A3 is done as a ratified thin
-caller. ABI T-154 now has a released/pinned ABI 4.0.0-rc.5 route visible to
-SDLC; the remaining Wave-1 work is to consume that route and shrink the local
-construct-site allowlist rather than adding another substitute. A2 remains
-dependent on the A5/T-154 transition boundary.
+**A-section gate:** A1 and A4 production runtime-event authorship are done
+through ABI 4.0.0-rc.6 route consumption. SDLC must not implement another local
+runtime-event assembler, synthetic cursor, graph-span reentry author, or
+transition-ref substitute. A3 is done as a ratified thin caller. First-class A5
+transition/ref consumption remains open under active ABI T-154 pressure, and A2
+remains dependent on that A5/T-154 transition boundary.
 
 **Lawful sink note (A4):** `appendOddSdlcRuntimeEvents` through ABG `emit()`
 (T-184) is lawful. Defect is **who constructs events**.
@@ -502,7 +500,7 @@ Full list: claude GAP § "Rejected / Lawful-On-Inspection" (17 items).
 | requirement | code reality | verdict | ledger |
 | --- | --- | --- | --- |
 | PRODUCT `typecheckGtlProgram` before runtime proof | `code/src/gtl_conformance/program.ts` builds the live inventory; public start, spec-method, release, and `build:semantic` preflight call the gate | **pass** | **B1 done** |
-| REQ-F-RUNTIME-001 ABG owns runtime facts | SDLC synthesizes vector cursor events | fail | A1, A4 |
+| REQ-F-RUNTIME-001 ABG owns runtime facts | production runtime-event authorship flows through ABG/ABI routes; only B-068 proof-fixture constructors remain excluded by IACS | **pass for A1/A4 production authorship** | A1 done; A4 done |
 | REQ-F-RUNTIME-002 no shadow runtime | convergence loop + closure/consequence chain | partial — A5 installed-status leak fixed; A2 and first-class transition/ref consumption remain blocked on A5/T-154 boundary | A2, A5 |
 | REQ-F-RUNTIME-005 ABG owns frontier | SDLC compiles DAG/payload candidates and calls ABG evented saga frontier with literal authority/control carrier admission | **pass** | A3 done |
 | REQ-F-ODDSDLC-011 AC-3 tenant stack not generic law | H1 target filename fixed; `/src` append and path regex rows remain | partial | H1 done; D1, D5 open |
@@ -550,12 +548,13 @@ Full list: claude GAP § "Rejected / Lawful-On-Inspection" (17 items).
 0. A4 inventory gate: **done 2026-06-09** in staged-compute design W-105
    inventory. W-110 slice A consumed existing ABG routes for deterministic
    conform-project F_D advance and converted traversal-hop audit carriers to
-   projection-only artifacts with negative source guards. Explicit graph-vector
-   resume cursor plus graph-span
-   reentry application are moved to active ABI T-154 or equivalent existing
-   route proof before deleting any A1/A4 site.
-1. A1: stop synthetic cursor event construction; require ABG continuation
-2. A4: enumerate construct-before-emit sites; rehome authorship
+   projection-only artifacts with negative source guards. W-110 slice D consumed
+   ABI 4.0.0-rc.6 explicit graph-vector resume cursor and graph-span/reentry
+   routes, shrinking production construct-event sites to zero.
+1. A1: **done 2026-06-10** — synthetic cursor event construction removed;
+   SDLC consumes `applyExplicitGraphVectorResumeCursor(...)`.
+2. A4: **done 2026-06-10** — production construct-before-emit sites removed;
+   SDLC consumes ABI authorship routes and retains only the ABG append sink.
 3. A3: **done 2026-06-09** — ratified thin caller over ABG evented saga frontier; carrier admission now rejects non-ABG execution authority/control.
 4. A5: **partial 2026-06-09** — installed convergence now gates on ABG `terminalKind: "converged"`; ABG `gap_stop` cannot be promoted by SDLC close/no-next-action. Remaining first-class transition/ref consumption is blocked on ABG T-154 or equivalent route proof.
 5. A2: reframe `--until converged` ownership after A5 boundary is clear
@@ -598,11 +597,10 @@ pin the current T-164 three-edge/residual-pressure proof before A5 edits
 
 1. **B1** — unwired ABG conformance gate (direct payoff of T-152/T-153)
 2. **H1** — `mapper_requirements.md` lineage/ingress recurrence (highest horizontal)
-3. **A1, A4** — verified synthetic runtime event authorship
-4. **A5 partial split** — closure candidate/read-model vs ABG fold/transition/ref split; coupled to T-154 and T-164 proof
-5. **A2 design-lock disposition** — installed `--until converged` loop after A5/T-154 boundary is clear
-7. **H6, D1, D4–D5** — remaining horizontal + ecosystem hygiene
-8. **B2–B3, D2–D3, C1a–C1b, H3–H12, P1/P3** — design-locked, probe-only, proof-residual, or low-severity
+3. **A5 partial split** — closure candidate/read-model vs ABG fold/transition/ref split; coupled to T-154 and T-164 proof
+4. **A2 design-lock disposition** — installed `--until converged` loop after A5/T-154 boundary is clear
+5. **H6, D1, D4–D5** — remaining horizontal + ecosystem hygiene
+6. **B2–B3, D2–D3, C1a–C1b, H3–H12, P1/P3** — design-locked, probe-only, proof-residual, or low-severity
 
 ---
 
@@ -656,7 +654,7 @@ addendum `T-197 Owner Partition And Decommission Register`.
 | W-050 | **Wave 0: B1 product GTL gate** | `test:t194` 2/2; `test:t197` 6/6; `test:t059` 10/10 installed-package proof; `build:semantic` runs `preflight:gtl` over the live production inventory and rejects missing target-carrier rows | done |
 | W-100 | Wave 1 design lock (A-rows) | A1-A5 statuses moved to `design_locked`; target owner dispositions are in staged-compute design addendum | done |
 | W-105 | Wave 1 pre-realization gate | staged-compute design § W-105 Construct-Site Sufficiency Inventory; ABG T-154 filed for explicit resume cursor and graph-span reentry consumer route; existing ABG runner routes identified for deterministic conformance F_D advance and F_D audit outcomes; construct-site source guard classifies every `construct*Event(...)` call under `code/src`, including excluded B-068 proof-fixture sites; `npm run test:t164` passed 22/22 edge-contract + 1/1 Rust-service sandbox on 2026-06-09 | done |
-| W-110 | Wave 1 realization | **partial/in_progress** — slice A rehomed conform-project F_D advance through ABG `runEngineIterateAsync(...)` and stopped traversal-hop audits from authoring local F_D runtime truth; slice B ratified A3 as thin caller over ABG evented saga frontier with literal authority/control carrier admission; slice C fixed A5 installed-status gating so SDLC consequence close cannot promote ABG `gap_stop` to convergence. Proof: `test:t197`, `test:t173`, `test:t174`, T-087/T-096 induction assertions, T-151 T-164 conformance assertion. A1 cursor, graph-span reentry families, and first-class transition/ref consumption were transferred to active ABI T-154; ABI 4.0.0-rc.5 now publishes the route through the `latest` release snapshot, so the next W-110 slice is SDLC route consumption and construct-site allowlist shrinkage. | in_progress_ready_for_consumption_abg_4_0_0_rc_5 |
+| W-110 | Wave 1 realization | **partial/in_progress** — slice A rehomed conform-project F_D advance through ABG `runEngineIterateAsync(...)` and stopped traversal-hop audits from authoring local F_D runtime truth; slice B ratified A3 as thin caller over ABG evented saga frontier with literal authority/control carrier admission; slice C fixed A5 installed-status gating so SDLC consequence close cannot promote ABG `gap_stop` to convergence; slice D consumes ABI 4.0.0-rc.6 `applyExplicitGraphVectorResumeCursor(...)` and `applyGraphSpanReentryRoute(...)`, removing production runtime-event constructors from `installed_operator.ts` and shrinking the construct-site allowlist to B-068 proof-fixture constructors only. Proof: `test:t197`, `test:t173`, `test:t174`, T-087/T-096 induction assertions, T-151 T-164 conformance assertion, and clean Rust hello-service live close `npm run test:t164:rust-service-live` on archive `build_tenants/typescript/test_env/test_runs/scenario_t164_rust_hello_service_lite_live/20260609T164901885Z_pid35003` with edge sequence `derive_intent_surface -> derive_lite_design_adr_surface -> derive_lite_component_code_surface -> prepare_test_execution_surface -> derive_test_execution_result_surface`; final execution evidence `status: succeeded`, `testsObserved: 1`, `passedCount: 1`, `failedCount: 0`, stdout `helloworld`. Remaining W-110 work is first-class A5 transition/ref consumption plus A2 ownership disposition after the A5 boundary is complete. | in_progress_a5_transition_ref_open |
 | W-200 | Wave 2 B2-B3 plus B4b residual | **partial** — B4b command-string OR-clauses removed from review-grade routing; B2/B3 remain open | in_progress |
 | W-300 | Wave 3 C1a/C1b | B-004 link; capability asset | open |
 | W-400 | Wave 4 D-rows | source tests | open |
