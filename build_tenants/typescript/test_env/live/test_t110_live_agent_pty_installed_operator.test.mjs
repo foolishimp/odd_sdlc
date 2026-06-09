@@ -26,7 +26,7 @@ const ABG_TYPESCRIPT_ROOT = resolve(
   REPO_ROOT,
   "../abiogenesis/build_tenants/abiogenesis/typescript"
 );
-const EXPECTED_ABG_VERSION = "4.0.0-rc.4";
+const EXPECTED_ABG_VERSION = "4.0.0-rc.5";
 const EXPECTED_ABG_CONFIG_DIGEST =
   "sha256:8e95750c8a848086aa4d900cd660000543d8ac4855ed31cdaa557a15de833df4";
 const LIVE_ENABLED = process.env["ODD_SDLC_TS_T110_LIVE"] === "1";

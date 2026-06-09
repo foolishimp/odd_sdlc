@@ -490,10 +490,11 @@ test("T-173 analyze-run reports traversal selection as read-only projection", ()
     const markdown = renderSdlcFdRunAnalysisMarkdown(result);
 
     assert.equal(result.traversalHopSelection.kind, "sdlc_traversal_hop_selection");
-    assert.equal(result.traversalHopSelection.outcomeClass, "framework_smoke");
+    assert.equal(result.profile, "hello_world");
+    assert.equal(result.traversalHopSelection.outcomeClass, "domain_product");
     assert.equal(result.traversalHopSelection.hopClass, "blocked");
     assert.ok(markdown.includes("## Traversal Selection"));
-    assert.ok(markdown.includes("- outcome class: framework_smoke"));
+    assert.ok(markdown.includes("- outcome class: domain_product"));
     assert.ok(
       markdown.includes(
         "- blocking reasons: complexity_decomposition_summary_missing"

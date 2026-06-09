@@ -370,6 +370,18 @@ test("T-184 ABG terminal truth controls non-close traversal", () => {
   );
   assert.match(
     installedOperatorSource,
+    /function abgTerminalAllowsInstalledConvergence/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /input\.terminalKind === "converged"/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /if \(input\.terminalKind === "gap_stop"\) \{\s*return "blocked";\s*\}/u
+  );
+  assert.doesNotMatch(
+    installedOperatorSource,
     /closureDisposition === "close"\s*\?\s*currentEdgeFromAcceptedClose\s*:\s*currentEdgeFromConsequence/u
   );
   assert.doesNotMatch(
