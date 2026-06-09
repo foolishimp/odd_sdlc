@@ -123,6 +123,7 @@ evaluation_criteria:
   - H3 enterprise_core_inventory is either absent from product/live default gates or consumes admitted tenant authority instead of frozen CDME names
   - analysis profile space open to admitted tenant spec; only generic default in source
   - B1 product-path preflight feeds the live SDLC graph/prompt/plugin inventory to `typecheckGtlProgram(...)`, not an empty, synthetic, or partial manifest
+  - W-105 records ABG/GTL sufficiency for every Wave-1 authority removal: use an existing ABG/GTL route when present; otherwise file or link an upstream ABG/GTL dependency before SDLC code deletes or substitutes the authority
   - P1-P3 transferred T-184 proof residuals are terminal with proof or explicit deferral
   - path regex lane classifier and deterministic traversal-method selection removed or projection-only
   - transport lawful as worker backend now; C1a carve-out or B-004 deferral documented; C1b grammar in declared capability asset
@@ -141,6 +142,7 @@ proof_surface:
 non_closure_conditions:
   - B1 remains test_env-only while claiming constitutional alignment
   - A-section rows deleted without adversarial verification pass documented in ledger
+  - A-section rows replace missing ABG/GTL capability with SDLC-local substitutes instead of recording an upstream ABG/GTL dependency
   - design-method completion claimed without IACS, structural diagram, or reference-to-target assets
   - handoff.ts partition (T-184) treated as sufficient without A1–A5 and H-cluster work
   - mapper_requirements.md or ENTERPRISE_CORE_COMPONENTS remain default framework gate truth
@@ -642,7 +644,7 @@ addendum `T-197 Owner Partition And Decommission Register`.
 | W-040 | Close transferred T-184 P1-P3 proof residuals | P1/P3 terminal here; P2 explicitly deferred to T-198 | open |
 | W-050 | **Wave 0: B1 product GTL gate** | `test:t194` 2/2; `test:t197` 6/6; `test:t059` 10/10 installed-package proof; `build:semantic` runs `preflight:gtl` over the live production inventory and rejects missing target-carrier rows | done |
 | W-100 | Wave 1 design lock (A-rows) | A1-A5 statuses moved to `design_locked`; target owner dispositions are in staged-compute design addendum | done |
-| W-105 | Wave 1 pre-realization gate | A4 construct-site inventory published; each A1/A4 family has an existing ABG/system route or successor ABG dependency; T-164 baseline proof pinned before A5 changes | open |
+| W-105 | Wave 1 pre-realization gate | A4 construct-site inventory published; each A1/A4 family has an existing ABG/system route or successor ABG dependency; each ABG/GTL insufficiency is filed or linked upstream instead of patched locally in SDLC; T-164 baseline proof pinned before A5 changes | open |
 | W-110 | Wave 1 realization | focused tests; semantic green | open |
 | W-200 | Wave 2 B2-B3 plus B4b residual | T-153 audit tests | open |
 | W-300 | Wave 3 C1a/C1b | B-004 link; capability asset | open |
