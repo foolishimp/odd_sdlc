@@ -60,6 +60,26 @@ function assertConformancePassed(report) {
   assert.equal(report.issueCount, 0);
 }
 
+function constructEventSites() {
+  const sites = [];
+  const callPattern = /\b(construct[A-Za-z0-9_]*Event)\s*\(/gu;
+  for (const filePath of repoFilesUnder("build_tenants/typescript/code/src")) {
+    if (path.extname(filePath) !== ".ts") {
+      continue;
+    }
+    const relativePath = path.relative(REPO_ROOT, filePath).split(path.sep).join("/");
+    const source = readFileSync(filePath, "utf8");
+    for (const match of source.matchAll(callPattern)) {
+      const constructorName = match[1];
+      if (constructorName === undefined) {
+        continue;
+      }
+      sites.push(`${relativePath}:${constructorName}`);
+    }
+  }
+  return sites.sort();
+}
+
 test("T-197 product gate typechecks the live SDLC graph inventory", () => {
   const input = constructCurrentSdlcGtlProgramConformanceInput();
   const report = typecheckCurrentSdlcGtlProgram();
@@ -195,6 +215,26 @@ test("T-197 design ratifies owner partition assets before Wave 1 code", () => {
   assert.match(ticket, /\| W-105 \| Wave 1 pre-realization gate \|/u);
   assert.match(ticket, /ABG T-154 filed for explicit resume cursor/u);
   assert.match(ticket, /npm run test:t164` passed 22\/22 edge-contract \+ 1\/1 Rust-service sandbox/u);
+});
+
+test("T-197 W-105 classifies every source runtime event constructor site", () => {
+  assert.deepEqual(constructEventSites(), [
+    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructGraphReentryAppliedEvent",
+    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructGraphReentryPlannedEvent",
+    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructGraphSpanAssessedEvent",
+    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructGraphSpanAssessedEvent",
+    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructGraphSpanEvaluationScheduledEvent",
+    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructGraphSpanEvaluationScheduledEvent",
+    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructGraphSpanFoldbackEvaluatedEvent",
+    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructGraphSpanFoldbackEvaluatedEvent",
+    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructVectorClosedEvent",
+    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructVectorEvaluatedEvent",
+    "build_tenants/typescript/code/src/operator/installed_operator.ts:constructVectorTraversalPlannedEvent",
+    "build_tenants/typescript/code/src/qualification/enterprise_core_iteration_sandbox.ts:constructRetryProgressRecordedEvent",
+    "build_tenants/typescript/code/src/qualification/enterprise_core_iteration_sandbox.ts:constructVectorClosedEvent",
+    "build_tenants/typescript/code/src/qualification/enterprise_core_iteration_sandbox.ts:constructVectorEvaluatedEvent",
+    "build_tenants/typescript/code/src/qualification/enterprise_core_iteration_sandbox.ts:constructVectorEvaluatedEvent"
+  ]);
 });
 
 test("T-197 H1 keeps target-specific requirements filenames out of framework law", () => {

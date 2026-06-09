@@ -378,6 +378,31 @@ Baseline before A5 edits: `npm run test:t164` passed on 2026-06-09 with
 | repair graph-span reentry | `repairReentryGraphSpanRuntimeEvents` constructs schedule/assessment/foldback events at L2063-L2078 plus plan/apply through `graphReentryPlanRuntimeEventsForSpanEvents`; appended at L10017 | `graph_span_evaluation_scheduled`, `graph_span_assessed`, `graph_span_foldback_evaluated`, `graph_reentry_planned`, `graph_reentry_applied` | **partially sufficient primitives, missing consumer route**: ABG T-103 owns graph-span law and exports schedule/fold/frontier/plan primitives, but SDLC still assembles runtime events and plan/apply locally; upstream dependency T-154 must expose or document a consumer-safe route | Until T-154 or equivalent proof exists, do not delete/rewrite this into another SDLC event assembler; after route exists, SDLC may submit product assessment candidates only. |
 | post-action graph-span reentry | `postActionReentryGraphSpanRuntimeEvents` constructs schedule/assessment/foldback events at L2191-L2206 plus plan/apply; appended at L10043 | same graph-span and graph-reentry runtime fact family as repair reentry | **partially sufficient primitives, missing consumer route**: same T-103/T-154 disposition | Same as repair graph-span reentry; preserve T-164 residual-pressure baseline before changing `traversal_consequence.ts`. |
 
+Construct-site exhaustiveness is enforced by
+`test_t197_product_gtl_gate.test.mjs` over every `construct*Event(...)` call
+under `build_tenants/typescript/code/src`. Current classified product-runtime
+sites are:
+
+- `installed_operator.ts` explicit resume cursor:
+  `constructVectorTraversalPlannedEvent`, `constructVectorEvaluatedEvent`,
+  `constructVectorClosedEvent`; blocked on T-154.
+- `installed_operator.ts` graph-span reentry planning:
+  `constructGraphReentryPlannedEvent`, `constructGraphReentryAppliedEvent`;
+  blocked on T-154 as part of repair/post-action graph-span reentry.
+- `installed_operator.ts` repair/post-action graph-span rows:
+  two each of `constructGraphSpanEvaluationScheduledEvent`,
+  `constructGraphSpanAssessedEvent`, and
+  `constructGraphSpanFoldbackEvaluatedEvent`; blocked on T-154.
+
+Current excluded proof-fixture sites are:
+
+- `qualification/enterprise_core_iteration_sandbox.ts` B-068 enterprise-core
+  iteration probe: `constructVectorEvaluatedEvent`,
+  `constructVectorClosedEvent`, and `constructRetryProgressRecordedEvent`.
+  These are `SdlcProofFixture` sites, not product-runtime authority; H3 was
+  verified probe-only in T-197 Phase 0. If this file becomes a live default
+  gate, the exclusion must be removed and repriced before closure.
+
 ## Canonical Prompt-Source Carrier
 
 `worker_construction_brief.json` is the canonical worker prompt-source carrier.
