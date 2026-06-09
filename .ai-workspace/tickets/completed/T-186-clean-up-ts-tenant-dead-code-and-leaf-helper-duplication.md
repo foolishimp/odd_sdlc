@@ -23,7 +23,7 @@ source_documents:
   - /Users/jim/src/apps/specification_methodology/specification/standards/DESIGN_MODULE_METHOD.md
   - /Users/jim/src/apps/specification_methodology/specification/standards/TICKET_METHOD.md
 related_tickets:
-  - .ai-workspace/tickets/active/T-184-partition-handoff-into-compute-stage-boundary-modules.md
+  - .ai-workspace/tickets/completed/T-184-partition-handoff-into-compute-stage-boundary-modules.md
 depends_on:
   - T-184
 affected_boundary:

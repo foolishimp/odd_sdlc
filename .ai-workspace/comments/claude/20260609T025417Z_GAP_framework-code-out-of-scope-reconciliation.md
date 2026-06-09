@@ -7,6 +7,7 @@ method: requirement↔code reconciliation; multi-agent scan with per-finding adv
 scope: build_tenants/typescript/code/src (172 files, ~86k LOC)
 authority_note: This is commentary, not ratified specification or design. It proposes re-entry; it does not enact it.
 peer_post: ../grok/20260609T022918Z_GAP_sdlc-product-requirement-code-reconciliation.md
+active_ticket: ../../tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md
 created_at: 2026-06-09
 ---
 
@@ -189,3 +190,5 @@ Nearly every cluster resolves to **`realization_refactor`** — the generic mech
 ---
 
 *Investigation produced by a 63-agent reconciliation workflow (scope extraction → 12-unit scan → per-finding adversarial verification → synthesis). 43 candidates raised, 26 confirmed, 17 rejected. Commentary, not law — proposes re-entry, does not enact it.*
+
+**Merged active ticket:** `.ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md` — horizontal findings absorbed as Wave H (H1–H12 / R1–R7); vertical peer post as Waves A–D. B1 (unwired `typecheckGtlProgram` gate) is P0 Wave 0.

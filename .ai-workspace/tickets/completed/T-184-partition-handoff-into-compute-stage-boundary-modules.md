@@ -7,8 +7,8 @@
 - library_usage: consume
 - governing_library: "@abiogenesis/typescript-tenant@4.0.0-rc.4"
 - library_rationale: T-184 consumes ABG-owned runtime truth, GTL program conformance, prompt AssetSurface, plugin contract, target-carrier, and execution-boundary admission surfaces rather than defining local contract law.
-- status: active
-- proof_status: pending
+- status: completed
+- proof_status: partition_passed_residuals_transferred_to_T-197
 - build_tenant: typescript
 - goal: delete `operator/handoff.ts` as an architectural home by moving each surviving interface into its owning `transform.C`, `evaluate.C`, `consequence.C`, product-materialization, postflight, ledger, or system-artifact module
 - change_intent: preserve the T-183 F_P semantic authority boundary while removing the monolithic file that still lets launch, prompt, materialization, diagnostic, replay, test-execution, and closure-adjacent side effects drift together
@@ -18,6 +18,8 @@
 - triaged_at: 2026-05-26
 - created_at: 2026-05-26
 - updated_at: 2026-06-09
+- completed_at: 2026-06-09
+- superseded_by: .ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md
 - migration_strategy: deletion_first_no_bridge
 - target_truth: ABG/system owns runtime events, payload admission, payload ledgers, assurance fold, traversal transition, continuation, correction, and replay truth; odd_sdlc owns SDLC edge meaning and product read-model interpretation; every plugin helper lives under its owning compute-stage module
 - superseded_truth: `operator/handoff.ts` as a shared utility bag for prompt generation, product topology, materialization observation, evaluator/register support, postflight diagnostics, replay, installed-operator-owned artifacts, and archive writes
@@ -27,6 +29,21 @@
 - proof_surface: ABG `specification/PRODUCT.md`, odd_sdlc `specification/PRODUCT.md`, this ticket, T-183, current compute-stage design module, new T-184 source tests, semantic suite, JS hello-world live, Rust server hello-world live, and data mapper live
 - depends_on:
   - T-183
+
+## Supersession / Hygiene Close - 2026-06-09
+
+T-184 is closed as the compute-stage handoff partition slice. The codebase no
+longer treats `operator/handoff.ts` as the architecture home, the partition
+proof remains the baseline for transform/evaluate/consequence ownership, and
+checkpoint revision `6af364e` recorded the then-current semantic/lint/live proof
+bundle.
+
+This close does not claim that every authority-cleanup residual in the wider
+SDLC graph is solved. The remaining generated-asset production-path proof,
+data-mapper live breadth proof, ABG/GTL owner-partition reconciliation, and
+target-identity leakage rows are transferred to
+`.ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md`.
+T-197 is the single active surface for that cleanup cluster.
 
 ## Intake
 
@@ -257,16 +274,13 @@ Current suspect side effects to eliminate or rehome:
 | H-230 | Audit F_D postflight/blocking carriers as diagnostic-only. | deterministic report/admission failures are system diagnostics or ABG contract failures only; product retry/block/close still derives from selected evaluate/consequence authority | fixed: `workerReportAdmissionPostflight(...)` and `deterministicReportAdmissionPostflight(...)` return diagnostic postflight with empty `blockingReasons`, carry `worker_report_admission_failed` as `operator_blocked`, and `completeReportAdmissionFailure(...)` publishes a consequence next-action projection instead of a product gap dossier |
 | H-240 | Refactor tests that preserve old surfaces. | tests exercise production-path carriers or are deleted; no test imports public old writer helpers or embeds fenced component-depth carriers as accepted proof | partial: focused T-183/T-184 proof rejects the deleted surfaces, T-151/T-158 fixtures now use current evaluator-register and review-grade authority, and the full semantic suite passes; remaining proof-quality target is behavioral LD-025/LD-030/LD-032 coverage beyond source grep |
 
-Current scope note: T-184 remains open until verification. The functional code
-partition is now intended to be code complete: `launch_contract.ts` owns
+Current scope note: this ticket is no longer the active authority-cleanup
+surface. The functional code partition is completed: `launch_contract.ts` owns
 transform launch/package/brief emission and delegates product-materialization
 authority, result projection, postflight/gap dossier, repair re-entry,
 evaluate/postflight checks, staged-construction authority, constructor
 projection, and prompt-edge directive policy to their owning modules. The
-remaining closure boundary is proof: build/lint/focused/source tests, GTL
-program conformance, and a live reduced-overlay Rust run must demonstrate that
-the partition still closes through selected `evaluate.C` and selected
-composition identity.
+remaining production-path and live breadth proof continues under T-197.
 
 2026-06-09 functional completion update: reduced-overlay live scenario
 contracts no longer accept product-file materialization as terminal proof.

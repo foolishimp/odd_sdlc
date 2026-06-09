@@ -654,8 +654,8 @@ Implemented and proved this round:
   self-test sample strings.
 - GTL program conformance proof: `npm run test:t194` passed `3/3` with
   `promptAssetCount === 3`, including `evaluate_design_depth`.
-- T-194 RC3 closing commit revision: pending atomic commit of the RC3
-  migration/proof slice.
+- T-194 RC3 closing commit revision: `6af364e` (`Checkpoint SDLC graph cleanup
+  and ABG4 alignment`).
 - focused migration and prompt/GTL proof passed:
   `npm run test:t194` `3/3`,
   `npm run test:t028` `3/3`,

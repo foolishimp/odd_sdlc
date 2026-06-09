@@ -21,12 +21,12 @@ source_documents:
   - specification/requirements/18-typed-construction-algebra.md
   - .ai-workspace/comments/codex/20260603T160321Z_T188_typed_continuation_state_machine_design.md
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_ABG_3_9_RC3_COMPUTE_STAGE_BOUNDARY.md
-  - .ai-workspace/tickets/active/T-184-partition-handoff-into-compute-stage-boundary-modules.md
+  - .ai-workspace/tickets/completed/T-184-partition-handoff-into-compute-stage-boundary-modules.md
   - .ai-workspace/tickets/completed/T-185-agent-internal-subworkstreams-for-compute-stage-acceleration.md
   - .ai-workspace/tickets/completed/T-187-restore-fp-evaluator-prompt-boundary-and-proportionality.md
   - .ai-workspace/comments/codex/20260601T122142AEST_data_mapper_latest_vs_test35_depth_review.md
 related_tickets:
-  - .ai-workspace/tickets/active/T-184-partition-handoff-into-compute-stage-boundary-modules.md
+  - .ai-workspace/tickets/completed/T-184-partition-handoff-into-compute-stage-boundary-modules.md
   - .ai-workspace/tickets/completed/T-185-agent-internal-subworkstreams-for-compute-stage-acceleration.md
   - .ai-workspace/tickets/completed/T-187-restore-fp-evaluator-prompt-boundary-and-proportionality.md
   - .ai-workspace/tickets/completed/T-189-close-t188-runtime-authority-bug-ledger-and-abg-handoff.md

@@ -24,9 +24,9 @@ source_documents:
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_ABG_3_9_RC3_COMPUTE_STAGE_BOUNDARY.md
   - .ai-workspace/tickets/completed/T-181-pilot-fp-evaluator-populated-design-depth-registers.md
   - .ai-workspace/tickets/completed/T-183-delete-fd-semantic-registers-and-restore-bare-admission.md
-  - .ai-workspace/tickets/active/T-184-partition-handoff-into-compute-stage-boundary-modules.md
+  - .ai-workspace/tickets/completed/T-184-partition-handoff-into-compute-stage-boundary-modules.md
 related_tickets:
-  - .ai-workspace/tickets/active/T-184-partition-handoff-into-compute-stage-boundary-modules.md
+  - .ai-workspace/tickets/completed/T-184-partition-handoff-into-compute-stage-boundary-modules.md
   - .ai-workspace/tickets/completed/T-185-agent-internal-subworkstreams-for-compute-stage-acceleration.md
   - .ai-workspace/tickets/completed/T-181-pilot-fp-evaluator-populated-design-depth-registers.md
   - .ai-workspace/tickets/completed/T-183-delete-fd-semantic-registers-and-restore-bare-admission.md

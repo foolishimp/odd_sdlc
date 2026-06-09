@@ -11,8 +11,9 @@
   - `specification/requirements/16-edge-gain-closure-contract.md`
   - `specification/requirements/18-typed-construction-algebra.md`
   - `build_tenants/typescript/code/src/`
-**Status**: Open
-**Backlog ticket**: `.ai-workspace/tickets/backlog/T-197-reconcile-product-boundary-and-remove-authority-leakage.md`
+**Status**: Open (merged into active T-197)
+**Active ticket**: `.ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md`
+**Peer post (horizontal axis)**: `.ai-workspace/comments/claude/20260609T025417Z_GAP_framework-code-out-of-scope-reconciliation.md`
 
 ## Summary
 
@@ -164,7 +165,7 @@ file append.
 
 ## Ticket / Re-Entry Guidance
 
-Consolidated backlog: **T-197** (`.ai-workspace/tickets/backlog/T-197-reconcile-product-boundary-and-remove-authority-leakage.md`).
+Consolidated active ticket: **T-197** (`.ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md`).
 
 | Wave | Smallest lawful re-entry | Ticket |
 | --- | --- | --- |

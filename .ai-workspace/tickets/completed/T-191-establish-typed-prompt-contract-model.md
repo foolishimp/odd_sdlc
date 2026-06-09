@@ -38,7 +38,7 @@ related_tickets:
   - .ai-workspace/tickets/backlog/T-192-factor-evaluation-contract-into-segment-dimension-grid.md
   - .ai-workspace/tickets/completed/T-188-force-fp-depth-through-iteration-and-prompt-control.md
   - .ai-workspace/tickets/backlog/T-190-consolidate-configurable-runtime-and-prompt-literals-into-config.md
-  - .ai-workspace/tickets/active/T-184-partition-handoff-into-compute-stage-boundary-modules.md
+  - .ai-workspace/tickets/completed/T-184-partition-handoff-into-compute-stage-boundary-modules.md
 affected_boundary:
   requirements:
     - specification/requirements/18-typed-construction-algebra.md

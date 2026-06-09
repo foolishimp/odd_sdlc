@@ -3,7 +3,7 @@
 **Author**: grok
 **Date**: 2026-06-08T06:55:43Z
 **Addresses**:
-  - `.ai-workspace/tickets/active/T-195-close-t194-proof-and-release-hygiene.md`
+  - `.ai-workspace/tickets/completed/T-195-close-t194-proof-and-release-hygiene.md`
   - `.ai-workspace/tickets/completed/T-194-migrate-typescript-tenant-to-abg-4-0-0-rc-2.md`
 **Status**: Open
 

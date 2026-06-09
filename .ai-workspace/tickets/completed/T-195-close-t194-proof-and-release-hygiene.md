@@ -3,8 +3,8 @@ id: T-195
 title: Close T-194 proof and release hygiene
 type: chore
 ticket_category: ordinary
-status: active
-proof_status: pending
+status: completed
+proof_status: passed
 build_tenant: typescript
 owner: odd_sdlc
 source_ticket: T-194
@@ -15,7 +15,10 @@ re_entry_point: tests_proof
 first_missing_layer: tests_proof
 triaged_at: 2026-06-08
 created_at: 2026-06-08
-updated_at: 2026-06-08
+updated_at: 2026-06-09
+completed_at: 2026-06-09
+closing_commit: 6af364e
+successor_ticket: .ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md
 priority: high
 dependencies:
   - T-194
@@ -65,6 +68,18 @@ proof_surface:
 ---
 
 # T-195: Close T-194 Proof And Release Hygiene
+
+## Closure / Hygiene Close - 2026-06-09
+
+T-195 is completed as T-194 proof and release hygiene. Checkpoint revision
+`6af364e` recorded the RC3/RC4 migration proof bundle and the T-194 acceptance
+evidence now cites that immutable revision instead of a pending commit.
+
+This ticket does not own the broader in-product GTL conformance hook. The open
+PRODUCT gate requiring `typecheckGtlProgram(...)` in `code/src` build/start or
+publish preflight is transferred to
+`.ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md`
+as P0/B1.
 
 ## STDO Triage
 
@@ -164,8 +179,8 @@ acceptance section:
 
 - `test:t194` **3/3** (not 2/2)
 - closing commit revision
-- note that live-harness and full prompt-inventory closure moved to T-195 if
-  not completed in the same revision
+- note that any remaining product-code GTL gate pressure is outside T-195 and
+  owned by T-197
 
 ## Implementation Update - 2026-06-08
 
@@ -182,10 +197,10 @@ acceptance section:
 - `selectComponentRowForObligation` no longer falls back to the first
   component row; unmatched module and requirement obligations fail closed.
 - T-194 acceptance evidence now records `npm run test:t194` as `3/3` and
-  names the closing commit as pending.
+  names checkpoint commit `6af364e` as the closing revision.
 
-Remaining closure condition: commit the T-194/T-195 proof-hygiene slice as one
-atomic revision, then replace the pending commit note in T-194 with that hash.
+Remaining cleanup pressure is no longer T-195 scope. T-197 owns the product-code
+GTL gate and wider authority-leakage remediation.
 
 ## Out Of Scope
 
