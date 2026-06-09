@@ -2,7 +2,7 @@
 
 **Status**: Active
 **Date**: 2026-05-07
-**Owner Tickets**: `.ai-workspace/tickets/completed/T-058-realize-typescript-public-cli-adapter-over-graph-query-start-surfaces.md`, `.ai-workspace/tickets/active/T-120-realize-retry-local-repair-prompts-from-typed-gap-dossiers.md`, `.ai-workspace/tickets/active/T-129-migrate-typescript-to-abg-3-7-0-rc-1-fp-consciousness-evaluator-substrate.md`
+**Owner Tickets**: `.ai-workspace/tickets/completed/T-058-realize-typescript-public-cli-adapter-over-graph-query-start-surfaces.md`, `.ai-workspace/tickets/active/T-120-realize-retry-local-repair-prompts-from-typed-gap-dossiers.md`, `.ai-workspace/tickets/active/T-194-migrate-typescript-tenant-to-abg-4-0-0-rc-1.md`
 **Supersedes**: `ODD_SDLC_TYPESCRIPT_PUBLIC_CLI_ADAPTER.md`
 **Implements**: REQ-F-ODDSDLC-040, REQ-F-ODDSDLC-041, REQ-F-ODDSDLC-043, REQ-F-ODDSDLC-051
 **Derives From**: `ODD_SDLC_TYPESCRIPT_TENANT_DERIVATION.md`, `ODD_SDLC_TYPESCRIPT_POLICY_SURFACES.md`, `ODD_SDLC_TYPESCRIPT_DETERMINISTIC_TRAVERSAL_STATE_MACHINE.md`

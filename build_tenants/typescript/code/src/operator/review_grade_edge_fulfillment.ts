@@ -1,8 +1,13 @@
 // Implements: T-182
 
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { resolve } from "node:path";
+import { relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
+import {
+  admitGtlContractFulfillmentBinding,
+  constructGtlContractFulfillmentBinding,
+  type GtlContractFulfillmentBinding
+} from "@abiogenesis/typescript-tenant";
 import {
   parseArray,
   parseClosedRecord,
@@ -16,6 +21,9 @@ import {
   type SdlcReviewGradeEdgeFulfillmentAdmission,
   type SdlcReviewGradeEdgeFulfillmentAssessment,
   type SdlcReviewGradeObligationFinding,
+  type SdlcComponentDepthRegister,
+  type SdlcComponentRealizationRow,
+  type SdlcComponentTopologyRow,
   type SdlcRequirementFunctionFulfillmentBinding,
   type SdlcWorkerObligationAssessment,
   type SdlcWorkerHandoffManifest
@@ -24,12 +32,16 @@ import {
   sdlcReviewGradeEdgeFulfillmentAssessmentRequired
 } from "./edge_output_policy.js";
 import { sha256Text } from "../shared/digest.js";
+import { admitComponentDepthRegisterFromArtifact } from "./component_depth_register.js";
 
 export const REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE =
   "review_grade_edge_fulfillment_assessment.json";
 
 export const REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF =
   "evaluation-rule://odd-sdlc/review-grade-edge-fulfillment/fp";
+
+const REVIEW_GRADE_PROMPT_NULL_BINDING_REF_PREFIX =
+  "prompt-null://odd-sdlc/review-grade/fulfillment-binding";
 
 export interface SdlcReviewGradeReadOnlyInputFileState {
   readonly path: string;
@@ -137,16 +149,34 @@ function reviewGradeFindingIsDownstreamStagePressure(input: {
   readonly finding: SdlcReviewGradeObligationFinding;
   readonly targetAssetType?: string | undefined;
 }): boolean {
+  const carryoverStatus =
+    input.finding.fulfillmentStatus === "partial" ||
+    input.finding.fulfillmentStatus === "blocked";
   if (
     !input.finding.obligationId.startsWith("requirement:") ||
-    input.finding.fulfillmentStatus !== "partial"
+    !carryoverStatus
   ) {
     return false;
   }
-  if (input.finding.failureClass === "wrong_stage") {
-    return true;
-  }
   const action = input.finding.requiredAction?.toLowerCase() ?? "";
+  const actionNamesDownstreamTestOrExecution =
+    (action.includes("downstream") ||
+      action.includes("later") ||
+      action.includes("carry")) &&
+    (action.includes("test") ||
+      action.includes("execution") ||
+      action.includes("execution evidence") ||
+      action.includes("executionevidence") ||
+      action.includes("test carrier") ||
+      action.includes("test/execution") ||
+      action.includes("derive_test_execution_result_surface") ||
+      action.includes("prepare_test_execution_surface"));
+  if (input.finding.failureClass === "wrong_stage") {
+    return (
+      input.targetAssetType === "component_code_surface" &&
+      actionNamesDownstreamTestOrExecution
+    );
+  }
   if (
     input.targetAssetType === "component_code_surface" &&
     (input.finding.failureClass === "test_overlap_missing" ||
@@ -199,18 +229,20 @@ export function reviewGradeEdgeFulfillmentOpenPressureRefs(input: {
   readonly assessments: readonly SdlcWorkerObligationAssessment[];
 }): readonly string[] {
   return uniqueSorted(
-    input.assessments.flatMap((assessment) =>
-      assessment.reviewGrade === true &&
-      assessment.fulfillmentStatus !== "fulfilled" &&
-      !(
-        assessment.fulfillmentStatus === "partial" &&
-        assessment.reviewFailureClass === "wrong_stage"
-      )
-        ? [
-            `pressure://odd-sdlc/review-grade/${input.runRef}/${encodeURIComponent(assessment.obligationId)}`
-          ]
-        : []
-    )
+    input.assessments.flatMap((assessment) => {
+      const downstreamCarryover =
+        assessment.reviewFailureClass === "wrong_stage" &&
+        assessment.blockingReasons.some((reason) =>
+          reason.startsWith("requirement_carried_for_downstream_closure:")
+        );
+      return assessment.reviewGrade === true &&
+        assessment.fulfillmentStatus !== "fulfilled" &&
+        !downstreamCarryover
+          ? [
+              `pressure://odd-sdlc/review-grade/${input.runRef}/${encodeURIComponent(assessment.obligationId)}`
+            ]
+          : [];
+    })
   );
 }
 
@@ -267,75 +299,179 @@ function parseNullableRequiredAction(
 
 function parseFulfillmentBinding(
   input: unknown,
-  label: string
-): SdlcRequirementFunctionFulfillmentBinding {
+  label: string,
+  context: { readonly obligationId?: string } = {}
+): GtlContractFulfillmentBinding {
   const record = parseClosedRecord(input, label, [
+    "bindingRef",
     "kind",
+    "obligationRef",
     "requirementRef",
     "productRequirementRef",
     "designObligationRef",
     "componentRef",
     "productTargetRef",
-    "codeSurfaceRef",
+    "outputSurfaceRef",
     "functionOrEntrypointRef",
     "realizationEvidenceRefs",
     "testOrExecutionEvidenceRefs",
-    "evaluatorFindingRef"
+    "evaluatorFindingRef",
+    "authorityRefs",
+    "evidenceRefs"
   ]);
   const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
-  if (kind !== "sdlc_requirement_function_fulfillment_binding") {
+  if (kind !== "gtl_contract_fulfillment_binding") {
     throw new TypeError(`${label}.kind: unexpected fulfillment binding kind`);
   }
-  return Object.freeze({
-    kind: "sdlc_requirement_function_fulfillment_binding" as const,
-    requirementRef: parseNonEmptyString(
-      record["requirementRef"],
-      `${label}.requirementRef`
-    ),
-    productRequirementRef: parseNonEmptyString(
+  const nullSentinel = (fieldName: string): string =>
+    `${REVIEW_GRADE_PROMPT_NULL_BINDING_REF_PREFIX}/${encodeURIComponent(
+      context.obligationId ?? "unknown-obligation"
+    )}/${fieldName}`;
+  const parseBindingString = (
+    value: unknown,
+    fieldLabel: string,
+    fieldName: string
+  ): string => {
+    if (value === null) {
+      return nullSentinel(fieldName);
+    }
+    return parseNonEmptyString(value, fieldLabel);
+  };
+  const obligationRef = context.obligationId ?? "";
+  const bindingObligationRef =
+    obligationRef.length > 0
+      ? obligationRef
+      : parseBindingString(
+          record["obligationRef"],
+          `${label}.obligationRef`,
+          "obligationRef"
+        );
+  const nonRequirementObligation =
+    !bindingObligationRef.startsWith("requirement:");
+  const nonRequirementFallbackRef = (fieldName: string): string =>
+    `binding-fallback://odd-sdlc/review-grade/${encodeURIComponent(
+      bindingObligationRef
+    )}/${fieldName}`;
+  const parseBindingStringWithFallback = (
+    value: unknown,
+    fieldLabel: string,
+    fieldName: string,
+    fallback: string | null,
+    options: { readonly admitNullAsFallback?: boolean } = {}
+  ): string => {
+    if (
+      (value === undefined || (options.admitNullAsFallback === true && value === null)) &&
+      fallback !== null
+    ) {
+      return fallback;
+    }
+    return parseBindingString(value, fieldLabel, fieldName);
+  };
+  const parseBindingStringList = (
+    value: unknown,
+    fieldLabel: string,
+    fieldName: string
+  ): readonly string[] => {
+    if (value === null) {
+      return Object.freeze([nullSentinel(fieldName)]);
+    }
+    return parseStringList(value, fieldLabel);
+  };
+  const productTargetRef = parseBindingString(
+    record["productTargetRef"],
+    `${label}.productTargetRef`,
+    "productTargetRef"
+  );
+  const requirementRef = parseBindingStringWithFallback(
+    record["requirementRef"],
+    `${label}.requirementRef`,
+    "requirementRef",
+    nonRequirementObligation ? bindingObligationRef : null,
+    { admitNullAsFallback: nonRequirementObligation }
+  );
+  const binding = constructGtlContractFulfillmentBinding({
+    bindingRef:
+      record["bindingRef"] === undefined
+        ? undefined
+        : parseBindingString(record["bindingRef"], `${label}.bindingRef`, "bindingRef"),
+    obligationRef: bindingObligationRef,
+    requirementRef,
+    productRequirementRef: parseBindingStringWithFallback(
       record["productRequirementRef"],
-      `${label}.productRequirementRef`
+      `${label}.productRequirementRef`,
+      "productRequirementRef",
+      nonRequirementObligation ? requirementRef : null,
+      { admitNullAsFallback: nonRequirementObligation }
     ),
-    designObligationRef: parseNonEmptyString(
+    designObligationRef: parseBindingStringWithFallback(
       record["designObligationRef"],
-      `${label}.designObligationRef`
+      `${label}.designObligationRef`,
+      "designObligationRef",
+      nonRequirementObligation
+        ? nonRequirementFallbackRef("designObligationRef")
+        : null
     ),
-    componentRef: parseNonEmptyString(record["componentRef"], `${label}.componentRef`),
-    productTargetRef: parseNonEmptyString(
-      record["productTargetRef"],
-      `${label}.productTargetRef`
+    componentRef: parseBindingStringWithFallback(
+      record["componentRef"],
+      `${label}.componentRef`,
+      "componentRef",
+      nonRequirementObligation
+        ? nonRequirementFallbackRef("componentRef")
+        : null
     ),
-    codeSurfaceRef: parseNonEmptyString(
-      record["codeSurfaceRef"],
-      `${label}.codeSurfaceRef`
+    productTargetRef,
+    outputSurfaceRef: parseBindingString(
+      record["outputSurfaceRef"],
+      `${label}.outputSurfaceRef`,
+      "outputSurfaceRef"
     ),
-    functionOrEntrypointRef: parseNonEmptyString(
+    functionOrEntrypointRef: parseBindingStringWithFallback(
       record["functionOrEntrypointRef"],
-      `${label}.functionOrEntrypointRef`
+      `${label}.functionOrEntrypointRef`,
+      "functionOrEntrypointRef",
+      nonRequirementObligation
+        ? nonRequirementFallbackRef("functionOrEntrypointRef")
+        : productTargetRef,
+      { admitNullAsFallback: !nonRequirementObligation }
     ),
-    realizationEvidenceRefs: parseStringList(
+    realizationEvidenceRefs: parseBindingStringList(
       record["realizationEvidenceRefs"],
-      `${label}.realizationEvidenceRefs`
+      `${label}.realizationEvidenceRefs`,
+      "realizationEvidenceRefs"
     ),
-    testOrExecutionEvidenceRefs: parseStringList(
+    testOrExecutionEvidenceRefs: parseBindingStringList(
       record["testOrExecutionEvidenceRefs"],
-      `${label}.testOrExecutionEvidenceRefs`
+      `${label}.testOrExecutionEvidenceRefs`,
+      "testOrExecutionEvidenceRefs"
     ),
-    evaluatorFindingRef: parseNonEmptyString(
+    evaluatorFindingRef: parseBindingString(
       record["evaluatorFindingRef"],
-      `${label}.evaluatorFindingRef`
+      `${label}.evaluatorFindingRef`,
+      "evaluatorFindingRef"
+    ),
+    authorityRefs: parseBindingStringList(
+      record["authorityRefs"],
+      `${label}.authorityRefs`,
+      "authorityRefs"
+    ),
+    evidenceRefs: parseBindingStringList(
+      record["evidenceRefs"],
+      `${label}.evidenceRefs`,
+      "evidenceRefs"
     )
   });
+  return admitGtlContractFulfillmentBinding(binding);
 }
 
 function parseNullableFulfillmentBinding(
   input: unknown,
-  label: string
+  label: string,
+  context: { readonly obligationId?: string } = {}
 ): SdlcRequirementFunctionFulfillmentBinding | null {
   if (input === null) {
     return null;
   }
-  return parseFulfillmentBinding(input, label);
+  return parseFulfillmentBinding(input, label, context);
 }
 
 function parseReviewFinding(
@@ -357,9 +493,13 @@ function parseReviewFinding(
   if (kind !== "sdlc_review_grade_obligation_finding") {
     throw new TypeError(`${label}.kind: unexpected review finding kind`);
   }
+  const obligationId = parseNonEmptyString(
+    record["obligationId"],
+    `${label}.obligationId`
+  );
   return Object.freeze({
     kind: "sdlc_review_grade_obligation_finding" as const,
-    obligationId: parseNonEmptyString(record["obligationId"], `${label}.obligationId`),
+    obligationId,
     fulfillmentStatus: parseEnumValue(
       record["fulfillmentStatus"],
       `${label}.fulfillmentStatus`,
@@ -374,7 +514,8 @@ function parseReviewFinding(
     ),
     fulfillmentBinding: parseNullableFulfillmentBinding(
       record["fulfillmentBinding"],
-      `${label}.fulfillmentBinding`
+      `${label}.fulfillmentBinding`,
+      { obligationId }
     ),
     rationale: parseNonEmptyString(record["rationale"], `${label}.rationale`)
   });
@@ -433,6 +574,261 @@ function parseReviewAssessment(
   });
 }
 
+function fulfillmentBindingRequirementRefAdmitted(input: {
+  readonly obligationId: string;
+  readonly requirementRef: string;
+  readonly productRequirementRef: string;
+  readonly declaredRequirementRefs: ReadonlySet<string>;
+}): boolean {
+  if (input.requirementRef === input.obligationId) {
+    return true;
+  }
+  if (input.obligationId.startsWith("requirement:")) {
+    return false;
+  }
+  return (
+    input.productRequirementRef === input.requirementRef &&
+    input.declaredRequirementRefs.has(input.requirementRef)
+  );
+}
+
+function fulfillmentBindingContainsPromptNullSentinel(
+  binding: SdlcRequirementFunctionFulfillmentBinding
+): boolean {
+  const refs = [
+    binding.bindingRef,
+    binding.obligationRef,
+    binding.requirementRef,
+    binding.productRequirementRef,
+    binding.designObligationRef,
+    binding.componentRef,
+    binding.productTargetRef,
+    binding.outputSurfaceRef,
+    binding.functionOrEntrypointRef,
+    binding.evaluatorFindingRef,
+    ...binding.realizationEvidenceRefs,
+    ...binding.testOrExecutionEvidenceRefs,
+    ...binding.authorityRefs,
+    ...binding.evidenceRefs
+  ];
+  return refs.some((ref) =>
+    ref.startsWith(REVIEW_GRADE_PROMPT_NULL_BINDING_REF_PREFIX)
+  );
+}
+
+function slashPath(input: string): string {
+  return input.split(sep).join("/");
+}
+
+function workspaceRefForPath(input: {
+  readonly workspaceRoot: string;
+  readonly absolutePath: string;
+}): string {
+  return `workspace://${slashPath(relative(input.workspaceRoot, input.absolutePath))}`;
+}
+
+function requirementRefMatches(left: string, right: string): boolean {
+  return left === right || left.replace(/^requirement:/u, "") === right.replace(/^requirement:/u, "");
+}
+
+function rowRequirementRefs(
+  row: SdlcComponentRealizationRow | SdlcComponentTopologyRow
+): readonly string[] {
+  return row.requirementIds;
+}
+
+function componentRowsForBinding(
+  register: SdlcComponentDepthRegister
+): readonly (SdlcComponentRealizationRow | SdlcComponentTopologyRow)[] {
+  return Object.freeze([
+    ...register.componentRealizationRows,
+    ...register.componentTopologyRows
+  ]);
+}
+
+function selectComponentRowForObligation(input: {
+  readonly register: SdlcComponentDepthRegister;
+  readonly obligationId: string;
+  readonly requirementRef: string;
+}): SdlcComponentRealizationRow | SdlcComponentTopologyRow | null {
+  const rows = componentRowsForBinding(input.register);
+  if (rows.length === 0) {
+    return null;
+  }
+  if (input.obligationId.startsWith("module:")) {
+    const moduleName = input.obligationId.slice("module:".length);
+    return rows.find((row) => row.moduleName === moduleName) ?? null;
+  }
+  if (input.obligationId.startsWith("requirement:")) {
+    return (
+      rows.find((row) =>
+        rowRequirementRefs(row).some((candidate) =>
+          requirementRefMatches(candidate, input.obligationId)
+        )
+      ) ??
+      rows.find((row) =>
+        rowRequirementRefs(row).some((candidate) =>
+          requirementRefMatches(candidate, input.requirementRef)
+        )
+      ) ?? null
+    );
+  }
+  return (
+    rows.find((row) =>
+      rowRequirementRefs(row).some((candidate) =>
+        requirementRefMatches(candidate, input.requirementRef)
+      )
+    ) ?? null
+  );
+}
+
+function moduleRootWorkspaceRef(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly row: SdlcComponentRealizationRow | SdlcComponentTopologyRow;
+}): string {
+  const outputRef = workspaceRefForPath({
+    workspaceRoot: input.manifest.workspaceRoot,
+    absolutePath: input.manifest.outputFile
+  }).slice("workspace://".length);
+  const moduleRoot = `build_tenants/${input.row.moduleName}/`;
+  const moduleIndex = outputRef.indexOf(moduleRoot);
+  return moduleIndex >= 0 ? outputRef.slice(0, moduleIndex + moduleRoot.length) : "";
+}
+
+function productTargetRefForRow(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly row: SdlcComponentRealizationRow | SdlcComponentTopologyRow;
+}): string {
+  return `workspace://${moduleRootWorkspaceRef(input)}${slashPath(input.row.relativePath)}`;
+}
+
+function requirementRefForBinding(input: {
+  readonly obligationId: string;
+  readonly row: SdlcComponentRealizationRow | SdlcComponentTopologyRow;
+  readonly declaredRequirementRefs: readonly string[];
+}): string | null {
+  if (input.obligationId.startsWith("requirement:")) {
+    return input.obligationId;
+  }
+  const rowRef = rowRequirementRefs(input.row).find((candidate) =>
+    input.declaredRequirementRefs.some((declared) =>
+      requirementRefMatches(candidate, declared)
+    )
+  );
+  if (rowRef !== undefined) {
+    return input.declaredRequirementRefs.find((declared) =>
+      requirementRefMatches(rowRef, declared)
+    ) ?? rowRef;
+  }
+  return input.declaredRequirementRefs.length === 1
+    ? input.declaredRequirementRefs[0] ?? null
+    : null;
+}
+
+function deriveFulfillmentBindingForFinding(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly register: SdlcComponentDepthRegister;
+  readonly finding: SdlcReviewGradeObligationFinding;
+  readonly declaredRequirementRefs: readonly string[];
+}): GtlContractFulfillmentBinding | null {
+  const requirementRefForRowSelection = input.finding.obligationId.startsWith(
+    "requirement:"
+  )
+    ? input.finding.obligationId
+    : input.declaredRequirementRefs[0] ?? input.finding.obligationId;
+  const row = selectComponentRowForObligation({
+    register: input.register,
+    obligationId: input.finding.obligationId,
+    requirementRef: requirementRefForRowSelection
+  });
+  if (row === null) {
+    return null;
+  }
+  const requirementRef = requirementRefForBinding({
+    obligationId: input.finding.obligationId,
+    row,
+    declaredRequirementRefs: input.declaredRequirementRefs
+  });
+  const designObligationRef =
+    row.sourceAssetRefs[0] ??
+    input.finding.acceptedAuthorityRefs[0] ??
+    input.finding.evidenceRefs[0] ??
+    null;
+  if (requirementRef === null || designObligationRef === null) {
+    return null;
+  }
+  const outputSurfaceRef = workspaceRefForPath({
+    workspaceRoot: input.manifest.workspaceRoot,
+    absolutePath: input.manifest.outputFile
+  });
+  const productTargetRef = productTargetRefForRow({
+    manifest: input.manifest,
+    row
+  });
+  const gtlBinding = constructGtlContractFulfillmentBinding({
+    obligationRef: input.finding.obligationId,
+    requirementRef,
+    productRequirementRef: requirementRef,
+    designObligationRef,
+    componentRef: row.componentId,
+    productTargetRef,
+    outputSurfaceRef,
+    functionOrEntrypointRef: `${productTargetRef}#component:${row.componentId}`,
+    realizationEvidenceRefs: Object.freeze([productTargetRef, outputSurfaceRef]),
+    testOrExecutionEvidenceRefs: input.finding.evidenceRefs,
+    evaluatorFindingRef: `evaluation-finding://odd-sdlc/review-grade/${encodeURIComponent(input.finding.obligationId)}`,
+    authorityRefs: input.finding.acceptedAuthorityRefs,
+    evidenceRefs: input.finding.evidenceRefs
+  });
+  return admitGtlContractFulfillmentBinding(gtlBinding);
+}
+
+function canonicalizeReviewAssessmentFulfillmentBindings(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly assessment: SdlcReviewGradeEdgeFulfillmentAssessment;
+}): SdlcReviewGradeEdgeFulfillmentAssessment {
+  if (input.manifest.targetAssetType !== "component_code_surface") {
+    return input.assessment;
+  }
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: input.manifest.targetAssetType,
+    outputFile: input.manifest.outputFile
+  });
+  if (admission.status !== "admitted" || admission.register === null) {
+    return input.assessment;
+  }
+  const register = admission.register;
+  const declaredRequirementRefs = input.manifest.traversalObligationContext.obligations
+    .filter(
+      (obligation) =>
+        obligation.obligationKind === "requirement" ||
+        obligation.obligationId.startsWith("requirement:")
+    )
+    .map((obligation) => obligation.obligationId);
+  return Object.freeze({
+    ...input.assessment,
+    findings: Object.freeze(
+      input.assessment.findings.map((finding) => {
+        if (finding.fulfillmentStatus !== "fulfilled") {
+          return finding;
+        }
+        const fulfillmentBinding = deriveFulfillmentBindingForFinding({
+          manifest: input.manifest,
+          register,
+          finding,
+          declaredRequirementRefs
+        });
+        return fulfillmentBinding === null
+          ? finding
+          : Object.freeze({
+              ...finding,
+              fulfillmentBinding
+            });
+      })
+    )
+  });
+}
+
 function assessmentValidationErrors(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly assessment: SdlcReviewGradeEdgeFulfillmentAssessment;
@@ -452,6 +848,15 @@ function assessmentValidationErrors(input: {
     manifest.traversalObligationContext.obligations.map(
       (obligation) => obligation.obligationId
     )
+  );
+  const declaredRequirementRefs = new Set(
+    manifest.traversalObligationContext.obligations
+      .filter(
+        (obligation) =>
+          obligation.obligationKind === "requirement" ||
+          obligation.obligationId.startsWith("requirement:")
+      )
+      .map((obligation) => obligation.obligationId)
   );
   const reviewed = new Set(assessment.reviewedObligationIds);
   const findingsById = new Map(
@@ -488,7 +893,18 @@ function assessmentValidationErrors(input: {
     }
     if (
       finding.fulfillmentBinding !== null &&
-      finding.fulfillmentBinding.requirementRef !== finding.obligationId
+      fulfillmentBindingContainsPromptNullSentinel(finding.fulfillmentBinding)
+    ) {
+      errors.push(`review_grade_fulfillment_binding_prompt_null:${finding.obligationId}`);
+    }
+    if (
+      finding.fulfillmentBinding !== null &&
+      !fulfillmentBindingRequirementRefAdmitted({
+        obligationId: finding.obligationId,
+        requirementRef: finding.fulfillmentBinding.requirementRef,
+        productRequirementRef: finding.fulfillmentBinding.productRequirementRef,
+        declaredRequirementRefs
+      })
     ) {
       errors.push(`review_grade_fulfillment_binding_requirement_mismatch:${finding.obligationId}`);
     }
@@ -580,7 +996,10 @@ export function admitReviewGradeEdgeFulfillmentAssessmentFromArtifact(input: {
     });
   }
   try {
-    const assessment = parseReviewAssessment(candidate, "review_grade_assessment");
+    const assessment = canonicalizeReviewAssessmentFulfillmentBindings({
+      manifest: input.manifest,
+      assessment: parseReviewAssessment(candidate, "review_grade_assessment")
+    });
     const errors = assessmentValidationErrors({
       manifest: input.manifest,
       assessment

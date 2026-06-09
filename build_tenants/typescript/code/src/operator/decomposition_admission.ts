@@ -501,7 +501,7 @@ function implementationSummaryRows(
         parentId: `module://${slugRefPart(row.moduleName)}`,
         ownedUpstreamRefs: row.requirementIds,
         publicBoundaryRefs:
-          row.publicBoundary.length > 0 ? [row.publicBoundary] : [],
+          row.relativePath.length > 0 ? [row.relativePath] : [],
         substantiveResponsibilityRefs: [
           `concern-role://${row.concernRole}`,
           ...row.sourceAssetRefs

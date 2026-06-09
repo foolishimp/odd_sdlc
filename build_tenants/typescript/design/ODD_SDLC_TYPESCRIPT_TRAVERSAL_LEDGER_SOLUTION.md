@@ -50,7 +50,11 @@ Discovery evidence:
 Current TypeScript evidence:
 
 - `build_tenants/typescript/code/src/graph/catalog.ts`
-- `build_tenants/typescript/code/src/operator/handoff.ts`
+- `build_tenants/typescript/code/src/operator/plugins/transform/launch_contract.ts`
+- `build_tenants/typescript/code/src/operator/plugins/transform/result_projection.ts`
+- `build_tenants/typescript/code/src/operator/plugins/evaluate/`
+- `build_tenants/typescript/code/src/operator/plugins/consequence/`
+- `build_tenants/typescript/code/src/operator/product_materialization/`
 - `build_tenants/typescript/code/src/operator/assurance_gate.ts`
 - `build_tenants/typescript/code/src/operator/installed_operator.ts`
 - `data_mapper.test65.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260501T143724759Z_pid65991/*`

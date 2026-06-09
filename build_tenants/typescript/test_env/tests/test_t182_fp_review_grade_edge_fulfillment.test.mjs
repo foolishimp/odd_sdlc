@@ -39,6 +39,8 @@ import {
   SDLC_EDGE_GAIN_CLOSURE_CONTRACTS,
   SDLC_OPERATOR_RUN_ARTIFACT_CATALOG,
   SDLC_PRODUCT_GRAPH_EDGE_POLICY_ROWS,
+  sdlcTargetCarrierContractRef,
+  sdlcTargetCarrierOutputKind,
   writeHandoffFiles
 } from "../../build/semantic/code/src/index.js";
 import {
@@ -149,19 +151,22 @@ function reviewGradeAssessment(manifest, overrides = {}) {
     fulfillmentBinding:
       manifest.targetAssetType === "component_code_surface"
         ? {
-            kind: "sdlc_requirement_function_fulfillment_binding",
+            kind: "gtl_contract_fulfillment_binding",
+            obligationRef: obligationId,
             requirementRef: obligationId,
             productRequirementRef: obligationId,
             designObligationRef: acceptedAuthorityRef,
             componentRef: "component://t182/app",
             productTargetRef: pathToFileURL(manifest.outputFile).href,
-            codeSurfaceRef: "code-surface://t182/src/app.js",
+            outputSurfaceRef: "code-surface://t182/src/app.js",
             functionOrEntrypointRef: "entrypoint://t182/app-main",
             realizationEvidenceRefs: [evidenceRef],
             testOrExecutionEvidenceRefs: [
               `finding://t182/review-grade/${encodeURIComponent(obligationId)}`
             ],
-            evaluatorFindingRef: `finding://t182/review-grade/${encodeURIComponent(obligationId)}`
+            evaluatorFindingRef: `finding://t182/review-grade/${encodeURIComponent(obligationId)}`,
+            authorityRefs: [acceptedAuthorityRef],
+            evidenceRefs: [evidenceRef]
           }
         : null,
     rationale:
@@ -250,12 +255,86 @@ function shallowImplementationDesignRegister(manifest) {
   };
 }
 
+function componentCodeDepthTargetCarrier(manifest) {
+  const requirementIds = manifest.traversalObligationContext.obligations
+    .filter(
+      (obligation) =>
+        obligation.obligationKind === "requirement" ||
+        obligation.obligationId.startsWith("requirement:")
+    )
+    .map((obligation) => obligation.obligationId);
+  const designRef = "asset-type://implementation_design_surface";
+  return {
+    kind: sdlcTargetCarrierOutputKind("component_code_surface"),
+    edgeRef: manifest.edgeName,
+    targetAssetType: "component_code_surface",
+    contractRef: sdlcTargetCarrierContractRef({
+      edgeRef: manifest.edgeName,
+      targetAssetType: "component_code_surface"
+    }),
+    contractDigest: "sha256:t182-component-code",
+    payload: {
+      kind: "sdlc_component_depth_register",
+      registerVersion: "ts-component-depth-v1",
+      targetAssetType: "component_code_surface",
+      componentTopologyRows: [
+        {
+          kind: "sdlc_component_topology_row",
+          componentId: "app",
+          moduleName: "app-core",
+          relativePath: "src/app.js",
+          publicBoundary: "Program entrypoint",
+          concernRole: "other",
+          requirementIds,
+          sourceAssetRefs: [designRef]
+        }
+      ],
+      componentRealizationRows: [
+        {
+          kind: "sdlc_component_realization_row",
+          componentId: "app",
+          moduleName: "app-core",
+          relativePath: "src/app.js",
+          publicBoundary: "Program entrypoint",
+          trancheId: null,
+          firstProductFileToChange: "src/app.js",
+          upstreamComponentIds: [],
+          requirementIds,
+          sourceAssetRefs: [designRef]
+        }
+      ],
+      testComponentTopologyRows: [],
+      componentTestRows: [],
+      componentTestQualificationRows: [],
+      componentExecutionFailureRegister: null,
+      componentRepairSchedule: null,
+      releaseDepthParity: null
+    }
+  };
+}
+
+function writeComponentCodeDepthTargetCarrier(manifest) {
+  mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+  writeFileSync(
+    manifest.outputFile,
+    [
+      "# Component code surface",
+      "",
+      "```json component_depth_register",
+      JSON.stringify(componentCodeDepthTargetCarrier(manifest), null, 2),
+      "```",
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+}
+
 test("T-183 ticket absorbs review-grade fulfillment into the one edge ledger surface", () => {
   const ticket = readRepoFile(
     ".ai-workspace/tickets/completed/T-183-delete-fd-semantic-registers-and-restore-bare-admission.md"
   );
   const design = readRepoFile(
-    "build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_ABG_3_9_RC3_COMPUTE_STAGE_BOUNDARY.md"
+    "build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_STAGED_COMPUTE_BOUNDARY.md"
   );
 
   assert.match(ticket, /review-grade asset adequacy/u);
@@ -433,6 +512,238 @@ test("T-182 admits full review-grade findings and rejects missing or weak assess
       "entrypoint://t182/app-main"
     );
 
+    const scopedObligation = manifest.traversalObligationContext.obligations.find(
+      (obligation) =>
+        obligation.obligationKind !== "requirement" &&
+        !obligation.obligationId.startsWith("requirement:")
+    );
+    const requirementObligation = manifest.traversalObligationContext.obligations.find(
+      (obligation) =>
+        obligation.obligationKind === "requirement" ||
+        obligation.obligationId.startsWith("requirement:")
+    );
+    assert.ok(scopedObligation);
+    assert.ok(requirementObligation);
+
+    const scopedBindingBase = reviewGradeAssessment(manifest);
+    const scopedBindingAssessment = {
+      ...scopedBindingBase,
+      findings: scopedBindingBase.findings.map((finding) =>
+        finding.obligationId === scopedObligation.obligationId
+          ? {
+              ...finding,
+              fulfillmentBinding: {
+                ...finding.fulfillmentBinding,
+                requirementRef: requirementObligation.obligationId,
+                productRequirementRef: requirementObligation.obligationId
+              }
+            }
+          : finding
+      )
+    };
+    const scopedBindingPath = writeAssessment(manifest, scopedBindingAssessment);
+    const scopedBinding = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest,
+      outputFile: scopedBindingPath
+    });
+    assert.equal(scopedBinding.status, "admitted");
+    assert.equal(scopedBinding.blockingReasons.length, 0);
+
+    const nonRequirementPartialBindingAssessment = {
+      ...scopedBindingBase,
+      findings: scopedBindingBase.findings.map((finding) => {
+        if (finding.obligationId !== scopedObligation.obligationId) {
+          return finding;
+        }
+        const {
+          requirementRef,
+          productRequirementRef,
+          designObligationRef,
+          componentRef,
+          functionOrEntrypointRef,
+          ...partialBinding
+        } = finding.fulfillmentBinding;
+        assert.equal(requirementRef, scopedObligation.obligationId);
+        assert.equal(productRequirementRef, scopedObligation.obligationId);
+        assert.equal(designObligationRef.length > 0, true);
+        assert.equal(componentRef.length > 0, true);
+        assert.equal(functionOrEntrypointRef.length > 0, true);
+        return {
+          ...finding,
+          fulfillmentBinding: partialBinding
+        };
+      })
+    };
+    const nonRequirementPartialBindingPath = writeAssessment(
+      manifest,
+      nonRequirementPartialBindingAssessment
+    );
+    const nonRequirementPartialBinding =
+      admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+        manifest,
+        outputFile: nonRequirementPartialBindingPath
+      });
+    assert.equal(nonRequirementPartialBinding.status, "admitted");
+    const admittedScopedFinding =
+      nonRequirementPartialBinding.assessment.findings.find(
+        (finding) => finding.obligationId === scopedObligation.obligationId
+      );
+    assert.ok(admittedScopedFinding);
+    assert.equal(
+      admittedScopedFinding.fulfillmentBinding.requirementRef,
+      scopedObligation.obligationId
+    );
+    assert.match(
+      admittedScopedFinding.fulfillmentBinding.functionOrEntrypointRef,
+      /^binding-fallback:\/\/odd-sdlc\/review-grade\//u
+    );
+
+    const nonRequirementNullRequirementRefsAssessment = {
+      ...scopedBindingBase,
+      findings: scopedBindingBase.findings.map((finding) =>
+        finding.obligationId === scopedObligation.obligationId
+          ? {
+              ...finding,
+              fulfillmentBinding: {
+                ...finding.fulfillmentBinding,
+                requirementRef: null,
+                productRequirementRef: null
+              }
+            }
+          : finding
+      )
+    };
+    const nonRequirementNullRequirementRefsPath = writeAssessment(
+      manifest,
+      nonRequirementNullRequirementRefsAssessment
+    );
+    const nonRequirementNullRequirementRefs =
+      admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+        manifest,
+        outputFile: nonRequirementNullRequirementRefsPath
+      });
+    assert.equal(
+      nonRequirementNullRequirementRefs.status,
+      "admitted",
+      nonRequirementNullRequirementRefs.blockingReasons.join("\n")
+    );
+    const admittedNullScopedFinding =
+      nonRequirementNullRequirementRefs.assessment.findings.find(
+        (finding) => finding.obligationId === scopedObligation.obligationId
+      );
+    assert.ok(admittedNullScopedFinding);
+    assert.equal(
+      admittedNullScopedFinding.fulfillmentBinding.requirementRef,
+      scopedObligation.obligationId
+    );
+    assert.equal(
+      admittedNullScopedFinding.fulfillmentBinding.productRequirementRef,
+      scopedObligation.obligationId
+    );
+
+    const requirementFileTargetBindingAssessment = {
+      ...scopedBindingBase,
+      findings: scopedBindingBase.findings.map((finding) =>
+        finding.obligationId === requirementObligation.obligationId
+          ? {
+              ...finding,
+              fulfillmentBinding: {
+                ...finding.fulfillmentBinding,
+                componentRef: "cargo_manifest",
+                productTargetRef: "build_tenants/hello_world_rust/Cargo.toml",
+                functionOrEntrypointRef: null,
+                realizationEvidenceRefs: [
+                  "workspace://build_tenants/hello_world_rust/Cargo.toml"
+                ],
+                testOrExecutionEvidenceRefs: []
+              }
+            }
+          : finding
+      )
+    };
+    const requirementFileTargetBindingPath = writeAssessment(
+      manifest,
+      requirementFileTargetBindingAssessment
+    );
+    const requirementFileTargetBinding =
+      admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+        manifest,
+        outputFile: requirementFileTargetBindingPath
+      });
+    assert.equal(
+      requirementFileTargetBinding.status,
+      "admitted",
+      requirementFileTargetBinding.blockingReasons.join("\n")
+    );
+    const admittedFileTargetFinding =
+      requirementFileTargetBinding.assessment.findings.find(
+        (finding) => finding.obligationId === requirementObligation.obligationId
+      );
+    assert.ok(admittedFileTargetFinding);
+    assert.equal(
+      admittedFileTargetFinding.fulfillmentBinding.functionOrEntrypointRef,
+      "build_tenants/hello_world_rust/Cargo.toml"
+    );
+
+    const promptNullBindingAssessment = {
+      ...scopedBindingBase,
+      findings: scopedBindingBase.findings.map((finding) =>
+        finding.obligationId === scopedObligation.obligationId
+          ? {
+              ...finding,
+              fulfillmentBinding: {
+                ...finding.fulfillmentBinding,
+                functionOrEntrypointRef: null
+              }
+            }
+          : finding
+      )
+    };
+    const promptNullBindingPath = writeAssessment(
+      manifest,
+      promptNullBindingAssessment
+    );
+    const promptNullBinding =
+      admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+        manifest,
+        outputFile: promptNullBindingPath
+      });
+    assert.equal(promptNullBinding.status, "rejected");
+    assert.match(
+      promptNullBinding.blockingReasons.join("\n"),
+      /review_grade_fulfillment_binding_prompt_null/u
+    );
+
+    const undeclaredRequirementBinding = {
+      ...scopedBindingBase,
+      findings: scopedBindingBase.findings.map((finding) =>
+        finding.obligationId === scopedObligation.obligationId
+          ? {
+              ...finding,
+              fulfillmentBinding: {
+                ...finding.fulfillmentBinding,
+                requirementRef: "requirement:t182.not_declared",
+                productRequirementRef: "requirement:t182.not_declared"
+              }
+            }
+          : finding
+      )
+    };
+    const undeclaredRequirementPath = writeAssessment(
+      manifest,
+      undeclaredRequirementBinding
+    );
+    const undeclaredRequirement =
+      admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+        manifest,
+        outputFile: undeclaredRequirementPath
+      });
+    assert.equal(undeclaredRequirement.status, "rejected");
+    assert.match(
+      undeclaredRequirement.blockingReasons.join("\n"),
+      /review_grade_fulfillment_binding_requirement_mismatch/u
+    );
+
     const base = reviewGradeAssessment(manifest);
     const missingFunctionBinding = {
       ...base,
@@ -520,6 +831,299 @@ test("T-182 admits full review-grade findings and rejects missing or weak assess
     assert.match(
       duplicate.blockingReasons.join("\n"),
       /review_grade_finding_duplicate/u
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-150 derives review-grade fulfillment bindings from admitted GTL target carrier truth", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_code_surface",
+      "t150-gtl-binding-derivation"
+    );
+    writeComponentCodeDepthTargetCarrier(manifest);
+
+    const base = reviewGradeAssessment(manifest);
+    const assessmentWithoutPromptBindings = {
+      ...base,
+      findings: base.findings.map((finding) => ({
+        ...finding,
+        fulfillmentBinding: null
+      }))
+    };
+    const outputFile = writeAssessment(manifest, assessmentWithoutPromptBindings);
+    const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest,
+      outputFile
+    });
+
+    assert.equal(
+      admission.status,
+      "admitted",
+      admission.blockingReasons.join("\n")
+    );
+    assert.equal(admission.blockingReasons.length, 0);
+    assert.equal(admission.assessment.status, "passed");
+    assert.equal(
+      admission.assessment.findings.every(
+        (finding) => finding.fulfillmentBinding !== null
+      ),
+      true
+    );
+    const moduleFinding = admission.assessment.findings.find(
+      (finding) => finding.obligationId === "module:app-core"
+    );
+    assert.ok(moduleFinding);
+    assert.equal(moduleFinding.fulfillmentBinding.componentRef, "app");
+    assert.equal(moduleFinding.fulfillmentBinding.productTargetRef, "workspace://src/app.js");
+    assert.equal(
+      moduleFinding.fulfillmentBinding.functionOrEntrypointRef,
+      "workspace://src/app.js#component:app"
+    );
+    assert.equal(
+      moduleFinding.fulfillmentBinding.outputSurfaceRef,
+      "workspace://build_tenants/typescript/design/component_code_surface.md"
+    );
+    assert.equal(
+      moduleFinding.fulfillmentBinding.kind,
+      "gtl_contract_fulfillment_binding"
+    );
+    assert.ok(moduleFinding.fulfillmentBinding.bindingRef.length > 0);
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-150 canonicalizes prompt-shaped review-grade bindings through admitted GTL target carrier truth", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_code_surface",
+      "t150-gtl-binding-canonicalization"
+    );
+    writeComponentCodeDepthTargetCarrier(manifest);
+
+    const declaredRequirementRefs = new Set(
+      manifest.traversalObligationContext.obligations
+        .filter(
+          (obligation) =>
+            obligation.obligationKind === "requirement" ||
+            obligation.obligationId.startsWith("requirement:")
+        )
+        .map((obligation) => obligation.obligationId)
+    );
+    assert.equal(declaredRequirementRefs.size > 0, true);
+    const base = reviewGradeAssessment(manifest);
+    const promptShapedAssessment = {
+      ...base,
+      findings: base.findings.map((finding) => ({
+        ...finding,
+        fulfillmentBinding: {
+          ...finding.fulfillmentBinding,
+          requirementRef: finding.obligationId.startsWith("requirement:")
+            ? finding.obligationId
+            : null,
+          productRequirementRef: finding.obligationId.startsWith("requirement:")
+            ? finding.obligationId
+            : null,
+          componentRef: "prompt-owned-component",
+          productTargetRef: "build_tenants/hello_world_javascript/src/hello.js",
+          outputSurfaceRef: "workspace://prompt-owned.md",
+          functionOrEntrypointRef: finding.obligationId.startsWith("requirement:")
+            ? "prompt-owned-entrypoint"
+            : null
+        }
+      }))
+    };
+    const outputFile = writeAssessment(manifest, promptShapedAssessment);
+    const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest,
+      outputFile
+    });
+
+    assert.equal(
+      admission.status,
+      "admitted",
+      admission.blockingReasons.join("\n")
+    );
+    assert.equal(admission.blockingReasons.length, 0);
+    for (const finding of admission.assessment.findings) {
+      assert.equal(
+        declaredRequirementRefs.has(finding.fulfillmentBinding.requirementRef),
+        true
+      );
+      assert.equal(
+        finding.fulfillmentBinding.productRequirementRef,
+        finding.fulfillmentBinding.requirementRef
+      );
+      if (finding.obligationId.startsWith("requirement:")) {
+        assert.equal(finding.fulfillmentBinding.requirementRef, finding.obligationId);
+      }
+      assert.equal(finding.fulfillmentBinding.componentRef, "app");
+      assert.equal(
+        finding.fulfillmentBinding.productTargetRef,
+        "workspace://src/app.js"
+      );
+      assert.equal(
+        finding.fulfillmentBinding.functionOrEntrypointRef,
+        "workspace://src/app.js#component:app"
+      );
+    }
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-195 review-grade binding fails closed for unmatched module obligations", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const baseManifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_code_surface",
+      "t195-gtl-binding-no-row-fallback"
+    );
+    writeComponentCodeDepthTargetCarrier(baseManifest);
+    const templateObligation =
+      baseManifest.traversalObligationContext.obligations[0];
+    const manifest = {
+      ...baseManifest,
+      traversalObligationContext: {
+        ...baseManifest.traversalObligationContext,
+        obligations: [
+          ...baseManifest.traversalObligationContext.obligations,
+          {
+            ...templateObligation,
+            obligationId: "module:missing-module",
+            obligationKind: "module"
+          }
+        ]
+      }
+    };
+    const base = reviewGradeAssessment(manifest);
+    const assessmentWithoutBindings = {
+      ...base,
+      findings: base.findings.map((finding) => ({
+        ...finding,
+        fulfillmentBinding: null
+      }))
+    };
+    const outputFile = writeAssessment(manifest, assessmentWithoutBindings);
+    const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest,
+      outputFile
+    });
+
+    assert.equal(admission.status, "rejected");
+    assert.match(
+      admission.blockingReasons.join("\n"),
+      /review_grade_function_binding_missing:module:missing-module/u
+    );
+    assert.doesNotMatch(
+      admission.blockingReasons.join("\n"),
+      /review_grade_fulfillment_binding_requirement_mismatch/u
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-195 review-grade binding fails closed for unmatched requirement obligations", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const baseManifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_code_surface",
+      "t195-gtl-binding-no-requirement-row-fallback"
+    );
+    writeComponentCodeDepthTargetCarrier(baseManifest);
+    const templateObligation =
+      baseManifest.traversalObligationContext.obligations[0];
+    const manifest = {
+      ...baseManifest,
+      traversalObligationContext: {
+        ...baseManifest.traversalObligationContext,
+        obligations: [
+          ...baseManifest.traversalObligationContext.obligations,
+          {
+            ...templateObligation,
+            obligationId: "requirement:REQ-T195-MISSING",
+            obligationKind: "requirement"
+          }
+        ]
+      }
+    };
+    const base = reviewGradeAssessment(manifest);
+    const assessmentWithoutBindings = {
+      ...base,
+      findings: base.findings.map((finding) => ({
+        ...finding,
+        fulfillmentBinding: null
+      }))
+    };
+    const outputFile = writeAssessment(manifest, assessmentWithoutBindings);
+    const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest,
+      outputFile
+    });
+
+    assert.equal(admission.status, "rejected");
+    assert.match(
+      admission.blockingReasons.join("\n"),
+      /review_grade_function_binding_missing:requirement:REQ-T195-MISSING/u
+    );
+    assert.doesNotMatch(
+      admission.blockingReasons.join("\n"),
+      /review_grade_fulfillment_binding_requirement_mismatch/u
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-194 rejects SDLC-local review-grade fulfillment binding lookalikes", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_code_surface",
+      "t194-gtl-binding-kind"
+    );
+    writeComponentCodeDepthTargetCarrier(manifest);
+
+    const legacyKind = [
+      "sdlc",
+      "requirement",
+      "function",
+      "fulfillment",
+      "binding"
+    ].join("_");
+    const legacyAssessment = {
+      ...reviewGradeAssessment(manifest),
+      findings: reviewGradeAssessment(manifest).findings.map((finding) => ({
+        ...finding,
+        fulfillmentBinding: {
+          ...finding.fulfillmentBinding,
+          kind: legacyKind
+        }
+      }))
+    };
+    const outputFile = writeAssessment(manifest, legacyAssessment);
+    const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest,
+      outputFile
+    });
+
+    assert.equal(admission.status, "rejected");
+    assert.equal(
+      admission.blockingReasons.some((reason) =>
+        reason.includes("unexpected fulfillment binding kind")
+      ),
+      true
     );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
@@ -665,7 +1269,13 @@ test("T-182 wrong-stage review findings are downstream pressure, not same-edge r
     }));
     assert.equal(
       reviewGradeFindingsAreDownstreamStagePressure(wrongStageFindings),
-      true
+      false
+    );
+    assert.equal(
+      reviewGradeFindingsAreDownstreamStagePressure(wrongStageFindings, {
+        targetAssetType: "test_design_surface"
+      }),
+      false
     );
     assert.equal(
       reviewGradeFindingsAreDownstreamStagePressure([
@@ -706,6 +1316,78 @@ test("T-182 wrong-stage review findings are downstream pressure, not same-edge r
           status: "blocked",
           findings: wrongStageFindings
         }
+      }),
+      [
+        `pressure://odd-sdlc/review-grade/t182-wrong-stage-pressure/${encodeURIComponent(wrongStageFindings[0].obligationId)}`
+      ]
+    );
+    const downstreamExecutionCarryFinding = {
+      ...wrongStageFindings[0],
+      requiredAction:
+        "Admit formal execution evidence at the downstream test/execution surface; carry requirement id in test carrier and execution evidence refs."
+    };
+    assert.equal(
+      reviewGradeFindingsAreDownstreamStagePressure([downstreamExecutionCarryFinding], {
+        targetAssetType: "component_code_surface"
+      }),
+      true
+    );
+    assert.deepEqual(
+      reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+        runRef: "t182-code-downstream-execution-carry",
+        targetAssetType: "component_code_surface",
+        assessment: {
+          ...base,
+          status: "blocked",
+          findings: [downstreamExecutionCarryFinding]
+        }
+      }),
+      []
+    );
+    const blockedDownstreamExecutionCarryFinding = {
+      ...downstreamExecutionCarryFinding,
+      fulfillmentStatus: "blocked",
+      requiredAction:
+        "Carry req_t164_rust_svc_005 to the downstream test/proof stage for admitted smoke execution via the declared testExecutionContract (cargo run + curl GET / assert body=helloworld exit 0); this edge declares no test product file target and source/build_config obligations are otherwise fulfilled."
+    };
+    assert.equal(
+      reviewGradeFindingsAreDownstreamStagePressure([blockedDownstreamExecutionCarryFinding], {
+        targetAssetType: "component_code_surface"
+      }),
+      true
+    );
+    assert.deepEqual(
+      reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+        runRef: "t164-code-downstream-execution-carry",
+        targetAssetType: "component_code_surface",
+        assessment: {
+          ...base,
+          status: "blocked",
+          findings: [blockedDownstreamExecutionCarryFinding]
+        }
+      }),
+      []
+    );
+    assert.deepEqual(
+      reviewGradeEdgeFulfillmentOpenPressureRefs({
+        runRef: "t164-code-downstream-execution-carry",
+        assessments: [
+          {
+            kind: "sdlc_worker_obligation_assessment",
+            obligationId: blockedDownstreamExecutionCarryFinding.obligationId,
+            fulfillmentStatus: "blocked",
+            evidenceRefs: blockedDownstreamExecutionCarryFinding.evidenceRefs,
+            blockingReasons: [
+              `requirement_carried_for_downstream_closure:${blockedDownstreamExecutionCarryFinding.obligationId.replace(/^requirement:/u, "")}`
+            ],
+            reviewGrade: true,
+            reviewFailureClass: blockedDownstreamExecutionCarryFinding.failureClass,
+            requiredAction: blockedDownstreamExecutionCarryFinding.requiredAction,
+            semanticEvidenceRefs: blockedDownstreamExecutionCarryFinding.evidenceRefs,
+            acceptedAuthorityRefs: blockedDownstreamExecutionCarryFinding.acceptedAuthorityRefs,
+            fulfillmentBinding: null
+          }
+        ]
       }),
       []
     );

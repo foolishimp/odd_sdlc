@@ -25,9 +25,9 @@ import {
   evaluateMaterializedProductFiles,
   evaluateObligationAssessments,
   evaluateStagedConstructionAuthority,
-  evaluateWorkerAuthorityReadBoundary,
-  resolveProductMaterializationReplay
-} from "../transform/launch_contract.js";
+  evaluateWorkerAuthorityReadBoundary
+} from "./postflight_checks.js";
+import { resolveProductMaterializationReplay } from "../transform/result_projection.js";
 import { sdlcInstalledOperatorProjectsOutput } from "../../edge_output_policy.js";
 import { writeSdlcSystemArtifact } from "../../system_artifacts.js";
 import {

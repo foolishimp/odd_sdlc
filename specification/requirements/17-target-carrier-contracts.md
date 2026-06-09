@@ -71,6 +71,9 @@ selected target carrier contract.
   fixed-field mutation, and stale digest each reject the candidate
 - AC-5: rejected carriers produce typed non-close diagnostics visible in
   archives and read models
+- AC-6: review-grade fulfillment findings that bind an obligation to realized
+  product output shall carry ABIogenesis `GtlContractFulfillmentBinding` truth,
+  not an SDLC-local lookalike binding shape
 
 ### REQ-F-ODDSDLC-072 - query, gaps, archives, and replay carry carrier identity
 

@@ -2,8 +2,11 @@
 
 - id: T-184
 - title: Partition handoff into compute-stage boundary modules
-- type: realization_refactor
+- type: chore
 - ticket_category: implementation_migration
+- library_usage: consume
+- governing_library: "@abiogenesis/typescript-tenant@4.0.0-rc.4"
+- library_rationale: T-184 consumes ABG-owned runtime truth, GTL program conformance, prompt AssetSurface, plugin contract, target-carrier, and execution-boundary admission surfaces rather than defining local contract law.
 - status: active
 - proof_status: pending
 - build_tenant: typescript
@@ -14,13 +17,13 @@
 - first_missing_layer: module ownership for transform/evaluate/consequence/system artifact side effects
 - triaged_at: 2026-05-26
 - created_at: 2026-05-26
-- updated_at: 2026-05-31
+- updated_at: 2026-06-09
 - migration_strategy: deletion_first_no_bridge
 - target_truth: ABG/system owns runtime events, payload admission, payload ledgers, assurance fold, traversal transition, continuation, correction, and replay truth; odd_sdlc owns SDLC edge meaning and product read-model interpretation; every plugin helper lives under its owning compute-stage module
 - superseded_truth: `operator/handoff.ts` as a shared utility bag for prompt generation, product topology, materialization observation, evaluator/register support, postflight diagnostics, replay, installed-operator-owned artifacts, and archive writes
 - closure_law: `operator/handoff.ts` has no public exports and is deleted or reduced to a temporary empty shell before completion; no generated-asset closure, retry, repair, next action, evaluator admission, or system artifact write may depend on a helper whose authority is hidden in handoff
 - evaluation_criteria: focused tests prove no public import from `./handoff.js`, no raw `.ai-workspace` writes outside ABG/system artifact or ABG emit sinks, no framework semantic work-surface writer outside selected transform/evaluate/consequence contracts, and live JS/Rust/data-mapper archives close through the selected composition and selected F_P evaluation path
-- non_closure_conditions: retaining `handoff.ts` as a shrinking adapter with public behavior, adding compatibility aliases, moving code without changing ownership, keeping direct work-surface writes from installed operator F_D helpers, preserving node-specific source language branches, or leaving analyzer/runtime duplicate admission paths
+- non_closure_conditions: retaining `handoff.ts` as a shrinking adapter with public behavior, adding old-import aliases, moving code without changing ownership, keeping direct work-surface writes from installed operator F_D helpers, preserving node-specific source language branches, or leaving analyzer/runtime duplicate admission paths
 - proof_surface: ABG `specification/PRODUCT.md`, odd_sdlc `specification/PRODUCT.md`, this ticket, T-183, current compute-stage design module, new T-184 source tests, semantic suite, JS hello-world live, Rust server hello-world live, and data mapper live
 - depends_on:
   - T-183
@@ -100,6 +103,29 @@ This ticket is aligned to ABG and odd_sdlc `PRODUCT.md` as of 2026-05-27.
 The current code either conforms to this table or remains open T-184 work. A
 closure item is not satisfied by moving code under a better filename; the code
 must stop owning the wrong authority.
+
+## T-153 Contract-Law Owner Classification
+
+This ticket is the downstream outward audit for ABG T-153
+`REQ-L-GTL3-CONTRACT-LAW-API`. The classification below is not a new SDLC
+contract law. It records which existing owner each surfaced contract definition
+belongs to.
+
+| surface | owner classification | durable proof |
+| --- | --- | --- |
+| SDLC graph functions and graph vectors | GTL-declared language law; SDLC owns product edge meaning over those declarations | `constructSdlcGtlModule()` publishes the graph program; T-194 feeds the materialized module to ABG `typecheckGtlProgram(...)`. |
+| target-carrier contract rows | GTL target-carrier law declared on `GraphVector.declarations`; ABG admits/typechecks the row inventory; SDLC registry is a read model | `constructSdlcTargetCarrierRegistry(...)` reads declarations from graph vectors; T-194 supplies full production target-carrier fields to ABG. |
+| component-depth register syntax | downstream product read model; selected target-carrier envelope law is GTL target-carrier law | `SDLC_COMPONENT_DEPTH_REGISTER_CONTRACT_TRACE` names the GTL target-carrier family/envelope refs; `admitComponentDepthRegisterFromArtifact(...)` rejects local wrapper contract refs in target-carrier envelopes. |
+| prompt construction assets | GTL `AssetSurface` plus GTL `Node` view; SDLC prompt authority policy is product overlay data | `constructSdlcPromptInvocationProjection(...)` calls ABG `constructAssetSurface(...)` and `admitAssetSurface(...)`; T-194 submits prompt assets to ABG conformance. |
+| plugin contracts | ABG engine plugin contract over GTL hook/compute declarations; plugin code supplies transform/evaluate/consequence data only | `operator/plugins/plugin_contracts.ts` constructs ABG `EnginePluginContract` values; T-184 and T-194 assert stage roles and pass them through ABG conformance. |
+| handoff/module partition | ABG owns runtime/admission/event/ledger/closure/replay truth; SDLC owns stage-local product meaning and read models | T-184 source tests reject `handoff.ts` imports, raw operator writes, runtime-event rewrite, and dispatch-stage consequence projection. |
+
+The focused proof is
+`node --test test_env/tests/test_t184_handoff_partition_boundary.test.mjs`,
+including `T-153 outward contract-law audit is backed by GTL and ABG surfaces`.
+The ABG program proof is
+`node --test test_env/tests/test_t194_gtl_program_conformance.test.mjs`.
+On 2026-06-08 the focused results were T-184 21/21 and T-194 3/3.
 
 ## Defect Shape
 
@@ -205,13 +231,14 @@ Current suspect side effects to eliminate or rehome:
 | --- | --- | --- | --- |
 | H-001 | Add a source test that enumerates current `handoff.ts` public exports and fails if new exports are added during migration. | test fails on new public handoff export | done: `test_t184_handoff_partition_boundary.test.mjs` fails if `handoff.ts`, public imports, `writeOperatorArchiveFile`, or raw operator file writers return |
 | H-010 | Move stable JSON/hash/run-id helpers out of handoff. | build passes; no installed operator import for these helpers from handoff | planned |
-| H-020 | Move product-materialization authority helpers into `product_materialization/authority.ts`. | tests still prove tenant stack/product target authority; no source-specific branch added | planned |
+| H-020 | Move product-materialization authority helpers into `product_materialization/authority.ts`. | tests still prove tenant stack/product target authority; no source-specific branch added | code complete: product-materialization authority now has one public module, and transform/result/evaluate consumers import the same authority calculation instead of carrying private copies |
 | H-030 | Move transform launch contract helpers into `plugins/transform/launch_contract.ts`. | worker prompt/package tests pass; prompt still uses one governance reference and typed work queue | first slice done: former `handoff.ts` moved under transform plugin ownership; finer extraction still belongs to H-040/H-050/H-070/H-080 |
-| H-040 | Move materialization observation/replay/manifest helpers into `product_materialization/*`. | observation is read-only; no output artifact synthesis remains | done: observation, replay, and manifest algorithms now live in `operator/product_materialization/{observation,replay,manifest}.ts`; `launch_contract.ts` retains only public adapter wrappers and transform-owned dependency wiring |
-| H-050 | Move worker result and `FpTransformResult` projection into `plugins/transform/result_projection.ts`. | generated-asset closure still requires selected F_P review evidence | planned |
+| H-040 | Move materialization observation/replay/manifest helpers into `product_materialization/*`. | observation is read-only; no output artifact synthesis remains | code complete: observation, replay, and manifest algorithms now live in `operator/product_materialization/{observation,replay,manifest}.ts`; public barrel exports observation directly and `launch_contract.ts` no longer exports observation adapter wrappers |
+| H-050 | Move worker result and `FpTransformResult` projection into `plugins/transform/result_projection.ts`. | generated-asset closure still requires selected F_P review evidence | code complete: post-transform worker report admission, replay merge, FpTransformResult construction/write/read, and report-stage refs now live in `plugins/transform/result_projection.ts`; installed operator imports that module directly |
+| H-055 | Replace SDLC-local review-grade fulfillment bindings with ABIogenesis GTL contract-fulfillment bindings. | live component-code review-grade obligations carry admitted `gtl_contract_fulfillment_binding` objects with derived `bindingRef`s | done: T-194 ABG4 migration consumed `GtlContractFulfillmentBinding` directly in the review-grade handoff parser, prompt, worker result report, and live T-132 component-code run |
 | H-060 | Split or delete installed-operator-owned evaluation artifacts. | no deterministic work-surface writer remains except declared execution evidence through ABG/system | partial: the old public writer is gone, declared workspace targets write through the file-store effect, declared edge projection now runs from `plugin.consequence.C` and catalogs as a consequence read model, and report/admission diagnostics are fixed under H-230; generated-asset closure still needs production-path proof |
-| H-070 | Move gap dossier and retry diagnostic projection into `postflight/gap_dossier.ts`. | gap dossier remains diagnostic/read model; it cannot select next action directly | planned |
-| H-080 | Move repair re-entry projection into consequence module. | repair action derives from closure decision plus `ActionCatalog` | planned |
+| H-070 | Move gap dossier and retry diagnostic projection into `postflight/gap_dossier.ts`. | gap dossier remains diagnostic/read model; it cannot select next action directly | code complete: gap dossier path/construct/admit/read/write now live in `postflight/gap_dossier.ts`; transform launch no longer imports the gap-dossier writer |
+| H-080 | Move repair re-entry projection into consequence module. | repair action derives from closure decision plus `ActionCatalog` | code complete: repair re-entry planning and accepted-carrier/evidence helpers now live in `plugins/consequence/repair_reentry.ts`; launch consumes that consequence policy only to package retry context |
 | H-090 | Replace `writeOperatorArchiveFile` with direct `writeSdlcSystemArtifact` imports. | grep proves no `writeOperatorArchiveFile` export/import remains | done: source imports direct system writer and public wrapper export is removed |
 | H-100 | Delete `handoff.ts` and update `operator/index.ts`. | build fails if any consumer imports `./handoff.js`; file removed | done: `operator/index.ts` exports the transform launch contract and system artifact writer directly |
 | H-110 | Add raw-write audit tests for operator modules. | raw writes only in effect executors or approved product transformer/evaluator boundary | done for operator source: T-184 test rejects `writeFileSync`, `appendFileSync`, and `createWriteStream` in `operator/` |
@@ -228,14 +255,27 @@ Current suspect side effects to eliminate or rehome:
 | H-210 | Collapse framework-owned evaluation target policy to one edge policy surface. | `installedOperatorOwnsEvaluationOutput`, review-grade required/exempt logic, postflight output exceptions, and artifact writer policy read one cataloged edge-output policy | partial: operator review-grade/postflight/writer decisions use `sdlcEdgeOutputPolicyForTargetAssetType(...)`; product graph contract catalog still carries a separate projection/review-grade exemption list and must be collapsed into a pure contract-level policy module |
 | H-220 | Move installed-operator plugin prompts/contracts into plugin modules or plugin-set factory. | `installed_operator.ts` wires ABG plugin set from `operator/plugins/*` surfaces; it does not own F_P evaluator prompts, rule contracts, or semantic rule selection | done: plugin contracts live in `operator/plugins/plugin_contracts.ts`, plugin-set construction and rule metadata live in `operator/plugins/plugin_set.ts`, evaluator prompt bodies live in `operator/plugins/evaluate/prompts.ts`, and `installed_operator.ts` passes typed callbacks into `createSdlcAbgPluginSet(...)` |
 | H-230 | Audit F_D postflight/blocking carriers as diagnostic-only. | deterministic report/admission failures are system diagnostics or ABG contract failures only; product retry/block/close still derives from selected evaluate/consequence authority | fixed: `workerReportAdmissionPostflight(...)` and `deterministicReportAdmissionPostflight(...)` return diagnostic postflight with empty `blockingReasons`, carry `worker_report_admission_failed` as `operator_blocked`, and `completeReportAdmissionFailure(...)` publishes a consequence next-action projection instead of a product gap dossier |
-| H-240 | Refactor compatibility tests that preserve legacy surfaces. | tests exercise production-path carriers or are deleted; no test imports public legacy writer helpers or embeds fenced component-depth carriers as accepted proof | partial: focused T-183/T-184 proof rejects the deleted surfaces, T-151/T-158 fixtures now use current evaluator-register and review-grade authority, and the full semantic suite passes; remaining proof-quality target is behavioral LD-025/LD-030/LD-032 coverage beyond source grep |
+| H-240 | Refactor tests that preserve old surfaces. | tests exercise production-path carriers or are deleted; no test imports public old writer helpers or embeds fenced component-depth carriers as accepted proof | partial: focused T-183/T-184 proof rejects the deleted surfaces, T-151/T-158 fixtures now use current evaluator-register and review-grade authority, and the full semantic suite passes; remaining proof-quality target is behavioral LD-025/LD-030/LD-032 coverage beyond source grep |
 
-Current scope note: T-184 remains open. `handoff.ts` deletion is literal, but
-`operator/plugins/transform/launch_contract.ts` still owns transform launch,
-result projection, postflight/gap dossier, repair re-entry, execution evidence,
-and evaluate-adjacent helper exports. The partition is not closed until
-H-010/H-020/H-050/H-070/H-080, LD-011, and the T-187 prompt-boundary decision
-either land or this ticket is explicitly re-scoped to file deletion only.
+Current scope note: T-184 remains open until verification. The functional code
+partition is now intended to be code complete: `launch_contract.ts` owns
+transform launch/package/brief emission and delegates product-materialization
+authority, result projection, postflight/gap dossier, repair re-entry,
+evaluate/postflight checks, staged-construction authority, constructor
+projection, and prompt-edge directive policy to their owning modules. The
+remaining closure boundary is proof: build/lint/focused/source tests, GTL
+program conformance, and a live reduced-overlay Rust run must demonstrate that
+the partition still closes through selected `evaluate.C` and selected
+composition identity.
+
+2026-06-09 functional completion update: reduced-overlay live scenario
+contracts no longer accept product-file materialization as terminal proof.
+The lite live proof must observe, in order,
+`derive_lite_component_code_surface -> prepare_test_execution_surface ->
+derive_test_execution_result_surface`, and it must verify graph-owned
+`sdlc_worker_execution_evidence` from
+`derive_test_execution_result_surface`. This keeps "hello world" from passing
+by an external process check or workspace-file existence alone.
 
 This is a design-reframe / realization-HOW gap, not a product-law violation by
 file size or filename. The product-law risk is indirect: one cross-stage module
@@ -258,19 +298,19 @@ or duplicate surface discovered during the live run is tracked here.
 | LD-003 | `t164_data_mapper_full_capability_live/20260526T050928948Z_pid56692`, run `20260526T101301157Z_pid56862` | `component_realization_qualification_surface.md` was a workspace product target but was written through the system artifact writer, which enforces operator-run archive containment. | `.ai-workspace` runtime artifacts use `writeSdlcSystemArtifact`; declared workspace product targets use the file-store effect at `manifest.outputFile`. | fixed: workspace target JSON writer uses file-store effect; covered by `test:t184` |
 | LD-004 | code trace in `operator/plugins/transform/launch_contract.ts` and `operator/installed_operator.ts` around installed-operator-owned evaluation artifacts | no-dispatch qualification/projection surfaces were implemented as target-specific branches (`component_realization_qualification_surface`, `component_test_qualification_surface`, `release_depth_parity_surface`) and then moved under a consequence filename while still being invoked from dispatch. | multi-surface projection code is legacy debt; every edge should use one generic edge-output projection/materialization flow with edge-declared producer policy, and declared projection materialization must run as `plugin.consequence.C` projection over admitted state. | fixed: declared projection writer and target-specific projection branches live in `operator/plugins/consequence/edge_projection.ts`, dispatch now only publishes a pending system-projection report, `projectConsequenceForInstalledOperatorState(...)` invokes the writer, and `test:t184` rejects dispatch-stage writer calls plus installed-operator evaluation cataloging |
 | LD-005 | code trace in `operator/plugins/transform/launch_contract.ts` | local helper name `writeStableJsonFile` hid the system/workspace boundary after LD-003. | helper names must expose authority boundary, not serialization detail. | fixed locally: renamed to `writeWorkspaceTargetJsonFile`; covered by source grep and `test:t184` |
-| LD-006 | source trace: `operator/plugins/evaluate/postflight.ts` imports `__handoffEvaluate*`, `__handoffResolveProductMaterializationReplay`, and `__handoffInstalledOperatorOwnsEvaluationOutput` from `operator/plugins/transform/launch_contract.ts` | deleting `handoff.ts` moved the coupling but did not fully partition it; evaluate/postflight still reaches through transform launch internals for replay, diagnostics, and framework-owned output policy. | stage modules must bind through owning surfaces: transform launch, product-materialization observation/replay, evaluate/postflight diagnostics, and effects. Cross-stage `__handoff*` aliases are compatibility debt. | fixed: `__handoff` source grep is clean and `test:t184` enforces it |
+| LD-006 | source trace: `operator/plugins/evaluate/postflight.ts` imports `__handoffEvaluate*`, `__handoffResolveProductMaterializationReplay`, and `__handoffInstalledOperatorOwnsEvaluationOutput` from `operator/plugins/transform/launch_contract.ts` | deleting `handoff.ts` moved the coupling but did not fully partition it; evaluate/postflight still reaches through transform launch internals for replay, diagnostics, and framework-owned output policy. | stage modules must bind through owning surfaces: transform launch, product-materialization observation/replay, evaluate/postflight diagnostics, and effects. Cross-stage `__handoff*` aliases are old-stage debt. | fixed: `__handoff` source grep is clean and `test:t184` enforces it |
 | LD-007 | source trace: `operator/component_depth_register.ts` `fencedComponentDepthCandidates(...)` and `jsonCandidates(...)` | component-depth admission still accepts fenced JSON blocks when whole-file JSON parsing fails. That can preserve the stale-structured-carrier-under-fresh-prose failure pattern T-183 was meant to delete. | semantic component-depth rows must come from selected `evaluate.C/F_P` content register or explicit project authority, then be admitted as exact carrier truth; Markdown/fenced bridge parsing cannot satisfy authority. | fixed: fenced bridge removed; `test:t183` now rejects fenced component-depth carriers |
 | LD-008 | source trace: `operator/traversal_consequence.ts` `legacyReplayOnlyCompositionIdentityForInput(...)`; design acceptance at `ODD_SDLC_TYPESCRIPT_ABG_3_9_RC3_COMPUTE_STAGE_BOUNDARY.md` says synthesized identity fails closed | closure and next-action projections can still fall back to locally synthesized selected composition identity when no ABG-selected identity is supplied. | live runtime closure must preserve ABG-selected `abg.fn_composition` ref/digest/selection/regime identity; replay fixture support must not be reachable from live closure. | fixed: selected composition is required in closure/next-action constructors; legacy fallback removed |
 | LD-009 | source trace: `operator/work_category_governance.ts` `TARGET_ASSET_GOVERNANCE_CATEGORY` and `target_asset_catalog_fallback` | prompt governance category can be selected from a target-asset fallback map when the graph/function catalog has no entry. This is a second categorization surface beside the graph catalog. | live edge work-category governance should come from graph/function catalog truth; target fallback is at most a migration diagnostic or test fixture behavior. | fixed: target-asset fallback removed; graph/function catalog is required |
 | LD-010 | source trace: `operator/index.ts` still exports `writeInstalledOperatorOwnedEvaluationArtifact`; `test_t184_handoff_partition_boundary.test.mjs` imports it as public API | the framework-owned product-surface writer is still a public operator API and is currently blessed by T-184 tests. | product-surface projection/materialization should be selected by the edge-output projection surface, not a public helper named for installed-operator ownership. | fixed: old public writer export removed; tests consume shared edge-output policy |
-| LD-011 | source trace: `operator/plugins/transform/launch_contract.ts` `componentDepthFieldSetForTarget(...)`, `compactComponentDepthDirective(...)`, and target-specific outcome directives | node/asset-specific prompt semantics still live inside the generic transform launch contract, including stale repair-schedule instructions as prose. | Live product-law gap: prompt-bearing edges must flow through declared prompt contexts and selected edge/node pressure, not a separate prompt-template authority surface inside generic transform launch code. Generic launch should package declared pressure and bounded archive refs, not own semantic target rules or dump forensic packages into worker prompts. | open: move per-target directives into `operator/nodes/*`, graph/node pressure modules, or catalog-backed prompt fragments; add source proof that `launch_contract.ts` has no semantic target switch and no prompt-owned repair schedule constitution |
+| LD-011 | source trace: `operator/plugins/transform/launch_contract.ts` `componentDepthFieldSetForTarget(...)`, `compactComponentDepthDirective(...)`, and target-specific outcome directives | node/asset-specific prompt semantics still lived inside the generic transform launch contract, including stale repair-schedule instructions as prose. | Live product-law gap: prompt-bearing edges must flow through declared prompt contexts and selected edge/node pressure, not a separate prompt-template authority surface inside generic transform launch code. Generic launch should package declared pressure and bounded archive refs, not own semantic target rules or dump forensic packages into worker prompts. | code complete / proof pending: target-specific outcome directives moved to `operator/plugins/transform/prompt_edge_policy.ts`, and `launch_contract.ts` now packages admitted manifest/brief context and calls that prompt-policy surface; verification must add or refresh source proof so semantic target switches do not return to generic launch |
 | LD-012 | source trace: `operator/plugins/transform/launch_contract.ts` `ensureObservedTransformOutput(...)` writes `manifest.outputFile` when it is missing | if a worker materializes files but omits the contracted transform artifact, F_D can synthesize an output artifact from observed filesystem state. | transform output candidates belong to `transform.C`; F_D materialization observation may write diagnostics but must not substitute the transform artifact. | fixed: synthesis helper deleted; missing output artifact is not replaced |
 | LD-013 | source trace: `operator/installed_operator.ts` `writeInstalledOperatorNoDispatchArtifact(...)` and `noDispatchReport(...)` | no-dispatch edges can synthesize markdown output and worker-result reports under installed-operator authority. | no-dispatch is a declared projection/qualification policy, not a special installed-operator product writer. It must route through the same generic edge-output projection surface as every other A -> B edge. | fixed for product output: no-dispatch artifact writer deleted; dispatch writes only a pending system-projection report and consequence.C writes the declared projection output |
 | LD-014 | source trace: `operator/review_grade_edge_fulfillment.ts` `frameworkOwnedEvaluationTarget(...)`; compare `operator/plugins/transform/launch_contract.ts` `installedOperatorOwnsEvaluationOutput(...)` | framework-owned target sets are duplicated in separate modules, so review-grade requirement policy can drift from output-writer policy. | one edge-output policy surface must say whether an edge is worker-authored, evaluator-authored, projection-only, review-grade-required, or no-close. | partial: operator decisions consume `edge_output_policy.ts`; remaining duplicate lives in `contracts/product_graph_contract_catalog.ts` and should be moved to a pure contract-level policy |
 | LD-015 | source trace: `operator/installed_operator.ts` `fpDispatchPluginContract()`, `fpEvaluatorPluginContract()`, `designDepthFpEvaluatorPrompt(...)`, and `reviewGradeEdgeFulfillmentPrompt(...)` | `installed_operator.ts` owned plugin contracts and evaluator prompts instead of consuming a plugin-set boundary from `operator/plugins/*`. | installed operator should bind ABG to declared plugin modules; F_P evaluator prompts and rule contracts belong to `plugins/evaluate/*`, not the runtime loop file. | fixed: `createSdlcAbgPluginSet(...)` constructs ABG plugin/rule metadata from plugin modules, contracts live in `plugins/plugin_contracts.ts`, prompts live in `plugins/evaluate/prompts.ts`, and focused T-184 source proof rejects those definitions in `installed_operator.ts` |
 | LD-016 | source trace: `operator/assurance_gate.ts` formerly built materialization, shallow-realization, capability, obligation, component-depth, design-completeness, requirement-closure, and carry ledgers, then marked them diagnostic-only | even diagnostic-only F_D ledgers looked like a second semantic judgment surface that could be accidentally promoted again. | F_D may admit/write system artifacts and refs only; semantic adequacy judgment belongs to selected `evaluate.C/F_P` output and consequence closure. | fixed: runtime assurance ledger construction is purged, `assurance_ledgers.json` is no longer written or cataloged, and `test:t183` proves the runtime gate cannot construct/fold assurance ledgers |
 | LD-017 | source trace: `operator/installed_operator.ts` `workerReportAdmissionPostflight(...)` and `deterministicReportAdmissionPostflight(...)` returned `status: "blocked"` using `legacyBlockingReasonCode(...)` | deterministic report/admission failures looked like postflight closure blockers in the runtime state shape. | malformed reports are system contract diagnostics or ABG admission failures; they must not be confused with product semantic block/retry authority. | fixed: report admission postflight now has `status: "diagnostic"`, empty `blockingReasons`, `operator_blocked` carrier metadata, and the dispatch stop ref is the consequence next-action projection with `contract_failure` runtime artifact |
-| LD-018 | source trace: `build_tenants/typescript/test_env/tests/test_t184_handoff_partition_boundary.test.mjs` imports `writeInstalledOperatorOwnedEvaluationArtifact`; older tests such as `test_t076...` and `test_t120...` embed fenced `component_depth_register` blocks | some tests still prove compatibility with the very surfaces T-184 is deleting. | tests are proof surfaces; if they require legacy interfaces, the legacy interface remains alive. Refactor to production-path fixtures or delete redundant tests. | fixed for focused proof: `test:t184` rejects old public writer imports and `test:t183` rejects fenced component-depth bridges; broader legacy fixture sweep remains in LD-019 if future full suite exposes more |
+| LD-018 | source trace: `build_tenants/typescript/test_env/tests/test_t184_handoff_partition_boundary.test.mjs` imports `writeInstalledOperatorOwnedEvaluationArtifact`; older tests such as `test_t076...` and `test_t120...` embed fenced `component_depth_register` blocks | some tests still accept the very surfaces T-184 is deleting. | tests are proof surfaces; if they require legacy interfaces, the legacy interface remains alive. Refactor to production-path fixtures or delete redundant tests. | fixed for focused proof: `test:t184` rejects old public writer imports and `test:t183` rejects fenced component-depth bridges; broader legacy fixture sweep remains in LD-019 if future full suite exposes more |
 | LD-019 | source/test audit after deleting fenced component-depth admission | other historical tests may still carry legacy fenced component-depth fixtures even if focused T-183/T-184 proof is now corrected. | stale tests must be refactored to exact carriers or deleted when discovered; no test may keep a deleted authority path alive. | open watch item: run broader semantic suite before ticket closure and update/delete any stale fixture that fails due to the intended bridge removal |
 | LD-020 | data-mapper live trace `20260526T131037710Z_pid64804`, retry run `20260526T132002672Z_pid64999`; source trace `operator/plugins/transform/launch_contract.ts` retry instructions | retry prompt called selected review-grade residual pressure a "prior deterministic defect" even though the retry came from `evaluate.C/F_P`. | prompt language is part of the authority boundary; F_D diagnostics can write facts, but retry work queues are evaluated residual pressure from selected evaluation/consequence truth. | fixed: shared retry instruction now says "evaluated residual pressure" and `npm run build:semantic` passes after the patch |
 | LD-021 | data-mapper live trace `20260526T131037710Z_pid64804`, design-depth evaluator retry runs `20260526T165603084Z_pid20915`, `20260526T172204812Z_pid20915`, `20260527T044320358Z_pid46689`, and `20260527T050000015Z_pid51394` | design-depth `evaluate.C/F_P` spent the old 15-minute timeout in hidden register construction and never wrote `design_depth_fp_evaluator_content_register.json`; prompt-only fragment instructions still allowed hidden thinking after the first reads; an empty draft register proved observable but still left the model constructing a full write in hidden thought. | the evaluate content register is the F_D admission/write interface; F_D may pre-create nonprojectable draft rows, agents convert those rows incrementally into semantic fragment rows, and F_D assembles only admitted non-draft fragment rows into the register projection after preserving selected composition identity. | fixed locally: nonprojectable `sdlc_design_depth_register_fragment_draft` rows are seeded for every section, `sdlc_design_depth_register_fragment` rows are admitted/projected only when all sections are present and row refs are non-draft, and the prompt now instructs plan plus incremental conversion; covered by `test:t181` and `test:t184`; final full data-mapper completion still needs rerun |
@@ -293,7 +333,7 @@ or duplicate surface discovered during the live run is tracked here.
 | LD-038 | same clean data-mapper sandbox `t164_data_mapper_full_capability_live/20260528T170316953Z_pid29551`, implementation-design runs `20260528T193047558Z_pid29713`, `20260528T194036149Z_pid76473`, `20260528T194947208Z_pid49363`, and `20260528T200633745Z_pid74646`; compare `design_depth_fp_evaluator_content_register.json`, `design_depth_fp_evaluator_stdout.log`, and `design_depth_fp_evaluator_process_events.jsonl` | LD-031's first-update prompt fix converted draft rows, but the evaluator then printed ADR section/table dumps and spent hidden time in full-register or multi-table extraction without another durable section write. The content register remained 12 fragment rows with only `designCompletenessVerdict` non-empty. | first-write visibility is necessary but not sufficient. The evaluate.C/F_P content-register interface must expose incremental semantic progress, but product law does not permit F_D prompt text to prescribe ADR-table semantic extraction as the evaluator method. | reopened into T-187: the exact second-update command is not accepted as a final fix. It must be removed or replaced by a lawful compact prompt/helper boundary that preserves F_P semantic judgment and F_D carrier/admission mechanics. |
 | LD-039 | same clean data-mapper sandbox `t164_data_mapper_full_capability_live/20260528T170316953Z_pid29551`, component-test runs `20260528T231248281Z_pid4831`, `20260528T233548721Z_pid64985`, and retry `20260528T235331869Z_pid64985`; compare `product_materialization_manifest.json`, `postflight.json`, and `review_grade_edge_fulfillment_assessment.json` | the first component-test attempt materialized 25 ScalaTest files under module-local `src/test/scala/...` paths, but product-materialization observation classified them as `other`, so postflight emitted `materialized_product_role_missing:test`. The same-sandbox retry then saw those test files as unchanged and reused the stale prior `other` replay rows, suppressing current path-based `test` role inference. Review-grade correctly blocked because the framework materializedFiles surface contained only build config, despite valid test files existing in the workspace. | same-edge retry must be able to recover from stale framework classification without requiring the agent to rewrite every product file. Prior replay rows are evidence, not stronger than the current materialization contract; if a prior row role does not satisfy the current required role, observation must fall through to current path/contract inference. | fixed locally and staged into the same sandbox install: component-test observation infers required `test` role from module-local `src/test` paths, and stale exact/path replay rows with non-required roles no longer suppress current required-role inference. Covered by `test_t066_product_materialization_contract.test.mjs` T-184 tests. Resume `20260528T235616980Z_pid16678` is the live proof attempt. |
 | LD-040 | same clean data-mapper sandbox `t164_data_mapper_full_capability_live/20260528T170316953Z_pid29551`, component-test retry `20260528T233548721Z_pid64985`; compare `worker_result_report.json`, `product_materialization_manifest.json`, and prior manifest `20260528T231248281Z_pid4831/product_materialization_manifest.json` | materialization replay was skipped when the current attempt materialized only declared build-config files because `materializationReplayIsNeeded(...)` treated satisfied declared targets as sufficient and did not also enforce `requiredRoles: ["test"]`. The manifest therefore wrote only three build-config rows and no replay metadata, even though prior same-edge materialization existed and the current product contract still required test evidence. | declared target satisfaction and required product roles are conjunctive admission pressure. A build/config target cannot satisfy a required `test` role, and replay must remain available when current transform output omits required-role materialization already present in prior same-edge state. | fixed locally and staged into the same sandbox install: replay eligibility now checks missing `requiredRoles` even when declared target contracts exist. Covered by `test_t066_product_materialization_contract.test.mjs` T-184 replay test. Resume `20260528T235616980Z_pid16678` is the live proof attempt. |
-| LD-041 | same clean data-mapper sandbox `t164_data_mapper_full_capability_live/20260528T170316953Z_pid29551`, test-execution-result runs `20260529T000433786Z_pid16678`, `20260529T000522061Z_pid16678`, `20260529T000551698Z_pid16678`, `20260529T000621617Z_pid16678`, and `20260529T000651403Z_pid16678`; compare `worker_result_report.json`, `sdlc_edge_closure_decision.json`, and `runtime_events.json` | the ABG re-entry primitive was working: every retry emitted `graph_span_evaluation_scheduled -> graph_span_assessed -> graph_span_foldback_evaluated -> graph_reentry_planned -> graph_reentry_applied`, which backs replay up to the selected edge. The edge still looped until retry guard exhaustion because `derive_test_execution_result_surface` was treated as a pending consequence projection: postflight and evaluate ran before the installed test shards wrote `sdlc_worker_execution_evidence`, so every clean same-edge reprocess observed `executionEvidence: null` and selected `test_execution_evidence_missing`. | test execution evidence is the transform/system-admission result for this no-dispatch edge, not a pure consequence read model. The test command must run and write admitted `sdlc_worker_execution_evidence` before postflight/evaluate/consequence; consequence projection may remain idempotent but must not be the first writer for this target. | fixed locally: the no-dispatch installed path special-cases `test_execution_result_surface`, runs `writeTestExecutionResultSystemTransformOutput(...)` before postflight, builds the worker report from the admitted output, and leaves the consequence projection idempotent. Covered by `npm run build:semantic`, `test_t172_edge_accounting.test.mjs`, and `test_t184_handoff_partition_boundary.test.mjs`. Patch is being staged into the same sandbox install for resume. |
+| LD-041 | same clean data-mapper sandbox `t164_data_mapper_full_capability_live/20260528T170316953Z_pid29551`, test-execution-result runs `20260529T000433786Z_pid16678`, `20260529T000522061Z_pid16678`, `20260529T000551698Z_pid16678`, `20260529T000621617Z_pid16678`, and `20260529T000651403Z_pid16678`; compare `worker_result_report.json`, `sdlc_edge_closure_decision.json`, and `runtime_events.json` | the ABG re-entry primitive was working: every retry emitted `graph_span_evaluation_scheduled -> graph_span_assessed -> graph_span_foldback_evaluated -> graph_reentry_planned -> graph_reentry_applied`, which backs replay up to the selected edge. The edge still looped until retry guard exhaustion because `derive_test_execution_result_surface` was treated as a pending consequence projection: postflight and evaluate ran before the installed test shards wrote `sdlc_worker_execution_evidence`, so every clean same-edge reprocess observed `executionEvidence: null` and selected `test_execution_evidence_missing`. | test execution evidence is the transform/system-admission result for this no-dispatch edge, not a pure consequence read model. The test command must run and write admitted `sdlc_worker_execution_evidence` before postflight/evaluate/consequence; consequence projection may remain idempotent but must not be the first writer for this target. | fixed and live-proven for the reduced overlay: the no-dispatch installed path special-cases `test_execution_result_surface`, runs `writeTestExecutionResultSystemTransformOutput(...)` before postflight, builds the worker report from the admitted output, and leaves the consequence projection idempotent. Reduced-overlay live scenario contracts require the component-code, test-preparation, and test-execution-result edges before the harness may stop, so product-file-only materialization cannot satisfy live proof. `npm run test:t160:hello-world-rust-lite-live` passed on 2026-06-09 at `build_tenants/typescript/test_env/test_runs/scenario_t160_hello_world_rust_lite_live/20260608T200640297Z_pid99396`: `derive_test_execution_result_surface` wrote `sdlc_worker_execution_evidence` with `command: "cargo run --quiet"`, `testsObserved: 1`, `passedCount: 1`, and stdout `Hello, world!`. Fresh data-mapper run remains pending for H-140. |
 | LD-042 | source trace after 2026-05-31 prompt-boundary review: `operator/plugins/evaluate/prompts.ts` exact Node command blocks and `test_t181_fp_evaluator_design_register.test.mjs` exact prompt assertions | the design-depth evaluator prompt carried kilobytes of framework-authored Node.js, including a semantic ADR-table extraction recipe, and tests blessed exact prompt snippets as proof. This came from the pre-T-185 T-181/T-183/T-184 evaluator-register reliability path, not from T-185 subworkstreams. | Prompt-bearing generic edges carry admitted refs, scope, schema, and pressure; they do not own a separate prompt-template constitution. F_D may make F_P cheaper and more observable, but it cannot stand in for semantic evaluation by prescribing row derivation through prompt scripts. | fixed under T-187 deterministic proof: exact Node recipes are gone; first-update mechanics cite a named authority-neutral helper contract; focused T-181/T-184/T-187 proof passes. Data-mapper gate proof remains blocked until T-187 JS hello-world proof is accepted. |
 
 ## Current Root-Cause Note
@@ -341,6 +381,40 @@ recreate the authority violation T-184 is deleting.
 
 ## Current Verification
 
+- 2026-06-09 functional completion gate:
+  - `npm run build:semantic`: pass.
+  - `npm run test:t184`: pass, 21/21.
+  - `npm run test:t160`: pass, 25/25.
+  - `npm run test:t194`: pass, 3/3; current TypeScript graph and prompt
+    plugin surfaces pass ABG `typecheckGtlProgram(...)`.
+  - `node --test test_env/sandbox/test_scenario_sandbox.test.mjs`: pass, 32
+    non-live descriptor tests, 10 opt-in live tests skipped; includes
+    graph-edge-owned execution-evidence assertion.
+  - `node --test
+    test_env/tests/test_t187_fp_evaluator_prompt_boundary.test.mjs
+    test_env/tests/test_t143_product_materialization_authority_targets.test.mjs
+    test_env/tests/test_t168_design_consumer_test_pipeline.test.mjs`: pass,
+    74/74; includes the regression that bare runner labels such as `cargo`
+    remain `testExecutionContract: "undeclared"`.
+  - `npm run lint:semantic`: pass.
+  - `npm run lint:test-harness`: pass.
+  - `npm run test:semantic`: pass, 944/944.
+  - `git diff --check`: pass.
+- 2026-06-09 live reduced-overlay Rust proof:
+  `npm run test:t160:hello-world-rust-lite-live` passed, 1/1, in
+  998,881.968292 ms. Archive:
+  `build_tenants/typescript/test_env/test_runs/scenario_t160_hello_world_rust_lite_live/20260609T022620726Z_pid53618`.
+  The scenario contract enforced the lite overlay prefix
+  `derive_lite_design_adr_surface -> derive_lite_component_code_surface ->
+  prepare_test_execution_surface -> derive_test_execution_result_surface`; the
+  required runtime edges observed in the archive were
+  `derive_lite_component_code_surface`, `prepare_test_execution_surface`, and
+  `derive_test_execution_result_surface`, each with closure `close` and zero
+  residual pressure, followed by overlay close.
+  The final edge wrote graph-owned `sdlc_worker_execution_evidence` at
+  `.ai-workspace/runtime/odd_sdlc/assets/20260609T024258920Z_pid53618/test_execution_result_surface.md`
+  with `command: "cargo run --quiet"`, `testsObserved: 1`, `passedCount: 1`,
+  `failedCount: 0`, and stdout `Hello, world!`.
 - `npm run build:semantic` plus focused
   `test_t181_fp_evaluator_design_register.test.mjs`,
   `test_t184_handoff_partition_boundary.test.mjs`,
@@ -531,12 +605,12 @@ recreate the authority violation T-184 is deleting.
 - `npm run lint:semantic`: pass
 - `npm run lint:test-harness`: pass
 - `git diff --check`: pass
-- `npm run test:t180`: pass after the ABG rc.5 substrate update; current file
-  is `test_t180_abg_3_9_current_staged_compute_boundary.test.mjs`
-- `npm run test:t059`: pass after the ABG rc.5 install adapter update
+- `npm run test:t180`: pass after the ABG rc.4 substrate update; current file
+  is `test_t180_abg_4_current_staged_compute_boundary.test.mjs`
+- `npm run test:t059`: pass after the ABG rc.4 install adapter update
 - `npm run build:semantic && node --test
   test_env/tests/test_t028_abiogenesis_substrate_binding.test.mjs`: pass after
-  the ABG rc.5 substrate binding update
+  the ABG rc.4 substrate binding update
 - `npm run test:semantic`: pass, 799 tests, after stale F_D direct-block /
   materialization fixtures were refactored or deleted without restoring F_D
   semantic authority
@@ -573,7 +647,7 @@ recreate the authority violation T-184 is deleting.
   `test_t138_traversal_consequence_replayability.test.mjs`,
   `test_t139_public_gaps_read_only_evaluator_view.test.mjs`,
   `test_t141_gtl_transform_boundary.test.mjs` through the selected
-  composition fixture band, and `test_t180_abg_3_9_current_staged_compute_boundary.test.mjs`
+  composition fixture band, and `test_t180_abg_4_current_staged_compute_boundary.test.mjs`
   now pass under the current evaluate/consequence authority model. Tests that
   only preserved deleted F_D direct-block/materialization authority were
   deleted or rewritten.
@@ -585,14 +659,14 @@ Product-law closure requires the code to match ABG and odd_sdlc
 
 - [x] `handoff.ts` has no public exports and is deleted or empty.
 - [x] `operator/index.ts` no longer re-exports from `./handoff.js`.
-- [ ] `plugins/transform/launch_contract.ts` no longer owns cross-stage result
+- [x] `plugins/transform/launch_contract.ts` no longer owns cross-stage result
   projection, postflight/gap dossier, repair re-entry, execution evidence, or
   evaluate-adjacent helper exports.
 - [x] `.ai-workspace` runtime event persistence calls ABG `emit(...)` before
   appending to the installed event stream.
 - [x] `operator/event_store.ts` does not sort, de-duplicate, rewrite, or project
   replay order from the canonical event archive.
-- [ ] Per-target prompt semantics are declared by node/edge pressure or catalog
+- [x] Per-target prompt semantics are declared by node/edge pressure or catalog
   prompt-context surfaces, not by semantic target switches in
   `plugins/transform/launch_contract.ts`.
 - [x] No framework helper writes a transform output because a worker omitted it.
@@ -601,8 +675,8 @@ Product-law closure requires the code to match ABG and odd_sdlc
   `observeProductMaterializationDelta*` do not write.
 - [x] Product-materialization observation/replay/manifest code lives under
   `operator/product_materialization/*` rather than
-  `plugins/transform/launch_contract.ts`; `launch_contract.ts` keeps adapter
-  wrappers only for existing public imports.
+  `plugins/transform/launch_contract.ts`; public imports route through the
+  product-materialization modules directly.
 - [x] `installed_operator.ts` does not define plugin contracts, evaluator
   prompts, evaluation rules, or plugin-set construction; it imports those from
   `operator/plugins/*`, consequence, or system modules.
@@ -621,12 +695,9 @@ Product-law closure requires the code to match ABG and odd_sdlc
 - [x] `npm run build:semantic` passes.
 - [x] `npm run test:t183` passes.
 - [x] `npm run test:t184` exists and passes.
-- [x] `npm run test:t180` passes against the current ABG rc.5 substrate.
+- [x] `npm run test:t180` passes against the current ABG rc.4 substrate.
 - [x] `npm run lint:semantic` passes.
-- [ ] `git diff --check` passes for the whole dirty worktree. Current scoped
-  T-184 cleanup diff check passes, but full worktree check is blocked by
-  unrelated trailing whitespace in
-  `.ai-workspace/comments/jim/20260509_graphfunctions_odd`.
+- [x] `git diff --check` passes for the whole dirty worktree.
 - [x] JS hello-world live is clean.
 - [x] Rust server hello-world live is clean.
 - [x] Full semantic suite passes, or every remaining failure is ticketed as a
@@ -637,7 +708,7 @@ Product-law closure requires the code to match ABG and odd_sdlc
 ## Non-Goals
 
 - Do not rename GTL/ABG carriers.
-- Do not add compatibility layers for old `handoff.ts` imports.
+- Do not add old-import adapters for `handoff.ts`.
 - Do not reintroduce deterministic semantic register population.
 - Do not add JS/Rust/Scala/Python/data-mapper-specific logic to generic SDLC.
 - Do not change the ABG runner contract unless a separate ABG ticket requires

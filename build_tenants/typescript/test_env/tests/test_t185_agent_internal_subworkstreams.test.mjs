@@ -85,7 +85,12 @@ function makeWorkspace() {
       "# Requirements",
       "",
       "REQ-T185-001: Map source rows into normalized target rows.",
-      "REQ-T185-002: Keep ingestion and mapping responsibilities separately traceable."
+      "REQ-T185-002: Keep ingestion and mapping responsibilities separately traceable.",
+      "REQ-T185-003: Preserve ingestion parser errors as typed diagnostics.",
+      "REQ-T185-004: Materialize mapping transforms behind a stable module boundary.",
+      "REQ-T185-005: Keep generated source paths under the tenant output root.",
+      "REQ-T185-006: Cite requirement lineage for every generated component.",
+      "REQ-T185-007: Carry unresolved evidence gaps without closing the edge."
     ].join("\n"),
     "utf8"
   );
@@ -392,7 +397,7 @@ test("T-185 design proof records execution authority, IACS, and DAG reconciliati
   const computeStageDesign = readFileSync(
     tenantFile(
       "design",
-      "ODD_SDLC_TYPESCRIPT_ABG_3_9_RC3_COMPUTE_STAGE_BOUNDARY.md"
+      "ODD_SDLC_TYPESCRIPT_STAGED_COMPUTE_BOUNDARY.md"
     ),
     "utf8"
   );

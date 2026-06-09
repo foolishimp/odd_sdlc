@@ -17,19 +17,23 @@ import {
   constructSdlcNextActionProjection,
   constructSdlcOverlaySegmentCompletion,
   constructSdlcTraversalOverlayCatalog,
+  deriveSdlcPostActionOverlayReentryActionInput,
   deriveSdlcEdgeClosureDecision,
   deriveSdlcWorkspaceIngressReport,
   FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE,
   FG_CONFORM_PROJECT,
+  FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
   FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
   FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
+  FG_PREPARE_TEST_EXECUTION_SURFACE,
   FG_SOLUTION_ARCHITECTURE_EXECUTIVE,
   projectSdlcQueryDomain,
   projectSdlcWorkerAttachment,
   publicSdlcOverlayStartTargets,
   publicStartOnce,
+  sdlcTraversalOverlayFailureReentryRoute,
   SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF,
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
   SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
@@ -112,9 +116,22 @@ test("T-160 publishes governed traversal overlays with boundary refs", () => {
     for (const template of overlay.assetTemplates) {
       assert.equal(template.kind, "sdlc_overlay_asset_template");
       assert.match(template.templateRef, /^overlay:\/\/odd-sdlc\//);
-      assert.equal(template.terminalRole, "terminal_asset");
+      assert.doesNotMatch(
+        template.defaultPath,
+        /hello_world_javascript/u,
+        `${overlay.overlayRef} ${template.assetType}`
+      );
+      assert(
+        ["terminal_asset", "supporting_asset"].includes(template.terminalRole)
+      );
       assert(overlay.graphFunctionRefs.includes(template.producerGraphFunctionRef));
     }
+    assert(
+      overlay.assetTemplates.some(
+        (template) => template.terminalRole === "terminal_asset"
+      ),
+      overlay.overlayRef
+    );
     assert.equal(
       overlay.graphFunctionRefs.some((ref) => ref.startsWith("graph-function:")),
       false,
@@ -160,24 +177,104 @@ test("T-160 lite overlay terminates on a bounded implementation edge", () => {
     graph.vectors.map((vector) => vector.name),
     [
       FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
-      FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+      FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+      FG_PREPARE_TEST_EXECUTION_SURFACE,
+      FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
     ]
   );
-  assert.equal(finalVector.name, FG_DERIVE_LITE_COMPONENT_CODE_SURFACE);
-  assert.equal(finalVector.target.name, "component_code_surface");
+  assert.equal(finalVector.name, FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE);
+  assert.equal(finalVector.target.name, "test_execution_result_surface");
   assert.deepStrictEqual(
-    finalVector.source.map((node) => node.name),
+    graph.vectors[1].source.map((node) => node.name),
     ["implementation_design_surface"]
   );
   assert.equal(
-    finalVector.source.some((node) =>
+    graph.vectors[1].source.some((node) =>
       node.name !== "implementation_design_surface"
     ),
     false
   );
 });
 
-test("T-160 framework-smoke Min(F_P) overlay terminates on component-code edge", () => {
+test("T-160 reduced implementation overlays publish tenant-neutral code and test assets", () => {
+  const module = constructSdlcGtlModule();
+  const catalog = constructSdlcTraversalOverlayCatalog({ module });
+  for (const overlayRef of [
+    SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
+    SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF
+  ]) {
+    const overlay = catalog.overlays.find(
+      (candidate) => candidate.overlayRef === overlayRef
+    );
+    assert(overlay, overlayRef);
+    const templates = new Map(
+      overlay.assetTemplates.map((template) => [template.assetType, template])
+    );
+
+    assert.deepStrictEqual(
+      [...templates.keys()].sort(),
+      [
+        "component_code_surface",
+        "implementation_design_surface",
+        "test_execution_result_surface",
+        "test_execution_surface"
+      ].sort(),
+      overlayRef
+    );
+    assert.equal(
+      templates.get("component_code_surface")?.defaultPath,
+      "design/component_code_surface.md",
+      overlayRef
+    );
+    assert.equal(
+      templates.get("implementation_design_surface")?.producerGraphFunctionRef,
+      FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+      overlayRef
+    );
+    assert.equal(
+      templates.get("test_execution_surface")?.producerGraphFunctionRef,
+      FG_PREPARE_TEST_EXECUTION_SURFACE,
+      overlayRef
+    );
+    assert.equal(
+      templates.get("test_execution_result_surface")?.producerGraphFunctionRef,
+      FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
+      overlayRef
+    );
+    assert.equal(
+      templates.get("test_execution_result_surface")?.terminalRole,
+      "terminal_asset",
+      overlayRef
+    );
+  }
+});
+
+test("T-160 lite overlay routes failed test execution back to component code", () => {
+  const module = constructSdlcGtlModule();
+  const catalog = constructSdlcTraversalOverlayCatalog({ module });
+  const overlay = catalog.overlays.find(
+    (candidate) =>
+      candidate.overlayRef === SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
+  );
+  assert(overlay);
+
+  const route = sdlcTraversalOverlayFailureReentryRoute({
+    overlay,
+    completedGraphVectorRef: FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
+    closureDisposition: "repair"
+  });
+
+  assert(route);
+  assert.equal(route.sourceGraphVectorName, FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE);
+  assert.equal(route.targetGraphVectorName, FG_DERIVE_LITE_COMPONENT_CODE_SURFACE);
+  assert.deepEqual(route.closureDispositions, ["repair"]);
+  assert(
+    route.reasonRefs.some((ref) => ref.includes("test-execution-failed")),
+    route.reasonRefs.join("\n")
+  );
+});
+
+test("T-160 framework-smoke Min(F_P) overlay terminates on test execution proof", () => {
   const module = constructSdlcGtlModule();
   const frameworkSmokeExecutive = module.graphFunctions.find(
     (graphFunction) => graphFunction.name === FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE
@@ -191,11 +288,13 @@ test("T-160 framework-smoke Min(F_P) overlay terminates on component-code edge",
     graph.vectors.map((vector) => vector.name),
     [
       FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
-      FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+      FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+      FG_PREPARE_TEST_EXECUTION_SURFACE,
+      FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
     ]
   );
-  assert.equal(finalVector.name, FG_DERIVE_LITE_COMPONENT_CODE_SURFACE);
-  assert.equal(finalVector.target.name, "component_code_surface");
+  assert.equal(finalVector.name, FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE);
+  assert.equal(finalVector.target.name, "test_execution_result_surface");
 
   const catalog = constructSdlcTraversalOverlayCatalog({ module });
   const overlay = catalog.overlays.find(
@@ -204,11 +303,14 @@ test("T-160 framework-smoke Min(F_P) overlay terminates on component-code edge",
   assert(overlay);
   assert.deepStrictEqual(
     overlay.termination.terminalGraphFunctionRefs,
-    [FG_DERIVE_LITE_COMPONENT_CODE_SURFACE]
+    [FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE]
+  );
+  const terminalTemplate = overlay.assetTemplates.find(
+    (template) => template.terminalRole === "terminal_asset"
   );
   assert.equal(
-    overlay.assetTemplates[0]?.producerGraphFunctionRef,
-    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+    terminalTemplate?.producerGraphFunctionRef,
+    FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
   );
 });
 
@@ -432,6 +534,49 @@ test("T-160 public start admits overlay binding directly for lite traversal", ()
   );
 });
 
+test("T-160 post-action overlay repair selects the lite component-code vector", () => {
+  const { module, queryDomain, conformedProject, workspaceRoot } = startContext();
+  const outcome = publicStartOnce({
+    request: admitSdlcPublicStartRequest({
+      workspaceRoot,
+      target: {
+        kind: "overlay",
+        handle: "lite-design-module-implementation"
+      },
+      until: "blocked",
+      defaultRegime: "F_P"
+    }),
+    module,
+    queryDomain,
+    conformedProject,
+    workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
+  });
+  assert(outcome.executionContract);
+  const graph = materializeGraphFunction(outcome.executionContract.basis.graphFunction);
+  const testExecutionIndex = graph.vectors.findIndex(
+    (vector) => vector.name === FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
+  );
+  assert(testExecutionIndex > 0);
+
+  const action = deriveSdlcPostActionOverlayReentryActionInput({
+    basis: outcome.executionContract.basis,
+    module,
+    overlayRef: SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
+    completedGraphVectorRef: FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
+    closureDecisionDisposition: "repair",
+    currentVectorIndex: testExecutionIndex
+  });
+
+  assert(action);
+  assert.equal(action.actionKind, "reenter_graph_span");
+  assert.equal(action.graphFunctionRef, outcome.executionContract.targetGraphFunction);
+  assert.match(action.graphVectorRef, /derive_lite_component_code_surface/u);
+  assert(
+    action.eligibleReasonRefs.some((ref) => ref.includes("test-execution-failed")),
+    action.eligibleReasonRefs.join("\n")
+  );
+});
+
 test("T-170 hello-world profile selects thread overlay for next start", () => {
   const { module, queryDomain, workspaceRoot } = startContext();
   const conformedProject = conformProjectProfileFromConstraintsText({
@@ -582,10 +727,10 @@ test("T-160 public start binds existing overlay assets as material workspace tru
   const workspaceRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t160-material-"));
   const materialPath = path.join(
     workspaceRoot,
-    "build_tenants/hello_world_javascript/src/hello.js"
+    "design/component_code_surface.md"
   );
   mkdirSync(path.dirname(materialPath), { recursive: true });
-  writeFileSync(materialPath, "console.log('hello');\n", "utf8");
+  writeFileSync(materialPath, "# Component Code Surface\n", "utf8");
   const { module, queryDomain, conformedProject } = startContext(workspaceRoot);
   const outcome = publicStartOnce({
     request: admitSdlcPublicStartRequest({
@@ -611,9 +756,9 @@ test("T-160 public start binds existing overlay assets as material workspace tru
   assert.equal(binding.mode, "material");
   assert.equal(
     binding.relativePath,
-    "build_tenants/hello_world_javascript/src/hello.js"
+    "design/component_code_surface.md"
   );
-  assert(binding.assetRef.endsWith("/build_tenants/hello_world_javascript/src/hello.js"));
+  assert(binding.assetRef.endsWith("/design/component_code_surface.md"));
   assert(
     binding.evidenceRefs.includes(
       outcome.executionContract.overlayBinding.workspaceBasis.preActionWorkspaceObservationRef
@@ -845,7 +990,7 @@ test("T-160 consequence carriers preserve overlay binding identity", () => {
     graphCatalogDigestRef: "graph-catalog-digest://odd-sdlc/t160",
     edgeRef: "edge://odd-sdlc/t160/lite",
     attemptRef: "attempt://odd-sdlc/t160/lite",
-    targetBindingRefs: ["target-binding://odd-sdlc/component_code_surface"],
+    targetBindingRefs: ["target-binding://odd-sdlc/test_execution_result_surface"],
     evidenceBundleRefs: ["evidence://odd-sdlc/t160/lite"],
     counts: {
       expected: 1,
@@ -1036,5 +1181,5 @@ test("T-160 cross-graph repair reentry does not replay already-closed target bas
   assert.match(operatorSource, /function decodedArchiveRefForScope/);
   assert.match(operatorSource, /function replayEventsWithoutDuplicateVectorClosures/);
   assert.match(operatorSource, /replayEventVectorClosureKey/);
-  assert.match(operatorSource, /input\.projected\.priorGapDossiers\.some/);
+  assert.match(operatorSource, /projected\.priorGapDossiers\.some/);
 });

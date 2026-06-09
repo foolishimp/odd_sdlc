@@ -200,7 +200,7 @@ function abgFnCompositionDeclaration(input: {
     hostTargetSchemaRef: input.target.schema.ref,
     standardsContextRefs: Object.freeze(["REQ-L-GTL3-COMPUTE-NOTATION"]),
     policyContextRefs: Object.freeze([
-      "policy://odd-sdlc/abg-3.9-rc3-staged-compute"
+      "policy://odd-sdlc/staged-compute"
     ]),
     carrierContextRefs: Object.freeze([
       "carrier://odd-sdlc/transform-evaluate-consequence"
@@ -301,13 +301,14 @@ function vectorDeclarations(
 function reusableVectorDeclarations(
   entry: SdlcReusableGraphFunctionCatalogEntry,
   traversalStrategyPlan: OddSdlcTraversalStrategyPlanConfig,
-  target: Node
+  target: Node,
+  vectorName: string = entry.name
 ): SerializedAttrs {
   return attrs([
-    abgFnCompositionDeclaration({ name: entry.name, target }),
+    abgFnCompositionDeclaration({ name: vectorName, target }),
     sdlcTargetCarrierDeclarationForTarget({
-      edgeRef: entry.name,
-      targetAssetType: firstOutput(entry),
+      edgeRef: vectorName,
+      targetAssetType: target.name,
       target
     }),
     traversalModulationDeclaration(entry.name, traversalStrategyPlan),
@@ -318,6 +319,14 @@ function reusableVectorDeclarations(
     attr("abg_owned_runtime_truth", stringListValue(entry.abgOwnedRuntimeTruth)),
     attr("sdlc_owned_domain_truth", stringListValue(entry.sdlcOwnedDomainTruth))
   ]);
+}
+
+function reusableVectorNameForTarget(
+  entry: SdlcReusableGraphFunctionCatalogEntry,
+  target: Node,
+  index: number
+): string {
+  return index === 0 ? entry.name : `${entry.name}__${target.name}`;
 }
 
 function graphFunctionForEntry(
@@ -363,40 +372,49 @@ function reusableGraphFunctionForEntry(
 ): GraphFunction {
   const sourceNodes = entry.inputs.map(nodeFor);
   const outputNodes = entry.outputs.map(nodeFor);
-  const primaryTarget = nodeFor(firstOutput(entry));
-  const primaryGraph = edge(sourceNodes, primaryTarget, {
-    id: `vector:odd_sdlc:${entry.name}`,
-    name: entry.name,
-    operators: [BUILDER_OPERATOR],
-    evaluators: [
-      admitEvaluator({
-        name: `${entry.name}_contract_fd`,
-        regime: "F_D",
-        description: `Deterministic contract admission for ${entry.name}.`,
-        binding: `fd://odd_sdlc/library/${entry.name}/contract`,
-        tags: ["library_fd", entry.name]
-      }),
-      admitEvaluator({
-        name: `${entry.name}_configured_fp`,
-        regime: "F_P",
-        description: entry.intent,
-        binding: `fp://odd_sdlc/library/${entry.name}/construct`,
-        tags: ["library_fp", entry.name]
-      })
-    ],
-    contexts: [],
-    rule: null,
-    allowsSubwork: false,
-    declarations: reusableVectorDeclarations(entry, traversalStrategyPlan, primaryTarget),
-    tags: ["odd_sdlc", "reusable_graph_function"]
-  });
-  const vector = firstVector(primaryGraph, entry.name);
+  const vectors = Object.freeze(
+    outputNodes.map((target, index) => {
+      const vectorName = reusableVectorNameForTarget(entry, target, index);
+      const primaryGraph = edge(sourceNodes, target, {
+        id: `vector:odd_sdlc:${vectorName}`,
+        name: vectorName,
+        operators: [BUILDER_OPERATOR],
+        evaluators: [
+          admitEvaluator({
+            name: `${vectorName}_contract_fd`,
+            regime: "F_D",
+            description: `Deterministic contract admission for ${vectorName}.`,
+            binding: `fd://odd_sdlc/library/${vectorName}/contract`,
+            tags: ["library_fd", entry.name, vectorName]
+          }),
+          admitEvaluator({
+            name: `${vectorName}_configured_fp`,
+            regime: "F_P",
+            description: entry.intent,
+            binding: `fp://odd_sdlc/library/${vectorName}/construct`,
+            tags: ["library_fp", entry.name, vectorName]
+          })
+        ],
+        contexts: [],
+        rule: null,
+        allowsSubwork: false,
+        declarations: reusableVectorDeclarations(
+          entry,
+          traversalStrategyPlan,
+          target,
+          vectorName
+        ),
+        tags: ["odd_sdlc", "reusable_graph_function"]
+      });
+      return firstVector(primaryGraph, vectorName);
+    })
+  );
   const graph = Object.freeze({
     name: `${entry.name}_workflow`,
     inputs: sourceNodes,
     outputs: outputNodes,
     nodes: uniqueNodes([...sourceNodes, ...outputNodes]),
-    vectors: Object.freeze([vector]),
+    vectors,
     contexts: Object.freeze([]),
     rules: Object.freeze([]),
     effects: Object.freeze([]),
@@ -598,15 +616,15 @@ export function constructSdlcGraphFunctionCatalog(): SdlcGraphFunctionCatalog {
       }),
       executiveEntry({
         name: FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
-        intent: "Lite traversal from composite implementation design to component implementation.",
+        intent: "Lite traversal from composite implementation design to component implementation and admitted test execution proof.",
         steps: LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE_STEPS,
-        outputs: ["component_code_surface"]
+        outputs: ["test_execution_result_surface"]
       }),
       executiveEntry({
         name: FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
-        intent: "Complexity-admitted Min(F_P) framework-smoke traversal for trivial products with preserved execution pressure.",
+        intent: "Complexity-admitted Min(F_P) framework-smoke traversal for trivial products with preserved execution proof.",
         steps: FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE_STEPS,
-        outputs: ["component_code_surface"]
+        outputs: ["test_execution_result_surface"]
       })
     ])
   });
@@ -638,7 +656,10 @@ export function constructSdlcGtlModule(input: {
     TRIAGE_FUNCTION_CATALOG,
     traversalStrategyPlan
   );
-  const liteExecutiveFunctions = liteFunctions;
+  const liteExecutiveFunctions = Object.freeze([
+    ...liteFunctions,
+    ...bootstrapFunctions
+  ]);
   const bootstrapExecutive = constructExecutive({
     name: "bootstrap_release_self_test",
     intent: "Top-level bootstrap-to-release executive over consolidated implementation and test plan carriers.",
@@ -677,23 +698,23 @@ export function constructSdlcGtlModule(input: {
   });
   const liteDesignModuleImplementationExecutive = constructExecutive({
     name: FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
-    intent: "Lite traversal from composite implementation design to component implementation.",
+    intent: "Lite traversal from composite implementation design to component implementation and admitted test execution proof.",
     functions: functionsByNames(
       liteExecutiveFunctions,
       LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE_STEPS,
       FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE
     ),
-    outputs: ["component_code_surface"]
+    outputs: ["test_execution_result_surface"]
   });
   const frameworkSmokeMinFpExecutive = constructExecutive({
     name: FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
-    intent: "Complexity-admitted Min(F_P) framework-smoke traversal for trivial products with preserved execution pressure.",
+    intent: "Complexity-admitted Min(F_P) framework-smoke traversal for trivial products with preserved execution proof.",
     functions: functionsByNames(
       liteExecutiveFunctions,
       FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE_STEPS,
       FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE
     ),
-    outputs: ["component_code_surface"]
+    outputs: ["test_execution_result_surface"]
   });
   const graphFunctions = Object.freeze([
     ...libraryFunctions,

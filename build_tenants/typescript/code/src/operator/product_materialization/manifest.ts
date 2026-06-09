@@ -2,6 +2,8 @@ import type {
   SdlcWorkerHandoffManifest,
   SdlcWorkerResultReport
 } from "../carriers.js";
+import { resolveProductMaterializationReplay } from "../plugins/transform/result_projection.js";
+import { writeSdlcSystemArtifact } from "../system_artifacts.js";
 
 interface ProductMaterializationManifestDeps {
   readonly resolveProductMaterializationReplay: (input: {
@@ -23,7 +25,7 @@ interface ProductMaterializationManifestDeps {
   }) => string;
 }
 
-export function writeProductMaterializationManifest(
+function writeProductMaterializationManifestWithDeps(
   input: {
     readonly manifest: SdlcWorkerHandoffManifest;
     readonly report: SdlcWorkerResultReport;
@@ -48,4 +50,14 @@ export function writeProductMaterializationManifest(
     payload
   });
   return input.manifest.productMaterialization.manifestFile;
+}
+
+export function writeProductMaterializationManifest(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly report: SdlcWorkerResultReport;
+}): string {
+  return writeProductMaterializationManifestWithDeps(input, {
+    resolveProductMaterializationReplay,
+    writeSdlcSystemArtifact
+  });
 }

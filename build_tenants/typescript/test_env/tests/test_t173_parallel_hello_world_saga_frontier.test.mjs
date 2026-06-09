@@ -70,7 +70,7 @@ function executionBasis() {
       workerId: "worker://synthetic",
       backendId: "backend://node-test",
       buildId: "build://odd-sdlc/t173",
-      resolvedRuntimeRef: "runtime://abg/3.8/saga-frontier"
+      resolvedRuntimeRef: "runtime://abiogenesis/saga-frontier"
     }),
     resolvedPolicy: Object.freeze({
       resolvedPolicyBundleRef: "policy://odd-sdlc/t173/parallel-frontier",
@@ -238,7 +238,7 @@ test("T-173 parallel hello-world declares SDLC topology and ABG executes disjoin
     maxRetryAttempts: 0,
     leaseTtlMs: 10_000,
     resolvedSystemPolicyRefs: [
-      "abg://3.8/event-sourced-saga-frontier",
+      "abg://abiogenesis/event-sourced-saga-frontier",
       traversal.selectionRef
     ]
   });
@@ -453,7 +453,7 @@ test("T-173 four-lane frontier fans out two dev lanes and two test lanes before 
     maxRetryAttempts: 0,
     leaseTtlMs: 10_000,
     resolvedSystemPolicyRefs: [
-      "abg://3.8/event-sourced-saga-frontier",
+      "abg://abiogenesis/event-sourced-saga-frontier",
       traversal.selectionRef
     ]
   });

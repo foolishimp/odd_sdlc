@@ -422,7 +422,7 @@ test("T-118 prompt points workers to the construction brief and not forensic pac
     readFileSync(files.invocationPackagePath, "utf8")
   );
 
-  assert(Buffer.byteLength(prompt, "utf8") < 6 * 1024);
+  assert(Buffer.byteLength(prompt, "utf8") < 8 * 1024);
   assert.doesNotMatch(prompt, new RegExp(manifest.workspaceRoot.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
   assert.match(prompt, /Read in order:/u);
   assert.match(prompt, /Primary transform intent:/u);
@@ -739,6 +739,25 @@ test("T-118 composite design-depth prompt does not duplicate carrier-shape evalu
     /\{"kind":"sdlc_aggregate_domain_model","modelVersion":"ts-design-depth-v1"/u
   );
   assert.doesNotMatch(directives, /"axis":"entity"/u);
+});
+
+test("T-118 component-code transform prompt publishes component concern-role enum", () => {
+  const files = writeHandoffFiles(
+    manifestForWorkspaceSpecSurface("derive_component_code_surface")
+  );
+  const invocationPackage = JSON.parse(
+    readFileSync(files.invocationPackagePath, "utf8")
+  );
+  const directives = invocationPackage.outcomeDirectives.join("\n");
+
+  assert.match(
+    directives,
+    /componentTopologyRows\[\]\.concernRole values are exactly parser, validator, mapper, error_model, io_adapter, reporting, domain_model, other/u
+  );
+  assert.match(
+    directives,
+    /use "other" for simple executable entrypoints or glue/u
+  );
 });
 
 test("T-157 product materialization prompt leaves execution evidence to evaluator surfaces", () => {

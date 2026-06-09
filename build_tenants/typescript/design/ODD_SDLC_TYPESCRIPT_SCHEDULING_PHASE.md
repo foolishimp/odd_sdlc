@@ -33,6 +33,22 @@ test_design_surface
 The schedule is graph state. It is not a ticket, not a manual checklist, and
 not an operator-local loop.
 
+The reduced lite overlay is a proportional projection of this same graph law.
+For hello-world-class traversals it still includes the execution spine:
+
+```text
+derive_component_code_surface
+-> prepare_test_execution_surface
+-> derive_test_execution_result_surface
+```
+
+The lite overlay may reduce breadth, but it may not replace execution proof
+with component-code materialization. `derive_test_execution_result_surface`
+must produce graph-owned `sdlc_worker_execution_evidence` before a lite live
+proof can claim product behavior. The overlay re-entry route for failed test
+execution is declarative selection policy consumed by the installed runtime;
+it is not a harness retry loop.
+
 ## Module Boundary
 
 Scheduling belongs to the `odd_sdlc` domain graph because it names the planned

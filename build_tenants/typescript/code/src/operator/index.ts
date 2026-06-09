@@ -214,39 +214,89 @@ export {
   sha256Text,
   sha256File,
   operatorRunId,
-  reconcileSdlcProductMaterializationAuthority,
-  declaredProductFileTargets,
   assertTraversalIntentPackagePressure,
   deriveWorkerHandoffManifest,
-  componentRepairReentryPlansForGapDossier,
   constructWorkerInvocationPackage,
   constructWorkerBrief,
   constructWorkerConstructionBrief,
   promptForHandoff,
+  promptForHandoffProjection,
   writeHandoffFiles,
-  admitWorkerResultReport,
-  snapshotProductMaterializationRoot,
-  deriveSdlcStagedConstructionAuditCarriers,
-  observeProductMaterializationDelta,
-  buildPostTransformWorkerResultReport,
-  workerResultReportWithReplayedProductMaterialization,
-  workerResultReportWithFpStageRefs,
   sourceAssetAuthorityRefsFromAbgOutputAuthorityProjections,
-  constructWorkerFpTransformResult,
-  writeWorkerFpTransformResult,
-  writeProductMaterializationManifest,
-  gapDossierPathForManifest,
-  constructPostflightGapDossier,
-  writePostflightGapDossier,
-  admitPostflightGapDossier,
-  readPostflightGapDossierRef,
-  constructorResultFromWorkerOutput,
-  readWorkerResultReport,
-  relativeToWorkspace,
-  type SdlcObservedProductFileSnapshot,
-  type SdlcStagedConstructionAuditCarrier,
-  type SdlcProductMaterializationSnapshot
+  relativeToWorkspace
 } from "./plugins/transform/launch_contract.js";
+
+export {
+  declaredProductFileTargets,
+  reconcileSdlcProductMaterializationAuthority
+} from "./product_materialization/authority.js";
+
+export {
+  observeProductMaterializationDelta,
+  snapshotProductMaterializationRoot,
+  type SdlcObservedProductFileSnapshot,
+  type SdlcProductMaterializationSnapshot
+} from "./product_materialization/observation.js";
+
+export {
+  writeProductMaterializationManifest
+} from "./product_materialization/manifest.js";
+
+export {
+  deriveSdlcStagedConstructionAuditCarriers,
+  type SdlcStagedConstructionAuditCarrier
+} from "./product_materialization/staged_authority.js";
+
+export {
+  admitWorkerResultReport,
+  buildPostTransformWorkerResultReport,
+  constructWorkerFpTransformResult,
+  readWorkerResultReport,
+  resolveProductMaterializationReplay,
+  workerResultReportWithFpStageRefs,
+  workerResultReportWithReplayedProductMaterialization,
+  writeWorkerFpTransformResult
+} from "./plugins/transform/result_projection.js";
+
+export {
+  componentRepairReentryPlansForGapDossier
+} from "./plugins/consequence/repair_reentry.js";
+
+export {
+  constructorResultFromWorkerOutput
+} from "./plugins/consequence/constructor_projection.js";
+
+export {
+  admitPostflightGapDossier,
+  constructPostflightGapDossier,
+  gapDossierPathForManifest,
+  readPostflightGapDossierRef,
+  writePostflightGapDossier
+} from "./postflight/gap_dossier.js";
+
+export {
+  SDLC_PROMPT_BOUNDED_FALLBACK_AUTHORITY_KIND_REFS,
+  SDLC_EVALUATION_DIMENSION_SCOPES,
+  SDLC_EVALUATION_GRID_PHYSICAL_EXECUTIONS,
+  SDLC_PROMPT_NORMAL_AUTHORITY_KIND_REFS,
+  SDLC_METHOD_AUTHORITY_COMPRESSION_REFS,
+  SDLC_PROMPT_AUTHORITY_POLICY_ROWS,
+  constructSdlcEvaluationGridContract,
+  constructSdlcPromptInvocationProjection,
+  sdlcPromptAuthorityCompressionFallbackPreconditionRef,
+  sdlcPromptSectionForEvaluationGridContract,
+  sdlcPromptSectionFromLines,
+  type SdlcDisambiguationCarrierRef,
+  type SdlcEvaluationDimensionRef,
+  type SdlcEvaluationDimensionScope,
+  type SdlcEvaluationGridContract,
+  type SdlcEvaluationGridPhysicalExecution,
+  type SdlcTransformUnitRef,
+  type SdlcPromptInvocationAsset,
+  type SdlcPromptAuthorityPolicyRow,
+  type SdlcPromptSectionConstructionInput,
+  type SdlcRenderedPromptProjection
+} from "./prompt_assets.js";
 
 export {
   writeDeclaredEdgeProjectionOutput
@@ -511,7 +561,8 @@ export {
   componentDepthResidualPressureRefs,
   parseComponentRealizationRow,
   parseComponentTopologyRow,
-  parseTestComponentTopologyRow
+  parseTestComponentTopologyRow,
+  SDLC_COMPONENT_DEPTH_REGISTER_CONTRACT_TRACE
 } from "./component_depth_register.js";
 
 export {
@@ -539,6 +590,7 @@ export {
   compactSdlcPriorGapDossiersForRetryContext,
   constructWorkerProcessFailurePostflight,
   deriveSdlcPostCloseOverlayContinuationActionInput,
+  deriveSdlcPostActionOverlayReentryActionInput,
   deriveSdlcPostProductMaterializationActionInput,
   deriveSdlcPostProductMaterializationActionResolution,
   deriveSdlcProductLineageYieldResumeBasis,

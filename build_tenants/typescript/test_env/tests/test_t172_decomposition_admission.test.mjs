@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import {
   SDLC_DEFAULT_DECOMPOSITION_SUMMARY_THRESHOLDS,
   deriveSdlcDecompositionSummary,
+  deriveSdlcStagedImplementationTopologyAuthority,
   selectSdlcDependencyMapTraversal
 } from "../../build/semantic/code/src/index.js";
 
@@ -61,6 +62,61 @@ test("T-172 admits proportional decomposition rows", () => {
   assert.equal(admitted.downstreamPerUpstreamRatio, 2 / 3);
   assert.equal(admitted.admissionDecision, "admit");
   assert.deepEqual(admitted.blockingReasons, []);
+});
+
+test("T-172 implementation topology projects structural boundary refs, not semantic boundary prose", () => {
+  const authority = deriveSdlcStagedImplementationTopologyAuthority({
+    requireTrivialDegenerateProduct: true,
+    register: {
+      kind: "sdlc_design_depth_register",
+      registerVersion: "ts-design-depth-v1",
+      targetAssetType: "implementation_design_surface",
+      implementationModuleRows: [
+        {
+          kind: "sdlc_implementation_module_row",
+          moduleName: "hello_world_javascript",
+          moduleRef: "module://hello-world-javascript"
+        }
+      ],
+      componentTopologyRows: [
+        {
+          kind: "sdlc_component_topology_row",
+          componentId: "hello_world_javascript:hello_entry",
+          moduleName: "hello_world_javascript",
+          relativePath: "build_tenants/hello_world_javascript/src/hello.js",
+          publicBoundary: "stdout Hello, world!",
+          concernRole: "io_adapter",
+          requirementIds: ["REQ-T132-001"],
+          sourceAssetRefs: ["fixture://t172/implementation-design"]
+        }
+      ],
+      componentRealizationRows: [
+        {
+          kind: "sdlc_component_realization_row",
+          componentId: "hello_world_javascript:hello_entry",
+          moduleName: "hello_world_javascript",
+          relativePath: "build_tenants/hello_world_javascript/src/hello.js",
+          publicBoundary: "stdout Hello, world!",
+          trancheId: "tranche-1",
+          firstProductFileToChange:
+            "build_tenants/hello_world_javascript/src/hello.js",
+          upstreamComponentIds: [],
+          requirementIds: ["REQ-T132-001"],
+          sourceAssetRefs: ["fixture://t172/implementation-design"]
+        }
+      ]
+    }
+  });
+
+  assert.equal(authority.summary.admissionDecision, "admit");
+  assert.deepEqual(authority.summary.invalidReferenceFields, []);
+  assert.deepEqual(authority.summary.rows[0].publicBoundaryRefs, [
+    "build_tenants/hello_world_javascript/src/hello.js"
+  ]);
+  assert.equal(
+    authority.summary.rows[0].publicBoundaryRefs.includes("stdout Hello, world!"),
+    false
+  );
 });
 
 test("T-172 rejects high-density downstream rows before materialization", () => {

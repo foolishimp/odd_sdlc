@@ -30,8 +30,11 @@ for the TypeScript line.
 
 The ABIogenesis TypeScript tenant is substrate evidence consumed through
 explicit release snapshots. The current TypeScript line consumes
-`@abiogenesis/typescript-tenant@3.9.0-rc.10` from
-`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.9.0-rc.10/`.
+`@abiogenesis/typescript-tenant@4.0.0-rc.4` from
+`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/latest/`,
+which points at the immutable
+`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.0.0-rc.4/`
+release snapshot.
 That cut proves GTL/ABG carriers, graph-function iteration, traversal probes,
 evented saga-frontier execution, no-compute-basis failure taxonomy,
 bootstrap-lineage slices, selected `abg.fn_composition` identity, canonical
@@ -43,10 +46,61 @@ worker supervision, heartbeat/progress lease separation, trace-visible
 inactivity cleanup, supervisor owner-exit cleanup for interrupted PTY workers,
 and retry-frontier replay that treats zero-attempt stops as evidence rather
 than fake attempt coverage. It also proves ABG's replay-derived runtime
-continuation-transition projection, where typed runtime facts and assurance
-fold outcomes outrank terminal retry fallback evidence. It is not itself
-`odd_sdlc.TS`, and it does not
-complete the SDLC product behavior.
+continuation-transition projection and primitive iteration-outcome projection,
+where typed runtime facts and assurance fold outcomes outrank terminal retry
+fallback evidence. It also proves the GTL Node-borne AssetSurface prompt-asset
+interface consumed by `odd_sdlc.TS`, where prompt asset structure is GTL law and
+SDLC prompt authority policy remains product overlay data. It also proves
+segment-scoped evaluation redispatch metadata, so downstream SDLC evaluation
+can preserve segment, dimension-cell, fold, and relation scope across ABG-owned
+redispatch instead of collapsing deep evaluation coverage back to edge-granular
+fallbacks. It also carries the clean ABG 4.0.0-rc.4 consolidation of the
+defaults/lever registry, temporal runtime-scope consolidation, iteration
+state-action algebra, prompt asset interface, and contract-fulfillment binding
+API that `odd_sdlc.TS` consumes. It also carries the ABG-owned
+`typecheckGtlProgram(...)` static GTL program conformance gate used by
+`odd_sdlc.TS` to typecheck current graph assets, prompt construction, plugin
+contracts, and active substrate identity before runtime execution. It is not
+itself `odd_sdlc.TS`, and it does not complete the SDLC product behavior.
+
+## GTL/ABG Contract-Law Consumption
+
+`odd_sdlc.TS` constitutionally consumes GTL and ABG through the ABG T-153
+contract-law API reload surface:
+
+- `/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/T-153-consolidate-gtl-contract-law-api-requirement-surface.md`
+- `/Users/jim/src/apps/abiogenesis/specification/requirements/gtl/REQ-L-GTL3-CONTRACT-LAW-API.md`
+- `/Users/jim/src/apps/abiogenesis/specification/PRODUCT.md`
+
+Those surfaces are product authority for this TypeScript line. A changed
+`odd_sdlc.TS` graph, graph overlay, prompt asset, target-carrier contract,
+plugin contract, public start, execution-contract declaration, selection or
+re-entry surface, or external tool boundary is constitutional only when it
+traces to either GTL language law or an ABG admission/runtime carrier over GTL
+language. Product-local parsers, prompt prose, scenario assertions, plugin
+wrappers, graph overlays, or generated inventories may project or test admitted
+truth, but they may not become second contract-law surfaces.
+
+Compressed capability reload:
+
+| capability | source of law consumed by `odd_sdlc.TS` | `odd_sdlc.TS` consequence |
+| --- | --- | --- |
+| graph structure and interface | GTL `Graph`, `Node`, `GraphVector`, `Interface`, `GraphFunction`, `Module`, and `Job` law | graph catalogs and overlays declare product routes over GTL carriers, not hidden controller loops |
+| graph algebra | GTL `edge`, `compose`, `substitute`, `recurse`, `fan_out`, `fan_in`, `gate`, `promote`, `identity`, and `same_object` law | optimized or lite traversal shapes remain graph-program declarations and must not invent local algebra |
+| `Operator` / `Evaluator` / `Rule` | GTL declaration law plus ABG binding/admission | plugin contracts and evaluator rules are declarations consumed by ABG, not SDLC-local runtime authority |
+| selected `F_D` / `F_P` / `F_H` composition | GTL hooks, compute notation, and ABG `abg.fn_composition` | `transform.C`, `evaluate.C`, and `consequence.C` preserve selected composition identity; plugins do not emit, fold, transition, replay, or close |
+| selection, refinement, synthesis, sub-work, recursion, and re-entry | GTL selection/refinement/synthesis/sub-work/recurse law plus ABG selection, continuation, retry, correction, and replay admission | graph overlays and re-entry policy are product views over GTL/ABG truth; inert or unadmitted route carriers are non-closure defects |
+| prompt construction and typed assets | GTL `AssetSurface` and ABG payload admission | prompt text is a rendered view over typed GTL prompt assets and SDLC product policy, not a prompt-only schema |
+| target-carrier contracts and execution evidence | GTL graph-vector/target-carrier law plus ABG payload/evidence admission | target rows and `sdlc_worker_execution_evidence` must carry visible contract fields and be admitted before closure |
+| public starts, worker binding, transport, and external tools | GTL module/job/role/hook declarations plus ABG worker, transport, payload, and provenance admission | CLI, PTY, MCP, shell, and scenario harness surfaces are gated tools, not product runtime truth or GTL law |
+
+The mandatory programmatic gate for this consumption boundary is ABG
+`typecheckGtlProgram(...)`, with raw input admitted through
+`admitGtlProgramConformanceInput(...)`. Any `odd_sdlc.TS` change that touches
+graph assets, prompt construction, plugin contracts, target-carrier rows,
+active substrate identity, overlay/public-start inventory, or external
+tool-boundary declarations must keep the ABG conformance proof passing before
+runtime or live proof is claimed.
 
 `odd_sdlc.TS` release evidence is rooted at
 `/Users/jim/src/apps/odd_sdlc/release_snapshots/odd-sdlc-typescript-tenant/`.
@@ -235,7 +289,7 @@ It is not a second SDLC runtime.
 
 Plain shell execution may launch the same installed entrypoint for local
 operation, but it is not a second command truth and must not accumulate SDLC
-policy, retry policy, traversal control, or compatibility facade behavior.
+policy, retry policy, traversal control, or old-surface adapter behavior.
 
 The same model-backed executable may also be used as an `F_P` worker/plugin
 when ABG dispatches a graph-function edge. That worker role is distinct from
@@ -252,7 +306,7 @@ The minimum installed operator loop is:
    governed transport rather than stopping at an unconsumed dispatch projection
 5. materialize the declared output asset under governed binding or allocation
 6. ingest the worker result through typed carriers and deterministic checks
-7. update runtime truth through ABG-owned events or ABG-compatible event
+7. update runtime truth through ABG-owned events or ABG-admitted event
    ingestion
 8. rerun `gaps` and see the next lawful edge or the remaining gap
 9. preserve an archive and postmortem sufficient to diagnose the run
@@ -302,6 +356,18 @@ roots, current obligation pressure, and local transform scope. Evaluator-owned
 admission, ledger, closure, and carrier truth remain enforced by evaluator and
 runtime surfaces.
 
+Evaluation follows the same boundary. Evaluation prompts may be physically
+fused for small products, but the logical contract remains decomposable into
+declared transform segments crossed with declared evaluation dimensions. F_P
+evaluators perform bounded semantic judgment over local segments, scoped
+carrier projections, and declared relation checks. F_D/GTL may construct typed
+carriers, declared refs, structural coverage checks, and rendered prompt views;
+they must not infer product semantics. ABG admits evaluation findings and folds
+admitted findings plus runtime facts into continuation through the ABG
+iteration-outcome fold. A fused prompt is a runtime optimization only when the
+typed segment/dimension basis, scoped carriers, finding refs, and fold inputs
+remain visible in admitted artifacts.
+
 The worker-facing construction brief is an intent probe, not a dump of runtime
 internals. It inlines the current edge intent, target summary, local obligation
 pressure, and bounded read/write surface, while enforceable details remain cited
@@ -343,6 +409,7 @@ they do not define parallel execution, closure, or optimization authority.
 | Graph function | Callable fragment of the overlay; may be composed, recursive, higher-order, or reused across overlays. | GTL `GraphFunction`. |
 | Typed vector traversal | One `A -> B` traversal inside the overlay or graph function. | GTL `GraphVector` with SDLC edge assurance declarations. |
 | Node or asset node | Typed SDLC surface such as bootstrap input, requirements, formalization, design, code, tests, release evidence, deployment evidence, or runtime return. | GTL `Node` plus `odd_sdlc` asset binding. |
+| Handoff fulfillment binding | Admitted relation from an SDLC obligation and selected target carrier to realized product output and evaluator evidence. | ABIogenesis `GtlContractFulfillmentBinding`; SDLC may interpret it but shall not publish a parallel local binding shape. |
 
 The overlay axioms are:
 
@@ -408,6 +475,16 @@ upstream-per-downstream compression, downstream-per-upstream expansion,
 owned-input density, downstream rows per upstream input, public boundaries,
 substantive responsibilities, and residual refs. Product profiles or edge
 contracts own the thresholds.
+
+Evaluation shape derives from admitted decomposition, traversal-hop, and
+complexity evidence, not from prompt text or an evaluator's ad hoc runtime
+choice. The selected evaluation contract may be a logical grid over declared
+transform segments and evaluation dimensions. Local dimensions, such as
+segment-local depth, authority conformance, and intra-slice realization, are
+bounded F_P evaluator questions. Global coverage is a structural set check over
+declared obligation and segment refs. Cross-segment trace is a declared relation
+check over typed refs. Closure readiness remains a fold over admitted findings
+and runtime facts.
 
 Dependency maps are authority surfaces for traversal selection. Steel-thread
 and parallel build are evaluator-selected traversal methods over admitted
@@ -1083,8 +1160,8 @@ surfaces around that carrier:
 - `odd_sdlc start --scope ... --target next|graph_function:<published_handle>|asset:<published_handle> --until ...`
   for lawful worksite-scoped graph advancement through the same governed graph
   state
-- current constructive `F_P` dispatches use the ABG 3.2 prompt and manifest
-  shape; odd_sdlc contributes domain execution truth through declared prompt
+- current constructive `F_P` dispatches use ABIogenesis prompt and manifest
+  shapes; odd_sdlc contributes domain execution truth through declared prompt
   contexts rather than through a separate prompt-template authority surface
 - the current execution basis for one bounded dispatch is carried through one
   admitted `execution_contract_surface`, and the current source-carrier graph

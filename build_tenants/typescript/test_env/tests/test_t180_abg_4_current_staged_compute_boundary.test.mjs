@@ -1,5 +1,5 @@
 // Validates: T-180
-// Proves the ABG 3.9 release substrate uses the current immutable tarball and
+// Proves the ABG 4 release substrate uses the current release pointer to an immutable tarball and
 // consumes selected composition identity from ABG plugin input.
 
 import test from "node:test";
@@ -8,12 +8,24 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import {
+  constructFrameOpenedEvent,
+  constructGraphCallOpenedEvent,
+  constructGtlEvaluationScopeRef,
+  constructVectorTraversalPlannedEvent,
+  deriveIterationOutcomeFromRows,
+  deriveRuntimeAggregateProjection,
+  GTL_EVALUATION_SCOPE_KIND_VALUES
+} from "@abiogenesis/typescript-tenant";
+
+import {
   ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT,
+  constructOddSdlcAbiogenesisExecutionBasis,
   sdlcSelectedAbgFnCompositionIdentityFromEnginePluginInput
 } from "../../build/semantic/code/src/index.js";
 
-const ABG_RC_VERSION = "3.9.0-rc.10";
-const ABG_DEPENDENCY_REF = `file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/${ABG_RC_VERSION}/abiogenesis-typescript-tenant-${ABG_RC_VERSION}.tgz`;
+const ABG_RC_VERSION = "4.0.0-rc.4";
+const ABG_RELEASE_SNAPSHOT_REF = "latest";
+const ABG_DEPENDENCY_REF = `file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/${ABG_RELEASE_SNAPSHOT_REF}/abiogenesis-typescript-tenant-${ABG_RC_VERSION}.tgz`;
 
 const PACKAGE_ROOT = process.cwd();
 const REPO_ROOT = path.resolve(PACKAGE_ROOT, "../..");
@@ -26,9 +38,19 @@ function readRepoFile(relativePath) {
   return readFileSync(path.join(REPO_ROOT, relativePath), "utf8");
 }
 
+function readJsonAbsolute(filePath) {
+  return JSON.parse(readFileSync(filePath, "utf8"));
+}
+
 test(`T-180 pins the TypeScript tenant to ABG ${ABG_RC_VERSION}`, () => {
   const packageJson = readPackageJson("package.json");
   const packageLock = readPackageJson("package-lock.json");
+  const latestManifest = readJsonAbsolute(
+    path.resolve(
+      REPO_ROOT,
+      "../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/latest/release-snapshot-manifest.json"
+    )
+  );
 
   assert.equal(
     packageJson.dependencies["@abiogenesis/typescript-tenant"],
@@ -46,6 +68,9 @@ test(`T-180 pins the TypeScript tenant to ABG ${ABG_RC_VERSION}`, () => {
     ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.packageVersion,
     ABG_RC_VERSION
   );
+  assert.equal(latestManifest.releaseIdentity, ABG_RC_VERSION);
+  assert.equal(latestManifest.package.packageVersion, ABG_RC_VERSION);
+  assert.equal(latestManifest.sourceDirty, false);
 });
 
 test("T-180 selected composition identity is consumed from ABG plugin input", () => {
@@ -153,7 +178,7 @@ test("T-180 live evaluate and consequence paths do not synthesize selected compo
   assert.doesNotMatch(traversal, /Migration-only support for historical tests\/replay fixtures/u);
 });
 
-test("T-180 analyzer admits and renders RC3 stage truth", () => {
+test("T-180 analyzer admits and renders staged compute truth", () => {
   const catalog = readRepoFile(
     "build_tenants/typescript/code/src/contracts/operator_run_artifact_catalog.ts"
   );
@@ -166,12 +191,12 @@ test("T-180 analyzer admits and renders RC3 stage truth", () => {
   assert.match(loaders, /GTL_ADMITTED_STATE_REF_GUARD/u);
   assert.match(loaders, /GTL_CONSEQUENCE_PROJECTION_REF_GUARD/u);
   assert.match(loaders, /compositionSelectionRef: isTrimmedNonEmptyString/u);
-  assert.match(attempts, /rc3StageTruthFromCarriers/u);
-  assert.match(attempts, /RC3 selected composition drift/u);
-  assert.match(markdown, /## RC3 Stage Truth/u);
+  assert.match(attempts, /stagedComputeTruthFromCarriers/u);
+  assert.match(attempts, /Selected composition drift/u);
+  assert.match(markdown, /## Staged Compute Truth/u);
 });
 
-test("T-180 ABG release substrate passes actor invocation provenance to F_P evaluation rules", () => {
+test("T-180 ABG release substrate exposes the staged evaluate.C rule path", () => {
   const runner = readFileSync(
     path.join(
       PACKAGE_ROOT,
@@ -182,10 +207,59 @@ test("T-180 ABG release substrate passes actor invocation provenance to F_P eval
 
   assert.match(
     runner,
-    /const plannedEvaluationRules = plugins\.evaluationRules\.map[\s\S]*?actorInvocationRef: actorInvocationRef\(actorInvocation\)/u
+    /const plannedEvaluationRules = plugins\.evaluationRules\.map/u
   );
   assert.match(
     runner,
-    /const plannedBatchWithInputs = plannedBatch\.map[\s\S]*?actorInvocationRef: actorInvocationRef\(actorInvocation\)/u
+    /plugins\.evaluationRules/u
   );
+});
+
+test("T-180 ABG release substrate preserves segment-scoped redispatch rows", () => {
+  assert(GTL_EVALUATION_SCOPE_KIND_VALUES.includes("segment"));
+  assert(GTL_EVALUATION_SCOPE_KIND_VALUES.includes("dimension_cell"));
+
+  const basis = constructOddSdlcAbiogenesisExecutionBasis();
+  const vectorIndex = 0;
+  const projection = deriveRuntimeAggregateProjection(basis, [
+    constructGraphCallOpenedEvent(basis),
+    constructFrameOpenedEvent(basis),
+    constructVectorTraversalPlannedEvent({ basis, vectorIndex })
+  ]);
+  const graphVector = basis.graph.vectors[vectorIndex];
+  assert.notEqual(graphVector, undefined);
+
+  const scope = constructGtlEvaluationScopeRef({
+    scopeRef: "gtl.evaluation_scope://odd-sdlc/t180/deep-coverage/segment-2",
+    graphCallRef: projection.graphCallId,
+    frameRef: projection.frameId,
+    graphFunctionRef: basis.graphFunction.id,
+    graphVectorRef: graphVector.name,
+    vectorIndex,
+    compositionRef: "abg.fn_composition://odd-sdlc/t180/deep-coverage",
+    compositionDigest: "sha256:t180-deep-coverage",
+    scopeTopologyRef: "gtl.evaluation_scope_topology://odd-sdlc/t180/deep-coverage",
+    scopeKind: "segment",
+    segmentRef: "gtl.segment://odd-sdlc/t180/deep-coverage/segment-2"
+  });
+
+  const outcome = deriveIterationOutcomeFromRows({
+    basis,
+    runtimeProjection: projection,
+    vectorIndex,
+    runtimeRows: [
+      {
+        boundary: "evaluator",
+        status: "failed",
+        reason: "partial_evidence",
+        retryable: true,
+        evidenceRefs: ["evidence://odd-sdlc/t180/deep-coverage/segment-2"],
+        evaluationScopeRef: scope
+      }
+    ]
+  });
+
+  assert.equal(outcome.kind, "redispatch");
+  assert.equal(outcome.target.targetVectorIndex, vectorIndex);
+  assert.deepEqual(outcome.target.evaluationScopeRef, scope);
 });

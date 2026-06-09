@@ -15,10 +15,12 @@ const TENANT_STACK_SPEC_FILENAMES = Object.freeze([
   "EXECUTION_CONTRACT.json"
 ] as const);
 
-function objectRecord(value: unknown): JsonRecord | null {
+function isJsonRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? value as JsonRecord
-    : null;
+}
+
+function objectRecord(value: unknown): JsonRecord | null {
+  return isJsonRecord(value) ? value : null;
 }
 
 function stringFromUnknown(value: unknown): string | null {
@@ -99,16 +101,21 @@ function collectDeclaredToolEnvironment(value: unknown): DeclaredToolEnvironment
   const nested = nestedKeys.map((key) =>
     collectDeclaredToolEnvironment(record[key])
   );
+  const mergedEnvironmentVariables: Record<string, string> = {};
+  for (const entry of nested) {
+    for (const [name, variableValue] of Object.entries(entry.environmentVariables)) {
+      mergedEnvironmentVariables[name] = variableValue;
+    }
+  }
+  for (const [name, variableValue] of Object.entries(environmentVariables)) {
+    mergedEnvironmentVariables[name] = variableValue;
+  }
   return Object.freeze({
     directories: Object.freeze([
       ...directories,
       ...nested.flatMap((entry) => entry.directories)
     ]),
-    environmentVariables: Object.freeze(Object.assign(
-      {},
-      ...nested.map((entry) => entry.environmentVariables),
-      environmentVariables
-    ) as Record<string, string>)
+    environmentVariables: Object.freeze(mergedEnvironmentVariables)
   });
 }
 

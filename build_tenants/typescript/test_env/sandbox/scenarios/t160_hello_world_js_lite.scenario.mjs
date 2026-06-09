@@ -96,27 +96,34 @@ export function t160HelloWorldJsLiteLiveScenario({
     expectations: {
       workspaceFiles: [
         "build_tenants/hello_world_javascript/src/hello.js"
-    ],
-    handoffEdgeSequencePrefix: [
-      "derive_lite_design_adr_surface",
-      "derive_lite_module_surface",
-      "derive_lite_component_code_surface"
-    ],
-    processChecks: [
-      {
-        command: "node",
-        args: ["build_tenants/hello_world_javascript/src/hello.js"],
-        stdout: "Hello, world!"
-      }
-    ],
-    latestArchiveArtifacts: [
-      "sdlc_overlay_segment_completion.json"
-    ]
+      ],
+      handoffEdgeSequencePrefix: [
+        "derive_lite_design_adr_surface",
+        "derive_lite_component_code_surface",
+        "prepare_test_execution_surface",
+        "derive_test_execution_result_surface"
+      ],
+      requiredHandoffEdges: [
+        "derive_lite_component_code_surface",
+        "prepare_test_execution_surface",
+        "derive_test_execution_result_surface"
+      ],
+      executionEvidence: {
+        edgeName: "derive_test_execution_result_surface",
+        status: "succeeded",
+        commandIncludes: "node",
+        stdoutIncludes: "Hello, world!"
+      },
+      latestArchiveArtifacts: [
+        "worker_result_report.json",
+        "declared_edge_projection_artifact.json"
+      ]
     },
     liveWorker: worker,
     startUntil,
     maxAdvances,
     continueOnEdgeConverge: true,
-    stopAfterWorkspaceFilesExist: true
+    stopAfterWorkspaceFilesExist: false,
+    stopAfterRequiredHandoffEdges: true
   });
 }

@@ -26,7 +26,7 @@ test("T-028 declares ABIogenesis as consumed substrate authority", () => {
   );
   assert.equal(
     ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.packageVersion,
-    "3.9.0-rc.10"
+    "4.0.0-rc.4"
   );
   assert.equal(
     ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.runtimeTruthAuthority,
@@ -127,6 +127,23 @@ test("T-028 declares ABIogenesis as consumed substrate authority", () => {
   assert(
     ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.sourceAssumptions.some((entry) =>
       entry.includes("T-148")
+    )
+  );
+  assert(
+    ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.sourceAssumptions.some((entry) =>
+      entry.includes("T-149") &&
+      entry.includes("primitive iteration-outcome projection")
+    )
+  );
+  assert(
+    ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.sourceAssumptions.some((entry) =>
+      entry.includes("T-151")
+    )
+  );
+  assert(
+    ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.sourceAssumptions.some((entry) =>
+      entry.includes("T-152") &&
+      entry.includes("static GTL program conformance gate")
     )
   );
 });

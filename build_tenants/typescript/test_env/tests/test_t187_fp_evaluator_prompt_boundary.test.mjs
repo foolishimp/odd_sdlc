@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  rmSync,
   writeFileSync
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -18,6 +19,8 @@ import {
   admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity,
   constructDesignDepthDraftFragmentContentRegisterUpdate,
   deriveSdlcConformProjectProfileFromWorkspace,
+  deriveWorkerHandoffManifest,
+  hookContractByEdgeName,
   writeDesignDepthDraftFragmentContentRegisterUpdate
 } from "../../build/semantic/code/src/index.js";
 import {
@@ -36,6 +39,15 @@ const launchContractSource = readFileSync(
   fileURLToPath(
     new URL(
       "../../code/src/operator/plugins/transform/launch_contract.ts",
+      import.meta.url
+    )
+  ),
+  "utf8"
+);
+const promptEdgePolicySource = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../code/src/operator/plugins/transform/prompt_edge_policy.ts",
       import.meta.url
     )
   ),
@@ -217,7 +229,7 @@ test("T-187 briefs reference the admitted proportionality profile, not prose-onl
   );
   assert.match(evaluatorPromptSource, /degenerate profile means one module/u);
   assert.match(
-    launchContractSource,
+    promptEdgePolicySource,
     /proportionalityProfile as the admitted proportionality budget/u
   );
 });
@@ -403,6 +415,7 @@ build_tenants:
     build_tool: npm
     build_execution_contract: tenant-build-command
     test_runner: tenant-test-command
+    test_execution_contract: tenant-test-command
     deployment_contract: tenant-deploy-command
     runtime_observation_contract: tenant-observe-contract
 `
@@ -412,6 +425,26 @@ build_tenants:
   assert.equal(declared.testExecutionContract, "tenant-test-command");
   assert.equal(declared.deploymentContract, "tenant-deploy-command");
   assert.equal(declared.runtimeObservationContract, "tenant-observe-contract");
+
+  const runnerOnlyWorkspace = makeConformanceWorkspace(
+    "odd-sdlc-t187-runner-label",
+    `
+project:
+  name: runner label sandbox stack
+active_tenant: tenant_a
+build_tenants:
+  tenant_a:
+    output_dir: build_tenants/tenant_a
+    language: rust
+    build_tool: cargo
+    test_runner: cargo
+`
+  );
+  const runnerOnly = deriveSdlcConformProjectProfileFromWorkspace(
+    runnerOnlyWorkspace
+  );
+  assert.equal(runnerOnly.testRunner, "cargo");
+  assert.equal(runnerOnly.testExecutionContract, "undeclared");
 });
 
 test("T-187 review-grade evaluator prompt projects tenant-declared tool boundaries", () => {
@@ -527,7 +560,7 @@ test("T-187 design-depth evaluator prompt projects tenant-declared tool and read
   );
   assert.match(
     installedOperatorSource,
-    /designDepthFpEvaluatorPrompt\(\{[\s\S]*tenantToolEnvironment: tenantToolEnvironmentProjectionFor\(input\.manifest\)/u
+    /designDepthFpEvaluatorPromptProjection\(\{[\s\S]*tenantToolEnvironment: tenantToolEnvironmentProjectionFor\(input\.manifest\)/u
   );
 });
 
@@ -566,6 +599,11 @@ test("T-188 evaluator prompts keep generated clauses line-inspectable", () => {
   assert.match(prompt, /Tool-profile contract: obey the active tool list/u);
   assert.match(prompt, /bounded workspace-relative read-only inspection/u);
   assert.match(prompt, /do not run product, build, test, framework, traversal, or background commands/u);
+  assert.match(prompt, /the framework has already written the draft register/u);
+  assert.match(prompt, /ADR\/output artifact/u);
+  assert.match(prompt, /first semantic update/u);
+  assert.doesNotMatch(prompt, /ADR before the first register write/u);
+  assert.doesNotMatch(prompt, /ADR transform artifact[\s\S]*before the first evaluator update/u);
   assert.match(prompt, /must set limit <=80/u);
   assert.doesNotMatch(prompt, /Prefer bounded Node summaries/u);
   assert.doesNotMatch(prompt, /summarize selected keys with Node/u);
@@ -611,26 +649,26 @@ test("T-188 design-depth evaluator prompt publishes validator row-kind literals"
 
 test("T-188 implementation-design prompt keeps design-depth directive sectioned", () => {
   assert.match(
-    launchContractSource,
+    promptEdgePolicySource,
     /compactDesignDepthDirective[\s\S]*\.join\("\\n"\)/u
   );
 });
 
 test("T-188 lite design prompt carries tenant stack scalars for design-depth admission", () => {
   assert.match(
-    launchContractSource,
+    promptEdgePolicySource,
     /Implementation design ADR stack profile rows must expose tenant stack authority as scalar design facts/u
   );
   assert.match(
-    launchContractSource,
+    promptEdgePolicySource,
     /language, runtime\/module system, build tool, build config, dependency policy, test runner, and test command/u
   );
   assert.match(
-    launchContractSource,
+    promptEdgePolicySource,
     /Do not omit tenant-declared stack fields that the design-depth register admits/u
   );
   assert.match(
-    launchContractSource,
+    promptEdgePolicySource,
     /not ecosystem defaults/u
   );
 });
@@ -654,6 +692,44 @@ test("T-188 design-depth evaluator prompt forbids schema-invalid stack scalars",
   );
 });
 
+test("T-188 design-depth evaluator prompt forbids null state-diagram entity refs", () => {
+  assert.match(
+    evaluatorPromptSource,
+    /moduleStateDiagramFragments\[\]\.entityId is required scalar string, never null/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /entityId is a required non-empty string, never null/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /minimal owned observable-output entity/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /never write entityId:null for stateless diagrams/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /exists in moduleSchemaFragments\[\]\.entities\[\]\.entityId/u
+  );
+});
+
+test("T-188 design-depth evaluator prompt forbids schema-invalid transition trigger keys", () => {
+  assert.match(
+    evaluatorPromptSource,
+    /moduleStateDiagramFragments\[\]\.transitions\[\] has exactly kind, transitionId, fromState, toState, operationId, entityId/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /Never emit trigger, event, condition, action, summary, or description on a transition/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /transition cause belongs in operationId only/u
+  );
+});
+
 test("T-188 evaluator prompt does not infer build-config targets from ecosystem convention", () => {
   assert.match(
     evaluatorPromptSource,
@@ -670,9 +746,24 @@ test("T-188 worker prompt distinguishes current-edge materialization from downst
     launchContractSource,
     /current-edge materialized product file targets: none/u
   );
+  assert.match(
+    launchContractSource,
+    /declared downstream product file targets/u
+  );
   assert.doesNotMatch(
     launchContractSource,
     /declared product file targets: none/u
+  );
+});
+
+test("T-188 design lineage markers do not mint requirement authority", () => {
+  assert.match(
+    launchContractSource,
+    /const isDesignOrModuleSurface/u
+  );
+  assert.match(
+    launchContractSource,
+    /isDesignOrModuleSurface \|\| !sourceContainsRequirementAuthority/u
   );
 });
 
@@ -687,7 +778,11 @@ test("T-188 retry prompt filters downstream test and execution pressure", () => 
   );
   assert.match(
     launchContractSource,
-    /Prior gap reasons are downstream-stage pressure for a later graph edge/u
+    /downstream-stage pressure for a later graph edge/u
+  );
+  assert.match(
+    launchContractSource,
+    /Prior gap reasons are \$\{reasonLabel\}; no current-edge repair work items are assigned from that dossier/u
   );
   assert.match(
     launchContractSource,
@@ -812,6 +907,96 @@ test("T-187 review-grade evaluator prompt does not turn refs into obligations", 
     evaluatorPromptSource,
     /not obligations and must not become findings/u
   );
+});
+
+test("T-187 INTENT trace prose does not mint duplicate requirement obligations", () => {
+  const workspaceRoot = makeConformanceWorkspace(
+    "t187-intent-obligation-alias",
+    [
+      "project:",
+      "  name: t164_rust_hello_service_lite",
+      "active_tenant: hello_world_rust_service",
+      "build_tenants:",
+      "  hello_world_rust_service:",
+      "    output_dir: build_tenants/hello_world_rust_service",
+      "    language: rust",
+      "    build_tool: cargo"
+    ].join("\n")
+  );
+  try {
+    mkdirSync(path.join(workspaceRoot, "specification"), { recursive: true });
+    writeFileSync(
+      path.join(workspaceRoot, "bootstrap.md"),
+      [
+        "# Bootstrap",
+        "",
+        "### REQ-T164-RUST-SVC-001 Cargo Manifest",
+        "Provide one Cargo manifest.",
+        "",
+        "### REQ-T164-RUST-SVC-002 Rust Executable Source",
+        "Provide one Rust executable source."
+      ].join("\n"),
+      "utf8"
+    );
+    writeFileSync(
+      path.join(workspaceRoot, "specification/INTENT.md"),
+      [
+        "# Intent",
+        "",
+        "### REQ-T164-RUST-SVC-001 Cargo Manifest",
+        "Source: `workspace://bootstrap.md § REQ-T164-RUST-SVC-001`",
+        "| `requirement:t164_rust_hello_service_lite.bootstrap.req_t164_rust_svc_001` | covered |",
+        "",
+        "### REQ-T164-RUST-SVC-002 Rust Executable Source",
+        "Source: `workspace://bootstrap.md § REQ-T164-RUST-SVC-002`",
+        "| `requirement:t164_rust_hello_service_lite.bootstrap.req_t164_rust_svc_002` | covered |"
+      ].join("\n"),
+      "utf8"
+    );
+
+    const contract = hookContractByEdgeName("derive_lite_component_code_surface");
+    const manifest = deriveWorkerHandoffManifest({
+      workspaceRoot,
+      graphFunctionName: "lite_design_module_implementation",
+      edgeName: contract.edgeName,
+      vectorIndex: 1,
+      contract,
+      traversalAttemptEnvelope: {
+        kind: "traversal_attempt_envelope",
+        envelopeVersion: "ts-traversal-attempt-v1",
+        envelopeRef: "envelope://odd-sdlc/t187/intent-obligation-alias",
+        profileRef: "profile://odd-sdlc/t187/intent-obligation-alias",
+        strategyDirectiveRef: "strategy://odd-sdlc/full_breadth/t187",
+        selectedScheduleItemRefs: [],
+        phaseGateRefs: [],
+        requiredProgressArtifactRefs: [],
+        retryBudgetRemaining: 1,
+        mustExitAfterBoundedAttempt: false
+      },
+      runId: "t187-intent-obligation-alias"
+    });
+    const obligationIds = manifest.traversalObligationContext.obligations.map(
+      (obligation) => obligation.obligationId
+    );
+
+    assert(
+      obligationIds.includes(
+        "requirement:t164_rust_hello_service_lite.bootstrap.req_t164_rust_svc_001"
+      )
+    );
+    assert(
+      obligationIds.includes(
+        "requirement:t164_rust_hello_service_lite.bootstrap.req_t164_rust_svc_002"
+      )
+    );
+    assert.equal(
+      obligationIds.some((obligationId) => obligationId.includes(".intent.")),
+      false,
+      JSON.stringify(obligationIds, null, 2)
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
 });
 
 test("T-187 work-category governance also bounds terminal output", () => {

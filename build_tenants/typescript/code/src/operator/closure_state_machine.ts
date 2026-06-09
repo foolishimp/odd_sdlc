@@ -5,10 +5,14 @@
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
-  deriveRuntimeContinuationTransitionProjection,
+  deriveIterationOutcomeProjection,
   type ExecutionBasis,
-  type RuntimeAggregateProjection,
-  type RuntimeContinuationTransitionProjection
+  type IterationOutcomeProjection,
+  type IterationReason,
+  type IterationRedispatchTargetRow,
+  type IterationRuntimeRow,
+  type IterationSatisfactionRow,
+  type RuntimeAggregateProjection
 } from "@abiogenesis/typescript-tenant";
 import { uniqueSorted } from "../shared/collections.js";
 import {
@@ -54,9 +58,20 @@ export type SdlcClosureStateMachineBucket =
   | "reprice"
   | "block";
 
+type SdlcClosureRedispatchDisposition = Extract<
+  SdlcEdgeClosureDisposition,
+  "retry" | "repair" | "re-enter"
+>;
+
+interface SdlcClosureRedispatchCandidate {
+  readonly disposition: SdlcClosureRedispatchDisposition;
+  readonly explanationCode: SdlcClosureStateTransitionExplanation;
+  readonly row: IterationRedispatchTargetRow;
+}
+
 export interface SdlcClosureStateTransition {
   readonly kind: "sdlc_closure_state_transition";
-  readonly abgRuntimeTransitionProjection: RuntimeContinuationTransitionProjection;
+  readonly abgIterationOutcomeProjection: IterationOutcomeProjection;
   readonly disposition: SdlcEdgeClosureDisposition;
   readonly closurePolicy: SdlcEdgeClosurePolicy;
   readonly retryReasonRefs: readonly string[];
@@ -189,7 +204,7 @@ function transitionPolicy(
 }
 
 function transition(input: {
-  readonly abgRuntimeTransitionProjection: RuntimeContinuationTransitionProjection;
+  readonly abgIterationOutcomeProjection: IterationOutcomeProjection;
   readonly disposition: SdlcEdgeClosureDisposition;
   readonly explanationCode: SdlcClosureStateTransitionExplanation;
   readonly retryReasonRefs?: readonly string[];
@@ -201,7 +216,7 @@ function transition(input: {
 }): SdlcClosureStateTransition {
   assertSdlcDispositionAllowedByAbg({
     disposition: input.disposition,
-    projection: input.abgRuntimeTransitionProjection
+    projection: input.abgIterationOutcomeProjection
   });
   const retryReasonRefs = uniqueSorted(input.retryReasonRefs ?? Object.freeze([]));
   const repairReasonRefs = uniqueSorted(input.repairReasonRefs ?? Object.freeze([]));
@@ -215,7 +230,7 @@ function transition(input: {
   const yieldResumeBasis = input.yieldResumeBasis ?? null;
   return Object.freeze({
     kind: "sdlc_closure_state_transition" as const,
-    abgRuntimeTransitionProjection: input.abgRuntimeTransitionProjection,
+    abgIterationOutcomeProjection: input.abgIterationOutcomeProjection,
     disposition: input.disposition,
     closurePolicy: transitionPolicy(input.disposition),
     retryReasonRefs,
@@ -225,7 +240,9 @@ function transition(input: {
     blockReasonRefs,
     yieldResumeBasis,
     evidenceRefs: uniqueSorted([
-      input.abgRuntimeTransitionProjection.projectionRef,
+      input.abgIterationOutcomeProjection.projectionRef,
+      input.abgIterationOutcomeProjection.rowProjectionRef,
+      ...input.abgIterationOutcomeProjection.evidenceRefs,
       ...retryReasonRefs,
       ...repairReasonRefs,
       ...reenterReasonRefs,
@@ -239,37 +256,166 @@ function transition(input: {
 
 function assertSdlcDispositionAllowedByAbg(input: {
   readonly disposition: SdlcEdgeClosureDisposition;
-  readonly projection: RuntimeContinuationTransitionProjection;
+  readonly projection: IterationOutcomeProjection;
 }): void {
-  const allowedByAbg = new Set<SdlcEdgeClosureDisposition>();
-  switch (input.projection.disposition) {
-    case "close":
-      allowedByAbg.add("close");
-      break;
-    case "retry_same_edge":
-      allowedByAbg.add("retry");
-      allowedByAbg.add("block");
-      break;
-    case "yield_continuation":
-      allowedByAbg.add("yield");
-      allowedByAbg.add("block");
-      break;
-    case "reprice":
-      allowedByAbg.add("reprice");
-      allowedByAbg.add("block");
-      break;
-    case "inspect_runtime_archive":
-    case "block":
-      allowedByAbg.add("block");
-      allowedByAbg.add("repair");
-      allowedByAbg.add("re-enter");
-      break;
-  }
+  const allowedByAbg = sdlcDispositionsAllowedByAbgOutcome(input.projection);
   if (!allowedByAbg.has(input.disposition)) {
     throw new TypeError(
-      `SDLC closure transition ${input.disposition} contradicts ABG runtime continuation transition ${input.projection.disposition}:${input.projection.reason}`
+      `SDLC closure transition ${input.disposition} contradicts ABG iteration outcome ${JSON.stringify(input.projection.outcome)}`
     );
   }
+}
+
+function sdlcDispositionsAllowedByAbgOutcome(
+  projection: IterationOutcomeProjection
+): ReadonlySet<SdlcEdgeClosureDisposition> {
+  const outcome = projection.outcome;
+  if (outcome.kind === "redispatch") {
+    return new Set<SdlcEdgeClosureDisposition>(["retry", "repair", "re-enter"]);
+  }
+  if (outcome.kind === "suspend") {
+    return new Set<SdlcEdgeClosureDisposition>(["yield"]);
+  }
+  if (outcome.disposition === "converged") {
+    return new Set<SdlcEdgeClosureDisposition>(["close"]);
+  }
+  if (outcome.disposition === "deferred") {
+    return new Set<SdlcEdgeClosureDisposition>(["yield"]);
+  }
+  if (outcome.reEntryPoint !== null) {
+    return new Set<SdlcEdgeClosureDisposition>(["reprice"]);
+  }
+  return new Set<SdlcEdgeClosureDisposition>(["block"]);
+}
+
+function iterationRuntimeRow(input: {
+  readonly boundary: IterationRuntimeRow["boundary"];
+  readonly status: IterationRuntimeRow["status"];
+  readonly reason: IterationRuntimeRow["reason"];
+  readonly retryable: boolean;
+  readonly evidenceRefs: readonly string[];
+}): IterationRuntimeRow {
+  return Object.freeze({
+    boundary: input.boundary,
+    status: input.status,
+    reason: input.reason,
+    retryable: input.retryable,
+    evidenceRefs: uniqueSorted(input.evidenceRefs),
+    sourceProjectionRefs: Object.freeze([])
+  });
+}
+
+function iterationSatisfactionRow(input: {
+  readonly authorityRef: string;
+  readonly status?: IterationSatisfactionRow["status"] | undefined;
+  readonly reason: IterationReason;
+  readonly evidenceRefs: readonly string[];
+  readonly reEntryPoint: IterationSatisfactionRow["reEntryPoint"];
+}): IterationSatisfactionRow {
+  return Object.freeze({
+    authorityRef: input.authorityRef,
+    status: input.status ?? "unsatisfied",
+    reason: input.status === "satisfied" ? null : input.reason,
+    lifecycle: "active" as const,
+    evidenceRefs: uniqueSorted(input.evidenceRefs),
+    sourceProjectionRefs: Object.freeze([]),
+    reEntryPoint: input.reEntryPoint
+  });
+}
+
+function iterationRedispatchCandidate(input: {
+  readonly disposition: SdlcClosureRedispatchDisposition;
+  readonly explanationCode: SdlcClosureStateTransitionExplanation;
+  readonly vectorIndex: number;
+  readonly reEntryPoint: IterationRedispatchTargetRow["target"]["reEntryPoint"];
+  readonly reason: IterationReason;
+  readonly evidenceRefs: readonly string[];
+}): SdlcClosureRedispatchCandidate {
+  return Object.freeze({
+    disposition: input.disposition,
+    explanationCode: input.explanationCode,
+    row: Object.freeze({
+      target: Object.freeze({
+        reEntryPoint: input.reEntryPoint,
+        targetVectorIndex: input.vectorIndex
+      }),
+      reason: input.reason,
+      retryable: true,
+      provenanceChangeClass: "realization_refactor" as const,
+      evidenceRefs: uniqueSorted(input.evidenceRefs),
+      sourceProjectionRefs: Object.freeze([])
+    })
+  });
+}
+
+function rowsForRuntimeBlockRefs(
+  refs: readonly string[]
+): readonly IterationRuntimeRow[] {
+  return refs.map((ref) =>
+    iterationRuntimeRow({
+      boundary: "worker",
+      status: "failed",
+      reason: "runtime_failure",
+      retryable: false,
+      evidenceRefs: [ref]
+    })
+  );
+}
+
+function rowsForRepriceRefs(
+  refs: readonly string[]
+): readonly IterationSatisfactionRow[] {
+  return refs.map((ref) =>
+    iterationSatisfactionRow({
+      authorityRef: ref,
+      reason: "missing_authority",
+      evidenceRefs: [ref],
+      reEntryPoint: "requirements"
+    })
+  );
+}
+
+function rowsForEdgeAssuranceCloseRefs(
+  refs: readonly string[]
+): readonly IterationSatisfactionRow[] {
+  return refs.map((ref) =>
+    iterationSatisfactionRow({
+      authorityRef: ref,
+      status: "satisfied",
+      reason: "missing_evidence",
+      evidenceRefs: [ref],
+      reEntryPoint: null
+    })
+  );
+}
+
+function selectedRedispatchCandidate(input: {
+  readonly projection: IterationOutcomeProjection;
+  readonly candidates: readonly SdlcClosureRedispatchCandidate[];
+}): SdlcClosureRedispatchCandidate | null {
+  const outcome = input.projection.outcome;
+  if (outcome.kind !== "redispatch") {
+    return null;
+  }
+  return (
+    input.candidates.find(
+      (candidate) =>
+        candidate.row.retryable &&
+        candidate.row.reason === outcome.reason &&
+        candidate.row.target.reEntryPoint === outcome.target.reEntryPoint &&
+        candidate.row.target.targetVectorIndex === outcome.target.targetVectorIndex
+    ) ??
+    (outcome.reason === "terminal_retry_fallback"
+      ? iterationRedispatchCandidate({
+          disposition: "retry",
+          explanationCode: "abg_terminal_retry",
+          vectorIndex: outcome.target.targetVectorIndex ?? input.projection.vectorIndex,
+          reEntryPoint: outcome.target.reEntryPoint,
+          reason: outcome.reason,
+          evidenceRefs: input.projection.reasonRefs
+        })
+      : null)
+  );
 }
 
 function decodedRef(input: string): string {
@@ -306,7 +452,8 @@ function sdlcClosurePressureRefRequiresRepair(reasonRef: string): boolean {
   const decoded = decodedRef(reasonRef);
   return (
     decoded.includes("component_repair_schedule_repair_required") ||
-    decoded.includes("component_repair_schedule_row:")
+    decoded.includes("component_repair_schedule_row:") ||
+    decoded.includes("test_execution_result_failed")
   );
 }
 
@@ -324,6 +471,9 @@ function repairReasonFromClosurePressureRef(reasonRef: string): string {
   }
   if (decoded.includes("component_repair_schedule_triage_gap")) {
     return "component_repair_schedule_triage_gap";
+  }
+  if (decoded.includes("test_execution_result_failed")) {
+    return "test_execution_result_failed";
   }
   const componentDepthIndex = decoded.indexOf("/component_depth_register_invalid:");
   if (componentDepthIndex >= 0) {
@@ -349,7 +499,7 @@ function closurePressureRefMessage(reasonRef: string): string {
     return "Edge closure residual pressure requires triage rather than same-edge retry.";
   }
   if (sdlcClosurePressureRefRequiresRepair(reasonRef)) {
-    return "Component repair schedule residual pressure requires repair re-entry.";
+    return "Closure residual pressure requires repair re-entry.";
   }
   return "Edge closure residual pressure requires same-edge repair.";
 }
@@ -363,7 +513,6 @@ export function deriveSdlcClosureStateTransition(input: {
   readonly structuralBlockReasonRefs: readonly string[];
   readonly postActionBlockReasonRefs: readonly string[];
   readonly yieldResumeBasis: Omit<SdlcYieldResumeBasis, "kind"> | null;
-  readonly edgeCanClose: boolean;
   readonly edgeAssuranceDisposition: SdlcEdgeClosureDisposition | null;
 }): SdlcClosureStateTransition {
   const typedBlockReasonRefs = uniqueSorted([
@@ -415,95 +564,129 @@ export function deriveSdlcClosureStateTransition(input: {
     blockingReasonCarriers: input.blockingReasonCarriers,
     bucket: "retry"
   });
+  const hasRedispatchReasonRefs =
+    repairReasonRefs.length > 0 ||
+    reenterReasonRefs.length > 0 ||
+    retryReasonRefs.length > 0;
   const edgeAssuranceRef =
     input.edgeAssuranceDisposition === null
       ? []
       : [
           `edge-assurance-disposition://odd-sdlc/${input.runRef}/${input.edgeAssuranceDisposition}`
         ];
-  const abgRuntimeTransitionProjection =
-    deriveRuntimeContinuationTransitionProjection({
-      basis: input.abgRuntimeTransitionContext.basis,
-      runtimeProjection: input.abgRuntimeTransitionContext.runtimeProjection,
-      vectorIndex: input.abgRuntimeTransitionContext.vectorIndex,
-      typedBlockRefs: uniqueSorted([
-        ...blockReasonRefs,
-        ...repairReasonRefs,
-        ...reenterReasonRefs,
-        ...(input.edgeAssuranceDisposition === "block" ? edgeAssuranceRef : [])
-      ]),
-      typedRepriceRefs: uniqueSorted([
-        ...repriceReasonRefs,
-        ...(input.edgeAssuranceDisposition === "reprice" ? edgeAssuranceRef : [])
-      ]),
-      typedYieldRefs:
-        input.yieldResumeBasis === null
-          ? Object.freeze([])
-          : uniqueSorted([
-              input.yieldResumeBasis.resumeBasisRef,
-              ...input.yieldResumeBasis.admittedProgressRefs
-            ]),
-      typedRetryRefs: uniqueSorted([
+  const vectorIndex = input.abgRuntimeTransitionContext.vectorIndex;
+  const yieldRefs: readonly string[] =
+    input.yieldResumeBasis === null
+      ? Object.freeze([])
+      : uniqueSorted([
+          input.yieldResumeBasis.resumeBasisRef,
+          ...input.yieldResumeBasis.admittedProgressRefs
+        ]);
+  const redispatchCandidates = Object.freeze([
+    ...repairReasonRefs.map((ref) =>
+      iterationRedispatchCandidate({
+        disposition: "repair",
+        explanationCode:
+          typedRepairReasonRefs.includes(ref) ? "typed_repair" : "residual_repair",
+        vectorIndex,
+        reEntryPoint: "realization",
+        reason: "missing_evidence",
+        evidenceRefs: [ref]
+      })
+    ),
+    ...reenterReasonRefs.map((ref) =>
+      iterationRedispatchCandidate({
+        disposition: "re-enter",
+        explanationCode: "typed_reenter",
+        vectorIndex,
+        reEntryPoint: "proof",
+        reason: "evaluator_failure",
+        evidenceRefs: [ref]
+      })
+    ),
+    ...retryReasonRefs.map((ref) =>
+      iterationRedispatchCandidate({
+        disposition: "retry",
+        explanationCode: "typed_retry",
+        vectorIndex,
+        reEntryPoint: "realization",
+        reason: "missing_evidence",
+        evidenceRefs: [ref]
+      })
+    ),
+    ...(input.edgeAssuranceDisposition === "retry"
+      ? edgeAssuranceRef.map((ref) =>
+          iterationRedispatchCandidate({
+            disposition: "retry",
+            explanationCode: "edge_assurance_retry",
+            vectorIndex,
+            reEntryPoint: "realization",
+            reason: "missing_evidence",
+            evidenceRefs: [ref]
+          })
+        )
+      : [])
+  ]);
+  const abgIterationOutcomeProjection = deriveIterationOutcomeProjection({
+    basis: input.abgRuntimeTransitionContext.basis,
+    runtimeProjection: input.abgRuntimeTransitionContext.runtimeProjection,
+    vectorIndex,
+    satisfactionRows: Object.freeze([
+      ...rowsForRepriceRefs(repriceReasonRefs),
+      ...(input.edgeAssuranceDisposition === "close"
+        ? rowsForEdgeAssuranceCloseRefs(edgeAssuranceRef)
+        : [])
+    ]),
+    runtimeRows: Object.freeze([
+      ...rowsForRuntimeBlockRefs(blockReasonRefs),
+      ...(input.edgeAssuranceDisposition === "block" && !hasRedispatchReasonRefs
+        ? rowsForRuntimeBlockRefs(edgeAssuranceRef)
+        : []),
+      ...yieldRefs.map((ref) =>
+        iterationRuntimeRow({
+          boundary: "worker",
+          status: "handoff",
+          reason: null,
+          retryable: false,
+          evidenceRefs: [ref]
+        })
+      )
+    ]),
+    redispatchTargetRows: redispatchCandidates.map((candidate) => candidate.row),
+    terminalFallbackRefs: input.abgTerminalRetryRefs
+  });
+  const outcome = abgIterationOutcomeProjection.outcome;
+
+  if (outcome.kind === "redispatch") {
+    const selected = selectedRedispatchCandidate({
+      projection: abgIterationOutcomeProjection,
+      candidates: redispatchCandidates
+    });
+    if (selected === null) {
+      throw new TypeError(
+        `SDLC closure state transition cannot adapt ABG redispatch outcome ${JSON.stringify(outcome)}`
+      );
+    }
+    return transition({
+      abgIterationOutcomeProjection,
+      disposition: selected.disposition,
+      explanationCode: selected.explanationCode,
+      retryReasonRefs: uniqueSorted([
         ...retryReasonRefs,
-        ...(input.edgeAssuranceDisposition === "retry" ? edgeAssuranceRef : [])
+        ...(input.edgeAssuranceDisposition === "retry" ? edgeAssuranceRef : []),
+        ...(selected.explanationCode === "abg_terminal_retry"
+          ? input.abgTerminalRetryRefs
+          : [])
       ]),
-      terminalRetryRefs: input.abgTerminalRetryRefs,
-      edgeCanClose: input.edgeCanClose
-    });
-
-  if (blockReasonRefs.length > 0) {
-    return transition({
-      abgRuntimeTransitionProjection,
-      disposition: "block",
-      explanationCode:
-        typedBlockReasonRefs.length > 0
-          ? "typed_block_or_triage"
-          : "residual_triage",
-      retryReasonRefs,
-      repairReasonRefs,
-      reenterReasonRefs,
-      repriceReasonRefs,
-      blockReasonRefs
-    });
-  }
-
-  if (repairReasonRefs.length > 0) {
-    return transition({
-      abgRuntimeTransitionProjection,
-      disposition: "repair",
-      explanationCode:
-        typedRepairReasonRefs.length > 0 ? "typed_repair" : "residual_repair",
-      retryReasonRefs,
       repairReasonRefs,
       reenterReasonRefs,
       repriceReasonRefs
     });
   }
 
-  if (reenterReasonRefs.length > 0) {
+  if (outcome.kind === "suspend" || outcome.disposition === "deferred") {
     return transition({
-      abgRuntimeTransitionProjection,
-      disposition: "re-enter",
-      explanationCode: "typed_reenter",
-      retryReasonRefs,
-      reenterReasonRefs,
-      repriceReasonRefs
-    });
-  }
-
-  if (repriceReasonRefs.length > 0) {
-    return transition({
-      abgRuntimeTransitionProjection,
-      disposition: "reprice",
-      explanationCode: "typed_reprice",
-      retryReasonRefs,
-      repriceReasonRefs
-    });
-  }
-
-  if (input.yieldResumeBasis !== null) {
-    return transition({
-      abgRuntimeTransitionProjection,
+      abgIterationOutcomeProjection,
       disposition: "yield",
       explanationCode: "yield_progress",
       retryReasonRefs,
@@ -511,48 +694,51 @@ export function deriveSdlcClosureStateTransition(input: {
     });
   }
 
-  if (retryReasonRefs.length > 0) {
+  if (outcome.disposition === "converged") {
     return transition({
-      abgRuntimeTransitionProjection,
-      disposition: "retry",
-      explanationCode: "typed_retry",
-      retryReasonRefs
-    });
-  }
-
-  if (input.edgeAssuranceDisposition === "retry") {
-    return transition({
-      abgRuntimeTransitionProjection,
-      disposition: "retry",
-      explanationCode: "edge_assurance_retry"
-    });
-  }
-
-  if (input.abgTerminalRetryRefs.length > 0) {
-    return transition({
-      abgRuntimeTransitionProjection,
-      disposition: "retry",
-      explanationCode: "abg_terminal_retry",
-      retryReasonRefs: input.abgTerminalRetryRefs
-    });
-  }
-
-  if (input.edgeCanClose) {
-    return transition({
-      abgRuntimeTransitionProjection,
+      abgIterationOutcomeProjection,
       disposition: "close",
       explanationCode: "closed"
     });
   }
 
+  if (outcome.reEntryPoint !== null) {
+    return transition({
+      abgIterationOutcomeProjection,
+      disposition: "reprice",
+      explanationCode: "typed_reprice",
+      retryReasonRefs,
+      repairReasonRefs,
+      reenterReasonRefs,
+      repriceReasonRefs: uniqueSorted([
+        ...repriceReasonRefs,
+        ...(input.edgeAssuranceDisposition === "reprice" ? edgeAssuranceRef : [])
+      ])
+    });
+  }
+
   return transition({
-    abgRuntimeTransitionProjection,
+    abgIterationOutcomeProjection,
     disposition: "block",
     explanationCode:
-      input.edgeAssuranceDisposition === "block"
-        ? "edge_assurance_block"
-        : "unsupported_state_block",
-    blockReasonRefs: uniqueSorted(input.residualPressureRefs)
+      typedBlockReasonRefs.length > 0
+        ? "typed_block_or_triage"
+        : residualTriageReasonRefs.length > 0
+          ? "residual_triage"
+          : input.edgeAssuranceDisposition === "block"
+            ? "edge_assurance_block"
+            : "unsupported_state_block",
+    retryReasonRefs,
+    repairReasonRefs,
+    reenterReasonRefs,
+    repriceReasonRefs,
+    blockReasonRefs: uniqueSorted([
+      ...blockReasonRefs,
+      ...(input.edgeAssuranceDisposition === "block" ? edgeAssuranceRef : []),
+      ...(blockReasonRefs.length === 0 && input.edgeAssuranceDisposition !== "block"
+        ? input.residualPressureRefs
+        : [])
+    ])
   });
 }
 

@@ -74,15 +74,15 @@
     "test:t099": "npm run build:semantic && node --test test_env/tests/test_t099_tranched_indexed_pressure.test.mjs",
     "test:t100": "npm run build:semantic && node --test test_env/tests/test_t066_product_materialization_contract.test.mjs",
     "test:t101": "npm run build:semantic && node --test test_env/tests/test_t101_retry_report_rejection_loop.test.mjs",
-    "test:t102-t110:abg37-sandbox": "npm run build:semantic && node --test test_env/sandbox/test_t102_t109_abg37_semantic_ledger_sandbox.test.mjs",
-    "test:t102-t110:abg37-live": "npm run build:semantic && node --test test_env/live/test_t102_t109_abg37_live_semantic_ledger.test.mjs",
-    "test:t110:abg37-sandbox": "npm run build:semantic && node --test test_env/tests/test_t110_abg37_callout_projection.test.mjs",
-    "test:t110:abg37-live": "npm run build:semantic && node --test test_env/live/test_t110_live_agent_pty_installed_operator.test.mjs",
+    "test:t102-t110:semantic-ledger-sandbox": "npm run build:semantic && node --test test_env/sandbox/test_t102_t109_abg37_semantic_ledger_sandbox.test.mjs",
+    "test:t102-t110:semantic-ledger-live": "npm run build:semantic && node --test test_env/live/test_t102_t109_abg37_live_semantic_ledger.test.mjs",
+    "test:t110:typed-callout-sandbox": "npm run build:semantic && node --test test_env/tests/test_t110_typed_callout_projection.test.mjs",
+    "test:t110:typed-callout-live": "npm run build:semantic && node --test test_env/live/test_t110_live_agent_pty_installed_operator.test.mjs",
     "test:t109:data-mapper-live": "ODD_SDLC_TS_TEST_RUN_ROOT=${ODD_SDLC_TS_TEST_RUN_ROOT:-test_env/test_runs} npm run build:semantic && npm run guard:data-mapper-boundary && ODD_SDLC_TS_TEST_RUN_ROOT=${ODD_SDLC_TS_TEST_RUN_ROOT:-test_env/test_runs} node --test test_env/live/test_t109_live_installed_data_mapper_pty.test.mjs",
     "test:t115:data-mapper-repair-live": "ODD_SDLC_TS_TEST_RUN_ROOT=${ODD_SDLC_TS_TEST_RUN_ROOT:-test_env/test_runs} npm run build:semantic && npm run guard:data-mapper-boundary && ODD_SDLC_TS_TEST_RUN_ROOT=${ODD_SDLC_TS_TEST_RUN_ROOT:-test_env/test_runs} node --test test_env/live/test_t115_live_installed_data_mapper_repair_flow.test.mjs",
     "test:t122": "npm run build:semantic && node --test test_env/tests/test_t122_feature_scope_closure.test.mjs",
     "test:t123": "npm run build:semantic && node --test test_env/tests/test_t123_per_edge_traversal_strategy.test.mjs",
-    "test:t129": "npm run build:semantic && node --test test_env/tests/test_t129_abg37_evaluator_substrate.test.mjs",
+    "test:t129": "npm run build:semantic && node --test test_env/tests/test_t129_evaluator_substrate.test.mjs",
     "test:t131": "ODD_SDLC_TS_TEST_RUN_ROOT=${ODD_SDLC_TS_TEST_RUN_ROOT:-test_env/test_runs} npm run build:semantic && ODD_SDLC_TS_TEST_RUN_ROOT=${ODD_SDLC_TS_TEST_RUN_ROOT:-test_env/test_runs} node --test test_env/live/test_t131_guided_odd_chat_live_build.test.mjs",
     "test:t131:guided-odd-chat-live": "ODD_SDLC_TS_TEST_RUN_ROOT=${ODD_SDLC_TS_TEST_RUN_ROOT:-test_env/test_runs} ODD_SDLC_TS_T131_GUIDED_ODD_CHAT_LIVE=1 npm run test:t131",
     "test:t132": "npm run build:semantic && node --test --test-name-pattern \"T-132 JavaScript hello-world bootstrap induction\" test_env/sandbox/test_scenario_sandbox.test.mjs",
@@ -152,13 +152,15 @@
     "test:t174:four-lane-live": "npm run test:scenario:t174-four-lane-hello-world-js-live",
     "test:t175": "npm run build:semantic && node --test test_env/tests/test_t175_source_truth_migration.test.mjs",
     "test:t179": "npm run build:semantic && node --test test_env/tests/test_t179_epistemology_compliance.test.mjs",
-    "test:t180": "npm run build:semantic && node --test test_env/tests/test_t180_abg_3_9_current_staged_compute_boundary.test.mjs",
+    "test:t180": "npm run build:semantic && node --test test_env/tests/test_t180_abg_4_current_staged_compute_boundary.test.mjs",
     "test:t181": "npm run build:semantic && node --test test_env/tests/test_t181_fp_evaluator_design_register.test.mjs",
     "test:t182": "npm run build:semantic && node --test test_env/tests/test_t182_fp_review_grade_edge_fulfillment.test.mjs",
     "test:t183": "npm run build:semantic && node --test test_env/tests/test_t181_fp_evaluator_design_register.test.mjs test_env/tests/test_t182_fp_review_grade_edge_fulfillment.test.mjs test_env/tests/test_t183_plugin_trace_ledger.test.mjs test_env/tests/test_t171_component_depth_target_carrier_envelope.test.mjs test_env/tests/test_t116_design_depth_steel_thread.test.mjs test_env/tests/test_b086_fd_disambiguation_sweep.test.mjs",
     "test:t184": "npm run build:semantic && node --test test_env/tests/test_t184_handoff_partition_boundary.test.mjs",
     "test:t188": "npm run build:semantic && npm run guard:data-mapper-boundary && node --test test_env/tests/test_t188_fp_depth_iteration_closure.test.mjs test_env/tests/test_t188_data_mapper_lite_fixture.test.mjs test_env/tests/test_t188_closure_state_machine.test.mjs",
+    "test:t192": "npm run build:semantic && node --test test_env/tests/test_t192_evaluation_grid_prompt_contract.test.mjs",
     "test:t188:data-mapper-lite-lifecycle-live": "npm run build:semantic && npm run guard:data-mapper-boundary && node test_env/live/run_t188_data_mapper_lite_lifecycle.mjs",
+    "test:t194": "npm run build:semantic && node --test test_env/tests/test_t194_gtl_program_conformance.test.mjs",
     "live:data-mapper-sandbox": "npm run build:semantic && npm run guard:data-mapper-boundary && node test_env/live/run_full_external_data_mapper_sandbox.mjs",
     "live:data-mapper-steel-thread-sandbox": "ODD_SDLC_TS_DATA_MAPPER_LANE_NAME=data_mapper_steel_thread_sandbox ODD_SDLC_TS_TRAVERSAL_STRATEGY_PROFILE=steel_thread_after_requirements npm run live:data-mapper-sandbox",
     "test:scenario-sandbox": "npm run build:semantic && node --test test_env/sandbox/test_scenario_sandbox.test.mjs",
@@ -184,6 +186,6 @@
     "typescript": "6.0.3"
   },
   "dependencies": {
-    "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.9.0-rc.10/abiogenesis-typescript-tenant-3.9.0-rc.10.tgz"
+    "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/latest/abiogenesis-typescript-tenant-4.0.0-rc.4.tgz"
   }
 }

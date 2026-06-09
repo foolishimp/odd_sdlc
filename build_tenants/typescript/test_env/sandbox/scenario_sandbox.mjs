@@ -234,6 +234,19 @@ function observedHandoffEdgeSequence(workspace) {
     });
 }
 
+function observedHandoffEdgesIncludeInOrder(observed, expected) {
+  let cursor = 0;
+  for (const edge of observed) {
+    if (edge === expected[cursor]) {
+      cursor += 1;
+      if (cursor === expected.length) {
+        return true;
+      }
+    }
+  }
+  return expected.length === 0;
+}
+
 function handoffArchiveGroups(workspace) {
   const groups = [];
   for (const archiveRoot of operatorRunRoots(workspace)) {
@@ -358,6 +371,84 @@ function selectedEdgeAssuranceArchive(records) {
     return closure?.disposition === "close";
   });
   return closed.at(-1) ?? complete.at(-1) ?? records.at(-1) ?? null;
+}
+
+function filePathFromRef(ref) {
+  if (typeof ref !== "string" || ref.length === 0) return null;
+  if (ref.startsWith("file://")) {
+    try {
+      return fileURLToPath(ref);
+    } catch {
+      return null;
+    }
+  }
+  return path.isAbsolute(ref) ? ref : null;
+}
+
+function assertScenarioExecutionEvidence(result, scenario, expectation) {
+  if (expectation === null || typeof expectation !== "object") {
+    throw new Error(`${scenario.scenarioId}: executionEvidence expectation must be an object`);
+  }
+  const edgeName =
+    typeof expectation.edgeName === "string" && expectation.edgeName.length > 0
+      ? expectation.edgeName
+      : "derive_test_execution_result_surface";
+  const group = handoffArchiveGroups(result.workspace).find(
+    (candidate) => candidate.edgeName === edgeName
+  );
+  if (group === undefined) {
+    throw new Error(`${scenario.scenarioId}: execution evidence edge ${edgeName} not observed`);
+  }
+  const archive = selectedEdgeAssuranceArchive(group.records);
+  if (archive === null) {
+    throw new Error(`${scenario.scenarioId}: execution evidence edge ${edgeName} has no archive`);
+  }
+  const report = readRequiredJsonFile(
+    path.join(archive.archiveRoot, "worker_result_report.json"),
+    `${scenario.scenarioId}: ${edgeName} worker_result_report.json`
+  );
+  const outputFile = filePathFromRef(report.outputFile);
+  if (outputFile === null) {
+    throw new Error(`${scenario.scenarioId}: ${edgeName} report outputFile is not a file ref`);
+  }
+  const evidence = readRequiredJsonFile(
+    outputFile,
+    `${scenario.scenarioId}: ${edgeName} execution evidence output`
+  );
+  if (evidence.kind !== "sdlc_worker_execution_evidence") {
+    throw new Error(
+      `${scenario.scenarioId}: ${edgeName} output is ${evidence.kind}, expected sdlc_worker_execution_evidence`
+    );
+  }
+  if (typeof expectation.status === "string" && evidence.status !== expectation.status) {
+    throw new Error(
+      `${scenario.scenarioId}: ${edgeName} execution status ${evidence.status}, expected ${expectation.status}`
+    );
+  }
+  if (
+    typeof expectation.commandIncludes === "string" &&
+    !String(evidence.command ?? "").includes(expectation.commandIncludes)
+  ) {
+    throw new Error(
+      `${scenario.scenarioId}: ${edgeName} execution command does not include ${expectation.commandIncludes}`
+    );
+  }
+  if (typeof expectation.stdoutIncludes === "string") {
+    const stdoutText = (Array.isArray(evidence.shardEvidence)
+      ? evidence.shardEvidence
+      : []
+    )
+      .flatMap((shard) => Array.isArray(shard.reportRefs) ? shard.reportRefs : [])
+      .map(filePathFromRef)
+      .filter((ref) => ref !== null && ref.endsWith(".stdout.log"))
+      .map((filePath) => existsSync(filePath) ? readFileSync(filePath, "utf8") : "")
+      .join("\n");
+    if (!stdoutText.includes(expectation.stdoutIncludes)) {
+      throw new Error(
+        `${scenario.scenarioId}: ${edgeName} execution stdout does not include ${expectation.stdoutIncludes}`
+      );
+    }
+  }
 }
 
 function assertNonEmptyString(value, label) {
@@ -893,6 +984,16 @@ export async function runScenarioSandbox(scenario, options = {}) {
     ) {
       break;
     }
+    if (
+      scenario.stopAfterRequiredHandoffEdges === true &&
+      Array.isArray(scenario.expectations?.requiredHandoffEdges) &&
+      observedHandoffEdgesIncludeInOrder(
+        compressConsecutiveValues(observedHandoffEdgeSequence(workspace)),
+        scenario.expectations.requiredHandoffEdges
+      )
+    ) {
+      break;
+    }
     if (isStopStatus(lastStatus, stopStatuses)) break;
     if (
       scenario.stopAfterGraphClose === true &&
@@ -1086,6 +1187,16 @@ export function assertScenarioExpectations(result, scenario) {
       );
     }
   }
+  if (Array.isArray(expectations.requiredHandoffEdges)) {
+    const observed = compressConsecutiveValues(
+      observedHandoffEdgeSequence(result.workspace)
+    );
+    if (!observedHandoffEdgesIncludeInOrder(observed, expectations.requiredHandoffEdges)) {
+      throw new Error(
+        `${scenario.scenarioId}: required handoff edges missing — expected ${expectations.requiredHandoffEdges.join(" -> ")} in order, saw ${observed.join(" -> ")}`
+      );
+    }
+  }
   if (expectations.firstHandoffOverlayRef !== undefined) {
     const manifest = firstHandoffManifest(result.workspace);
     const overlayRef = manifest?.overlayRef;
@@ -1105,6 +1216,9 @@ export function assertScenarioExpectations(result, scenario) {
     result,
     expectations.liveFpParallelMaterializationFrontier
   );
+  if (expectations.executionEvidence !== undefined) {
+    assertScenarioExecutionEvidence(result, scenario, expectations.executionEvidence);
+  }
   if (Array.isArray(expectations.processChecks)) {
     for (const check of expectations.processChecks) {
       const command = check?.command;

@@ -302,7 +302,18 @@ test("T-030 materializes executive graph functions through ABIogenesis GTL carri
   const operationalProbe = deriveTraversalStructureProbe(operationalBasis);
 
   assert.equal(bootstrapBasis.graph.vectors.length, 22);
-  assert.equal(authorityConformanceBasis.graph.vectors.length, 1);
+  assert.equal(authorityConformanceBasis.graph.vectors.length, 6);
+  assert.deepStrictEqual(
+    authorityConformanceBasis.graph.vectors.map((vector) => vector.target.name),
+    [
+      "project_bootstrap_surface",
+      "intent_surface",
+      "product_surface",
+      "goal_surface",
+      "project_authority_conformance_projection",
+      "project_authority_next_action_projection"
+    ]
+  );
   assert.equal(operationalBasis.graph.vectors.length, 7);
   assert.equal(bootstrapProbe.edge, "derive_intent_surface");
   assert.equal(authorityConformanceProbe.edge, FG_CONFORM_PROJECT_AUTHORITY);

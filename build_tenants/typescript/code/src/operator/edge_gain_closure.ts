@@ -199,7 +199,8 @@ function refRequiresRepairReentry(ref: string): boolean {
   const decoded = decodedRefForPressureClassification(ref);
   return (
     decoded.includes("component_repair_schedule_repair_required") ||
-    decoded.includes("component_repair_schedule_row:")
+    decoded.includes("component_repair_schedule_row:") ||
+    decoded.includes("test_execution_result_failed")
   );
 }
 

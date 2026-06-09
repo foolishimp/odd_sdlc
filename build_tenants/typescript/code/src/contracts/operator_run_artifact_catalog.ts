@@ -139,6 +139,16 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     admissionRef: null
   }),
   row({
+    artifactRef: "operator-run-artifact://worker-prompt-asset",
+    relativePath: "worker_prompt_asset.json",
+    carrierKind: "sdlc_prompt_invocation_asset",
+    role: "worker_projection",
+    sourceOwner: "handoff_projection",
+    requiredForPresentEdge: false,
+    malformedGapTracked: true,
+    admissionRef: "admission://odd-sdlc/operator-run/worker-prompt-asset"
+  }),
+  row({
     artifactRef: "operator-run-artifact://worker-stdout",
     relativePath: "worker_stdout.log",
     carrierKind: null,
@@ -220,6 +230,17 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     requiredForPresentEdge: false,
     malformedGapTracked: false,
     admissionRef: null
+  }),
+  row({
+    artifactRef: "operator-run-artifact://review-grade-edge-fulfillment-prompt-asset",
+    relativePath: "review_grade_edge_fulfillment_prompt_asset.json",
+    carrierKind: "sdlc_prompt_invocation_asset",
+    role: "worker_projection",
+    sourceOwner: "installed_operator",
+    requiredForPresentEdge: false,
+    malformedGapTracked: true,
+    admissionRef:
+      "admission://odd-sdlc/operator-run/review-grade-edge-fulfillment-prompt-asset"
   }),
   row({
     artifactRef: "operator-run-artifact://review-grade-edge-fulfillment-postflight",
@@ -348,6 +369,17 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     admissionRef: null
   }),
   row({
+    artifactRef: "operator-run-artifact://design-depth-fp-evaluator-prompt-asset",
+    relativePath: "design_depth_fp_evaluator_prompt_asset.json",
+    carrierKind: "sdlc_prompt_invocation_asset",
+    role: "worker_projection",
+    sourceOwner: "installed_operator",
+    requiredForPresentEdge: false,
+    malformedGapTracked: true,
+    admissionRef:
+      "admission://odd-sdlc/operator-run/design-depth-fp-evaluator-prompt-asset"
+  }),
+  row({
     artifactRef: "operator-run-artifact://design-depth-fp-evaluator-stdout",
     relativePath: "design_depth_fp_evaluator_stdout.log",
     carrierKind: null,
@@ -396,6 +428,17 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     requiredForPresentEdge: false,
     malformedGapTracked: true,
     admissionRef: "admission://odd-sdlc/operator-run/design-depth-fp-evaluator-process-events"
+  }),
+  row({
+    artifactRef: "operator-run-artifact://design-depth-fp-evaluator-postflight",
+    relativePath: "design_depth_fp_evaluator_postflight.json",
+    carrierKind: "sdlc_operator_postflight_result",
+    role: "authority_admission",
+    sourceOwner: "installed_operator",
+    requiredForPresentEdge: false,
+    requiredWhen: "implementation_design_surface_present",
+    malformedGapTracked: true,
+    admissionRef: "admission://odd-sdlc/operator-run/design-depth-fp-evaluator-postflight"
   }),
   row({
     artifactRef: "operator-run-artifact://fp-evaluator-postflight",

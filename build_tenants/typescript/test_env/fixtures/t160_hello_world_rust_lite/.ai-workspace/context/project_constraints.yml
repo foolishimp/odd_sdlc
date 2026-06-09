@@ -17,5 +17,6 @@ build_tenants:
     language: Rust
     build_tool: cargo
     test_runner: cargo
+    test_execution_contract: cargo run --quiet
     module_structure:
       - hello_world_rust

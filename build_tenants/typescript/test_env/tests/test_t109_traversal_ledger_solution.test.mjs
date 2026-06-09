@@ -1,5 +1,5 @@
 // Validates: T-109
-// Validates: ABG-3.7-traversal-ledger-proof-routing
+// Validates: semantic-ledger-proof-routing
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -12,14 +12,14 @@ import * as oddSdlcTenant from "../../build/semantic/code/src/index.js";
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
 
-test("T-109 local product-ledger API is retired in favor of the ABG 3.7 semantic-ledger sandbox lane", () => {
+test("T-109 local product-ledger API is retired in favor of the semantic-ledger sandbox lane", () => {
   const packageJson = JSON.parse(
     readFileSync(path.join(PACKAGE_ROOT, "package.json"), "utf8")
   );
 
   assert.equal(
-    packageJson.scripts["test:t102-t110:abg37-sandbox"].includes(
-      "test_env/sandbox/test_t102_t109_abg37_semantic_ledger_sandbox.test.mjs"
+    packageJson.scripts["test:t102-t110:semantic-ledger-sandbox"].includes(
+      "semantic_ledger_sandbox.test.mjs"
     ),
     true
   );

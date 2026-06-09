@@ -283,6 +283,13 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
   const jsLite = t160HelloWorldJsLiteLiveScenario({ worker });
   assert.deepEqual(jsLite.startTarget, "overlay:lite-design-module-implementation");
   assert(jsLite.maxAdvances <= 4);
+  assert.deepEqual(jsLite.expectations.requiredHandoffEdges, [
+    "derive_lite_component_code_surface",
+    "prepare_test_execution_surface",
+    "derive_test_execution_result_surface"
+  ]);
+  assert.equal(jsLite.stopAfterWorkspaceFilesExist, false);
+  assert.equal(jsLite.stopAfterRequiredHandoffEdges, true);
   const rustServiceLive = t164RustHelloServiceLiteLiveScenario({ worker });
   assert.deepEqual(
     scenarioStartTargetForStep(rustServiceLive, 0),
@@ -301,14 +308,30 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
     rustServiceLive.expectations.handoffEdgeSequencePrefix[0],
     "derive_intent_surface"
   );
+  assert.deepEqual(rustServiceLive.expectations.requiredHandoffEdges, [
+    "derive_lite_component_code_surface",
+    "prepare_test_execution_surface",
+    "derive_test_execution_result_surface"
+  ]);
+  assert.deepEqual(
+    scenarioStartTargetForStep(rustServiceLive, 4),
+    "overlay:lite-design-module-implementation"
+  );
+  assert.deepEqual(
+    scenarioStartTargetForStep(rustServiceLive, 5),
+    "overlay:lite-design-module-implementation"
+  );
   assert.deepEqual(
     rustServiceLive.expectations.edgeAssuranceArchiveSequencePrefix,
     rustServiceLive.expectations.handoffEdgeSequencePrefix
   );
-  assert.deepEqual(
-    rustServiceLive.expectations.processChecks[0].stdout,
-    "helloworld"
-  );
+  assert.equal(rustServiceLive.expectations.processChecks, undefined);
+  assert.deepEqual(rustServiceLive.expectations.executionEvidence, {
+    edgeName: "derive_test_execution_result_surface",
+    status: "succeeded",
+    commandIncludes: "cargo run",
+    stdoutIncludes: "helloworld"
+  });
   const parallelHelloLive = t174ParallelHelloWorldJsLiveScenario({ worker });
   assert.deepEqual(
     scenarioStartTargetForStep(parallelHelloLive, 0),
@@ -364,15 +387,23 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
     variant: "third_party_model_variant"
   });
   assert.deepEqual(mindforgeLive.startTarget, "overlay:lite-design-module-implementation");
-  assert(mindforgeLive.maxAdvances <= 3);
+  assert(mindforgeLive.maxAdvances <= 4);
   assert.deepEqual(
     mindforgeLive.expectations.handoffEdgeSequencePrefix,
     [
       "derive_lite_design_adr_surface",
-      "derive_lite_module_surface",
-      "derive_lite_component_code_surface"
+      "derive_lite_component_code_surface",
+      "prepare_test_execution_surface",
+      "derive_test_execution_result_surface"
     ]
   );
+  assert.deepEqual(mindforgeLive.expectations.requiredHandoffEdges, [
+    "derive_lite_component_code_surface",
+    "prepare_test_execution_surface",
+    "derive_test_execution_result_surface"
+  ]);
+  assert.equal(mindforgeLive.stopAfterWorkspaceFilesExist, false);
+  assert.equal(mindforgeLive.stopAfterRequiredHandoffEdges, true);
   assert.deepEqual(
     mindforgeLive.expectations.processChecks[0].stdoutJson.equals.controlPath,
     mindforgeLive.expectedGovernanceOutput.controlPath
@@ -965,6 +996,75 @@ test("scenario sandbox: process checks can assert JSON stdout fields", () => {
               }
             }
           ]
+        }
+      }
+    )
+  );
+});
+
+test("scenario sandbox: execution evidence expectation is graph-edge owned", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-execution-evidence-"));
+  const runRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs/20260608T000000000Z_pid1"
+  );
+  mkdirSync(runRoot, { recursive: true });
+  writeEdgeAssuranceArchive(runRoot, "derive_test_execution_result_surface");
+  const stdoutPath = path.join(runRoot, "installed_operator_execution/rust.stdout.log");
+  const evidencePath = path.join(runRoot, "test_execution_result_surface.json");
+  mkdirSync(path.dirname(stdoutPath), { recursive: true });
+  writeFileSync(stdoutPath, "helloworld\n", "utf8");
+  writeJson(path.join(runRoot, "worker_result_report.json"), {
+    kind: "sdlc_worker_result_report",
+    targetAssetType: "test_execution_result_surface",
+    outputFile: evidencePath
+  });
+  writeJson(evidencePath, {
+    kind: "sdlc_worker_execution_evidence",
+    lane: "test",
+    command: "cargo run --quiet && curl http://127.0.0.1:18182/",
+    status: "succeeded",
+    reportRefs: [stdoutPath],
+    testsObserved: 1,
+    passedCount: 1,
+    failedCount: 0,
+    shardEvidence: [
+      {
+        kind: "sdlc_worker_execution_shard_evidence",
+        shardId: "test-shard-01-rust",
+        moduleName: "hello_world_rust_service",
+        lane: "test",
+        command: "cargo run --quiet && curl http://127.0.0.1:18182/",
+        status: "succeeded",
+        reportRefs: [stdoutPath],
+        testsObserved: 1,
+        passedCount: 1,
+        failedCount: 0
+      }
+    ]
+  });
+
+  assert.doesNotThrow(() =>
+    assertScenarioExpectations(
+      {
+        workspace,
+        advances: [
+          {
+            gaps: { payload: {} },
+            start: { payload: {} }
+          }
+        ]
+      },
+      {
+        scenarioId: "execution-evidence-regression",
+        expectations: {
+          requiredHandoffEdges: ["derive_test_execution_result_surface"],
+          executionEvidence: {
+            edgeName: "derive_test_execution_result_surface",
+            status: "succeeded",
+            commandIncludes: "cargo run",
+            stdoutIncludes: "helloworld"
+          }
         }
       }
     )

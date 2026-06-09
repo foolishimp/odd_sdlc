@@ -6,12 +6,20 @@
   "buildConfigTargets": [
     "Cargo.toml"
   ],
+  "byproductRules": [
+    "Cargo.lock",
+    "target/"
+  ],
   "testingTechStack": {
     "testMode": "local_http_service_smoke",
     "testBuildConfigTargets": [
       "Cargo.toml"
     ],
-    "evidenceFormat": "process-exit-plus-http-response"
+    "evidenceFormat": "process-exit-plus-http-response",
+    "byproductRules": [
+      "Cargo.lock",
+      "target/"
+    ]
   },
   "dependencyPolicy": "no_external_runtime_crates",
   "runtime": {

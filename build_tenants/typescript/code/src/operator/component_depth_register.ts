@@ -35,6 +35,10 @@ import {
   SDLC_COMPONENT_REPAIR_SCHEDULE_STATUSES,
   SDLC_COMPONENT_REPAIR_TARGETS
 } from "./carriers.js";
+import {
+  sdlcTargetCarrierContractRef,
+  sdlcTargetCarrierOutputKind
+} from "../graph/target_carrier_contracts.js";
 
 const COMPONENT_DEPTH_TARGETS = Object.freeze([
   "component_code_surface",
@@ -47,10 +51,90 @@ const COMPONENT_DEPTH_TARGETS = Object.freeze([
 
 type ComponentDepthTarget = (typeof COMPONENT_DEPTH_TARGETS)[number];
 
+const INVALID_COMPONENT_DEPTH_CANDIDATE_KIND =
+  "invalid_component_depth_candidate" as const;
+
+interface InvalidComponentDepthCandidate {
+  readonly kind: typeof INVALID_COMPONENT_DEPTH_CANDIDATE_KIND;
+  readonly reason: string;
+}
+
+export const SDLC_COMPONENT_DEPTH_REGISTER_CONTRACT_TRACE = Object.freeze({
+  kind: "sdlc_component_depth_register_contract_trace",
+  owner: "downstream_product_read_model",
+  registerVersion: "ts-component-depth-v1",
+  targetAssetTypes: COMPONENT_DEPTH_TARGETS,
+  gtlRequirementRefs: Object.freeze([
+    "REQ-L-GTL3-CONTRACT-LAW-API",
+    "REQ-L-GTL3-GRAPHVECTOR"
+  ]),
+  gtlTargetCarrierFamilyRef: "gtl://target-carrier-family/odd-sdlc/sdlc-output",
+  gtlTargetCarrierEnvelopeRef: "gtl://target-carrier-envelope/odd-sdlc/sdlc-output-v1",
+  abgAdmissionSurfaceRef: "admitComponentDepthRegisterFromArtifact"
+} as const);
+
 function isComponentDepthTarget(
   targetAssetType: string
 ): targetAssetType is ComponentDepthTarget {
   return COMPONENT_DEPTH_TARGETS.some((target) => target === targetAssetType);
+}
+
+function componentDepthTargetCarrierEnvelope(input: {
+  readonly record: Readonly<Record<string, unknown>>;
+  readonly payload: Readonly<Record<string, unknown>>;
+  readonly label: string;
+}): void {
+  const targetAssetType = parseNonEmptyString(
+    input.record["targetAssetType"],
+    `${input.label}.targetAssetType`
+  );
+  if (!isComponentDepthTarget(targetAssetType)) {
+    throw new TypeError(`${input.label}.targetAssetType: unsupported component-depth target`);
+  }
+  const payloadTargetAssetType = parseNonEmptyString(
+    input.payload["targetAssetType"],
+    `${input.label}.payload.targetAssetType`
+  );
+  if (payloadTargetAssetType !== targetAssetType) {
+    throw new TypeError(
+      `${input.label}.targetAssetType: envelope target ${targetAssetType} does not match payload target ${payloadTargetAssetType}`
+    );
+  }
+  const edgeRef = parseNonEmptyString(input.record["edgeRef"], `${input.label}.edgeRef`);
+  admitExactProtocolString({
+    value: input.record["kind"],
+    label: `${input.label}.kind`,
+    expected: sdlcTargetCarrierOutputKind(targetAssetType)
+  });
+  admitExactProtocolString({
+    value: input.record["contractRef"],
+    label: `${input.label}.contractRef`,
+    expected: sdlcTargetCarrierContractRef({ edgeRef, targetAssetType })
+  });
+  const contractDigest = parseNonEmptyString(
+    input.record["contractDigest"],
+    `${input.label}.contractDigest`
+  );
+  if (!contractDigest.startsWith("sha256:")) {
+    throw new TypeError(`${input.label}.contractDigest: expected sha256 digest`);
+  }
+}
+
+function invalidComponentDepthCandidate(reason: string): InvalidComponentDepthCandidate {
+  return Object.freeze({
+    kind: INVALID_COMPONENT_DEPTH_CANDIDATE_KIND,
+    reason
+  });
+}
+
+function isInvalidComponentDepthCandidate(
+  input: unknown
+): input is InvalidComponentDepthCandidate {
+  const record = recordValue(input);
+  return (
+    record?.["kind"] === INVALID_COMPONENT_DEPTH_CANDIDATE_KIND &&
+    typeof record["reason"] === "string"
+  );
 }
 
 export function parseComponentTopologyRow(
@@ -545,25 +629,21 @@ function recordValue(input: unknown): Readonly<Record<string, unknown>> | null {
 function parsedComponentDepthCandidates(input: unknown, label: string): readonly unknown[] {
   const candidates: unknown[] = [input];
   const record = recordValue(input);
-  const payload = recordValue(record?.["payload"]);
-  if (payload?.["kind"] === "sdlc_component_depth_register") {
-    const envelopeTargetAssetType = record?.["targetAssetType"];
-    if (
-      envelopeTargetAssetType !== undefined &&
-      typeof envelopeTargetAssetType !== "string"
-    ) {
-      throw new TypeError(`${label}.targetAssetType: expected string`);
+  if (record !== null) {
+    const payloadCandidate = recordValue(record["payload"]);
+    if (payloadCandidate?.["kind"] === "sdlc_component_depth_register") {
+      const payload = payloadCandidate;
+      try {
+        componentDepthTargetCarrierEnvelope({ record, payload, label });
+        return Object.freeze([payload]);
+      } catch (error) {
+        return Object.freeze([
+          invalidComponentDepthCandidate(
+            error instanceof Error ? error.message : String(error)
+          )
+        ]);
+      }
     }
-    if (record?.["edgeRef"] !== undefined) {
-      parseNonEmptyString(record["edgeRef"], `${label}.edgeRef`);
-    }
-    if (record?.["contractRef"] !== undefined) {
-      parseNonEmptyString(record["contractRef"], `${label}.contractRef`);
-    }
-    if (record?.["contractDigest"] !== undefined) {
-      parseNonEmptyString(record["contractDigest"], `${label}.contractDigest`);
-    }
-    return Object.freeze([payload]);
   }
   return Object.freeze(candidates);
 }
@@ -623,6 +703,19 @@ function jsonCandidates(content: string): readonly unknown[] {
   ];
   for (const block of markdownFencedJsonBlocks(content)) {
     candidates.push(...parseJsonCandidates(block.content, block.label));
+    const body = block.content.trimStart();
+    const registerLabelMatch =
+      /^(?:json\s+)?component_depth_register[^\S\r\n]*(?:\r?\n)([\s\S]*)$/u.exec(
+        body
+      );
+    if (registerLabelMatch !== null) {
+      candidates.push(
+        ...parseJsonCandidates(
+          registerLabelMatch[1] ?? "",
+          `${block.label}:component_depth_register_body`
+        )
+      );
+    }
   }
   return Object.freeze(candidates);
 }
@@ -689,6 +782,10 @@ export function admitComponentDepthRegisterFromArtifact(input: {
   const content = readFileSync(input.outputFile, "utf8");
   const errors: string[] = [];
   for (const candidate of jsonCandidates(content)) {
+    if (isInvalidComponentDepthCandidate(candidate)) {
+      errors.push(candidate.reason);
+      continue;
+    }
     try {
       const register = parseRegister(candidate, "component_depth_register");
       if (register.targetAssetType !== input.targetAssetType) {

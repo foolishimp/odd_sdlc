@@ -9,11 +9,9 @@ import {
 } from "../shared/validation.js";
 import type {
   SdlcComputeSubworkstreamManifest,
-  SdlcComputeSubworkstreamMergeDisposition,
   SdlcComputeSubworkstreamMergeResult,
   SdlcComputeSubworkstreamRow,
   SdlcComputeSubworkstreamStageRef,
-  SdlcComputeSubworkstreamStatus,
   SdlcWorkerHandoffManifest
 } from "./carriers.js";
 
@@ -249,7 +247,7 @@ function admitSubworkstreamRow(input: {
       record["status"],
       `${input.label}.status`,
       SDLC_COMPUTE_SUBWORKSTREAM_STATUSES
-    ) as SdlcComputeSubworkstreamStatus,
+    ),
     blockingReasonRefs: parseStringList(
       record["blockingReasonRefs"],
       `${input.label}.blockingReasonRefs`
@@ -262,7 +260,7 @@ function admitSubworkstreamRow(input: {
       record["mergeDisposition"],
       `${input.label}.mergeDisposition`,
       SDLC_COMPUTE_SUBWORKSTREAM_MERGE_DISPOSITIONS
-    ) as SdlcComputeSubworkstreamMergeDisposition
+    )
   });
 }
 

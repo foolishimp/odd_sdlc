@@ -309,7 +309,19 @@ test("T-164 current-full overlay vectors all have gain and closure contract rows
   });
   const uniqueCurrentFullVectorRefs = unique(currentFull.graphVectorRefs);
 
-  assert.equal(uniqueCurrentFullVectorRefs.length, 30);
+  assert.equal(uniqueCurrentFullVectorRefs.length, 35);
+  assert.deepStrictEqual(
+    uniqueCurrentFullVectorRefs.filter((graphVectorRef) =>
+      graphVectorRef.startsWith("Fg_conform_project__")
+    ).sort(),
+    [
+      "Fg_conform_project__capability_contract_surface",
+      "Fg_conform_project__conformance_gap_set",
+      "Fg_conform_project__execution_contract_surface",
+      "Fg_conform_project__module_inventory_surface",
+      "Fg_conform_project__selected_tenant_surface"
+    ]
+  );
 
   const categoryCounts = {};
   for (const graphVectorRef of uniqueCurrentFullVectorRefs) {
@@ -332,7 +344,7 @@ test("T-164 current-full overlay vectors all have gain and closure contract rows
   }
 
   assert.deepStrictEqual(categoryCounts, {
-    conformance: 1,
+    conformance: 6,
     authority_synthesis: 4,
     test_formalisation_and_planning: 3,
     solution_formalisation: 4,
@@ -352,8 +364,31 @@ test("T-164 published graph vector inventory is fully classified", () => {
     contracts: SDLC_EDGE_GAIN_CLOSURE_CONTRACTS
   });
 
-  assert.equal(publishedGraphVectorRefs.length, 50);
-  assert.equal(SDLC_EDGE_GAIN_CLOSURE_CONTRACTS.length, 50);
+  assert.equal(publishedGraphVectorRefs.length, 64);
+  assert.equal(SDLC_EDGE_GAIN_CLOSURE_CONTRACTS.length, 64);
+  assert.deepStrictEqual(
+    publishedGraphVectorRefs.filter((graphVectorRef) =>
+      graphVectorRef.startsWith("Fg_ingress_project__") ||
+      graphVectorRef.startsWith("Fg_conform_project__") ||
+      graphVectorRef.startsWith("Fg_conform_project_authority__")
+    ),
+    [
+      "Fg_conform_project__capability_contract_surface",
+      "Fg_conform_project__conformance_gap_set",
+      "Fg_conform_project__execution_contract_surface",
+      "Fg_conform_project__module_inventory_surface",
+      "Fg_conform_project__selected_tenant_surface",
+      "Fg_conform_project_authority__goal_surface",
+      "Fg_conform_project_authority__intent_surface",
+      "Fg_conform_project_authority__product_surface",
+      "Fg_conform_project_authority__project_authority_conformance_projection",
+      "Fg_conform_project_authority__project_authority_next_action_projection",
+      "Fg_ingress_project__ambiguity_register",
+      "Fg_ingress_project__bootstrap_gap_set",
+      "Fg_ingress_project__lineage_map",
+      "Fg_ingress_project__source_input_ledger"
+    ]
+  );
 
   assertSdlcEdgeGainClosureContractsRegistered({
     publishedGraphVectorRefs,
@@ -381,11 +416,11 @@ test("T-164 published graph vector inventory is fully classified", () => {
 
   assert.deepStrictEqual(classificationCounts, {
     library_only: 9,
-    close_capable: 35,
+    close_capable: 49,
     projection_only: 6
   });
   assert.deepStrictEqual(sourcePolicyCounts, {
-    strict: 49,
+    strict: 63,
     subset_allowed: 1
   });
 });
@@ -410,7 +445,7 @@ test("T-164 query domain and gaps expose edge assurance as a read-only view", ()
     queryDomain.edgeAssurance.actionClosureEvaluationFunction,
     "evaluate_action"
   );
-  assert.equal(queryDomain.edgeAssurance.rows.length, 50);
+  assert.equal(queryDomain.edgeAssurance.rows.length, 64);
   assert.deepStrictEqual(queryDomain.edgeAssurance.diagnostics, []);
   assert.equal(intentRow.edgeAssuranceContractRef, intentContractRef);
   assert.equal(intentRow.edgeAssuranceContractDigest, intentContractDigest);
@@ -490,7 +525,7 @@ test("T-164 overlay matrix covers every current overlay-selected vector", () => 
   );
 
   assert.equal(catalog.overlays.length, 5);
-  assert.equal(overlayVectorUnion.length, 32);
+  assert.equal(overlayVectorUnion.length, 37);
 
   for (const overlay of catalog.overlays) {
     assertSdlcOverlayEdgeGainClosureContracts({
@@ -501,7 +536,7 @@ test("T-164 overlay matrix covers every current overlay-selected vector", () => 
   }
 });
 
-test("T-164 lite direct implementation vector has a specialized residual-pressure row", () => {
+test("T-164 lite direct implementation vector carries downstream execution pressure", () => {
   const module = constructSdlcGtlModule();
   const catalog = constructSdlcTraversalOverlayCatalog({ module });
   const lite = overlayByRef(catalog, SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF);
@@ -520,12 +555,50 @@ test("T-164 lite direct implementation vector has a specialized residual-pressur
   }).get(FG_DERIVE_LITE_COMPONENT_CODE_SURFACE);
   assert(contract);
   assert.equal(contract.category, "implementation_encoding");
-  assert.equal(contract.compositionRole, "terminal");
+  assert.equal(contract.compositionRole, "intermediate");
   assert.equal(contract.sourceAssetPolicy, "subset_allowed");
   assert(
     contract.residualPressureRefs.includes(
       "pressure://odd-sdlc/current-full-traversal-refinement"
     )
+  );
+});
+
+test("T-164 lite overlay terminal vector is test execution result proof", () => {
+  const module = constructSdlcGtlModule();
+  const catalog = constructSdlcTraversalOverlayCatalog({ module });
+  const lite = overlayByRef(catalog, SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF);
+
+  assert.deepEqual(lite.termination.terminalAssetTypes, [
+    "test_execution_result_surface"
+  ]);
+  assert.deepEqual(lite.termination.terminalGraphFunctionRefs, [
+    "lite_design_module_implementation"
+  ]);
+  assert(
+    lite.graphVectorRefs.includes("prepare_test_execution_surface")
+  );
+  assert(
+    lite.graphVectorRefs.includes("derive_test_execution_result_surface")
+  );
+  const templates = new Map(
+    lite.assetTemplates.map((template) => [template.assetType, template])
+  );
+  assert.equal(
+    templates.get("test_execution_surface")?.producerGraphFunctionRef,
+    "prepare_test_execution_surface"
+  );
+  assert.equal(
+    templates.get("test_execution_surface")?.terminalRole,
+    "supporting_asset"
+  );
+  assert.equal(
+    templates.get("test_execution_result_surface")?.producerGraphFunctionRef,
+    "derive_test_execution_result_surface"
+  );
+  assert.equal(
+    templates.get("test_execution_result_surface")?.terminalRole,
+    "terminal_asset"
   );
 });
 

@@ -1,5 +1,5 @@
 // Validates: T-110
-// Validates: ABG-3.7-typed-callout-outcome-projection
+// Validates: typed-callout-outcome-projection
 
 import test from "node:test";
 import assert from "node:assert/strict";

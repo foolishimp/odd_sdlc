@@ -417,7 +417,11 @@ edge contract declares deterministic authority.
 | `graph/edge_gain_closure_contracts.ts` | Declarative matrix module | category templates, vector classifications, contract rows, validation diagnostics, source/target parity checks | runtime evidence, closure execution, graph traversal |
 | `graph/overlays.ts` | Overlay selection module | overlay membership and validation that selected vectors have contract rows | independent closure law |
 | `operator/edge_gain_closure.ts` | Semantic kernel module | pure derive/admit/measure/residual/close/compose functions over admitted carriers | process execution, filesystem mutation, ABG continuation |
-| `operator/handoff.ts` | Handoff carrier module | selected contract refs/digests in worker manifests and obligation context | prompt-only authority |
+| `operator/plugins/transform/launch_contract.ts` | Transform launch contract module | worker invocation package, manifest, construction brief, prompt asset refs, selected contract refs/digests in worker manifests and obligation context | evaluate, consequence, closure, or runtime truth |
+| `operator/plugins/transform/result_projection.ts` | Transform result projection module | admitted worker result report and `FpTransformResult` candidate/evidence projection | traversal selection or product closure |
+| `operator/plugins/evaluate/*` | Evaluate plugin modules | postflight checks, evaluator prompts, evaluator rule inputs, and read-only evaluation findings | transform output materialization, ABG fold, traversal transition |
+| `operator/plugins/consequence/*` | Consequence projection modules | product read-model projections over ABG-admitted state, including declared edge-output projection and repair re-entry projection | transform execution or independent action authority |
+| `operator/product_materialization/*` | Product materialization modules | workspace product-output authority, observation, replay, and manifest projection | runtime event truth or closure authority |
 | `operator/assurance_gate.ts` | Evidence admission module | conversion from postflight, worker reports, execution evidence, and ledgers into admitted evidence and gain inputs | graph-vector selection or next-action routing |
 | `operator/traversal_consequence.ts` | Consequence module | edge gain, residual pressure, and closure decision records in the consequence chain | local retry loop |
 | `operator/installed_operator.ts` | Adapter module | installed command binding, archive writing, ABG-compatible result publication | semantic closure beyond the admitted consequence |

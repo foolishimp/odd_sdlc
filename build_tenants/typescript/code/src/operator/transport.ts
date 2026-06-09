@@ -167,9 +167,7 @@ function claudeArgs(input: {
     "--setting-sources",
     "project,local",
     "--permission-mode",
-    "bypassPermissions",
-    "--disallowedTools",
-    "advisor"
+    "bypassPermissions"
   ]);
 }
 

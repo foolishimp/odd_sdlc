@@ -7,10 +7,12 @@ import { parseNonEmptyString } from "../shared/validation.js";
 import { sha256Text } from "../shared/digest.js";
 import {
   FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE,
+  FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
   FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
   FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
+  FG_PREPARE_TEST_EXECUTION_SURFACE,
   OPERATIONAL_FUNCTION_CATALOG,
   OPTIMIZED_FULL_TRAVERSAL_EXECUTIVE_STEPS,
   FG_SOLUTION_ARCHITECTURE_EXECUTIVE,
@@ -49,6 +51,7 @@ export type SdlcOverlayStopDisposition =
   | "product_converged"
   | "blocked";
 export type SdlcOverlayAssetBindingMode = "material" | "planned_from_template";
+export type SdlcOverlayReentryDisposition = "retry" | "repair" | "re-enter";
 
 export {
   SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF,
@@ -92,6 +95,12 @@ function admitSdlcOverlayBindingRef(
   return value;
 }
 
+function isSdlcOverlayReentryDisposition(
+  value: string
+): value is SdlcOverlayReentryDisposition {
+  return value === "retry" || value === "repair" || value === "re-enter";
+}
+
 export interface SdlcTraversalOverlayTermination {
   readonly policyRef: SdlcOverlayPolicyRef;
   readonly terminalAssetTypes: readonly string[];
@@ -133,6 +142,20 @@ export interface SdlcOverlayLedgerRequirement {
   readonly closureRequiresLedger: boolean;
 }
 
+export interface SdlcOverlayReentryRoute {
+  readonly kind: "sdlc_overlay_reentry_route";
+  readonly routeRef: string;
+  readonly overlayRef: SdlcTraversalOverlayRef;
+  readonly terminalGraphFunctionRef: string;
+  readonly sourceGraphVectorName: string;
+  readonly sourceGraphVectorRef: string;
+  readonly targetGraphVectorName: string;
+  readonly targetGraphVectorRef: string;
+  readonly targetNodeRef: string;
+  readonly closureDispositions: readonly SdlcOverlayReentryDisposition[];
+  readonly reasonRefs: readonly string[];
+}
+
 export interface SdlcTraversalOverlay {
   readonly kind: "sdlc_traversal_overlay";
   readonly overlayRef: SdlcTraversalOverlayRef;
@@ -153,6 +176,7 @@ export interface SdlcTraversalOverlay {
   readonly termination: SdlcTraversalOverlayTermination;
   readonly assetTemplates: readonly SdlcOverlayAssetTemplate[];
   readonly requiredLedgersByEdge: readonly SdlcOverlayLedgerRequirement[];
+  readonly reentryRoutes: readonly SdlcOverlayReentryRoute[];
   readonly predecessorOverlayRefs: readonly SdlcTraversalOverlayRef[];
 }
 
@@ -231,6 +255,13 @@ interface OverlayDefinition {
     readonly defaultPath: string;
     readonly producerGraphFunctionName: string;
     readonly terminalRole: "terminal_asset" | "supporting_asset";
+  }[];
+  readonly reentryRoutes?: readonly {
+    readonly terminalGraphFunctionName: string;
+    readonly sourceGraphVectorName: string;
+    readonly targetGraphVectorName: string;
+    readonly closureDispositions: readonly SdlcOverlayReentryDisposition[];
+    readonly reasonRefs: readonly string[];
   }[];
   readonly predecessorOverlayRefs?: readonly SdlcTraversalOverlayRef[];
   readonly nextEligibleOverlayRefs?: readonly SdlcTraversalOverlayRef[];
@@ -321,12 +352,16 @@ function overlayDefinitions(): readonly OverlayDefinition[] {
   const liteGraphFunctionNames = Object.freeze([
     FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
     FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
-    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+    FG_PREPARE_TEST_EXECUTION_SURFACE,
+    FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
   ]);
   const frameworkSmokeMinFpGraphFunctionNames = Object.freeze([
     FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
     FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
-    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+    FG_PREPARE_TEST_EXECUTION_SURFACE,
+    FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
   ]);
   return [
     {
@@ -372,44 +407,106 @@ function overlayDefinitions(): readonly OverlayDefinition[] {
         "overlay://odd-sdlc/framework-smoke"
       ] as const),
       name: "framework_smoke_min_fp",
-      intent: "Complexity-admitted Min(F_P) traversal for framework-smoke products whose pressure is proportional and preserved.",
+      intent: "Complexity-admitted Min(F_P) traversal for framework-smoke products whose pressure is proportional and proven by test execution.",
       graphFunctionNames: frameworkSmokeMinFpGraphFunctionNames,
       publicStartTargets: Object.freeze([FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE]),
       defaultStartTarget: FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
-      terminalAssetTypes: Object.freeze(["component_code_surface"]),
+      terminalAssetTypes: Object.freeze(["test_execution_result_surface"]),
       terminalGraphFunctionNames: Object.freeze([
-        FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+        FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE
       ]),
       lawfulStopDispositions: Object.freeze(["product_converged", "blocked"]),
       assetTemplates: Object.freeze([
         {
           assetType: "component_code_surface",
-          defaultPath: "build_tenants/hello_world_javascript/src/hello.js",
+          defaultPath: "design/component_code_surface.md",
           producerGraphFunctionName: FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+          terminalRole: "supporting_asset"
+        },
+        {
+          assetType: "implementation_design_surface",
+          defaultPath: "design/adrs/ADR-002-implementation-design-surface.md",
+          producerGraphFunctionName: FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+          terminalRole: "supporting_asset"
+        },
+        {
+          assetType: "test_execution_surface",
+          defaultPath: "design/test_execution_surface.md",
+          producerGraphFunctionName: FG_PREPARE_TEST_EXECUTION_SURFACE,
+          terminalRole: "supporting_asset"
+        },
+        {
+          assetType: "test_execution_result_surface",
+          defaultPath: "design/test_execution_result_surface.md",
+          producerGraphFunctionName: FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
           terminalRole: "terminal_asset"
+        }
+      ]),
+      reentryRoutes: Object.freeze([
+        {
+          terminalGraphFunctionName: FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
+          sourceGraphVectorName: FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
+          targetGraphVectorName: FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+          closureDispositions: Object.freeze([
+            "repair"
+          ] satisfies readonly SdlcOverlayReentryDisposition[]),
+          reasonRefs: Object.freeze([
+            "overlay-reentry://odd-sdlc/framework-smoke-min-fp/test-execution-failed/component-code"
+          ])
         }
       ])
     },
     {
       overlayRef: SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
       name: "lite_design_module_implementation",
-      intent: "Small software-change traversal from composite implementation design to product materialization.",
+      intent: "Small software-change traversal from composite implementation design to product materialization and test execution proof.",
       graphFunctionNames: liteGraphFunctionNames,
       publicStartTargets: Object.freeze([
         FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE
       ]),
       defaultStartTarget: FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
-      terminalAssetTypes: Object.freeze(["component_code_surface"]),
+      terminalAssetTypes: Object.freeze(["test_execution_result_surface"]),
       terminalGraphFunctionNames: Object.freeze([
-        FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+        FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE
       ]),
       lawfulStopDispositions: Object.freeze(["overlay_segment_complete", "blocked"]),
       assetTemplates: Object.freeze([
         {
           assetType: "component_code_surface",
-          defaultPath: "build_tenants/hello_world_javascript/src/hello.js",
+          defaultPath: "design/component_code_surface.md",
           producerGraphFunctionName: FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+          terminalRole: "supporting_asset"
+        },
+        {
+          assetType: "implementation_design_surface",
+          defaultPath: "design/adrs/ADR-002-implementation-design-surface.md",
+          producerGraphFunctionName: FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+          terminalRole: "supporting_asset"
+        },
+        {
+          assetType: "test_execution_surface",
+          defaultPath: "design/test_execution_surface.md",
+          producerGraphFunctionName: FG_PREPARE_TEST_EXECUTION_SURFACE,
+          terminalRole: "supporting_asset"
+        },
+        {
+          assetType: "test_execution_result_surface",
+          defaultPath: "design/test_execution_result_surface.md",
+          producerGraphFunctionName: FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
           terminalRole: "terminal_asset"
+        }
+      ]),
+      reentryRoutes: Object.freeze([
+        {
+          terminalGraphFunctionName: FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
+          sourceGraphVectorName: FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
+          targetGraphVectorName: FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+          closureDispositions: Object.freeze([
+            "repair"
+          ] satisfies readonly SdlcOverlayReentryDisposition[]),
+          reasonRefs: Object.freeze([
+            "overlay-reentry://odd-sdlc/lite-design-module-implementation/test-execution-failed/component-code"
+          ])
         }
       ]),
       predecessorOverlayRefs: Object.freeze([
@@ -546,6 +643,57 @@ function overlayFromDefinition(input: {
       });
     })
   );
+  const reentryRoutes = Object.freeze(
+    (input.definition.reentryRoutes ?? Object.freeze([])).map((route) => {
+      const terminalGraphFunction = input.byName.get(route.terminalGraphFunctionName);
+      if (terminalGraphFunction === undefined) {
+        throw new TypeError(
+          `${input.definition.overlayRef}: unpublished reentry route terminal ${route.terminalGraphFunctionName}`
+        );
+      }
+      const vectors = materializeGraphFunction(terminalGraphFunction).vectors;
+      const sourceVector = vectors.find(
+        (vector) =>
+          vector.name === route.sourceGraphVectorName ||
+          sdlcGraphVectorBoundaryRef(vector) === route.sourceGraphVectorName
+      );
+      if (sourceVector === undefined) {
+        throw new TypeError(
+          `${input.definition.overlayRef}: reentry source vector ${route.sourceGraphVectorName} is not in ${route.terminalGraphFunctionName}`
+        );
+      }
+      const targetVector = vectors.find(
+        (vector) =>
+          vector.name === route.targetGraphVectorName ||
+          sdlcGraphVectorBoundaryRef(vector) === route.targetGraphVectorName
+      );
+      if (targetVector === undefined) {
+        throw new TypeError(
+          `${input.definition.overlayRef}: reentry target vector ${route.targetGraphVectorName} is not in ${route.terminalGraphFunctionName}`
+        );
+      }
+      const sourceGraphVectorRef = sdlcGraphVectorBoundaryRef(sourceVector);
+      const targetGraphVectorRef = sdlcGraphVectorBoundaryRef(targetVector);
+      return Object.freeze({
+        kind: "sdlc_overlay_reentry_route" as const,
+        routeRef: [
+          "overlay-reentry-route://odd-sdlc",
+          encodeURIComponent(input.definition.overlayRef),
+          encodeURIComponent(sourceGraphVectorRef),
+          encodeURIComponent(targetGraphVectorRef)
+        ].join("/"),
+        overlayRef: input.definition.overlayRef,
+        terminalGraphFunctionRef: sdlcGraphFunctionBoundaryRef(terminalGraphFunction),
+        sourceGraphVectorName: sourceVector.name,
+        sourceGraphVectorRef,
+        targetGraphVectorName: targetVector.name,
+        targetGraphVectorRef,
+        targetNodeRef: targetVector.target.id,
+        closureDispositions: Object.freeze([...route.closureDispositions]),
+        reasonRefs: Object.freeze([...route.reasonRefs])
+      });
+    })
+  );
   return Object.freeze({
     kind: "sdlc_traversal_overlay" as const,
     overlayRef: input.definition.overlayRef,
@@ -598,6 +746,7 @@ function overlayFromDefinition(input: {
         })
       )
     ),
+    reentryRoutes,
     predecessorOverlayRefs: Object.freeze([
       ...(input.definition.predecessorOverlayRefs ?? [])
     ])
@@ -759,6 +908,30 @@ export function sdlcTraversalOverlayNextGraphContinuation(input: {
       targetNodeRef: nextGraphVector.target.id,
       sequenceIndex: completedIndex + 1
     });
+  }
+  return null;
+}
+
+export function sdlcTraversalOverlayFailureReentryRoute(input: {
+  readonly overlay: SdlcTraversalOverlay;
+  readonly completedGraphVectorRef: string;
+  readonly closureDisposition: string;
+}): SdlcOverlayReentryRoute | null {
+  const completedGraphVectorRef = parseNonEmptyString(
+    input.completedGraphVectorRef,
+    "completedGraphVectorRef"
+  );
+  if (!isSdlcOverlayReentryDisposition(input.closureDisposition)) {
+    return null;
+  }
+  for (const route of input.overlay.reentryRoutes) {
+    if (
+      route.closureDispositions.includes(input.closureDisposition) &&
+      (route.sourceGraphVectorName === completedGraphVectorRef ||
+        route.sourceGraphVectorRef === completedGraphVectorRef)
+    ) {
+      return route;
+    }
   }
   return null;
 }

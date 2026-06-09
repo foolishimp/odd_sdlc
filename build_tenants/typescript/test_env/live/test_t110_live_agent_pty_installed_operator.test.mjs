@@ -1,5 +1,5 @@
 // Validates: T-110
-// Validates: ABG-3.7-live-agent-PTY-installed-operator
+// Validates: ABG-4-live-agent-PTY-installed-operator
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -26,9 +26,9 @@ const ABG_TYPESCRIPT_ROOT = resolve(
   REPO_ROOT,
   "../abiogenesis/build_tenants/abiogenesis/typescript"
 );
-const EXPECTED_ABG_VERSION = "3.7.1-rc.1";
-const EXPECTED_FALLBACK_CONFIG_DIGEST =
-  "sha256:08372a2a641f0dacaa30f1e06be72f3d28e3bb96e704b81cfb55473f62ee0245";
+const EXPECTED_ABG_VERSION = "4.0.0-rc.4";
+const EXPECTED_ABG_CONFIG_DIGEST =
+  "sha256:8e95750c8a848086aa4d900cd660000543d8ac4855ed31cdaa557a15de833df4";
 const LIVE_ENABLED = process.env["ODD_SDLC_TS_T110_LIVE"] === "1";
 const WORKER_TRANSPORT =
   process.env["ODD_SDLC_TS_T110_LIVE_WORKER"] ??
@@ -60,7 +60,7 @@ function makeWorkspace(root) {
     [
       "# T-110 Live Agent PTY Fixture",
       "",
-      "This workspace proves the installed odd_sdlc TypeScript operator can invoke an admitted live worker through the ABG 3.7 PTY callout substrate."
+      "This workspace proves the installed odd_sdlc TypeScript operator can invoke an admitted live worker through the ABG 4 PTY callout substrate."
     ].join("\n"),
     "utf8"
   );
@@ -87,7 +87,7 @@ function makeWorkspace(root) {
     [
       "# Goals",
       "",
-      "- prove ABG 3.7 pty-terminal execution through an admitted worker binding",
+      "- prove ABG 4 pty-terminal execution through an admitted worker binding",
       "- preserve trace evidence without requiring provider-specific prose or stream shape"
     ].join("\n"),
     "utf8"
@@ -165,21 +165,21 @@ test(
       workspace,
       "node_modules/@abiogenesis/typescript-tenant/package.json"
     );
-    const installedFallbackConfigPath = path.join(
+    const installedAbgConfigPath = path.join(
       workspace,
-      ".abiogenesis/config/abg.fallbacks.json"
+      ".abiogenesis/config/abg.config.json"
     );
     assert.equal(existsSync(installedAbgPackageJsonPath), true);
-    assert.equal(existsSync(installedFallbackConfigPath), true);
+    assert.equal(existsSync(installedAbgConfigPath), true);
     const installedAbgPackageJson = readJson(installedAbgPackageJsonPath);
-    const fallbackConfigDigest = sha256File(installedFallbackConfigPath);
+    const abgConfigDigest = sha256File(installedAbgConfigPath);
     assert.equal(installedAbgPackageJson.version, EXPECTED_ABG_VERSION);
-    assert.equal(fallbackConfigDigest, EXPECTED_FALLBACK_CONFIG_DIGEST);
+    assert.equal(abgConfigDigest, EXPECTED_ABG_CONFIG_DIGEST);
     writeJson(path.join(archiveRoot, "installed_abg_substrate_snapshot.json"), {
       packageJsonPath: installedAbgPackageJsonPath,
       version: installedAbgPackageJson.version,
-      fallbackConfigPath: installedFallbackConfigPath,
-      fallbackConfigDigest
+      abgConfigPath: installedAbgConfigPath,
+      abgConfigDigest
     });
 
     const previousOddProfile = process.env["ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE"];

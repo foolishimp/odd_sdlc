@@ -90,6 +90,7 @@ function makeWorkspace() {
       "    language: TypeScript",
       "    build_tool: npm",
       "    test_runner: npm test",
+      "    test_execution_contract: npm test",
       "    module_structure:",
       "      - api",
       "      - worker"

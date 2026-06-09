@@ -17,5 +17,6 @@ build_tenants:
     language: JavaScript
     build_tool: node
     test_runner: node
+    test_execution_contract: node src/hello.js
     module_structure:
       - hello_world_javascript

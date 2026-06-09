@@ -3,7 +3,7 @@
 **Status**: Active
 **Date**: 2026-04-26
 **Implements**: REQ-F-ODDSDLC-040, REQ-F-ODDSDLC-041, REQ-F-ODDSDLC-042, REQ-F-ODDSDLC-043
-**Derives From**: `specification/PRODUCT.md`, `specification/requirements/13-odd-sdlc-typescript-tenant.md`, `build_tenants/python/design/ODD_SDLC_ABG_BOUNDARY_AND_MODULE_TOPOLOGY.md`, `/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/typescript/design/ABG_3_MODULE_DESIGN.md`
+**Derives From**: `specification/PRODUCT.md`, `specification/requirements/13-odd-sdlc-typescript-tenant.md`, `build_tenants/python/design/ODD_SDLC_ABG_BOUNDARY_AND_MODULE_TOPOLOGY.md`, `/Users/jim/src/apps/abiogenesis/specification/PRODUCT.md`
 
 ## Purpose
 
@@ -181,6 +181,26 @@ captured by a checked-in fixture or explicit fixture manifest.
 
 An RC claim may not rely on unit tests alone when it claims public SDLC
 workflow behavior.
+
+## Tenant Execution Contract Admission
+
+The tenant execution contract is product authority over how test execution is
+invoked. `test_execution_contract` and `tenant_test_execution_contract` are the
+only project-constraints keys that may populate the effective
+`testExecutionContract`. `test_runner` is a descriptive runner/tool label and
+must not be promoted into an execution command.
+
+| source key | admitted role | target |
+| --- | --- | --- |
+| `test_execution_contract` | concrete project execution command | `prepare_test_execution_surface` and `derive_test_execution_result_surface` |
+| `tenant_test_execution_contract` | tenant-level execution command | effective project profile when project-level command is absent |
+| `test_runner` | tool identity/read-model label | runner display, framework selection, or diagnostic context only |
+
+This keeps the external tool boundary in GTL/ABG contract-law terms: the
+product declares the command contract, the installed runtime executes it on the
+selected edge, and `derive_test_execution_result_surface` records admitted
+`sdlc_worker_execution_evidence`. A bare runner name such as `cargo`, `pytest`,
+or `sbt` is not execution proof.
 
 ## Non-Ownership
 

@@ -30,13 +30,22 @@ import {
   appendOddSdlcRuntimeEvents,
   constructPostflightGapDossier,
   constructSdlcGtlModule,
+  constructSdlcTargetCarrierRegistry,
   constructWorkerProcessFailurePostflight,
   deriveWorkerHandoffManifest,
   hookContractByEdgeName,
   readOddSdlcRuntimeEventsSync,
+  SDLC_COMPONENT_DEPTH_REGISTER_CONTRACT_TRACE,
   SDLC_T172_FULL_TRAVERSAL_EDGE_ACCOUNTING,
   sdlcEdgeOutputPolicyForTargetAssetType
 } from "../../build/semantic/code/src/index.js";
+import {
+  consequenceProjectionPluginContract,
+  designDepthFpEvaluatorRuleContract,
+  fpDispatchPluginContract,
+  fpEvaluatorPluginContract,
+  reviewGradeEdgeFulfillmentRuleContract
+} from "../../build/semantic/code/src/operator/plugins/plugin_contracts.js";
 
 const PACKAGE_ROOT = process.cwd();
 const REPO_ROOT = path.resolve(PACKAGE_ROOT, "../..");
@@ -282,6 +291,15 @@ test("T-184 product materialization observation and replay live under product mo
   const launchContractSource = readRepoFile(
     "build_tenants/typescript/code/src/operator/plugins/transform/launch_contract.ts"
   );
+  const operatorIndexSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/index.ts"
+  );
+  const installedOperatorSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+  const resultProjectionSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/plugins/transform/result_projection.ts"
+  );
   const observationSource = readRepoFile(
     "build_tenants/typescript/code/src/operator/product_materialization/observation.ts"
   );
@@ -292,9 +310,14 @@ test("T-184 product materialization observation and replay live under product mo
     "build_tenants/typescript/code/src/operator/product_materialization/manifest.ts"
   );
 
-  assert.match(launchContractSource, /product_materialization\/observation\.js/u);
-  assert.match(launchContractSource, /product_materialization\/replay\.js/u);
-  assert.match(launchContractSource, /product_materialization\/manifest\.js/u);
+  assert.doesNotMatch(launchContractSource, /product_materialization\/observation\.js/u);
+  assert.doesNotMatch(launchContractSource, /product_materialization\/replay\.js/u);
+  assert.doesNotMatch(launchContractSource, /product_materialization\/manifest\.js/u);
+  assert.match(operatorIndexSource, /product_materialization\/observation\.js/u);
+  assert.match(operatorIndexSource, /product_materialization\/manifest\.js/u);
+  assert.match(installedOperatorSource, /product_materialization\/observation\.js/u);
+  assert.match(installedOperatorSource, /product_materialization\/manifest\.js/u);
+  assert.match(resultProjectionSource, /product_materialization\/replay\.js/u);
   assert.match(observationSource, /function walkFiles/u);
   assert.match(observationSource, /observeProductMaterializationDeltaWithDiagnostics/u);
   assert.match(replaySource, /readProductMaterializationReplayManifest/u);
@@ -332,12 +355,18 @@ test("T-184 ABG terminal truth controls non-close traversal", () => {
   );
   assert.match(
     closureStateMachineSource,
-    /terminalRetryRefs: input\.abgTerminalRetryRefs/u
+    /deriveIterationOutcomeProjection\(\{/u
+  );
+  assert.match(
+    closureStateMachineSource,
+    /terminalFallbackRefs: input\.abgTerminalRetryRefs/u
   );
   assert.ok(
-    closureStateMachineSource.indexOf("if (blockReasonRefs.length > 0)") <
-      closureStateMachineSource.indexOf("if (input.abgTerminalRetryRefs.length > 0)"),
-    "typed block and triage reasons must outrank ABG terminal retry fallback"
+    closureStateMachineSource.indexOf("runtimeRows: Object.freeze") <
+      closureStateMachineSource.indexOf(
+        "terminalFallbackRefs: input.abgTerminalRetryRefs"
+      ),
+    "typed runtime rows must feed ABG before terminal retry fallback refs"
   );
   assert.match(
     installedOperatorSource,
@@ -367,7 +396,7 @@ test("T-184 selected evaluate.C residual pressure enters consequence closure", (
   );
   assert.match(
     installedOperatorSource,
-    /withAdditionalSdlcEdgeResidualPressureRefs\(\{\s*residualPressure: measuredEdgeResidualPressure,\s*requiredPressureRefs: selectedEvaluationResidualPressureRefs\s*\}\)/u
+    /withAdditionalSdlcEdgeResidualPressureRefs\(\{\s*residualPressure: measuredEdgeResidualPressure,\s*requiredPressureRefs: uniqueSorted\(\[\s*\.\.\.selectedEvaluationResidualPressureRefs,\s*\.\.\.testExecutionFailureResidualPressureRefs\s*\]\)\s*\}\)/u
   );
   assert.match(
     installedOperatorSource,
@@ -389,6 +418,66 @@ test("T-184 ticket carries the partition inventory and deletion gates", () => {
   assert.match(ticket, /operator\/plugins\/transform\/launch_contract\.ts/u);
   assert.match(ticket, /operator\/system_artifacts\.ts/u);
   assert.match(ticket, /No framework helper writes a transform output/u);
+});
+
+test("T-153 outward contract-law audit is backed by GTL and ABG surfaces", () => {
+  const module = constructSdlcGtlModule();
+  const targetCarrierRegistry = constructSdlcTargetCarrierRegistry({ module });
+  assert.deepEqual(targetCarrierRegistry.diagnostics, []);
+
+  const componentDepthTargetSet = new Set(
+    SDLC_COMPONENT_DEPTH_REGISTER_CONTRACT_TRACE.targetAssetTypes
+  );
+  const componentDepthRows = targetCarrierRegistry.rows.filter((row) =>
+    componentDepthTargetSet.has(row.targetAssetType)
+  );
+  assert.ok(
+    componentDepthRows.length >=
+      SDLC_COMPONENT_DEPTH_REGISTER_CONTRACT_TRACE.targetAssetTypes.length
+  );
+  for (const targetAssetType of SDLC_COMPONENT_DEPTH_REGISTER_CONTRACT_TRACE.targetAssetTypes) {
+    assert(
+      componentDepthRows.some((row) => row.targetAssetType === targetAssetType),
+      `${targetAssetType} must have a GTL target-carrier row`
+    );
+  }
+  for (const row of componentDepthRows) {
+    assert.equal(
+      row.outputCarrierFamilyRef,
+      SDLC_COMPONENT_DEPTH_REGISTER_CONTRACT_TRACE.gtlTargetCarrierFamilyRef
+    );
+    assert.equal(
+      row.binding.envelopeContractRef,
+      SDLC_COMPONENT_DEPTH_REGISTER_CONTRACT_TRACE.gtlTargetCarrierEnvelopeRef
+    );
+    assert.match(row.targetCarrierContractRef, /^gtl:\/\/target-carrier-contract\/odd-sdlc\//u);
+    assert.match(row.targetCarrierContractDigest, /^sha256:/u);
+    assert.equal(row.binding.source, "graph_vector_declarations");
+  }
+
+  const promptAssetsSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/prompt_assets.ts"
+  );
+  assert.match(promptAssetsSource, /constructAssetSurface/u);
+  assert.match(promptAssetsSource, /admitAssetSurface/u);
+  assert.match(promptAssetsSource, /assetSurface: input\.assetSurface/u);
+  assert.doesNotMatch(promptAssetsSource, /localPromptSchema|prompt_schema_clone/u);
+
+  const pluginContracts = [
+    fpDispatchPluginContract(),
+    fpEvaluatorPluginContract(),
+    designDepthFpEvaluatorRuleContract(),
+    reviewGradeEdgeFulfillmentRuleContract(),
+    consequenceProjectionPluginContract()
+  ];
+  assert.deepEqual(
+    pluginContracts.map((contract) => contract.authority),
+    ["effect_plugin", "effect_plugin", "effect_plugin", "effect_plugin", "effect_plugin"]
+  );
+  assert.deepEqual(
+    pluginContracts.map((contract) => contract.computeStageRole),
+    ["transform", "evaluate", "evaluate", "evaluate", "consequence"]
+  );
 });
 
 test("T-184 legacy managed traversal ledger is deleted", () => {
@@ -761,6 +850,22 @@ test("T-184 no-dispatch projection defers output reads until consequence", () =>
   assert.match(
     installedOperatorSource,
     /postflight\.status === "passed"\s*\?\s*Object\.freeze\(\[\]\)/u
+  );
+  const reviewGradeStateStart = installedOperatorSource.indexOf(
+    "function stateWithReviewGradePostflight"
+  );
+  const reviewGradeStateEnd = installedOperatorSource.indexOf(
+    "export function installedReentryGuardScopeForAttempt",
+    reviewGradeStateStart
+  );
+  const reviewGradeStateSource = installedOperatorSource.slice(
+    reviewGradeStateStart,
+    reviewGradeStateEnd
+  );
+  assert.match(reviewGradeStateSource, /postflight:\s*reviewGradePostflight/u);
+  assert.match(
+    reviewGradeStateSource,
+    /\n\s*blockingReasonCarriers\s*\n\s*\}\);/u
   );
   assert.match(noDispatchSource, /buildDeclaredEdgeProjectionPendingReport/u);
   assert.match(noDispatchSource, /deferConstructorUntilConsequence: true/u);

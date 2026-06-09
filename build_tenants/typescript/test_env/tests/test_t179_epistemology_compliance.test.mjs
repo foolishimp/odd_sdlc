@@ -45,11 +45,9 @@ function normalizeWhitespace(value) {
 }
 
 function extractTransformPromptSource(handoffSource) {
-  const start = handoffSource.indexOf(
-    'return [\n    "odd_sdlc F_P.transform launch contract."'
-  );
+  const start = handoffSource.indexOf("function promptForHandoffSections");
   assert.notEqual(start, -1);
-  const end = handoffSource.indexOf('  ].join("\\n");', start);
+  const end = handoffSource.indexOf("export function promptForHandoffProjection", start);
   assert.notEqual(end, -1);
   return handoffSource.slice(start, end);
 }

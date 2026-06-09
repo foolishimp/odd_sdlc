@@ -171,7 +171,7 @@ export const mindforgeAiAssistantScenarioFamily = Object.freeze([
 export function mindforgeAiAssistantLiveScenario({
   worker,
   variant = "third_party_model_variant",
-  maxAdvances = 3,
+  maxAdvances = 4,
   startUntil = "first_traversal"
 }) {
   if (typeof worker !== "string" || worker.length === 0) {
@@ -199,9 +199,21 @@ export function mindforgeAiAssistantLiveScenario({
       ],
       handoffEdgeSequencePrefix: [
         "derive_lite_design_adr_surface",
-        "derive_lite_module_surface",
-        "derive_lite_component_code_surface"
+        "derive_lite_component_code_surface",
+        "prepare_test_execution_surface",
+        "derive_test_execution_result_surface"
       ],
+      requiredHandoffEdges: [
+        "derive_lite_component_code_surface",
+        "prepare_test_execution_surface",
+        "derive_test_execution_result_surface"
+      ],
+      executionEvidence: {
+        edgeName: "derive_test_execution_result_surface",
+        status: "succeeded",
+        commandIncludes: "node",
+        stdoutIncludes: row.expectedOutput.useCaseId
+      },
       processChecks: [
         {
           command: "node",
@@ -239,7 +251,8 @@ export function mindforgeAiAssistantLiveScenario({
         }
       ],
       latestArchiveArtifacts: [
-        "sdlc_overlay_segment_completion.json"
+        "worker_result_report.json",
+        "declared_edge_projection_artifact.json"
       ]
     },
     expectedGovernanceOutput: row.expectedOutput,
@@ -248,6 +261,7 @@ export function mindforgeAiAssistantLiveScenario({
     startUntil,
     maxAdvances,
     continueOnEdgeConverge: true,
-    stopAfterWorkspaceFilesExist: true
+    stopAfterWorkspaceFilesExist: false,
+    stopAfterRequiredHandoffEdges: true
   });
 }

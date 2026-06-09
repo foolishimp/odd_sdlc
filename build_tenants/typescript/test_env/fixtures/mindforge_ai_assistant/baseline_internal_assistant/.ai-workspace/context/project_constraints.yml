@@ -15,5 +15,6 @@ build_tenants:
     language: JavaScript
     build_tool: node
     test_runner: node
+    test_execution_contract: node src/index.js examples/use_case.json
     module_structure:
       - mindforge_ai_assistant

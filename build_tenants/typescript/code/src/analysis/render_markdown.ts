@@ -210,15 +210,15 @@ function renderFrontierGraphTruth(
   return lines.join("\n");
 }
 
-function renderRc3StageTruth(
+function renderStagedComputeTruth(
   attempts: readonly SdlcFdRunAnalysisEdgeAttempt[]
 ): string {
   if (attempts.length === 0) {
-    return "## RC3 Stage Truth\n\nnone";
+    return "## Staged Compute Truth\n\nnone";
   }
   const bounded = boundedRows(attempts);
   const lines: string[] = [
-    "## RC3 Stage Truth",
+    "## Staged Compute Truth",
     "",
     "| # | status | composition | regime binding | evaluate | admitted graph call | consequence | read models | detail |",
     "| - | - | - | - | - | - | - | - | - |"
@@ -228,7 +228,7 @@ function renderRc3StageTruth(
     lines.push(limitLine);
   }
   for (const attempt of bounded.rows) {
-    const truth = attempt.rc3StageTruth;
+    const truth = attempt.stagedComputeTruth;
     lines.push(
       `| ${attempt.attemptOrdinal} | ${truth.status} | ${truth.selectedCompositionRef ?? "-"} | ${truth.selectedRegimeBindingRef ?? "-"} | ${truth.evaluateRef ?? "-"} | ${truth.admittedStateGraphCallRef ?? "-"} | ${truth.consequenceRef ?? "-"} | ${boundedJoinedText(truth.domainReadModelRefs, "<br>") || "-"} | ${truth.detail ?? "-"} |`
     );
@@ -471,7 +471,7 @@ export function renderSdlcFdRunAnalysisMarkdown(result: SdlcFdRunAnalysisResult)
     "",
     renderFrontierGraphTruth(result.edgeTraversal),
     "",
-    renderRc3StageTruth(result.edgeTraversal),
+    renderStagedComputeTruth(result.edgeTraversal),
     "",
     renderConceptualStageCoverage(result.conceptualStageCoverage),
     "",

@@ -74,7 +74,8 @@ function workspace(input = {}) {
       "    output_dir: build_tenants/scala_spark/",
       "    language: Scala",
       "    build_tool: sbt",
-      "    test_runner: sbt test"
+      "    test_runner: sbt test",
+      "    test_execution_contract: sbt test"
     ].join("\n"),
     "utf8"
   );
@@ -1941,7 +1942,8 @@ test("B-086 project conformance F_D defaults underdisambiguated source and rejec
       "    output_dir: build_tenants/scala_spark",
       "    language: Scala",
       "    build_tool: sbt",
-      "    test_runner: sbt test"
+      "    test_runner: sbt test",
+      "    test_execution_contract: sbt test"
     ].join("\n"),
     "utf8"
   );

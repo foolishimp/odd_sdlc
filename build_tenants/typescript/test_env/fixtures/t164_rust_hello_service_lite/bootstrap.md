@@ -86,6 +86,7 @@ through Cargo and making a local HTTP request to `GET /`.
 - port source: `HELLO_SERVICE_PORT`
 - proof client: command-line HTTP client
 - test mode: local process start plus HTTP call
+- build/proof byproducts: `Cargo.lock`, `target/`
 
 ## Generated File Contract
 
@@ -97,6 +98,7 @@ build_tenants/hello_world_rust_service/src/main.rs
 ```
 
 The traversal must create them as product evidence.
+Cargo proof byproducts are not product evidence for this fixture.
 
 ## Proof Shape
 

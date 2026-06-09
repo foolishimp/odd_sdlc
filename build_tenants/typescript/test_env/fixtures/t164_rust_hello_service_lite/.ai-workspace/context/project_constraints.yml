@@ -17,6 +17,7 @@ build_tenants:
     language: Rust
     build_tool: cargo
     test_runner: curl
+    test_execution_contract: port=${HELLO_SERVICE_PORT:-18182}; log=target/hello-service-smoke.log; mkdir -p target; HELLO_SERVICE_PORT=$port cargo run --quiet >$log 2>&1 & pid=$!; for _ in $(seq 1 200); do body=$(curl --fail --silent http://127.0.0.1:$port/ 2>/dev/null || true); if [ x$body = xhelloworld ]; then printf '%s\n' $body; kill $pid 2>/dev/null || true; exit 0; fi; sleep 0.2; done; cat $log >&2; kill $pid 2>/dev/null || true; exit 1
     capability_contracts:
       trivial_product: true
     module_structure:

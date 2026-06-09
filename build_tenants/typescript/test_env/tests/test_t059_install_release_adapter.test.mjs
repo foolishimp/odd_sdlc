@@ -37,21 +37,22 @@ const ABG_TYPESCRIPT_ROOT = resolve(
   REPO_ROOT,
   "../abiogenesis/build_tenants/abiogenesis/typescript"
 );
-const ABG_RELEASE_VERSION = "3.9.0-rc.10";
-const ABG_RELEASE_SOURCE_REF = "main";
-const ABG_RELEASE_SOURCE_COMMIT = "72b16e83125e87eeaa612bd2f397bfcdf3a24f90";
+const ABG_RELEASE_VERSION = "4.0.0-rc.4";
+const ABG_RELEASE_SOURCE_REF = "HEAD";
+const ABG_RELEASE_SOURCE_COMMIT = "05a00b497530155da7a4728a2d36f954621174cc";
 const ABG_RELEASE_TARBALL_SHA256 =
-  "e302291c326ba197b5f8efb1651db4940783904ede165bd6bffa50d1100f3367";
+  "39a33062b34e9b2ecccc8a7043f2f5d02a125a4ee86e8c980fd1db22f2d22f9b";
+const ABG_RELEASE_SNAPSHOT_REF = "latest";
 const ABG_RELEASE_SNAPSHOT_ROOT = resolve(
   REPO_ROOT,
-  `../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/${ABG_RELEASE_VERSION}`
+  `../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/${ABG_RELEASE_SNAPSHOT_REF}`
 );
 const ABG_RELEASE_TARBALL = path.join(
   ABG_RELEASE_SNAPSHOT_ROOT,
   `abiogenesis-typescript-tenant-${ABG_RELEASE_VERSION}.tgz`
 );
 const ABG_RELEASE_DEPENDENCY_REF =
-  `file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/${ABG_RELEASE_VERSION}/` +
+  `file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/${ABG_RELEASE_SNAPSHOT_REF}/` +
   `abiogenesis-typescript-tenant-${ABG_RELEASE_VERSION}.tgz`;
 const ODD_SDLC_RELEASE_SNAPSHOT_ROOT = resolve(
   REPO_ROOT,
@@ -149,8 +150,8 @@ function assertPackageManagerReplayKeepsCommand(targetRoot, commandName) {
   assert.equal(existsSync(commandPath), true, `${commandName} missing after npm replay`);
 }
 
-function installedAbgFallbackConfigPath(targetRoot) {
-  return path.join(targetRoot, ".abiogenesis/config/abg.fallbacks.json");
+function installedAbgConfigPath(targetRoot) {
+  return path.join(targetRoot, ".abiogenesis/config/abg.config.json");
 }
 
 function assertBootstrapGovernanceText(text) {
@@ -228,7 +229,7 @@ test("T-059 API installs odd_sdlc.TS and ABG runtime into a target workspace", a
   const oddSdlcCommand = assertCommandPath(outcome.commandPaths, "odd-sdlc-ts");
   assertCommandPath(outcome.commandPaths, "genesis-ts");
   assertCommandPath(outcome.commandPaths, "abiogenesis-ts");
-  assert.equal(existsSync(installedAbgFallbackConfigPath(targetRoot)), true);
+  assert.equal(existsSync(installedAbgConfigPath(targetRoot)), true);
   assert.equal(existsSync(outcome.installManifestPath), true);
   assert.equal(existsSync(outcome.normalizationPath), true);
   assert.equal(existsSync(outcome.bootstrapGuidePath), true);
@@ -286,7 +287,7 @@ test("T-059 API installs odd_sdlc.TS and ABG runtime into a target workspace", a
   assert.equal(payload.payload.dossier.choosesNextTraversal, false);
 });
 
-test("T-129 install preserves editable ABG fallback config and public CLI fails closed on malformed edits", async () => {
+test("T-129 install preserves editable ABG config and public CLI fails closed on malformed fallback edits", async () => {
   const targetRoot = makeTargetWorkspace("install-abg-fallback-config");
   const outcome = await installOddSdlcTypescript({
     targetRoot,
@@ -299,14 +300,17 @@ test("T-129 install preserves editable ABG fallback config and public CLI fails 
   const genesisCommand = assertCommandPath(outcome.commandPaths, "genesis-ts");
   assertCommandPath(outcome.commandPaths, "abiogenesis-ts");
 
-  const fallbackPath = installedAbgFallbackConfigPath(targetRoot);
-  assert.equal(existsSync(fallbackPath), true);
-  const originalFallback = readJson(fallbackPath);
-  const editedFallback = {
-    ...originalFallback,
-    bundleRef: "fallback-bundle://odd-sdlc/t129-local-edit"
+  const configPath = installedAbgConfigPath(targetRoot);
+  assert.equal(existsSync(configPath), true);
+  const originalConfig = readJson(configPath);
+  const editedConfig = {
+    ...originalConfig,
+    fallbacks: {
+      ...originalConfig.fallbacks,
+      bundleRef: "fallback-bundle://odd-sdlc/t129-local-edit"
+    }
   };
-  writeFileSync(fallbackPath, `${JSON.stringify(editedFallback, null, 2)}\n`, "utf8");
+  writeFileSync(configPath, `${JSON.stringify(editedConfig, null, 2)}\n`, "utf8");
 
   await installOddSdlcTypescript({
     targetRoot,
@@ -315,7 +319,10 @@ test("T-129 install preserves editable ABG fallback config and public CLI fails 
     installedPackageName: "odd-sdlc-t129"
   });
 
-  assert.equal(readJson(fallbackPath).bundleRef, editedFallback.bundleRef);
+  assert.equal(
+    readJson(configPath).fallbacks.bundleRef,
+    editedConfig.fallbacks.bundleRef
+  );
   const packageJson = readJson(path.join(targetRoot, "package.json"));
   assert.match(
     packageJson.dependencies["@odd-sdlc/typescript-tenant"],
@@ -326,17 +333,20 @@ test("T-129 install preserves editable ABG fallback config and public CLI fails 
     /^file:\.abiogenesis\/package-pack\//u
   );
 
-  const malformedFallback = {
-    ...editedFallback,
-    pluginTraversalObserverBindings: {
-      ...editedFallback.pluginTraversalObserverBindings,
-      transform: {
-        ...editedFallback.pluginTraversalObserverBindings.transform,
-        observerPromptRef: ""
+  const malformedConfig = {
+    ...editedConfig,
+    fallbacks: {
+      ...editedConfig.fallbacks,
+      pluginTraversalObserverBindings: {
+        ...editedConfig.fallbacks.pluginTraversalObserverBindings,
+        transform: {
+          ...editedConfig.fallbacks.pluginTraversalObserverBindings.transform,
+          observerPromptRef: ""
+        }
       }
     }
   };
-  writeFileSync(fallbackPath, `${JSON.stringify(malformedFallback, null, 2)}\n`, "utf8");
+  writeFileSync(configPath, `${JSON.stringify(malformedConfig, null, 2)}\n`, "utf8");
   const malformedRun = spawnSync(
     genesisCommand,
     ["gaps", "--scope", "workspace", "--workspace", targetRoot],

@@ -53,7 +53,7 @@ import {
   SDLC_REQUIREMENTS,
   edgePayloadFromRows,
   evaluateSemanticRows
-} from "../fixtures/t102_t109_abg37_mini_sdlc_lifecycle.mjs";
+} from "../fixtures/t102_t109_mini_sdlc_lifecycle.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(TEST_DIR, "../..");

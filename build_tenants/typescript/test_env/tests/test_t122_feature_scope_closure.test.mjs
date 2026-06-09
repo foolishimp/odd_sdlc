@@ -225,6 +225,7 @@ function workspaceWithModules() {
       "    language: scala",
       "    build_tool: sbt",
       "    test_runner: sbt test",
+      "    test_execution_contract: sbt test",
       "    module_structure:",
       "      - cdme-compiler",
       "      - cdme-assurance",

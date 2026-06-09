@@ -111,11 +111,13 @@ test("B-070 process://claude lowers to stream-json print argv with prompt on std
   const pmIndex = args.indexOf("--permission-mode");
   assert.equal(args[pmIndex + 1], "bypassPermissions");
   assert.ok(
-    args.includes("--disallowedTools"),
-    "Claude stream-json workers must deny unsupported server tools that can stall headless runs"
+    !args.includes("--disallowedTools"),
+    "Claude headless workers must not pass stale unsupported tool-deny entries"
   );
-  const disallowedToolsIndex = args.indexOf("--disallowedTools");
-  assert.equal(args[disallowedToolsIndex + 1], "advisor");
+  assert.ok(
+    !args.includes("advisor"),
+    "advisor is not a known Claude worker tool and can leave headless live runs pending"
+  );
 
   assert.ok(
     !args.includes(fx.manifestPath),

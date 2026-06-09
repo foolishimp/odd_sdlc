@@ -500,6 +500,14 @@ test("T-188 design-depth evaluator prompt rejects generic substitute domain rows
     evaluatorPromptSource,
     /Do not scrape source refs, authority refs, tech-stack\/spec docs/u
   );
+  assert.match(
+    evaluatorPromptSource,
+    /sdlc_verdict_axis\\?".*blocks admission/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /never \\"sdlc_verdict_axis\\"/u
+  );
 });
 
 test("T-188 review-grade prompt recognizes admitted materialized file rows", () => {

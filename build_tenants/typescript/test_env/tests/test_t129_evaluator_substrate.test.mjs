@@ -1,5 +1,5 @@
 // Validates: T-129
-// Validates: ABG-3.7-temporal-runtime-substrate
+// Validates: temporal-runtime-substrate
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -564,7 +564,7 @@ function publicGapsLexicalTrapBasis() {
   });
 }
 
-test("T-129 substrate boundary consumes ABG 3.7 construction evaluator priority truth", () => {
+test("T-129 substrate boundary consumes ABIogenesis construction evaluator priority truth", () => {
   const basis = constructOddSdlcAbiogenesisExecutionBasis({
     workspaceRoot: "/workspace/odd-sdlc/t129/evaluator",
     defaultRegime: "F_P",
@@ -643,7 +643,7 @@ test("T-129 substrate boundary consumes ABG 3.7 construction evaluator priority 
   assert.equal(report.localRankingAuthority, false);
   assert.equal(
     report.policyCarrierRef,
-    "policy-carrier://odd-sdlc/evaluate-next/source-default/abg-3.7"
+    "policy-carrier://odd-sdlc/evaluate-next/source-default"
   );
   assert.equal(
     report.policyVisibility,
@@ -774,7 +774,7 @@ test("T-129 public gap dossier ranks competing graph actions through the ABG eva
   );
 });
 
-test("T-129 substrate boundary consumes ABG 3.7 temporal GTL syntax and event-calculus eligibility", () => {
+test("T-129 substrate boundary consumes ABIogenesis temporal GTL syntax and event-calculus eligibility", () => {
   const { basis, vector } = buildOddSdlcAbg37Basis({
     name: "temporal_eligibility",
     declarations: attrs([temporalHookEntry("eligibility")])

@@ -20,6 +20,7 @@ import type {
   TraversalAttemptEnvelope,
   GtlAdmittedStateRef,
   GtlConsequenceProjectionRef,
+  GtlContractFulfillmentBinding,
   GtlEvaluation,
   GtlEvaluationFindingRef
 } from "@abiogenesis/typescript-tenant";
@@ -1502,25 +1503,11 @@ export interface SdlcWorkerObligationAssessment {
   readonly requiredAction?: string | null | undefined;
   readonly semanticEvidenceRefs?: readonly string[] | undefined;
   readonly acceptedAuthorityRefs?: readonly string[] | undefined;
-  readonly fulfillmentBinding?:
-    | SdlcRequirementFunctionFulfillmentBinding
-    | null
-    | undefined;
+  readonly fulfillmentBinding?: GtlContractFulfillmentBinding | null | undefined;
 }
 
-export interface SdlcRequirementFunctionFulfillmentBinding {
-  readonly kind: "sdlc_requirement_function_fulfillment_binding";
-  readonly requirementRef: string;
-  readonly productRequirementRef: string;
-  readonly designObligationRef: string;
-  readonly componentRef: string;
-  readonly productTargetRef: string;
-  readonly codeSurfaceRef: string;
-  readonly functionOrEntrypointRef: string;
-  readonly realizationEvidenceRefs: readonly string[];
-  readonly testOrExecutionEvidenceRefs: readonly string[];
-  readonly evaluatorFindingRef: string;
-}
+export type SdlcRequirementFunctionFulfillmentBinding =
+  GtlContractFulfillmentBinding;
 
 export interface SdlcReviewGradeObligationFinding {
   readonly kind: "sdlc_review_grade_obligation_finding";
@@ -1530,7 +1517,7 @@ export interface SdlcReviewGradeObligationFinding {
   readonly requiredAction: string | null;
   readonly evidenceRefs: readonly string[];
   readonly acceptedAuthorityRefs: readonly string[];
-  readonly fulfillmentBinding: SdlcRequirementFunctionFulfillmentBinding | null;
+  readonly fulfillmentBinding: GtlContractFulfillmentBinding | null;
   readonly rationale: string;
 }
 

@@ -181,9 +181,17 @@ classDiagram
   `.ai-workspace/events/events.jsonl`.
 - `operator/transport.ts` admits worker process transports and invokes the
   process with an archived manifest.
-- `operator/handoff.ts` derives the handoff manifest, prompt, result report,
-  product materialization contract, constructor result, and deterministic
-  postflight.
+- `operator/plugins/transform/launch_contract.ts` derives the worker handoff
+  manifest, invocation package, prompt asset refs, construction brief, and
+  product materialization contract used by `transform.C`.
+- `operator/plugins/transform/result_projection.ts` admits the worker result
+  report and projects transform candidate/evidence refs.
+- `operator/plugins/evaluate/*` owns deterministic postflight and F_P evaluator
+  prompt/rule inputs.
+- `operator/plugins/consequence/*` owns declared edge-output, constructor,
+  repair re-entry, and other read-model projections over ABG-admitted state.
+- `operator/product_materialization/*` owns product-output authority,
+  observation, replay, and materialization manifest projections.
 - `operator/installed_operator.ts` composes the first-slice run, emits
   ABG-compatible runtime facts, archives the run, and returns the operator
   projection.

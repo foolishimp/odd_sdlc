@@ -192,6 +192,35 @@ repair pressure. `qualify_component_test_execution_surface`,
 test, execution, and ledger truth; when their edge-accounting rows declare
 `workerDispatchAllowed: false`, worker dispatch is a runtime rejection.
 
+## Scenario Execution Evidence Proof IACS
+
+Live and sandbox scenario harnesses are proof observers. They may inspect
+runtime archives and assert that a selected edge produced execution evidence,
+but they do not create closure truth and do not advance the graph outside the
+installed runtime selection.
+
+| surface | role | owner | target |
+| --- | --- | --- | --- |
+| scenario `executionEvidence` expectation | proof-harness assertion row | qualification harness | names the edge whose archive must contain admitted execution evidence |
+| operator-run edge archive | runtime observation set | installed runtime over ABG-selected edge | stores worker result reports, shard output refs, and postflight summaries |
+| `worker_result_report.outputFile` | archive pointer | transform/system output report | points to the admitted edge output artifact |
+| `sdlc_worker_execution_evidence` | execution evidence carrier | `derive_test_execution_result_surface` | records command, exit status, stdout/stderr refs, observed tests, pass/fail counts, and diagnostics |
+| shard stdout/stderr refs | process-output evidence | worker/tool execution boundary | provides inspectable command output without becoming closure authority |
+
+```mermaid
+flowchart TD
+  A[Scenario expectation] --> B[Operator-run archive]
+  B --> C[Selected edge assurance archive]
+  C --> D[worker_result_report]
+  D --> E[sdlc_worker_execution_evidence]
+  E --> F[Shard stdout and stderr refs]
+  E --> G[Postflight and evaluator read models]
+```
+
+A scenario may pass only when the selected runtime edge archive contains
+`sdlc_worker_execution_evidence` for the expected edge. Workspace file presence,
+process checks, or harness-created artifacts are not substitutes.
+
 ## Structural Flow
 
 The full-breadth traversal must preserve this order unless a future ticket

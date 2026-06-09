@@ -93,7 +93,7 @@ function executionBasis() {
       workerId: "worker://synthetic",
       backendId: "backend://node-test",
       buildId: "build://odd-sdlc/t174",
-      resolvedRuntimeRef: "runtime://abg/3.8/saga-frontier"
+      resolvedRuntimeRef: "runtime://abiogenesis/saga-frontier"
     }),
     resolvedPolicy: Object.freeze({
       resolvedPolicyBundleRef: "policy://odd-sdlc/t174/feature-dependency-dag",
@@ -886,7 +886,7 @@ test("T-174 ABG frontier runner consumes compiled SDLC DAG without harness branc
     maxRetryAttempts: 0,
     leaseTtlMs: 10_000,
     resolvedSystemPolicyRefs: Object.freeze([
-      "abg://3.8/event-sourced-saga-frontier",
+      "abg://abiogenesis/event-sourced-saga-frontier",
       compilation.frontierRef
     ])
   });
@@ -1022,7 +1022,7 @@ test("T-174 synthetic hello-world multilane proof derives live frontier artifact
       maxRetryAttempts: 0,
       leaseTtlMs: 10_000,
       resolvedSystemPolicyRefs: Object.freeze([
-        "abg://3.8/event-sourced-saga-frontier",
+        "abg://abiogenesis/event-sourced-saga-frontier",
         moduleTraversal.selectionRef
       ])
     }),
@@ -1265,7 +1265,7 @@ test("T-174 data-mapper-style Scala modules form batched independent dev frontie
       maxRetryAttempts: 0,
       leaseTtlMs: 10_000,
       resolvedSystemPolicyRefs: Object.freeze([
-        "abg://3.8/event-sourced-saga-frontier",
+        "abg://abiogenesis/event-sourced-saga-frontier",
         traversal.selectionRef
       ])
     }),

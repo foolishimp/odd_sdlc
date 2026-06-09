@@ -347,11 +347,13 @@ Expected live edge sequence:
 
 ```text
 derive_lite_design_adr_surface
-  -> derive_lite_module_surface
   -> derive_lite_component_code_surface
+  -> prepare_test_execution_surface
+  -> derive_test_execution_result_surface
 ```
 
-This proves guided traversal rather than an unbounded full graph walk.
+This proves guided traversal rather than an unbounded full graph walk, and it
+requires graph-owned test execution evidence before the live proof can pass.
 
 ---
 

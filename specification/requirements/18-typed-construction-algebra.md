@@ -1,6 +1,6 @@
 # Typed Construction Algebra Requirements
 
-**Family**: REQ-F-ODDSDLC-074..086
+**Family**: REQ-F-ODDSDLC-074..088
 **Status**: Active
 **Category**: Governance, Runtime, Verification
 **Carries Forward From**:
@@ -18,6 +18,7 @@
 - `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_FP_EVALUATION_LEDGER_PURPOSE.md`
 - `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TRAVERSAL_ASSURANCE_INTEGRATION.md`
 - `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TRAVERSAL_INTENT_PACKAGE.md`
+- `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_EVALUATION_GRID_CONTRACT.md`
 
 This family defines the construction algebra for typed `odd_sdlc.TS`
 traversals. ABG owns runtime admission, event truth, projection, replay,
@@ -588,3 +589,90 @@ or ABG terminal status alone when typed SDLC blocking carriers exist.
 - AC-7: live/sandbox proof of a prompt-bearing edge must show the selected
   next action is derivable from the archived typed state-machine input, not
   from replaying string matching over pressure refs
+
+### REQ-F-ODDSDLC-087 - prompt assets project GTL typed asset surfaces
+
+Worker-facing prompts shall be rendered views over GTL typed asset surfaces.
+Prompt text is contract code, but the structural authority surface is the GTL
+Node-borne AssetSurface declared by `REQ-L-GTL3-ASSET-SURFACE`, with odd_sdlc
+authority-compression policy and prompt-family construction applied as product
+overlay data.
+
+**Acceptance Criteria**:
+- AC-1: every production prompt-bearing transform/evaluate worker invocation
+  writes a prompt invocation sidecar with a stable kind/version, prompt-family,
+  stage, a GTL Node carrying an AssetSurface, constructor refs,
+  method-compression refs, authority packet refs, tool/effect policy refs,
+  output carrier refs, proof obligation refs, and section/clause provenance
+- AC-2: rendered prompt text remains directly inspectable, but every rendered
+  section is traceable to a prompt clause asset with declared intent,
+  provenance refs, authority basis refs, recipient, mode, expected outcome, and
+  failure mode addressed
+- AC-3: authority compression has one source of truth: the odd_sdlc
+  prompt-family authority policy overlay. Clause rows may cite authority kinds,
+  but they do not independently classify those kinds as normal, fallback, or
+  forbidden, and those SDLC policy values do not descend into GTL
+- AC-4: raw bootstrap and raw intent documents are bounded fallback authority,
+  not routine evaluator inputs, once Product, requirements, admitted design,
+  target carrier, obligation, worker report, materialization, or method
+  compression authority is available
+- AC-5: shared method guidance is prompt input through installed,
+  digest-bound authority-compression assets such as
+  `workspace://.abiogenesis/docs/standards/authority_compressions/*`; prompt
+  constructors shall not routinely inline raw shared-method documents
+- AC-6: deterministic prompt constructors may assemble authority packets,
+  register rows, section/clause provenance, refs, digests, and renderer views.
+  They shall not prescribe a semantic extraction recipe that substitutes for
+  `F_P.transform` or `evaluate.C/F_P` judgment
+- AC-7: prompt asset construction reuses the GTL AssetSurface constructors and
+  declaration-shape admission from `@abiogenesis/typescript-tenant`, while
+  odd_sdlc validates only product overlay policy: exact kind/version literals,
+  closed prompt-family rows, deterministic projection, fail-closed authority
+  policy errors, and structural tests proving no SDLC-local prompt asset
+  register or parallel admission remains
+
+### REQ-F-ODDSDLC-088 - evaluation contract is a typed segment-dimension grid
+
+Prompt-bearing evaluation shall be decomposable and scalable. The logical
+evaluation contract is declared over transform segments crossed with evaluation
+dimensions, even when a small product physically fuses the work into one worker
+turn. `F_P` performs bounded semantic judgment over local cells and declared
+relation checks. `F_D` and GTL construct typed carriers, structural refs,
+rendered prompt views, and structural coverage checks without comprehending
+product content. ABG admits evaluation findings and folds findings plus runtime
+facts through the single runtime continuation truth surface.
+
+**Acceptance Criteria**:
+- AC-1: every production prompt-bearing evaluator invocation carries a typed
+  evaluation-grid contract with declared transform-unit refs, evaluation
+  dimension refs, scoped disambiguation-carrier refs, expected finding refs,
+  physical-execution metadata, and the ABG outcome-fold ref
+- AC-2: evaluation shape derives from admitted transform decomposition,
+  traversal-hop, and complexity/proportionality evidence. Prompt text and the
+  evaluator process shall not invent the segmentation or the dimension set at
+  runtime
+- AC-3: evaluation dimensions are explicitly classified as `cell`, `fold`, or
+  `relation`. Local depth, local authority/stage conformance, and intra-slice
+  realization may be cell dimensions only when decidable from the segment and
+  scoped carrier. Coverage is a structural ref-set fold, not a semantic F_P
+  question. Cross-segment trace is a declared relation over typed refs, not a
+  requirement to load the full graph into every cell
+- AC-4: the disambiguation carrier is a bounded replay-derived projection over
+  admitted events, authority snapshots, prior findings, and lineage refs needed
+  by the cell or relation. It is not accumulated history, a raw replay dump, or
+  a writable second truth surface
+- AC-5: physical prompt fusion is allowed only as an optimization over a small
+  logical grid. A fused prompt still exposes transform-unit refs, dimension
+  refs, carrier refs, expected finding refs, and fold inputs in the prompt
+  invocation asset
+- AC-6: evaluator cells shall not routine-read raw bootstrap, raw intent, sibling
+  workspace history, or historical run surfaces when admitted product,
+  requirement, design, target-carrier, obligation, materialization, execution,
+  or scoped-carrier authority is sufficient
+- AC-7: ABG owns admission, replay, continuation, and fold over typed findings
+  plus runtime facts. odd_sdlc shall not create a second local retry/block/close
+  outcome decider to compensate for missing ABG substrate
+- AC-8: localized redispatch is expressed through existing ABG re-entry
+  primitives when they can carry the failed segment/dimension target. If those
+  primitives are insufficient, the missing substrate is an abiogenesis
+  dependency before odd_sdlc closure, not an odd_sdlc-local ABG clone

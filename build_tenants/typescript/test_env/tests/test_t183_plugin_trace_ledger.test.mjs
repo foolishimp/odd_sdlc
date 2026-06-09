@@ -91,12 +91,12 @@ test("T-183 lineage completeness is review-grade F_P pressure, not F_D postfligh
   assert.match(postflightReturn, /blockingReasons: Object\.freeze\(\[\]\)/u);
   assert.doesNotMatch(postflightReturn, /status: blockingReasons\.length/u);
 
-  const handoffSource = readRepoFile(
-    "build_tenants/typescript/code/src/operator/plugins/transform/launch_contract.ts"
+  const postflightChecksSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/plugins/evaluate/postflight_checks.ts"
   );
-  const materializationCheck = handoffSource.slice(
-    handoffSource.indexOf("function evaluateMaterializedProductFiles"),
-    handoffSource.indexOf("function evaluateExecutionEvidence")
+  const materializationCheck = postflightChecksSource.slice(
+    postflightChecksSource.indexOf("function evaluateMaterializedProductFiles"),
+    postflightChecksSource.indexOf("function evaluateExecutionEvidence")
   );
   assert.match(
     materializationCheck,
@@ -147,8 +147,8 @@ test("T-183 post-transform diagnostics are bound through one functional interfac
   );
   assert.equal(
     (installedOperatorSource.match(/writeSdlcFpEvaluateResult\(/gu) ?? []).length,
-    1,
-    "installed operator has one F_P evaluation projection writer call site"
+    2,
+    "installed operator has only the diagnostic writer and the design-depth blocked-evaluator rewrite"
   );
   assert.equal(
     (installedOperatorSource.match(/deriveSdlcOperatorAssuranceGate\(/gu) ?? []).length,
@@ -161,6 +161,15 @@ test("T-183 post-transform diagnostics are bound through one functional interfac
     installedOperatorSource.indexOf("function shouldDeferDispatchConsequenceToFpEvaluator")
   );
   assert.match(refreshFlow, /runSdlcPostTransformDiagnosticFlow\(/u);
+  const blockedDesignDepthRewrite = installedOperatorSource.slice(
+    installedOperatorSource.indexOf("function stateWithBlockedDesignDepthFpEvaluatorOutcome"),
+    installedOperatorSource.indexOf("function workerReportWithReviewGradeAssessment")
+  );
+  assert.match(blockedDesignDepthRewrite, /writeSdlcFpEvaluateResult\(/u);
+  assert.match(
+    blockedDesignDepthRewrite,
+    /design_depth_fp_evaluator_postflight\.json/u
+  );
   const dispatchFlow = installedOperatorSource.slice(
     installedOperatorSource.indexOf("const completeReportDispatch = async"),
     installedOperatorSource.indexOf("const edgeAccountingRow =")

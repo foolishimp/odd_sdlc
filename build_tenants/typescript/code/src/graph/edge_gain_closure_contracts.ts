@@ -11,6 +11,8 @@ import {
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE
 } from "./catalog.js";
 import {
+  CONFORM_PROJECT_INPUTS,
+  CONFORM_PROJECT_OUTPUTS,
   FG_AMBIGUITY_ASSURANCE_LEDGER,
   FG_CAPABILITY_ASSURANCE_LEDGER,
   FG_CONFORM_PROJECT,
@@ -23,7 +25,11 @@ import {
   FG_SEMANTIC_CONVERGENCE_ASSURANCE_LEDGER,
   FG_SHALLOW_REALIZATION_ASSURANCE_LEDGER,
   FG_SINGLE_TYPED_TRAVERSAL,
-  FG_TRAVERSAL_ASSURANCE_FOLD
+  FG_TRAVERSAL_ASSURANCE_FOLD,
+  INGRESS_PROJECT_INPUTS,
+  INGRESS_PROJECT_OUTPUTS,
+  PROJECT_AUTHORITY_CONFORMANCE_INPUTS,
+  PROJECT_AUTHORITY_CONFORMANCE_OUTPUTS
 } from "./library.js";
 
 export type SdlcEdgeGainClosureCategory =
@@ -338,6 +344,38 @@ const LIBRARY_REFS = Object.freeze([
   "authority://odd-sdlc/typed-traversal-contract"
 ] as const);
 
+function secondaryOutputEdgeRef(edgeRef: string, targetAssetType: string): string {
+  return `${edgeRef}__${targetAssetType}`;
+}
+
+function secondaryOutputContracts(input: {
+  readonly edgeRef: string;
+  readonly category: SdlcEdgeGainClosureCategory;
+  readonly closureClassification: SdlcEdgeClosureClassification;
+  readonly sourceAssetTypes: readonly string[];
+  readonly targetAssetTypes: readonly string[];
+  readonly compositionRole: SdlcEdgeCompositionRole;
+  readonly authorityBasisRefs: readonly string[];
+  readonly proofLaneRefs: readonly string[];
+  readonly residualPressureRefs: readonly string[];
+}): readonly SdlcEdgeGainClosureContract[] {
+  return Object.freeze(
+    input.targetAssetTypes.slice(1).map((targetAssetType) =>
+      contract({
+        edgeRef: secondaryOutputEdgeRef(input.edgeRef, targetAssetType),
+        category: input.category,
+        closureClassification: input.closureClassification,
+        sourceAssetTypes: input.sourceAssetTypes,
+        targetAssetType,
+        compositionRole: input.compositionRole,
+        authorityBasisRefs: input.authorityBasisRefs,
+        proofLaneRefs: input.proofLaneRefs,
+        residualPressureRefs: input.residualPressureRefs
+      })
+    )
+  );
+}
+
 export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: FG_SINGLE_TYPED_TRAVERSAL,
@@ -370,6 +408,17 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     proofLaneRefs: ["test://odd-sdlc/t164/published-inventory"],
     residualPressureRefs: ["pressure://odd-sdlc/project-ingress"]
   }),
+  ...secondaryOutputContracts({
+    edgeRef: FG_INGRESS_PROJECT,
+    category: "project_ingress",
+    closureClassification: "close_capable",
+    sourceAssetTypes: INGRESS_PROJECT_INPUTS,
+    targetAssetTypes: INGRESS_PROJECT_OUTPUTS,
+    compositionRole: "prerequisite",
+    authorityBasisRefs: ["authority://odd-sdlc/project-ingress"],
+    proofLaneRefs: ["test://odd-sdlc/t164/published-inventory"],
+    residualPressureRefs: ["pressure://odd-sdlc/project-ingress"]
+  }),
   contract({
     edgeRef: FG_CONFORM_PROJECT,
     category: "conformance",
@@ -381,6 +430,17 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
       "project_topology_policy"
     ],
     targetAssetType: "conform_project_profile",
+    compositionRole: "prerequisite",
+    authorityBasisRefs: ["authority://odd-sdlc/workspace-topology"],
+    proofLaneRefs: ["test://odd-sdlc/t164/conformance"],
+    residualPressureRefs: ["pressure://odd-sdlc/conformance"]
+  }),
+  ...secondaryOutputContracts({
+    edgeRef: FG_CONFORM_PROJECT,
+    category: "conformance",
+    closureClassification: "close_capable",
+    sourceAssetTypes: CONFORM_PROJECT_INPUTS,
+    targetAssetTypes: CONFORM_PROJECT_OUTPUTS,
     compositionRole: "prerequisite",
     authorityBasisRefs: ["authority://odd-sdlc/workspace-topology"],
     proofLaneRefs: ["test://odd-sdlc/t164/conformance"],
@@ -399,6 +459,17 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
       "conformance_gap_set"
     ],
     targetAssetType: "project_bootstrap_surface",
+    compositionRole: "prerequisite",
+    authorityBasisRefs: AUTHORITY_REFS,
+    proofLaneRefs: ["test://odd-sdlc/t164/authority"],
+    residualPressureRefs: ["pressure://odd-sdlc/authority"]
+  }),
+  ...secondaryOutputContracts({
+    edgeRef: FG_CONFORM_PROJECT_AUTHORITY,
+    category: "authority_synthesis",
+    closureClassification: "close_capable",
+    sourceAssetTypes: PROJECT_AUTHORITY_CONFORMANCE_INPUTS,
+    targetAssetTypes: PROJECT_AUTHORITY_CONFORMANCE_OUTPUTS,
     compositionRole: "prerequisite",
     authorityBasisRefs: AUTHORITY_REFS,
     proofLaneRefs: ["test://odd-sdlc/t164/authority"],
@@ -940,7 +1011,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     sourceAssetPolicy: "subset_allowed",
     sourceAssetTypes: ["implementation_design_surface"],
     targetAssetType: "component_code_surface",
-    compositionRole: "terminal",
+    compositionRole: "intermediate",
     authorityBasisRefs: IMPLEMENTATION_REFS,
     proofLaneRefs: ["test://odd-sdlc/t164/lite-overlay"],
     residualPressureRefs: [

@@ -478,16 +478,6 @@ function declaredExecutionContracts(input: {
     input.runtimeObservationContract
   );
 
-  if (testExecutionContract === UNDECLARED_EXECUTION_CONTRACT) {
-    // Legacy constraints name the declared tenant test execution contract as
-    // test_runner. Preserve that declaration without deriving commands from
-    // language, build-tool, or capability labels.
-    const testRunner = normalizeExecutionContractDeclaration(input.testRunner);
-    if (testRunner !== UNDECLARED_EXECUTION_CONTRACT) {
-      testExecutionContract = testRunner;
-    }
-  }
-
   return Object.freeze({
     buildExecutionContract,
     testExecutionContract,

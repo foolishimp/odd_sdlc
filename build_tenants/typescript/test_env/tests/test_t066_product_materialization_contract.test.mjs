@@ -149,6 +149,7 @@ function makeExecutionWorkspace() {
       "    language: Scala",
       "    build_tool: sbt",
       "    test_runner: sbt test",
+      "    test_execution_contract: sbt test",
       "    module_structure:",
       "      - full-suite"
     ].join("\n"),
@@ -573,6 +574,7 @@ function makeCapabilityWorkspace() {
       "    language: Scala",
       "    build_tool: sbt",
       "    test_runner: sbt test",
+      "    test_execution_contract: sbt test",
       "    capability_contracts:",
       "      spark_session: true",
       "      dataframe_reads: true"
@@ -598,7 +600,8 @@ function declareScalaSbtTestRunner(workspaceRoot) {
       "    output_dir: build_tenants/scala_spark/",
       "    language: Scala",
       "    build_tool: sbt",
-      "    test_runner: sbt test"
+      "    test_runner: sbt test",
+      "    test_execution_contract: sbt test"
     ].join("\n"),
     "utf8"
   );
@@ -2312,6 +2315,20 @@ test("T-164 execution shards project tenant-declared byproduct rules", () => {
       "project/.sbtboot/**"
     ]
   );
+});
+
+test("T-164 Rust service fixture declares Cargo byproducts in tenant stack authority", () => {
+  const stackSpecFile = path.join(
+    PACKAGE_ROOT,
+    "test_env/fixtures/t164_rust_hello_service_lite/build_tenants/hello_world_rust_service/spec/TECH_STACK.json"
+  );
+  const stackSpec = JSON.parse(readFileSync(stackSpecFile, "utf8"));
+
+  assert.deepStrictEqual(stackSpec.byproductRules, ["Cargo.lock", "target/"]);
+  assert.deepStrictEqual(stackSpec.testingTechStack.byproductRules, [
+    "Cargo.lock",
+    "target/"
+  ]);
 });
 
 test("T-164 product lineage admits full requirement set beyond prompt slice", () => {
@@ -7364,6 +7381,7 @@ test("B-081 test execution preparation carries admitted schedule commands", () =
       "    language: Scala",
       "    build_tool: sbt",
       "    test_runner: sbt test",
+      "    test_execution_contract: sbt test",
       "    module_structure:",
       "      - analytics-core",
       "      - streaming-runtime"
@@ -7525,6 +7543,7 @@ test("B-085 archive retry preserves targeted execution shard scope", () => {
       "    language: Scala",
       "    build_tool: sbt",
       "    test_runner: sbt test",
+      "    test_execution_contract: sbt test",
       "    module_structure:",
       "      - cdme-compiler",
       "      - cdme-engine"
@@ -8401,6 +8420,7 @@ function makeT102PromptSweepWorkspace() {
       "    language: Scala",
       "    build_tool: sbt",
       "    test_runner: sbt test",
+      "    test_execution_contract: sbt test",
       "    declared_modules:",
       "      - core"
     ].join("\n"),

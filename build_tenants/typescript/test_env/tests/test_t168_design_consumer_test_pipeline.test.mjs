@@ -415,7 +415,8 @@ test("T-168 node execution shard runs materialized test files", () => {
       "    language: JavaScript",
       "    build_tool: node",
       "    runtime: node",
-      "    test_runner: node"
+      "    test_runner: node",
+      "    test_execution_contract: node --test test/HelloWorldProofBindingTests.test.js"
     ].join("\n")
   );
   writeFileSync(
@@ -440,7 +441,7 @@ test("T-168 node execution shard runs materialized test files", () => {
   assert.equal(manifest.productMaterialization.executionShards.length, 1);
   assert.equal(
     manifest.productMaterialization.executionShards[0].command,
-    "node"
+    "node --test test/HelloWorldProofBindingTests.test.js"
   );
 });
 
@@ -465,7 +466,8 @@ test("T-168 component-test handoff declares shard cwd and workspace-only logs", 
       "    language: JavaScript",
       "    build_tool: node",
       "    runtime: node",
-      "    test_runner: node"
+      "    test_runner: node",
+      "    test_execution_contract: node --test"
     ].join("\n")
   );
   materializeSdlcProjectConformance({ workspaceRoot: workspace });

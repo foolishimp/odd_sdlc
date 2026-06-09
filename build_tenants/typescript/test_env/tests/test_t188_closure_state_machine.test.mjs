@@ -20,6 +20,10 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(__dirname, "../..");
 const OPERATOR_SRC_ROOT = path.join(PACKAGE_ROOT, "code/src/operator");
+const INSTALLED_OPERATOR_SOURCE = readFileSync(
+  path.join(OPERATOR_SRC_ROOT, "installed_operator.ts"),
+  "utf8"
+);
 
 const EXPECTED_BUCKET_BY_REENTRY_POINT = Object.freeze({
   same_edge_retry: "retry",
@@ -60,7 +64,6 @@ function transitionFor(patch = {}) {
     structuralBlockReasonRefs: [],
     postActionBlockReasonRefs: [],
     yieldResumeBasis: null,
-    edgeCanClose: false,
     edgeAssuranceDisposition: null,
     ...patch
   });
@@ -113,13 +116,18 @@ test("T-188 evaluator process failure blocks instead of product-transform retry"
     assert.equal(transition.disposition, "block", code);
     assert.equal(transition.explanationCode, "typed_block_or_triage", code);
     assert.equal(
-      transition.abgRuntimeTransitionProjection.disposition,
-      "block",
+      transition.abgIterationOutcomeProjection.outcome.kind,
+      "terminate",
       code
     );
     assert.equal(
-      transition.abgRuntimeTransitionProjection.reason,
-      "typed_block",
+      transition.abgIterationOutcomeProjection.outcome.disposition,
+      "blocked",
+      code
+    );
+    assert.equal(
+      transition.abgIterationOutcomeProjection.outcome.reason,
+      "runtime_failure",
       code
     );
     assert.deepStrictEqual(transition.retryReasonRefs, [], code);
@@ -143,7 +151,11 @@ test("T-188 ABG terminal retry is only the no-typed-reason fallback", () => {
   assert.equal(fallbackTransition.disposition, "retry");
   assert.equal(fallbackTransition.explanationCode, "abg_terminal_retry");
   assert.equal(
-    fallbackTransition.abgRuntimeTransitionProjection.reason,
+    fallbackTransition.abgIterationOutcomeProjection.outcome.kind,
+    "redispatch"
+  );
+  assert.equal(
+    fallbackTransition.abgIterationOutcomeProjection.outcome.reason,
     "terminal_retry_fallback"
   );
 
@@ -166,7 +178,7 @@ test("T-188 ABG terminal retry is only the no-typed-reason fallback", () => {
       reentryPoint
     );
     assert.notEqual(
-      transition.abgRuntimeTransitionProjection.reason,
+      transition.abgIterationOutcomeProjection.outcome.reason,
       "terminal_retry_fallback",
       reentryPoint
     );
@@ -187,7 +199,145 @@ test("T-188 ABG terminal retry is only the no-typed-reason fallback", () => {
   }
 });
 
-test("T-188 SDLC repair adapters follow ABG typed-block priority", () => {
+test("T-188 edge-assurance close emits satisfied ABG row", () => {
+  const transition = transitionFor({
+    edgeAssuranceDisposition: "close"
+  });
+
+  assert.equal(transition.disposition, "close");
+  assert.equal(transition.explanationCode, "closed");
+  assert.equal(
+    transition.abgIterationOutcomeProjection.outcome.kind,
+    "terminate"
+  );
+  assert.equal(
+    transition.abgIterationOutcomeProjection.outcome.disposition,
+    "converged"
+  );
+  assert.equal(
+    transition.abgIterationOutcomeProjection.satisfactionRows.length,
+    1
+  );
+  assert.equal(
+    transition.abgIterationOutcomeProjection.satisfactionRows[0].status,
+    "satisfied"
+  );
+  assert.equal(
+    transition.abgIterationOutcomeProjection.satisfactionRows[0].reason,
+    null
+  );
+  assert.match(
+    transition.abgIterationOutcomeProjection.satisfactionRows[0].authorityRef,
+    /edge-assurance-disposition:\/\/odd-sdlc\/20260603T153222191Z_pid19186\/close/u
+  );
+});
+
+test("T-188 review-grade same-edge pressure remains redispatch, not structural block", () => {
+  const transition = transitionFor({
+    blockingReasonCarriers: [
+      makeSdlcBlockingReason({
+        code: "review_grade_edge_fulfillment_blocked",
+        reasonClass: "assurance",
+        lawfulReentryPoint: "same_edge_retry",
+        evidenceRefs: [
+          "file:///tmp/review_grade_edge_fulfillment_assessment.json",
+          "file:///tmp/worker_result_report.json"
+        ]
+      })
+    ],
+    residualPressureRefs: [
+      "obligation://odd-sdlc/target_asset%3Acomponent_code_surface/partial",
+      "pressure://odd-sdlc/fp-evaluate/run/review_grade_edge_fulfillment_blocked",
+      "pressure://odd-sdlc/review-grade/run/target_asset%3Acomponent_code_surface"
+    ],
+    edgeAssuranceDisposition: "retry"
+  });
+
+  assert.equal(transition.disposition, "retry");
+  assert.equal(transition.explanationCode, "typed_retry");
+  assert.equal(
+    transition.abgIterationOutcomeProjection.outcome.kind,
+    "redispatch"
+  );
+  assert.equal(
+    transition.abgIterationOutcomeProjection.outcome.reason,
+    "missing_evidence"
+  );
+  assert.equal(transition.blockReasonRefs.length, 0);
+  assert(
+    transition.retryReasonRefs.some((ref) =>
+      ref.includes("review_grade_edge_fulfillment_blocked")
+    ),
+    transition.retryReasonRefs.join("\n")
+  );
+});
+
+test("T-188 SDLC repair adapters are ABG redispatch rows", () => {
+  const testExecutionFailureTransition = transitionFor({
+    residualPressureRefs: [
+      "pressure://odd-sdlc/test_execution_result_failed/run%3A%2F%2Ft188%2Ffailed/failed/failed-count:1"
+    ],
+    edgeAssuranceDisposition: "block"
+  });
+
+  assert.equal(testExecutionFailureTransition.disposition, "repair");
+  assert.equal(
+    testExecutionFailureTransition.abgIterationOutcomeProjection.outcome.kind,
+    "redispatch"
+  );
+  assert(
+    testExecutionFailureTransition.repairReasonRefs.some((ref) =>
+      ref.includes("test_execution_result_failed")
+    ),
+    testExecutionFailureTransition.repairReasonRefs.join("\n")
+  );
+
+  const repairOnlyTransition = transitionFor({
+    blockingReasonCarriers: [
+      makeSdlcBlockingReason({
+        code: "unknown_blocking_reason",
+        reasonClass: "assurance",
+        lawfulReentryPoint: "repair_worker_output",
+        evidenceRefs: ["evidence://odd-sdlc/t188/repair-only"]
+      })
+    ],
+    abgTerminalRetryRefs: ["terminal-retry://odd-sdlc/t188/abg-terminal"]
+  });
+
+  assert.equal(repairOnlyTransition.disposition, "repair");
+  assert.equal(
+    repairOnlyTransition.abgIterationOutcomeProjection.outcome.kind,
+    "redispatch"
+  );
+  assert.equal(
+    repairOnlyTransition.abgIterationOutcomeProjection.outcome.target.reEntryPoint,
+    "realization"
+  );
+
+  const reenterOnlyTransition = transitionFor({
+    blockingReasonCarriers: [
+      makeSdlcBlockingReason({
+        code: "unknown_blocking_reason",
+        reasonClass: "assurance",
+        lawfulReentryPoint: "escalate_to_fp",
+        evidenceRefs: ["evidence://odd-sdlc/t188/reenter-only"]
+      })
+    ],
+    abgTerminalRetryRefs: ["terminal-retry://odd-sdlc/t188/abg-terminal"]
+  });
+
+  assert.equal(reenterOnlyTransition.disposition, "re-enter");
+  assert.equal(
+    reenterOnlyTransition.abgIterationOutcomeProjection.outcome.kind,
+    "redispatch"
+  );
+  assert.equal(
+    reenterOnlyTransition.abgIterationOutcomeProjection.outcome.target.reEntryPoint,
+    "proof"
+  );
+});
+
+test("T-188 ABG reprice priority outranks SDLC redispatch labels", () => {
   const repriceCarrier = makeSdlcBlockingReason({
     code: "unknown_blocking_reason",
     reasonClass: "runtime_policy",
@@ -207,14 +357,14 @@ test("T-188 SDLC repair adapters follow ABG typed-block priority", () => {
     abgTerminalRetryRefs: ["terminal-retry://odd-sdlc/t188/abg-terminal"]
   });
 
-  assert.equal(repairTransition.disposition, "repair");
+  assert.equal(repairTransition.disposition, "reprice");
   assert.equal(
-    repairTransition.abgRuntimeTransitionProjection.disposition,
-    "block"
+    repairTransition.abgIterationOutcomeProjection.outcome.kind,
+    "terminate"
   );
   assert.equal(
-    repairTransition.abgRuntimeTransitionProjection.reason,
-    "typed_block"
+    repairTransition.abgIterationOutcomeProjection.outcome.reason,
+    "missing_authority"
   );
   assert(
     repairTransition.repriceReasonRefs.includes(
@@ -236,14 +386,14 @@ test("T-188 SDLC repair adapters follow ABG typed-block priority", () => {
     abgTerminalRetryRefs: ["terminal-retry://odd-sdlc/t188/abg-terminal"]
   });
 
-  assert.equal(reenterTransition.disposition, "re-enter");
+  assert.equal(reenterTransition.disposition, "reprice");
   assert.equal(
-    reenterTransition.abgRuntimeTransitionProjection.disposition,
-    "block"
+    reenterTransition.abgIterationOutcomeProjection.outcome.kind,
+    "terminate"
   );
   assert.equal(
-    reenterTransition.abgRuntimeTransitionProjection.reason,
-    "typed_block"
+    reenterTransition.abgIterationOutcomeProjection.outcome.reason,
+    "missing_authority"
   );
   assert(
     reenterTransition.repriceReasonRefs.includes(
@@ -314,11 +464,29 @@ test("T-188 synthetic gap dossiers preserve typed carrier reentry class", () => 
 });
 
 test("T-188 continuation decider is not reintroduced outside closure_state_machine", () => {
+  const closureStateMachineSource = readFileSync(
+    path.join(OPERATOR_SRC_ROOT, "closure_state_machine.ts"),
+    "utf8"
+  );
+  assert.match(
+    closureStateMachineSource,
+    /deriveIterationOutcomeProjection\(\{/u
+  );
+  assert.match(
+    closureStateMachineSource,
+    /abgIterationOutcomeProjection/u
+  );
+  assert.equal(
+    closureStateMachineSource.includes("deriveRuntimeContinuationTransitionProjection"),
+    false
+  );
+
   const scannedSources = tsFilesUnder(OPERATOR_SRC_ROOT).filter(
     (sourcePath) => path.basename(sourcePath) !== "closure_state_machine.ts"
   );
   assert(scannedSources.length > 0);
   for (const forbidden of [
+    "deriveRuntimeContinuationTransitionProjection",
     "function blockingReasonRefsForReentry",
     "function closurePressureRefLawfulReentryPoint",
     "function closurePressureRefMessage",
@@ -334,4 +502,31 @@ test("T-188 continuation decider is not reintroduced outside closure_state_machi
       );
     }
   }
+});
+
+test("T-188 re-entered close preserves overlay segment completion authority", () => {
+  assert.match(
+    INSTALLED_OPERATOR_SOURCE,
+    /input\.start\.executionContract\?\.overlayRef \?\? input\.state\.manifest\.overlayRef/u
+  );
+  assert.match(
+    INSTALLED_OPERATOR_SOURCE,
+    /input\.start\.executionContract\?\.targetGraphFunction \?\?\s+input\.state\.manifest\.edgeName/u
+  );
+  assert.match(
+    INSTALLED_OPERATOR_SOURCE,
+    /overlay\.overlayRef === activeOverlayRef/u
+  );
+  assert.match(
+    INSTALLED_OPERATOR_SOURCE,
+    /const normalizedPostCloseVectorIndex = normalizePostCloseContinuationVectorIndex\(\{/u
+  );
+  assert.match(
+    INSTALLED_OPERATOR_SOURCE,
+    /normalizedPostCloseVectorIndex === null &&\s+activeOverlay !== null/u
+  );
+  assert.match(
+    INSTALLED_OPERATOR_SOURCE,
+    /nextVectorIndex: normalizedPostCloseVectorIndex/u
+  );
 });

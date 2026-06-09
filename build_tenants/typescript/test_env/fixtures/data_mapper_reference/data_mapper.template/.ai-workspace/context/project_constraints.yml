@@ -6,6 +6,7 @@ project:
   name: "data_mapper"
   kind: "data-pipeline"
   test_runner: "sbt test"
+  test_execution_contract: "sbt test"
 
 # Active build tenants (REQ-BT-001)
 # primary: execution tier that must fully converge
@@ -31,6 +32,7 @@ build_tenants:
     runtime: "JVM 11+"
     build_tool: "sbt"
     test_runner: "sbt test"
+    test_execution_contract: "sbt test"
     module_structure:
       - "cdme-compiler"    # topological compiler, type resolver, grain checker, sheaf manager
       - "cdme-assurance"   # AI assurance and dry-run executor
@@ -60,6 +62,7 @@ build_tenants:
     language_version: "SQL:2016"
     build_tool: "dbt"
     test_runner: "dbt test"
+    test_execution_contract: "dbt test"
     module_structure:
       - "models/staging"    # source declarations and raw ingestion models
       - "models/morphisms"  # one model per topology morphism

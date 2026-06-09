@@ -55,25 +55,31 @@ export function t160HelloWorldRustLiteLiveScenario({
       ],
       handoffEdgeSequencePrefix: [
         "derive_lite_design_adr_surface",
-        "derive_lite_module_surface",
-        "derive_lite_component_code_surface"
+        "derive_lite_component_code_surface",
+        "prepare_test_execution_surface",
+        "derive_test_execution_result_surface"
       ],
-      processChecks: [
-        {
-          command: "cargo",
-          args: ["run", "--quiet"],
-          cwd: "build_tenants/hello_world_rust",
-          stdout: "Hello, world!"
-        }
+      requiredHandoffEdges: [
+        "derive_lite_component_code_surface",
+        "prepare_test_execution_surface",
+        "derive_test_execution_result_surface"
       ],
+      executionEvidence: {
+        edgeName: "derive_test_execution_result_surface",
+        status: "succeeded",
+        commandIncludes: "cargo run",
+        stdoutIncludes: "Hello, world!"
+      },
       latestArchiveArtifacts: [
-        "sdlc_overlay_segment_completion.json"
+        "worker_result_report.json",
+        "declared_edge_projection_artifact.json"
       ]
     },
     liveWorker: worker,
     startUntil,
     maxAdvances,
     continueOnEdgeConverge: true,
-    stopAfterWorkspaceFilesExist: true
+    stopAfterWorkspaceFilesExist: false,
+    stopAfterRequiredHandoffEdges: true
   });
 }

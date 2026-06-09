@@ -1,4 +1,4 @@
-# ODD SDLC TypeScript ABG 3.9 RC3 Staged Compute Boundary
+# ODD SDLC TypeScript Staged Compute Boundary
 
 Status: implemented design for T-180 semantic proof; live hello-world proof
 pending.
@@ -10,7 +10,7 @@ Derives from:
 - `specification/requirements/18-typed-construction-algebra.md`
 - ABIogenesis `REQ-R-ABG3-FN-COMPOSITION`
 - ABIogenesis `REQ-L-GTL3-COMPUTE-NOTATION`
-- ABIogenesis `3.9.0-rc.6`
+- ABIogenesis staged-compute runtime law
 
 ## STDO Re-Triage
 
@@ -19,7 +19,7 @@ This is a `requirement_reprice` followed by `design_reframe`.
 The current SDLC TypeScript runtime states the compute-stage epistemology but
 still contains realization paths where SDLC-local code synthesizes selected
 composition identity and derives evaluation, ledgers, consequence, closure, and
-next action around one `fpDispatch` adapter. That conflicts with the ABG 3.9 RC3
+next action around one `fpDispatch` adapter. That conflicts with the staged compute
 boundary where ABG is the system side-effect owner and product plugins compute
 typed values or refs only.
 
@@ -45,8 +45,8 @@ meaning, analyzer read models, target-carrier meaning, and proof interpretation.
 
 ## Common-Surface Compression Rule
 
-This design extends the T-175 source-truth consolidation. New RC3 migration code
-must first route through existing common surfaces:
+This design extends the T-175 source-truth consolidation. New staged-compute
+migration code must first route through existing common surfaces:
 
 - value domains: `contracts/carrier_domain_catalog.ts`
 - artifact truth: `contracts/operator_run_artifact_catalog.ts`
@@ -65,13 +65,11 @@ proof before implementation closure.
 ## Handoff Removal Rule
 
 `operator/handoff.ts` is not an owning design module and is not an accepted
-long-term adapter. It is a deletion target. Any remaining code there is open
-T-183 migration debt, permitted only while it is a thin worker-launch bridge
-with no prompt semantics, evaluator semantics, ledger semantics, consequence
-selection, product topology, stack policy, or closure authority. Logic formerly
-collected there has these homes:
+adapter. It is a deletion target. Any return of code there is non-closure
+evidence unless a new ticket reprices this module map. Logic formerly collected
+there has these homes:
 
-| former handoff concern | owning RC3 surface |
+| former handoff concern | owning staged-compute surface |
 | --- | --- |
 | worker launch manifests, prompt source carriers, transform request/result refs | `operator/plugins/transform/*` |
 | selected F_P evaluator sidecar admission, design-depth pressure maps, review-grade findings | `operator/plugins/evaluate/*` |
@@ -82,10 +80,9 @@ collected there has these homes:
 | deterministic continuation projection | `operator/plugins/consequence/*` and `traversal_consequence.ts` |
 
 New code must not add prompt, semantic evaluation, ledger, consequence, stack,
-or topology logic to `handoff.ts`. If a helper is still imported from
-`handoff.ts`, it must either be the thin worker-launch bridge with a named T-183
-deletion row, or the design is not closed. Passing tests through a remaining
-handoff semantic path are non-closure evidence, not compatibility proof.
+or topology logic to `handoff.ts`. If a helper is imported from `handoff.ts`,
+the design is not closed. Passing tests through a remaining handoff semantic
+path is non-closure evidence, not proof.
 
 ## Canonical Prompt-Source Carrier
 
@@ -310,7 +307,8 @@ The TypeScript operator folder should therefore converge toward:
 
 Any node-specific semantic rule remaining in `handoff.ts`,
 `installed_operator.ts`, or a generic admission file is migration debt unless it
-is an F_D guard over an admitted F_P/project carrier.
+is an F_D guard over an admitted F_P/project carrier. A deleted handoff module
+may not be reintroduced as a staging point for those rules.
 
 ## ODD Authority Mapping
 
@@ -318,7 +316,7 @@ ODD_SDLC remains the practical implementation of ODD methodology. ODD's older
 function labels map onto the current post-transform compute process as
 authority functions inside selected `evaluate.C`, not as a new runtime layer:
 
-| ODD authority function | RC3 compute-stage spelling | admitted carrier family |
+| ODD authority function | staged-compute spelling | admitted carrier family |
 | --- | --- | --- |
 | `synthesize_model` | `synthesize_model.C/F_P` as a selected `evaluate.C` rule when model meaning is ambiguous | `ProductAssetModel` |
 | `eval_gap` | `eval_gap.C/F_P` as a selected `evaluate.C` rule over declared lineage-reachable ledger snapshots | `ObservationSnapshot` and `GapPressureRow` |
@@ -368,7 +366,7 @@ broken pressure chain.
 Product/materialization evidence is not the same as product fulfillment. The
 runtime may observe files, paths, tags, digests, execution logs, and materialized
 product-file roles, but those observations are only evidence candidates. This
-section restates existing `odd_sdlc` product and requirement law as an RC3
+section restates existing `odd_sdlc` product and requirement law as a staged-compute
 implementation boundary; it does not introduce a new product purpose.
 
 Generated code fulfillment requires an admitted semantic binding:
@@ -406,7 +404,16 @@ symbols, digests, test outputs, and evidence refs exist and are internally
 consistent. F_D must not infer from a changed file or requirement tag that a
 requirement has reached coded fulfillment.
 
-The generic row shape for coded fulfillment is:
+The generic fulfillment carrier is ABIogenesis
+`GtlContractFulfillmentBinding`. `odd_sdlc` may project local edge obligations,
+target-carrier rows, component-depth rows, materialized product files, and
+review-grade findings into that carrier before ABG admission, but it must not
+define a second local fulfillment-binding law. SDLC-local code under
+`operator/review_grade_edge_fulfillment.ts` is therefore a graph-edge projection
+adapter over SDLC evidence; reusable binding field law, identity derivation, and
+carrier admission remain ABG/GTL-owned under the T-153 contract-law API.
+
+The carrier fields used for coded fulfillment are:
 
 ```text
 requirementRef
@@ -475,7 +482,7 @@ truth surface and must be removed or demoted to non-authoritative diagnostics.
 
 ## Bad Register Elimination
 
-The RC3 implementation eliminates false-assurance registers. A false-assurance
+The staged-compute implementation eliminates false-assurance registers. A false-assurance
 register is any register, ledger, sidecar, parser result, archive artifact, or
 read model that can influence close, retry, repair, re-entry, reprice, next
 action, analyzer truth, or public gap truth without selected F_P semantic
@@ -548,9 +555,9 @@ flowchart TD
 
 ## IACS
 
-### AbgRc6SubstratePin
+### AbiogenesisSubstratePin
 
-Purpose: make ABG `3.9.0-rc.6` the single substrate release truth for the
+Purpose: make the selected ABIogenesis package the single substrate release truth for the
 TypeScript tenant.
 
 Owning surfaces:
@@ -570,7 +577,7 @@ surface without local synthesis.
 
 Owning surfaces:
 
-- ABG 3.9 RC3 plugin input / compute-stage binding carriers
+- staged compute plugin input / compute-stage binding carriers
 - SDLC transform, evaluate, consequence, analyzer, and archive carriers
 
 Acceptance: missing, stale, or locally synthesized selected composition identity
@@ -883,9 +890,9 @@ Analyzer output must show:
 - replay continuation refs
 - parallel branch refs and fan-in rows when T-174 frontier truth applies
 
-### HelloWorldRc2ProofHarness
+### Hello World Proof Harness
 
-Purpose: prove the installed hello-world lane follows the RC3 staged boundary.
+Purpose: prove the installed hello-world lane follows the staged boundary.
 
 The proof must run only after semantic tests pass. It must fail if hello-world
 output is produced through the old bundled SDLC adapter path.
@@ -936,9 +943,9 @@ truth surface.
 
 ## Implementation Sequence
 
-1. Pin ABG 3.9 RC3 in package, lockfile, substrate contract, install adapter, and
+1. Pin staged compute in package, lockfile, substrate contract, install adapter, and
    release snapshot tests.
-2. Wire ABG 3.9 RC3 selected composition and compute-stage binding consumption into
+2. Wire staged compute selected composition and compute-stage binding consumption into
    installed operator runtime inputs.
 3. Split current installed operator dispatch into transform, evaluate, and
    consequence product plugins.

@@ -85,6 +85,7 @@ build_tenants:
     language: kotlin
     build_tool: gradle
     test_runner: gradle test
+    test_execution_contract: gradle test
     module_structure:
       - ingress-core
       - settlement-engine

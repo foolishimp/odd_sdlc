@@ -6,7 +6,9 @@ import type {
 } from "../../carriers.js";
 import {
   SDLC_COMPONENT_CONCERN_ROLES,
-  SDLC_DESIGN_COMPLETENESS_STATUSES
+  SDLC_DESIGN_COMPLETENESS_STATUSES,
+  SDLC_DOMAIN_ATTRIBUTE_CARDINALITIES,
+  SDLC_DOMAIN_ENTITY_OWNERSHIP
 } from "../../carriers.js";
 import {
   DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_PATH,
@@ -18,6 +20,22 @@ import {
 import {
   DESIGN_DEPTH_FP_EVALUATOR_RULE_REF
 } from "./design_depth_register.js";
+import {
+  SDLC_PROMPT_BOUNDED_FALLBACK_AUTHORITY_KIND_REFS,
+  SDLC_PROMPT_NORMAL_AUTHORITY_KIND_REFS,
+  constructSdlcEvaluationGridContract,
+  constructSdlcPromptInvocationProjection,
+  sdlcPromptAuthorityCompressionFallbackPreconditionRef,
+  sdlcPromptSectionFromLines,
+  type SdlcDisambiguationCarrierRef,
+  type SdlcEvaluationDimensionRef,
+  type SdlcEvaluationDimensionScope,
+  type SdlcEvaluationGridContract,
+  type SdlcPromptFamily,
+  type SdlcPromptSectionConstructionInput,
+  type SdlcRenderedPromptProjection,
+  type SdlcTransformUnitRef
+} from "../../prompt_assets.js";
 
 function listForPrompt(values: readonly string[]): string {
   return values.length === 0 ? "none" : values.join(", ");
@@ -55,7 +73,165 @@ function tenantToolBoundaryPromptLines(
   ]);
 }
 
-export function designDepthFpEvaluatorPrompt(input: {
+function edgeAuthorityCompressionPromptLines(): readonly string[] {
+  return Object.freeze([
+    "- STDO authority compression: evaluate the current edge from the smallest admitted authority packet that can decide the obligation.",
+    "- Normal evaluation authority is specification/PRODUCT.md, specification/requirements/*, admitted design/depth refs, typed obligation rows, target-carrier refs, tenant stack authority, worker report evidence, and product materialization evidence.",
+    "- Raw bootstrap surfaces such as bootstrap.md and .ai-workspace/context/project_bootstrap.md are provenance/import sources, not routine evaluator inputs; do not read them unless a named provenance/import discrepancy cannot be resolved from the compressed packet.",
+    "- specification/INTENT.md is only a bounded fallback for missing scope/intent context; inspect at most the lines needed for the named unresolved obligation and never use raw intent text as a substitute for admitted requirement rows.",
+    "- Prefer specification/PRODUCT.md and specification/requirements/* over bootstrap or raw intent when judging product behavior, obligations, lineage, or accepted authority.",
+    "- Requirement lineage is carried by admitted obligation ids, requirement rows, target-carrier refs, and worker/materialization evidence. Do not rediscover lineage by rereading seed bootstrap text.",
+    "- If raw bootstrap or intent fallback is necessary, cite the unresolved obligation id or finding reason first, read with limit <=80, and keep that sourceBasis/evidence use local to that finding."
+  ]);
+}
+
+const ABG_ITERATION_OUTCOME_FOLD_REF =
+  "package:@abiogenesis/typescript-tenant@4.0.0-rc.4#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows";
+
+interface EvaluatePromptLineGroups {
+  readonly preAuthorityLines: readonly string[];
+  readonly postAuthorityLines: readonly string[];
+}
+
+function stableRefSegment(value: string | null | undefined, fallback: string): string {
+  const basis = value === null || value === undefined || value.trim().length === 0
+    ? fallback
+    : value;
+  return basis.replace(/[^A-Za-z0-9._:-]+/gu, "-");
+}
+
+function manifestObligationRefs(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  return Object.freeze(
+    (manifest.traversalObligationContext?.obligations ?? []).map(
+      (obligation) => obligation.obligationId
+    )
+  );
+}
+
+function evaluationDimension(input: {
+  readonly promptFamily: Extract<
+    SdlcPromptFamily,
+    "evaluate_design_depth" | "evaluate_review_grade"
+  >;
+  readonly dimensionKey: string;
+  readonly scope: SdlcEvaluationDimensionScope;
+}): SdlcEvaluationDimensionRef {
+  return Object.freeze({
+    kind: "sdlc_evaluation_dimension_ref" as const,
+    dimensionRef: `evaluation-dimension://odd-sdlc/${input.promptFamily}/${input.dimensionKey}`,
+    scope: input.scope,
+    expectedFindingRef: `evaluation-finding://odd-sdlc/${input.promptFamily}/${input.dimensionKey}`
+  });
+}
+
+function evaluationGridContractForPrompt(input: {
+  readonly promptFamily: Extract<
+    SdlcPromptFamily,
+    "evaluate_design_depth" | "evaluate_review_grade"
+  >;
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly sourceAssetRefs: readonly string[];
+  readonly targetAssetRefs: readonly string[];
+  readonly dimensions: readonly SdlcEvaluationDimensionRef[];
+  readonly provenanceRefs: readonly string[];
+}): SdlcEvaluationGridContract {
+  const graphRef = stableRefSegment(
+    input.manifest.graphFunctionName,
+    "unknown-graph-function"
+  );
+  const edgeRef = stableRefSegment(input.manifest.edgeName, "unknown-edge");
+  const targetRef = stableRefSegment(
+    input.manifest.targetAssetType,
+    "unknown-target"
+  );
+  const unitRef =
+    `transform-unit://odd-sdlc/${graphRef}/${edgeRef}/${targetRef}`;
+  const obligationRefs = manifestObligationRefs(input.manifest);
+  const transformUnit: SdlcTransformUnitRef = Object.freeze({
+    kind: "sdlc_transform_unit_ref" as const,
+    unitRef,
+    segmentKey: edgeRef,
+    sourceAssetRefs: input.sourceAssetRefs,
+    targetAssetRefs: input.targetAssetRefs,
+    obligationRefs
+  });
+  const semanticDimensions = input.dimensions.filter(
+    (dimension) => dimension.scope !== "fold"
+  );
+  const foldDimensions = input.dimensions.filter(
+    (dimension) => dimension.scope === "fold"
+  );
+  const authoritySnapshotRefs = Object.freeze([
+    ...input.sourceAssetRefs,
+    ...input.targetAssetRefs
+  ]);
+  const disambiguationCarriers = Object.freeze([
+    ...semanticDimensions.map((dimension): SdlcDisambiguationCarrierRef =>
+      Object.freeze({
+        kind: "sdlc_disambiguation_carrier_ref" as const,
+        carrierRef:
+          `disambiguation-carrier://odd-sdlc/${input.promptFamily}/${edgeRef}/${stableRefSegment(dimension.scope, "scope")}/${stableRefSegment(dimension.dimensionRef, "dimension")}`,
+        scopeRef: `${unitRef}#${dimension.dimensionRef}`,
+        authoritySnapshotRefs,
+        priorFindingRefs: Object.freeze([] as const),
+        lineageRefs: obligationRefs
+      })
+    ),
+    ...foldDimensions.map((dimension): SdlcDisambiguationCarrierRef =>
+      Object.freeze({
+        kind: "sdlc_disambiguation_carrier_ref" as const,
+        carrierRef:
+          `disambiguation-carrier://odd-sdlc/${input.promptFamily}/${edgeRef}/fold/${stableRefSegment(dimension.dimensionRef, "dimension")}`,
+        scopeRef:
+          `evaluation-grid-fold://odd-sdlc/${input.promptFamily}/${edgeRef}#${dimension.dimensionRef}`,
+        authoritySnapshotRefs,
+        priorFindingRefs: input.dimensions.map(
+          (candidate) => candidate.expectedFindingRef
+        ),
+        lineageRefs: obligationRefs
+      })
+    )
+  ]);
+  return constructSdlcEvaluationGridContract({
+    logicalGridRef:
+      `evaluation-grid://odd-sdlc/${input.promptFamily}/${graphRef}/${edgeRef}/${targetRef}`,
+    physicalExecution: "fused_prompt",
+    transformUnits: Object.freeze([transformUnit]),
+    evaluationDimensions: input.dimensions,
+    disambiguationCarriers,
+    expectedFindingRefs: input.dimensions.map(
+      (dimension) => dimension.expectedFindingRef
+    ),
+    abgOutcomeFoldRef: ABG_ITERATION_OUTCOME_FOLD_REF,
+    provenanceRefs: input.provenanceRefs
+  });
+}
+
+function useCompactFusedEvaluationPrompt(
+  manifest: SdlcWorkerHandoffManifest
+): boolean {
+  const profile = manifest.proportionalityProfile ?? null;
+  const obligationCount =
+    manifest.traversalObligationContext?.obligations?.length ?? 0;
+  return profile !== null && obligationCount > 0 && obligationCount <= 8;
+}
+
+function compactObligationPromptLines(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  const obligationRefs = manifestObligationRefs(manifest);
+  return Object.freeze([
+    `- graphFunctionName: ${manifest.graphFunctionName}`,
+    `- edgeName: ${manifest.edgeName}`,
+    `- targetAssetType: ${manifest.targetAssetType}`,
+    `- obligationCount: ${obligationRefs.length}`,
+    `- obligationRefs: ${listForPrompt(obligationRefs)}`
+  ]);
+}
+
+function compactDesignDepthPromptLineGroups(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly manifestPath: string;
   readonly governanceRef: string;
@@ -72,37 +248,318 @@ export function designDepthFpEvaluatorPrompt(input: {
   readonly selectedCompositionSelectionRef: string;
   readonly selectedRegimeBindingRef: string | null;
   readonly tenantToolEnvironment?: SdlcTenantToolEnvironmentProjection;
-}): string {
-  return [
-    "odd_sdlc evaluate.C/F_P design-depth register rule.",
-    "",
-    "Purpose:",
-    "- Populate the implementation design-depth content register as the highest semantic design-depth truth for downstream transforms.",
-    "- Evaluate the workspace, admitted transform evidence, worker report, construction brief, invocation package, ADR artifact, and residual pressure together.",
-    "- Treat depth as the priority F_P judgment: decide whether the component/module decomposition, source ownership, public boundaries, and residual pressure are proportionate to the requirements.",
-    "- For each requirement or requirement group, decide whether it requires separable_public_boundary, shared_component, test_boundary, data_contract_boundary, runtime_or_persistence_boundary, human_review, or blocked handling. Encode that decision in component row publicBoundary/rationale text and designCompletenessVerdict reasons.",
-    "- Domain vocabulary is authority-bound. Derive moduleSchemaFragments, aggregateDomainModel, aggregateSunnyDaySequence, component publicBoundary text, and operation/entity ids from product/ADR/scenario/requirement terms, not from the project slug, package name, file path, examples, or generic words such as input, output, mapping, result, parser, mapper, or validator.",
-    "- If accepted authority names domain concepts such as entities, morphisms, cardinality, dot paths, routes, orders, ledgers, or other product nouns, the register must preserve those nouns in entity ids, operation ids, attributes, sequence steps, and verdict reasons. Generic substitute nouns are semantic underproduction.",
-    "- If you cannot ground a register section in accepted product vocabulary, mark the relevant designCompletenessVerdict axis partial or blocked and cite the missing authority instead of filling a plausible generic model.",
-    "- This is evaluation work. Do not rewrite the ADR, source files, tests, package files, or product materialization outputs.",
-    "- You may use agent-internal subagents or parallel workstreams as read-only compute strategy for independent modules, interfaces, obligation slices, or evidence packets.",
-    `- If you use evaluator subworkstreams, record them in ${input.subworkstreamManifestPath}. Rows must cite authority/dependency inputs, stay read-only over workspace/product files, and remain observation only.`,
-    "- Evaluator subworkstreams do not emit ABG events, write ledgers, close edges, select traversal, publish consequence projections, or create ABG branch leases. The parent evaluate.C result owns the final content-register merge.",
-    "- The content register path is the durable evaluation artifact; the task is not a single-shot JSON response.",
-    `- The system pre-creates that path as a non-admitted draft with selected composition identity and one "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND}" row per register section. Your job is to convert draft rows into semantic "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND}" rows incrementally.`,
-    "",
-    "Tenant tool boundary:",
-    ...tenantToolBoundaryPromptLines(input.tenantToolEnvironment),
-    "- Read boundary: use only workspace-relative paths or explicit workspace/run-archive paths named in this prompt; do not read/cite/copy sibling sandboxes, historical test_runs, home memory, /tmp, or outside-workspace absolute paths.",
-    "- Tool-profile contract: obey the active tool list. If command execution is not exposed, inspect with bounded file reads/writes only. If command execution is exposed by the worker runtime, use it only for bounded workspace-relative read-only inspection or the named content-register update helper when this prompt permits it; do not run product, build, test, framework, traversal, or background commands.",
-    "- Read cap: every Read tool call over JSON, Markdown, report, manifest, or source artifacts must set limit <=80; use offset/limit for bounded inspection and inspect only the lines needed for the current section.",
-    "",
-    "Read in order:",
+}): EvaluatePromptLineGroups {
+  return Object.freeze({
+    preAuthorityLines: Object.freeze([
+      "odd_sdlc evaluate.C/F_P design-depth register rule.",
+      "",
+      "Small fused evaluation grid mode:",
+      "- Use the typed Evaluation grid contract below as the logical work boundary.",
+      "- Decide only local design-depth and stage-conformance semantics for this transform unit.",
+      "- Do not reconstruct global coverage, closure, continuation, or trace policy as a second SDLC. Coverage is a structural fold over refs; ABG owns close/block/redispatch.",
+      "- This is evaluation work. Do not rewrite the ADR, source files, tests, package files, reports, ledgers, or product materialization outputs.",
+      `- Durable evaluation artifact to create and validate: ${input.contentRegisterPath}`,
+      `- Optional observation-only subworkstream manifest: ${input.subworkstreamManifestPath}`,
+      "",
+      "Admitted edge packet:",
+      ...compactObligationPromptLines(input.manifest),
+      "",
+      "Tenant tool boundary:",
+      ...tenantToolBoundaryPromptLines(input.tenantToolEnvironment),
+      "- Tool-profile contract: obey the active tool list. If command execution is not exposed, inspect with bounded file reads/writes only. If command execution is exposed by the worker runtime, use it only for bounded workspace-relative read-only inspection or the named content-register update helper when this prompt permits it; do not run product, build, test, framework, traversal, or background commands.",
+      "- Read boundary: use only workspace-relative paths or explicit workspace/run-archive paths named in this prompt; do not read/cite/copy sibling sandboxes, historical test_runs, home memory, /tmp, or outside-workspace absolute paths.",
+      "- Read cap: every Read tool call over JSON, Markdown, report, manifest, or source artifacts must set limit <=80; inspect only the lines needed for the current register section."
+    ]),
+    postAuthorityLines: Object.freeze([
+      "",
+      "Read in order:",
+      `1. compressed work-category governance (${input.governanceRef}): ${input.governancePath}`,
+      `2. construction brief: ${input.constructionBriefPath}`,
+      `3. pre-created draft content register: ${input.contentRegisterPath}`,
+      "4. worker result summary below; inspect the worker report only for a named missing detail.",
+      `5. bounded inspection of the ADR/output artifact: ${input.manifest.outputFile}; the framework has already written the draft register, so this read is allowed before the first semantic update.`,
+      "",
+      "Precomputed worker result report summary:",
+      ...input.workerReportSummaryLines.map((line) => `- ${line}`),
+      "",
+      "Hard bounds:",
+      `- Do not use the Read tool on the handoff manifest (${input.manifestPath}); selected edge facts are in this prompt.`,
+      `- Do not inspect ${input.workerReportPath} or ${input.invocationPackagePath} before the first semantic update unless a named missing detail requires it.`,
+      "- The first evaluator update after reading the draft register and ADR must write semantic rows; do not spend the first pass gathering exhaustive context.",
+      "- Prefer one compact complete write for a small fused grid. If uncertain, write partial/blocked verdict axes with reasons instead of hidden synthesis.",
+      "- Do not print full files, full JSON objects, full ADR tables, requirement tables, or source files to stdout.",
+      "- Do not write EvaluationFinding rows into the content register. The grid's expected finding refs are prompt-sidecar and ABG-fold refs, not contentRows[].",
+      "",
+      "Required content-register envelope:",
+      "- kind: \"sdlc_evaluate_content_register\"",
+      "- registerVersion: \"ts-evaluate-content-register-v1\"",
+      "- stage: \"evaluate.C\"",
+      `- ruleRef: "${DESIGN_DEPTH_FP_EVALUATOR_RULE_REF}"`,
+      "- ruleRole: \"semantic_judgment\"",
+      "- computeMeans: \"F_P\"",
+      "- authorityFunction: \"synthesize_model\"",
+      `- selectedCompositionRef: "${input.selectedCompositionRef}"`,
+      `- selectedCompositionDigest: "${input.selectedCompositionDigest}"`,
+      `- selectedCompositionSelectionRef: "${input.selectedCompositionSelectionRef}"`,
+      `- selectedRegimeBindingRef: ${input.selectedRegimeBindingRef === null ? "null" : JSON.stringify(input.selectedRegimeBindingRef)}`,
+      `- compositionContributionRef: "${input.selectedRegimeBindingRef ?? input.selectedCompositionRef}"`,
+      "- sourceBasisRefs[], candidateArtifactRefs[], evidenceRefs[], contentRows[].",
+      "- contentRows[] entries have exactly kind, rowRef, authorityFunction, carrierFamily, contentKind, payload, sourceBasisRefs, evidenceRefs.",
+      `- Preferred contentKind: "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND}". Optional final contentKind: "sdlc_design_depth_register".`,
+      "- Forbidden contentKind values in this register include \"sdlc_evaluation_finding\" and any grid/fold finding row. Do not use carrierFamily values outside ProductAssetModel, ObservationSnapshot, GapPressureRow, EdgeFulfillment, EdgeClosureDecision, or NextActionProjection.",
+      "",
+      "Fragment row contract:",
+      "- payload.kind: \"sdlc_design_depth_register_fragment\"",
+      "- payload.fragmentVersion: \"ts-design-depth-fragment-v1\"",
+      "- payload.targetAssetType: \"implementation_design_surface\"",
+      `- payload.section is one of ${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.join(", ")}`,
+      "- payload.sequence is positive; payload.mergeMode is \"replace\"; payload.value is the section value.",
+      "- For the small fused grid, produce one semantic row for every listed section, or one full sdlc_design_depth_register row if the complete register is already available.",
+      "",
+      "Design-depth register minimum:",
+      "- registerVersion/modelVersion/sequenceVersion/verdictVersion: \"ts-design-depth-v1\" where applicable.",
+      "- Include stackProfileRows, implementationModuleRows, aggregateDomainModelRows, moduleSchemaFragments, moduleStateDiagramFragments, aggregateDomainModel, sunnyDaySequenceRows, aggregateSunnyDaySequence, componentTopologyRows, componentRealizationRows, fileTargetRows, designCompletenessVerdict.",
+      "- stackProfileRows[] rows are closed objects with exactly kind, stackRef, language, buildTool. Never emit field, value, sourceRef, packageManager, runtime, dependencyPolicy, or note fields in stackProfileRows.",
+      "- implementationModuleRows[]: kind, moduleName, moduleRef. aggregateDomainModelRows[]: kind, modelRef. sunnyDaySequenceRows[]: kind, sequenceRef. fileTargetRows[]: kind, relativePath, role.",
+      "- moduleSchemaFragments[]: kind \"sdlc_module_schema_fragment\", moduleName, entities, operations, requirementIds, sourceAssetRefs.",
+      "- moduleSchemaFragments[].entities[]: kind \"sdlc_domain_entity\", entityId, moduleName, ownership, attributes, invariants, sourceAssetRefs. Never emit kind \"sdlc_entity_row\".",
+      "- A trivial executable still needs one minimal owned entity when a module state diagram is emitted; use accepted observable product vocabulary such as entity:<module>.observable_output with one scalar attribute for stdout/message/output rather than an empty entity list plus a null state entity.",
+      "- sdlc_domain_entity.attributes[]: kind \"sdlc_domain_attribute\", attributeId, name, valueType, cardinality, invariantRefs. Never emit kind \"sdlc_attribute_row\".",
+      "- moduleSchemaFragments[].operations[] and aggregateDomainModel.operations[]: kind \"sdlc_domain_operation\", operationId, moduleName, inputEntityIds, outputEntityIds, requiredAttributeIds. Never emit kind \"sdlc_operation_row\".",
+      `- Entity ownership values are exactly ${SDLC_DOMAIN_ENTITY_OWNERSHIP.join(", ")}; never emit primary, internal, external, local, or source. Attribute cardinality values are exactly ${SDLC_DOMAIN_ATTRIBUTE_CARDINALITIES.join(", ")}.`,
+      "- moduleStateDiagramFragments[]: kind \"sdlc_module_state_diagram_fragment\", moduleName, entityId, stateless, states, transitions, requirementIds, sourceAssetRefs. entityId is a required non-empty string, never null, and must reference a moduleSchemaFragments[].entities[].entityId for that module. For a stateless trivial executable, set stateless:true and states/transitions:[] while still referencing the minimal observable-output entity.",
+      "- moduleStateDiagramFragments[].transitions[] has exactly kind, transitionId, fromState, toState, operationId, entityId. Never emit trigger, event, condition, action, summary, or description on a transition; encode the cause as an operationId that references moduleSchemaFragments[].operations[].operationId.",
+      "- aggregateDomainModel: kind \"sdlc_aggregate_domain_model\", modelVersion, entities, operations, crossModuleReferences, evidenceRefs. Aggregate entities: kind \"sdlc_aggregate_domain_entity\", entityId, ownerModuleName, attributes, sourceModuleNames. crossModuleReferences rows have fromModuleName, toModuleName, entityId.",
+      "- aggregateSunnyDaySequence: kind \"sdlc_aggregate_sunny_day_sequence\", sequenceVersion \"ts-design-depth-v1\", steps, evidenceRefs.",
+      "- aggregateSunnyDaySequence.steps[]: kind \"sdlc_sunny_day_sequence_step\", stepId, moduleName, operationId, inputEntityIds, outputEntityIds, stateTransitionIds. Never emit kind \"sdlc_sunny_day_step\".",
+      "- componentTopologyRows[]: kind, componentId, moduleName, relativePath, publicBoundary, concernRole, requirementIds, sourceAssetRefs.",
+      `- componentTopologyRows[].concernRole values are exactly ${SDLC_COMPONENT_CONCERN_ROLES.join(", ")}.`,
+      "- componentRealizationRows[]: kind, componentId, moduleName, relativePath, publicBoundary, trancheId, firstProductFileToChange, upstreamComponentIds, requirementIds, sourceAssetRefs.",
+      "- For a trivial product, keep one module and one source component unless accepted authority names separate source files or a hard boundary.",
+      "- componentTopologyRows[] and componentRealizationRows[] must use source-role product paths only; every component relativePath must match a source-role fileTargetRows entry.",
+      "- Keep fileTargetRows to declared product targets. Do not add authority, spec, ADR, cache, target/, build output, or proof byproduct paths as product targets.",
+      "- Preserve executable/script/service entrypoint obligations in publicBoundary and verdict reasons.",
+      "- Use accepted product vocabulary for entity, operation, attribute, component, and sequence ids; do not substitute generic input/output/result names.",
+      "- designCompletenessVerdict has exactly kind, verdictVersion, entity, attribute, flow. Each axis object has exactly kind, axis, status, reasons, evidenceRefs; status is satisfied, partial, or blocked.",
+      "- Closed nested rows must be objects, not strings. Use kind-bearing objects for entities, attributes, operations, transitions, aggregate entities, and sunny-day steps.",
+      "- For a small product, keep schema/domain/sequence compact: no more than two entities and two operations per module unless authority requires more.",
+      "",
+      "Self-check before final response:",
+      "- Re-open the content register with bounded Read and verify valid JSON, selected identity preservation, row key sets, all required sections, matching component/file paths, and compact size.",
+      "- Reject and rewrite if any design-depth row contains field/value/sourceRef summary triples or any key outside the exact row contracts above.",
+      "- Reject and rewrite if any nested row kind is sdlc_entity_row, sdlc_attribute_row, sdlc_operation_row, or sdlc_sunny_day_step; the accepted nested kinds are sdlc_domain_entity, sdlc_domain_attribute, sdlc_domain_operation, sdlc_entity_state_transition, sdlc_aggregate_domain_entity, and sdlc_sunny_day_sequence_step.",
+      "- Rewrite until valid. Final response is one compact line; the content register file is the evaluation truth."
+    ])
+  });
+}
+
+function compactReviewGradePromptLineGroups(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly governanceRef: string;
+  readonly governancePath: string;
+  readonly constructionBriefPath: string;
+  readonly invocationPackagePath: string;
+  readonly workerReportPath: string;
+  readonly assessmentPath: string;
+  readonly subworkstreamManifestPath: string;
+  readonly tenantToolEnvironment?: SdlcTenantToolEnvironmentProjection;
+}): EvaluatePromptLineGroups {
+  return Object.freeze({
+    preAuthorityLines: Object.freeze([
+      "odd_sdlc evaluate.C/F_P review-grade edge fulfillment rule.",
+      "",
+      "Small fused evaluation grid mode:",
+      "- Use the typed Evaluation grid contract below as the logical work boundary.",
+      "- Decide local obligation fulfillment and local stage-boundary conformance for this transform unit.",
+      "- Bind fulfilled component_code_surface findings to concrete product targets and entrypoints. Treat materialization binding as a narrow relation check.",
+      "- Do not reconstruct global coverage, closure, continuation, or trace policy as a second SDLC. Coverage is a structural fold over refs; ABG owns close/block/redispatch.",
+      "- This is semantic evaluation work. Do not rewrite source, tests, design artifacts, reports, ledgers, package files, or framework files.",
+      `- The only durable JSON output you may create or modify is the assessment artifact at ${input.assessmentPath}.`,
+      `- Optional observation-only subworkstream manifest: ${input.subworkstreamManifestPath}.`,
+      "",
+      "Admitted edge packet:",
+      ...compactObligationPromptLines(input.manifest),
+      "",
+      "Tenant tool boundary:",
+      ...tenantToolBoundaryPromptLines(input.tenantToolEnvironment),
+      "- Tool-profile contract: obey the active tool list. If command execution is not exposed, inspect with bounded file reads/writes only. If command execution is exposed by the worker runtime, use it only for bounded workspace-relative read-only inspection unless this prompt explicitly names an execution probe; do not run product, build, test, framework, traversal, background, or mutation commands.",
+      "- Read cap: every Read tool call over JSON, Markdown, report, manifest, or source artifacts must set limit <=80; inspect only the lines needed for the current finding."
+    ]),
+    postAuthorityLines: Object.freeze([
+      "",
+      "Read in order:",
+      `1. compressed work-category governance (${input.governanceRef}): ${input.governancePath}`,
+      `2. construction brief: ${input.constructionBriefPath}`,
+      `3. invocation package: ${input.invocationPackagePath}`,
+      `4. worker result report: ${input.workerReportPath}`,
+      "5. generated product files named by worker_result_report.materializedFiles or product_materialization_manifest.files.",
+      "6. accepted design-depth/component refs named by the construction brief when present.",
+      "",
+      "Reading discipline:",
+      "- Do not print full files, full JSON objects, full requirement tables, or full source files to stdout.",
+      "- Terminal output is a work trace. The assessment JSON is the evaluation truth.",
+      "- Do not issue parallel tool calls, helper-output debugging, background jobs, product execution, build, test, framework, or traversal commands.",
+      "- If command execution is unavailable, evaluate execution requirements only from admitted execution evidence. Missing later test/runtime proof is wrong_stage when the current edge declared no test/execution target.",
+      "",
+      "Required assessment envelope:",
+      "- kind: \"sdlc_review_grade_edge_fulfillment_assessment\"",
+      "- assessmentVersion: \"ts-review-grade-v1\"",
+      `- graphFunctionName: ${JSON.stringify(input.manifest.graphFunctionName)}`,
+      `- edgeName: ${JSON.stringify(input.manifest.edgeName)}`,
+      `- targetAssetType: ${JSON.stringify(input.manifest.targetAssetType)}`,
+      "- status: \"passed\" or \"blocked\"",
+      "- reviewedObligationIds: admitted obligation ids from worker_result_report obligation assessments or invocation package inline obligations only.",
+      "- findings[]: one finding per reviewed obligation id.",
+      "- evidenceRefs: refs for assessment, generated assets, accepted authority, and review evidence.",
+      "- summary: one compact sentence. No extra top-level keys.",
+      "",
+      "Finding shape:",
+      "- kind: \"sdlc_review_grade_obligation_finding\"",
+      "- obligationId: exact obligation id",
+      "- fulfillmentStatus: fulfilled, partial, blocked, or unassessed",
+      "- failureClass: null when fulfilled, otherwise trace_missing, semantic_not_realized, boundary_collapsed, wrong_stage, schema_invalid, execution_environment, or test_overlap_missing",
+      "- requiredAction: null when fulfilled, otherwise the next concrete work item",
+      "- evidenceRefs and acceptedAuthorityRefs: non-empty arrays",
+      "- fulfillmentBinding: null except every fulfilled component_code_surface finding must include it",
+      "- rationale: compact reason. No extra finding keys.",
+      "",
+      "fulfillmentBinding shape for fulfilled component_code_surface findings:",
+      "- kind: \"gtl_contract_fulfillment_binding\"",
+      "- obligationRef, requirementRef, productRequirementRef, designObligationRef, componentRef, productTargetRef, outputSurfaceRef, functionOrEntrypointRef, realizationEvidenceRefs, testOrExecutionEvidenceRefs, evaluatorFindingRef, authorityRefs, evidenceRefs.",
+      "- bindingRef is optional in your draft; ABG derives and admits the final bindingRef.",
+      "",
+      "Review rules:",
+      "- File existence, tags, digests, or smoke output are evidence, not proof by themselves.",
+      "- Mark trace_missing when a generated product file has no lineage in the asset, selected target carrier, worker report, or product materialization manifest.",
+      "- Mark semantic_not_realized when behavior is absent, stubbed, placeholder, disconnected from the public boundary, or contradicts tenant stack authority.",
+      "- Mark boundary_collapsed when generated source collapses accepted components back into a coarse facade.",
+      "- Mark wrong_stage for lawful downstream carryover only. Test execution or runtime proof absent on component_code_surface is wrong_stage when source/build_config obligations are otherwise fulfilled and no test/execution product target is declared on this edge.",
+      "- On component_code_surface, inspect every role=source materialized file and declared build/config support before deciding executable or public-boundary evidence is absent.",
+      "- Build outputs, dependency caches, lockfiles, target/, coverage, and transient byproducts are not product fulfillment unless declared product targets.",
+      "- If all reviewed obligations are fulfilled, status must be passed and every finding failureClass/requiredAction must be null.",
+      "- If any reviewed obligation is partial, blocked, or unassessed, status must be blocked and every non-fulfilled finding must include failureClass and requiredAction. ABG will fold lawful wrong_stage carryover.",
+      "",
+      "Self-check before final response:",
+      "- Re-open the assessment JSON with bounded Read and verify the exact top-level/finding key sets, one finding per reviewed id, no extra obligation ids, non-empty evidence/authority refs, and component_code_surface fulfillment bindings.",
+      "- Rewrite until valid. Final response: reviewStatus=<passed|blocked> reviewed=<n> blocked=<n>."
+    ])
+  });
+}
+
+function declaredEvaluatePromptSections(input: {
+  readonly promptFamily: Extract<
+    SdlcPromptFamily,
+    "evaluate_design_depth" | "evaluate_review_grade"
+  >;
+  readonly lineGroups: EvaluatePromptLineGroups;
+  readonly fallbackPreconditionRef: string;
+}): readonly SdlcPromptSectionConstructionInput[] {
+  const authorityCompressionLines = [
+    "Authority compression:",
+    ...edgeAuthorityCompressionPromptLines()
+  ];
+  return Object.freeze([
+    sdlcPromptSectionFromLines({
+      role: "purpose",
+      title: "evaluate purpose and local semantic boundary",
+      textLines: Object.freeze(input.lineGroups.preAuthorityLines),
+      intent:
+        "State the evaluate.C purpose, read-only boundary, tool profile, and concrete output obligation for this edge.",
+      authorityKindRefs: SDLC_PROMPT_NORMAL_AUTHORITY_KIND_REFS,
+      expectedOutcome:
+        "Evaluator receives the edge task without raw-bootstrap or runtime-forensic fallback as routine authority.",
+      failureModeAddressed:
+        "untyped evaluator prose, F_D semantic prescription, or routine fallback-authority over-read",
+      appliesWhen: "evaluate.C prompt construction before authority compression"
+    }),
+    sdlcPromptSectionFromLines({
+      role: "authority_packet",
+      title: "authority compression",
+      textLines: authorityCompressionLines,
+      intent:
+        "Declare normal authority order and bounded fallback conditions for unresolved provenance, import, intent, or forensic discrepancies.",
+      authorityKindRefs: Object.freeze([
+        ...SDLC_PROMPT_NORMAL_AUTHORITY_KIND_REFS,
+        ...SDLC_PROMPT_BOUNDED_FALLBACK_AUTHORITY_KIND_REFS
+      ]),
+      fallbackPreconditionRefs: Object.freeze([input.fallbackPreconditionRef]),
+      mode: "fallback",
+      expectedOutcome:
+        "Evaluator prefers compressed admitted authority and only inspects fallback surfaces for named unresolved discrepancies.",
+      failureModeAddressed:
+        "raw bootstrap over-read, intent-as-authority drift, or fallback authority used as routine prompt input",
+      appliesWhen: "evaluate.C authority reconciliation"
+    }),
+    sdlcPromptSectionFromLines({
+      role: "output_contract",
+      title: "evaluate output contract and review rules",
+      textLines: Object.freeze(input.lineGroups.postAuthorityLines),
+      intent:
+        "Render the ordered evidence packet, output schema, self-checks, and review rules for the admitted evaluate.C artifact.",
+      authorityKindRefs: SDLC_PROMPT_NORMAL_AUTHORITY_KIND_REFS,
+      expectedOutcome:
+        "Evaluator writes only the contracted evaluation artifact with schema-valid findings and compact status output.",
+      failureModeAddressed:
+        "missing evaluation artifact, schema drift, stdout truth drift, or evaluator mutation of product/runtime authority",
+      appliesWhen: "evaluate.C prompt construction after authority compression"
+    })
+  ]);
+}
+
+function designDepthFpEvaluatorPromptLineGroups(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly manifestPath: string;
+  readonly governanceRef: string;
+  readonly governancePath: string;
+  readonly constructionBriefPath: string;
+  readonly invocationPackagePath: string;
+  readonly workerReportPath: string;
+  readonly workerReportSummaryLines: readonly string[];
+  readonly contentRegisterPath: string;
+  readonly registerProjectionPath: string;
+  readonly subworkstreamManifestPath: string;
+  readonly selectedCompositionRef: string;
+  readonly selectedCompositionDigest: string;
+  readonly selectedCompositionSelectionRef: string;
+  readonly selectedRegimeBindingRef: string | null;
+  readonly tenantToolEnvironment?: SdlcTenantToolEnvironmentProjection;
+}): EvaluatePromptLineGroups {
+  if (useCompactFusedEvaluationPrompt(input.manifest)) {
+    return compactDesignDepthPromptLineGroups(input);
+  }
+  return Object.freeze({
+    preAuthorityLines: Object.freeze([
+      "odd_sdlc evaluate.C/F_P design-depth register rule.",
+      "",
+      "Purpose:",
+      "- Populate the implementation design-depth content register as the highest semantic design-depth truth for downstream transforms.",
+      "- Evaluate the workspace, admitted transform evidence, worker report, construction brief, invocation package, ADR artifact, and residual pressure together.",
+      "- Treat depth as the priority F_P judgment: decide whether the component/module decomposition, source ownership, public boundaries, and residual pressure are proportionate to the requirements.",
+      "- For each requirement or requirement group, decide whether it requires separable_public_boundary, shared_component, test_boundary, data_contract_boundary, runtime_or_persistence_boundary, human_review, or blocked handling. Encode that decision in component row publicBoundary/rationale text and designCompletenessVerdict reasons.",
+      "- Domain vocabulary is authority-bound. Derive moduleSchemaFragments, aggregateDomainModel, aggregateSunnyDaySequence, component publicBoundary text, and operation/entity ids from product/ADR/scenario/requirement terms, not from the project slug, package name, file path, examples, or generic words such as input, output, mapping, result, parser, mapper, or validator.",
+      "- If accepted authority names domain concepts such as entities, morphisms, cardinality, dot paths, routes, orders, ledgers, or other product nouns, the register must preserve those nouns in entity ids, operation ids, attributes, sequence steps, and verdict reasons. Generic substitute nouns are semantic underproduction.",
+      "- If you cannot ground a register section in accepted product vocabulary, mark the relevant designCompletenessVerdict axis partial or blocked and cite the missing authority instead of filling a plausible generic model.",
+      "- This is evaluation work. Do not rewrite the ADR, source files, tests, package files, or product materialization outputs.",
+      "- You may use agent-internal subagents or parallel workstreams as read-only compute strategy for independent modules, interfaces, obligation slices, or evidence packets.",
+      `- If you use evaluator subworkstreams, record them in ${input.subworkstreamManifestPath}. Rows must cite authority/dependency inputs, stay read-only over workspace/product files, and remain observation only.`,
+      "- Evaluator subworkstreams do not emit ABG events, write ledgers, close edges, select traversal, publish consequence projections, or create ABG branch leases. The parent evaluate.C result owns the final content-register merge.",
+      "- The content register path is the durable evaluation artifact; the task is not a single-shot JSON response.",
+      `- The system pre-creates that path as a non-admitted draft with selected composition identity and one "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND}" row per register section. Your job is to convert draft rows into semantic "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND}" rows incrementally.`,
+      "",
+      "Tenant tool boundary:",
+      ...tenantToolBoundaryPromptLines(input.tenantToolEnvironment),
+      "- Read boundary: use only workspace-relative paths or explicit workspace/run-archive paths named in this prompt; do not read/cite/copy sibling sandboxes, historical test_runs, home memory, /tmp, or outside-workspace absolute paths.",
+      "- Tool-profile contract: obey the active tool list. If command execution is not exposed, inspect with bounded file reads/writes only. If command execution is exposed by the worker runtime, use it only for bounded workspace-relative read-only inspection or the named content-register update helper when this prompt permits it; do not run product, build, test, framework, traversal, or background commands.",
+      "- Read cap: every Read tool call over JSON, Markdown, report, manifest, or source artifacts must set limit <=80; use offset/limit for bounded inspection and inspect only the lines needed for the current section."
+    ]),
+    postAuthorityLines: Object.freeze([
+      "",
+      "Read in order:",
     `1. compressed work-category governance (${input.governanceRef}): ${input.governancePath}`,
     `2. bounded inspection of construction brief: ${input.constructionBriefPath}`,
     `3. bounded inspection of the pre-created draft content register at ${input.contentRegisterPath}; preserve its top-level selected composition identity from the embedded selected identity values in this prompt if the file is large.`,
-    "4. convert each draft row into a semantic design-depth fragment row from the construction brief, admitted transform evidence, and selected authority refs.",
-    "5. only after the first evaluator update, read the ADR or workspace authority refs needed to resolve a specific missing payload section.",
+    `4. bounded inspection of the ADR/output artifact: ${input.manifest.outputFile}; the framework has already written the draft register, so this read is allowed before the first semantic update.`,
+    "5. convert each draft row into a semantic design-depth fragment row from the construction brief, admitted transform evidence, the ADR/output artifact, and selected authority refs.",
     "",
     "Precomputed worker result report summary:",
     ...input.workerReportSummaryLines.map((line) => `- ${line}`),
@@ -111,9 +568,8 @@ export function designDepthFpEvaluatorPrompt(input: {
     `- Do not use the Read tool on the handoff manifest (${input.manifestPath}). It is too large; selected manifest facts needed for this evaluation are projected into the prompt, construction brief, and worker summary.`,
     `- Do not inspect the worker result report (${input.workerReportPath}) before the first evaluator update. Its compact summary is already in this prompt.`,
     `- Do not use the Read tool on the worker invocation package (${input.invocationPackagePath}) before the first evaluator update. Selected invocation pressure is already in the construction brief and worker summary.`,
-    `- Do not read or summarize the ADR transform artifact (${input.manifest.outputFile}) before the first evaluator update.`,
-    "- Before the first evaluator update, do not inspect extra authority files beyond the governance doc, construction brief, and draft content register.",
-    "- The first evaluator content-register update must be your selected evaluate.C/F_P judgment. Do not spend the first pass gathering exhaustive context.",
+    "- Before the first evaluator update, do not inspect extra authority files beyond the governance doc, construction brief, draft content register, and ADR/output artifact named above.",
+    "- The first evaluator content-register update must be your selected evaluate.C/F_P judgment from the draft register plus ADR/output artifact. Do not spend the first pass gathering exhaustive context.",
     "- Do not run a worker-result-report discovery script before the first evaluator update.",
     "- Do not run any bounded-summary action before the first evaluator update. After reading the governance doc, construction brief, and draft content register, the next tool action must publish the content register update.",
     "- Do not say you are writing the register until that file write has succeeded.",
@@ -215,18 +671,21 @@ export function designDepthFpEvaluatorPrompt(input: {
     "- implementationModuleRows[] with kind \"sdlc_implementation_module_row\", moduleName, moduleRef",
     "- aggregateDomainModelRows[] with kind \"sdlc_aggregate_domain_model_row\", modelRef",
     "- moduleSchemaFragments[] with kind \"sdlc_module_schema_fragment\", moduleName, entities, operations, requirementIds, sourceAssetRefs",
+    "- moduleSchemaFragments[].entities[] is empty only when no moduleStateDiagramFragments[] row is emitted for that module; if a diagram row is present, it must point at a concrete entity.",
     "- moduleStateDiagramFragments[] with kind \"sdlc_module_state_diagram_fragment\", moduleName, entityId, stateless, states, transitions, requirementIds, sourceAssetRefs",
+    "- moduleStateDiagramFragments[].entityId is required scalar string, never null. For stateless trivial executables, reference a minimal owned observable-output entity and set stateless:true with empty states/transitions.",
     "- aggregateDomainModel with kind \"sdlc_aggregate_domain_model\", modelVersion, entities, operations, crossModuleReferences, evidenceRefs",
     `- aggregateDomainModel.modelVersion must be exactly "ts-design-depth-v1".`,
     "- sunnyDaySequenceRows[] with kind \"sdlc_sunny_day_sequence_row\", sequenceRef",
     "- aggregateSunnyDaySequence with kind \"sdlc_aggregate_sunny_day_sequence\", sequenceVersion, steps, evidenceRefs",
     `- aggregateSunnyDaySequence.sequenceVersion must be exactly "ts-design-depth-v1".`,
-    "- componentTopologyRows[] with kind, componentId, moduleName, relativePath, publicBoundary, concernRole, requirementIds, sourceAssetRefs",
-    "- componentRealizationRows[] with kind, componentId, moduleName, relativePath, publicBoundary, trancheId, firstProductFileToChange, upstreamComponentIds, requirementIds, sourceAssetRefs",
+    "- componentTopologyRows[] with kind \"sdlc_component_topology_row\", componentId, moduleName, relativePath, publicBoundary, concernRole, requirementIds, sourceAssetRefs",
+    "- componentRealizationRows[] with kind \"sdlc_component_realization_row\", componentId, moduleName, relativePath, publicBoundary, trancheId, firstProductFileToChange, upstreamComponentIds, requirementIds, sourceAssetRefs",
     "- fileTargetRows[] with kind \"sdlc_file_target_row\", relativePath, role",
     "- designCompletenessVerdict with kind \"sdlc_design_completeness_verdict\", verdictVersion, entity, attribute, and flow axis verdicts.",
     "- designCompletenessVerdict is a closed object with exactly kind, verdictVersion, entity, attribute, flow. Do not emit entityAxis, attributeAxis, flowAxis, axisVerdicts, or any extra designCompletenessVerdict fields.",
     "- Each designCompletenessVerdict axis object is closed with exactly kind \"sdlc_design_completeness_axis_verdict\", axis, status, reasons, evidenceRefs. Do not add summaries, scores, counts, confidence, coverage, missingItems, or nested axis-specific objects.",
+    "- Reject and rewrite before final output if any designCompletenessVerdict axis object has kind \"sdlc_verdict_axis\"; that alias is invalid and blocks admission.",
     `- Allowed componentTopologyRows[].concernRole values: ${SDLC_COMPONENT_CONCERN_ROLES.join(", ")}`,
     `- Allowed designCompletenessVerdict.*.status values: ${SDLC_DESIGN_COMPLETENESS_STATUSES.join(", ")}. Use "satisfied" for a complete axis; never use "complete".`,
     "",
@@ -236,7 +695,9 @@ export function designDepthFpEvaluatorPrompt(input: {
     "- sdlc_domain_entity.invariants must be a string array of compact invariant statements or invariant refs. Structured invariant objects are invalid; put detailed support in evidenceRefs, invariantRefs, or designCompletenessVerdict.reasons instead.",
     "- sdlc_domain_entity.attributes[] must contain closed sdlc_domain_attribute objects with kind, attributeId, name, valueType, cardinality, invariantRefs.",
     "- moduleSchemaFragments[].operations[] and aggregateDomainModel.operations[] must contain closed sdlc_domain_operation objects with kind, operationId, moduleName, inputEntityIds, outputEntityIds, requiredAttributeIds.",
+    "- If moduleStateDiagramFragments[] is non-empty, every diagram entityId must be a non-null string matching an emitted module entity id; never write entityId:null for stateless diagrams.",
     "- moduleStateDiagramFragments[].transitions[] must contain closed sdlc_entity_state_transition objects with kind, transitionId, fromState, toState, operationId, entityId.",
+    "- moduleStateDiagramFragments[].transitions[] must never contain trigger, event, condition, action, summary, or description; transition cause belongs in operationId only.",
     "- aggregateDomainModel.entities[] must contain closed sdlc_aggregate_domain_entity objects with kind, entityId, ownerModuleName, attributes, sourceModuleNames.",
     "- aggregateDomainModel.entities[].attributes[] must contain full closed sdlc_domain_attribute objects. Copy or adapt the owning module schema attribute objects; never emit attribute id strings, names, or summaries in this array. If no valid aggregate attributes are needed, use an empty array.",
     "- aggregateDomainModel.crossModuleReferences[] must contain closed objects with fromModuleName, toModuleName, entityId.",
@@ -307,19 +768,157 @@ export function designDepthFpEvaluatorPrompt(input: {
     `- Self-check fragment sections: only ${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.join(", ")}.`,
     "- Self-check final sdlc_design_depth_register payload: registerVersion exactly ts-design-depth-v1.",
     "- Self-check non-null aggregateDomainModel.modelVersion, aggregateSunnyDaySequence.sequenceVersion, and designCompletenessVerdict.verdictVersion: exactly ts-design-depth-v1.",
+    "- Self-check every moduleStateDiagramFragments[].entityId is a non-null string and, for that module, exists in moduleSchemaFragments[].entities[].entityId.",
     "- Self-check non-null designCompletenessVerdict keys: exactly attribute, entity, flow, kind, verdictVersion.",
     "- Self-check each designCompletenessVerdict axis object: exactly axis, evidenceRefs, kind, reasons, status.",
+    "- Self-check each designCompletenessVerdict axis object kind is exactly \"sdlc_design_completeness_axis_verdict\" and never \"sdlc_verdict_axis\".",
     "- Self-check moduleSchemaFragments[].entities[].invariants: array of strings.",
     "- Self-check register arrays contain objects, not strings: stackProfileRows, implementationModuleRows, aggregateDomainModelRows, moduleSchemaFragments, moduleStateDiagramFragments, aggregateDomainModel.entities, aggregateDomainModel.operations, aggregateDomainModel.crossModuleReferences, aggregateSunnyDaySequence.steps, componentTopologyRows, componentRealizationRows, fileTargetRows.",
     "- Self-check nested register arrays contain objects, not strings: moduleSchemaFragments[].entities, moduleSchemaFragments[].entities[].attributes, moduleSchemaFragments[].operations, moduleStateDiagramFragments[].transitions, aggregateDomainModel.entities[].attributes.",
+    "- Self-check every moduleStateDiagramFragments[].transitions[] object has exactly kind, transitionId, fromState, toState, operationId, entityId; rewrite if trigger/event/condition/action/summary/description appears.",
     "- Do not run another exploratory command after deciding the component/module set; write the content register file first, then validate that file.",
     `- Self-check target file: ${input.contentRegisterPath}`,
     "- Do not include Markdown fences, explanation, comments, or trailing prose in the content register file.",
     "- After writing the content register, respond with a one-line summary only."
-  ].join("\n");
+    ])
+  });
 }
 
-export function reviewGradeEdgeFulfillmentPrompt(input: {
+export function designDepthFpEvaluatorPromptProjection(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly manifestPath: string;
+  readonly governanceRef: string;
+  readonly governancePath: string;
+  readonly constructionBriefPath: string;
+  readonly invocationPackagePath: string;
+  readonly workerReportPath: string;
+  readonly workerReportSummaryLines: readonly string[];
+  readonly contentRegisterPath: string;
+  readonly registerProjectionPath: string;
+  readonly subworkstreamManifestPath: string;
+  readonly selectedCompositionRef: string;
+  readonly selectedCompositionDigest: string;
+  readonly selectedCompositionSelectionRef: string;
+  readonly selectedRegimeBindingRef: string | null;
+  readonly tenantToolEnvironment?: SdlcTenantToolEnvironmentProjection;
+}): SdlcRenderedPromptProjection {
+  const lineGroups = designDepthFpEvaluatorPromptLineGroups(input);
+  const evaluationGridContract = evaluationGridContractForPrompt({
+    promptFamily: "evaluate_design_depth",
+    manifest: input.manifest,
+    sourceAssetRefs: [
+      input.governanceRef,
+      input.governancePath,
+      input.constructionBriefPath,
+      input.invocationPackagePath,
+      input.workerReportPath,
+      input.manifestPath
+    ],
+    targetAssetRefs: [
+      input.contentRegisterPath,
+      input.registerProjectionPath,
+      input.subworkstreamManifestPath
+    ],
+    dimensions: [
+      evaluationDimension({
+        promptFamily: "evaluate_design_depth",
+        dimensionKey: "local-depth-sufficiency",
+        scope: "cell"
+      }),
+      evaluationDimension({
+        promptFamily: "evaluate_design_depth",
+        dimensionKey: "local-authority-stage-conformance",
+        scope: "cell"
+      }),
+      evaluationDimension({
+        promptFamily: "evaluate_design_depth",
+        dimensionKey: "register-output-contract",
+        scope: "relation"
+      }),
+      evaluationDimension({
+        promptFamily: "evaluate_design_depth",
+        dimensionKey: "obligation-coverage-fold",
+        scope: "fold"
+      })
+    ],
+    provenanceRefs: [
+      "REQ-F-ODDSDLC-088",
+      "build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_EVALUATION_GRID_CONTRACT.md",
+      DESIGN_DEPTH_FP_EVALUATOR_RULE_REF
+    ]
+  });
+  return constructSdlcPromptInvocationProjection({
+    promptFamily: "evaluate_design_depth",
+    stage: "evaluate.C",
+    recipient: "evaluator",
+    targetAssetType: input.manifest.targetAssetType ?? "implementation_design_surface",
+    workCategory: input.manifest.edgeName ?? null,
+    edgePolicyRef: DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
+    constructorRef: "prompt-constructor://odd-sdlc/evaluate_design_depth/v1",
+    authorityPacketRefs: [
+      input.governanceRef,
+      input.governancePath,
+      input.constructionBriefPath,
+      input.invocationPackagePath,
+      input.workerReportPath,
+      input.manifestPath
+    ],
+    obligationRefs: [
+      input.selectedCompositionRef,
+      input.selectedCompositionSelectionRef,
+      ...(input.selectedRegimeBindingRef === null
+        ? []
+        : [input.selectedRegimeBindingRef])
+    ],
+    toolEffectPolicyRefs: [
+      "tool-policy://odd-sdlc/evaluate/read-write-only",
+      "tenant-tool-environment://current-state"
+    ],
+    outputCarrierRefs: [
+      input.contentRegisterPath,
+      input.registerProjectionPath,
+      input.subworkstreamManifestPath
+    ],
+    proofObligationRefs: [
+      DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
+      "REQ-F-ODDSDLC-083",
+      "REQ-F-ODDSDLC-087",
+      "REQ-F-ODDSDLC-088"
+    ],
+    evaluationGridContract,
+    promptSections: declaredEvaluatePromptSections({
+      promptFamily: "evaluate_design_depth",
+      lineGroups,
+      fallbackPreconditionRef:
+        sdlcPromptAuthorityCompressionFallbackPreconditionRef(
+          "evaluate_design_depth"
+        )
+    })
+  });
+}
+
+export function designDepthFpEvaluatorPrompt(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly manifestPath: string;
+  readonly governanceRef: string;
+  readonly governancePath: string;
+  readonly constructionBriefPath: string;
+  readonly invocationPackagePath: string;
+  readonly workerReportPath: string;
+  readonly workerReportSummaryLines: readonly string[];
+  readonly contentRegisterPath: string;
+  readonly registerProjectionPath: string;
+  readonly subworkstreamManifestPath: string;
+  readonly selectedCompositionRef: string;
+  readonly selectedCompositionDigest: string;
+  readonly selectedCompositionSelectionRef: string;
+  readonly selectedRegimeBindingRef: string | null;
+  readonly tenantToolEnvironment?: SdlcTenantToolEnvironmentProjection;
+}): string {
+  return designDepthFpEvaluatorPromptProjection(input).promptText;
+}
+
+function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly governanceRef: string;
   readonly governancePath: string;
@@ -329,27 +928,33 @@ export function reviewGradeEdgeFulfillmentPrompt(input: {
   readonly assessmentPath: string;
   readonly subworkstreamManifestPath: string;
   readonly tenantToolEnvironment?: SdlcTenantToolEnvironmentProjection;
-}): string {
-  return [
-    "odd_sdlc evaluate.C/F_P review-grade edge fulfillment rule.",
-    "",
-    "Purpose:",
-    "- Review the generated asset against incoming requirements, accepted upstream authority, stage boundary, evidence, and likely failure modes.",
-    "- This is semantic evaluation work. Do not rewrite source, tests, design artifacts, reports, ledgers, or framework files.",
-    "- The evaluator is read-only over workspace and product files. Do not use apply_patch, shell redirection, scripts, formatters, build tools, or editor commands to modify any generated asset, source file, test file, design surface, report, ledger, package file, or framework file.",
-    `- The only durable JSON output you may create or modify is the assessment artifact at ${input.assessmentPath}.`,
-    `- The only optional sidecar you may create or modify is the observation-only subworkstream manifest at ${input.subworkstreamManifestPath}.`,
-    "- You may use agent-internal subagents or parallel workstreams as read-only compute strategy for independent modules, obligation slices, or evidence packets.",
-    `- If you use evaluator subworkstreams, record them in ${input.subworkstreamManifestPath}. Rows must cite authority/dependency inputs, leave write/output-allocation fields empty, and remain observation only.`,
-    "- Evaluator subworkstreams do not emit ABG events, write ledgers, close edges, select traversal, publish consequence projections, or create ABG branch leases. The parent evaluate.C result owns the final assessment merge.",
-    "- The assessment file is an evaluation sidecar consumed by the existing SdlcWorkerObligationAssessment -> SdlcEdgeFulfillmentLedger path. It is not a new closure ledger.",
-    "",
-    "Tenant tool boundary:",
-    ...tenantToolBoundaryPromptLines(input.tenantToolEnvironment),
-    "- Tool-profile contract: obey the active tool list. If command execution is not exposed, inspect with bounded file reads/writes only. If command execution is exposed by the worker runtime, use it only for bounded workspace-relative read-only inspection unless this prompt explicitly names an execution probe; do not run product, build, test, framework, traversal, background, or mutation commands.",
-    "- Read cap: every Read tool call over JSON, Markdown, report, manifest, or source artifacts must set limit <=80; use offset/limit for bounded inspection and inspect only the lines needed for the current finding or assessment section.",
-    "",
-    "Read in order:",
+}): EvaluatePromptLineGroups {
+  if (useCompactFusedEvaluationPrompt(input.manifest)) {
+    return compactReviewGradePromptLineGroups(input);
+  }
+  return Object.freeze({
+    preAuthorityLines: Object.freeze([
+      "odd_sdlc evaluate.C/F_P review-grade edge fulfillment rule.",
+      "",
+      "Purpose:",
+      "- Review the generated asset against incoming requirements, accepted upstream authority, stage boundary, evidence, and likely failure modes.",
+      "- This is semantic evaluation work. Do not rewrite source, tests, design artifacts, reports, ledgers, or framework files.",
+      "- The evaluator is read-only over workspace and product files. Do not use apply_patch, shell redirection, scripts, formatters, build tools, or editor commands to modify any generated asset, source file, test file, design surface, report, ledger, package file, or framework file.",
+      `- The only durable JSON output you may create or modify is the assessment artifact at ${input.assessmentPath}.`,
+      `- The only optional sidecar you may create or modify is the observation-only subworkstream manifest at ${input.subworkstreamManifestPath}.`,
+      "- You may use agent-internal subagents or parallel workstreams as read-only compute strategy for independent modules, obligation slices, or evidence packets.",
+      `- If you use evaluator subworkstreams, record them in ${input.subworkstreamManifestPath}. Rows must cite authority/dependency inputs, leave write/output-allocation fields empty, and remain observation only.`,
+      "- Evaluator subworkstreams do not emit ABG events, write ledgers, close edges, select traversal, publish consequence projections, or create ABG branch leases. The parent evaluate.C result owns the final assessment merge.",
+      "- The assessment file is an evaluation sidecar consumed by the existing SdlcWorkerObligationAssessment -> SdlcEdgeFulfillmentLedger path. It is not a new closure ledger.",
+      "",
+      "Tenant tool boundary:",
+      ...tenantToolBoundaryPromptLines(input.tenantToolEnvironment),
+      "- Tool-profile contract: obey the active tool list. If command execution is not exposed, inspect with bounded file reads/writes only. If command execution is exposed by the worker runtime, use it only for bounded workspace-relative read-only inspection unless this prompt explicitly names an execution probe; do not run product, build, test, framework, traversal, background, or mutation commands.",
+      "- Read cap: every Read tool call over JSON, Markdown, report, manifest, or source artifacts must set limit <=80; use offset/limit for bounded inspection and inspect only the lines needed for the current finding or assessment section."
+    ]),
+    postAuthorityLines: Object.freeze([
+      "",
+      "Read in order:",
     `1. compressed work-category governance (${input.governanceRef}): ${input.governancePath}`,
     `2. bounded inspection of construction brief: ${input.constructionBriefPath}`,
     `3. bounded inspection of invocation package: ${input.invocationPackagePath}`,
@@ -410,17 +1015,22 @@ export function reviewGradeEdgeFulfillmentPrompt(input: {
     "- No other finding keys are allowed. Do not add helper booleans, carryover flags, scores, sourceAssetCarryover, sourceAssetStatus, confidence, or notes fields.",
     "",
     "fulfillmentBinding shape when required:",
-    "- kind: \"sdlc_requirement_function_fulfillment_binding\"",
-    "- requirementRef: exact obligation id",
-    "- productRequirementRef: accepted product requirement ref or exact obligation id when no narrower product-requirement ref exists",
+    "- kind: \"gtl_contract_fulfillment_binding\"",
+    "- obligationRef: exact obligation id for this finding",
+    "- requirementRef: exact obligation id; for non-requirement scoped obligations such as target_asset, source_asset, module, source_set, inline, or aggregate, this may instead be a declared product requirement id carried by that scope",
+    "- productRequirementRef: accepted product requirement ref or exact obligation id when no narrower product-requirement ref exists; when requirementRef uses a carried product requirement for a scoped non-requirement obligation, productRequirementRef must match it",
     "- designObligationRef: accepted design/depth/component row ref that assigned the obligation",
     "- componentRef: accepted component/module ref",
     "- productTargetRef: target carrier or declared product-file target ref",
-    "- codeSurfaceRef: generated source file/API/route/CLI/service ref",
+    "- outputSurfaceRef: generated source file/API/route/CLI/service ref",
     "- functionOrEntrypointRef: concrete function, exported API, route, CLI command, service entrypoint, executable script, or equivalent public behavior ref",
     "- realizationEvidenceRefs: source/runtime evidence refs proving the binding",
     "- testOrExecutionEvidenceRefs: test, execution, or evaluator evidence refs that hold the binding to account",
     "- evaluatorFindingRef: stable finding ref for this evaluation finding",
+    "- authorityRefs: accepted authority refs used to admit this binding",
+    "- evidenceRefs: evidence refs used to admit this binding",
+    "- bindingRef may be omitted; ABG derives and admits the final bindingRef.",
+    "- Do not emit JSON null inside fulfillmentBinding. For non-requirement scoped obligations with no narrower product requirement, use the exact obligationId for requirementRef and productRequirementRef. For file-target-only requirements with no function/API, use productTargetRef as functionOrEntrypointRef.",
     "",
     "Review rules:",
     "- A requirement tag, file path, schema-valid report, or passing smoke output is evidence, not proof by itself.",
@@ -438,8 +1048,8 @@ export function reviewGradeEdgeFulfillmentPrompt(input: {
     "- wrong_stage is only for lawful downstream carryover. If the current asset omits the requirement mapping, loses accepted authority, invents an owner, or claims executable fulfillment on the wrong edge, use trace_missing, semantic_not_realized, boundary_collapsed, or schema_invalid instead.",
     "- Requirement lineage is transformer-owned semantic evidence, not a postflight closure shortcut. Inspect worker_result_report.materializedFiles, product_materialization_manifest.files, selected target-carrier materializedFiles, and native file tags/comments where the file format permits them.",
     "- Mark trace_missing when a generated product file is used as fulfillment evidence but carries no lineage in the asset itself, selected target carrier, worker report, or materialization manifest. Do not pass by file existence, digest, or test success alone.",
-    "- For every component_code_surface fulfilled finding, bind obligationId -> product requirement when available -> design/depth obligation -> component/product target -> function/API/route/CLI/entrypoint -> evidence in fulfillmentBinding.",
-    "- For component_code_surface source_asset, module, target_asset, source_set, inline, or aggregate findings, use the exact obligationId as requirementRef and productRequirementRef when no narrower product requirement exists, but still bind the finding to the concrete generated entrypoint/public behavior and evidence.",
+    "- For every component_code_surface fulfilled finding, bind finding.obligationId plus product requirement when available -> design/depth obligation -> component/product target -> function/API/route/CLI/entrypoint -> evidence in fulfillmentBinding.",
+    "- For component_code_surface source_asset, module, target_asset, source_set, inline, or aggregate findings, use the carried product requirement id as requirementRef and productRequirementRef when one is declared for the scope; use the exact obligationId only when no narrower product requirement exists. Still bind the finding to the concrete generated entrypoint/public behavior and evidence.",
     "- A fulfilled component_code_surface finding with fulfillmentBinding:null is invalid and will be retried, even when the obligation is module-level or source-asset-level carryover.",
     "- If tenant stack ambiguity was present, verify that the generated artifact or evidence contains a compact stack reconciliation decision before passing stack-dependent product materialization.",
     "- Verify consistency among tenant stack authority, emitted product syntax/files, declared product targets, declared execution commands, and returned execution evidence. This is evaluation only: do not repair generated product files or mutate tenant-stack authority.",
@@ -463,5 +1073,119 @@ export function reviewGradeEdgeFulfillmentPrompt(input: {
     "- Verify every finding.obligationId is present in reviewedObligationIds and every reviewedObligationId came from an admitted obligation-id field, not from an authority/evidence ref string.",
     "- Rewrite until it is valid whole-file JSON with no Markdown fences, comments, trailing prose, or extra keys.",
     "- Final response must be one line: reviewStatus=<passed|blocked> reviewed=<n> blocked=<n>."
-  ].join("\n");
+    ])
+  });
+}
+
+export function reviewGradeEdgeFulfillmentPromptProjection(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly governanceRef: string;
+  readonly governancePath: string;
+  readonly constructionBriefPath: string;
+  readonly invocationPackagePath: string;
+  readonly workerReportPath: string;
+  readonly assessmentPath: string;
+  readonly subworkstreamManifestPath: string;
+  readonly tenantToolEnvironment?: SdlcTenantToolEnvironmentProjection;
+}): SdlcRenderedPromptProjection {
+  const lineGroups = reviewGradeEdgeFulfillmentPromptLineGroups(input);
+  const evaluationGridContract = evaluationGridContractForPrompt({
+    promptFamily: "evaluate_review_grade",
+    manifest: input.manifest,
+    sourceAssetRefs: [
+      input.governanceRef,
+      input.governancePath,
+      input.constructionBriefPath,
+      input.invocationPackagePath,
+      input.workerReportPath
+    ],
+    targetAssetRefs: [
+      input.assessmentPath,
+      input.subworkstreamManifestPath
+    ],
+    dimensions: [
+      evaluationDimension({
+        promptFamily: "evaluate_review_grade",
+        dimensionKey: "local-obligation-fulfillment",
+        scope: "cell"
+      }),
+      evaluationDimension({
+        promptFamily: "evaluate_review_grade",
+        dimensionKey: "local-stage-boundary-conformance",
+        scope: "cell"
+      }),
+      evaluationDimension({
+        promptFamily: "evaluate_review_grade",
+        dimensionKey: "materialization-binding-relation",
+        scope: "relation"
+      }),
+      evaluationDimension({
+        promptFamily: "evaluate_review_grade",
+        dimensionKey: "obligation-coverage-fold",
+        scope: "fold"
+      })
+    ],
+    provenanceRefs: [
+      "REQ-F-ODDSDLC-088",
+      "build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_EVALUATION_GRID_CONTRACT.md",
+      "evaluation-rule://odd-sdlc/review-grade-edge-fulfillment/fp"
+    ]
+  });
+  return constructSdlcPromptInvocationProjection({
+    promptFamily: "evaluate_review_grade",
+    stage: "evaluate.C",
+    recipient: "evaluator",
+    targetAssetType: input.manifest.targetAssetType ?? "unknown_target_asset",
+    workCategory: input.manifest.edgeName ?? null,
+    edgePolicyRef: "evaluation-rule://odd-sdlc/review-grade-edge-fulfillment/fp",
+    constructorRef: "prompt-constructor://odd-sdlc/evaluate_review_grade/v1",
+    authorityPacketRefs: [
+      input.governanceRef,
+      input.governancePath,
+      input.constructionBriefPath,
+      input.invocationPackagePath,
+      input.workerReportPath
+    ],
+    obligationRefs: [
+      input.manifest.graphFunctionName ?? "graph-function://unknown",
+      input.manifest.edgeName ?? "graph-edge://unknown"
+    ],
+    toolEffectPolicyRefs: [
+      "tool-policy://odd-sdlc/evaluate/read-write-only",
+      "tenant-tool-environment://current-state"
+    ],
+    outputCarrierRefs: [
+      input.assessmentPath,
+      input.subworkstreamManifestPath
+    ],
+    proofObligationRefs: [
+      "REQ-F-ODDSDLC-083",
+      "REQ-F-ODDSDLC-087",
+      "REQ-F-ODDSDLC-088",
+      "proof://odd-sdlc/review-grade-edge-fulfillment-assessment"
+    ],
+    evaluationGridContract,
+    promptSections: declaredEvaluatePromptSections({
+      promptFamily: "evaluate_review_grade",
+      lineGroups,
+      fallbackPreconditionRef:
+        sdlcPromptAuthorityCompressionFallbackPreconditionRef(
+          "evaluate_review_grade"
+        )
+    })
+  });
+}
+
+export function reviewGradeEdgeFulfillmentPrompt(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly governanceRef: string;
+  readonly governancePath: string;
+  readonly constructionBriefPath: string;
+  readonly invocationPackagePath: string;
+  readonly workerReportPath: string;
+  readonly assessmentPath: string;
+  readonly subworkstreamManifestPath: string;
+  readonly tenantToolEnvironment?: SdlcTenantToolEnvironmentProjection;
+}): string {
+  return reviewGradeEdgeFulfillmentPromptProjection(input).promptText;
 }

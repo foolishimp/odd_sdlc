@@ -563,7 +563,7 @@ test("T-128 installed start returns worker_failed envelope after process failure
     `process://node?script=${encodeURIComponent(workerScript)}`
   ]);
 
-  assert.equal(start.status, "ok");
+  assert.equal(start.status, "ok", start.payload?.error ?? JSON.stringify(start.payload));
   assert.equal(start.payload.kind, "sdlc_installed_operator_start_outcome");
   assert.equal(start.payload.status, "worker_failed");
   assert.equal("loop" in start.payload, false);
@@ -913,7 +913,7 @@ test("T-159 assurance rejection rewrites F_P evaluate result as blocked", async 
     `process://node?script=${encodeURIComponent(workerScript)}`
   ]);
 
-  assert.equal(start.status, "ok");
+  assert.equal(start.status, "ok", start.payload?.error ?? JSON.stringify(start.payload));
   assert.equal(start.payload.status, "blocked");
   assert.equal(
     existsSync(path.join(start.payload.archiveRoot, "postflight.json")),
@@ -925,15 +925,23 @@ test("T-159 assurance rejection rewrites F_P evaluate result as blocked", async 
   const postflight = JSON.parse(
     readFileSync(path.join(start.payload.archiveRoot, "postflight.json"), "utf8")
   );
+  const designDepthPostflight = JSON.parse(
+    readFileSync(
+      path.join(start.payload.archiveRoot, "design_depth_fp_evaluator_postflight.json"),
+      "utf8"
+    )
+  );
   assert.equal(evaluateResult.kind, "sdlc_fp_evaluate_result");
-  assert.equal(evaluateResult.status, "passed");
-  assert.equal(evaluateResult.postflightStatus, "passed");
-  assert.match(evaluateResult.postflightRef, /postflight\.json$/u);
+  assert.equal(postflight.status, "passed");
+  assert.equal(designDepthPostflight.status, "blocked");
+  assert.equal(evaluateResult.status, "blocked");
+  assert.equal(evaluateResult.postflightStatus, "blocked");
+  assert.match(evaluateResult.postflightRef, /design_depth_fp_evaluator_postflight\.json$/u);
   assert.match(
     [
       start.payload.summary.blockingReason ?? "",
       ...evaluateResult.blockingReasons,
-      ...postflight.blockingReasonCarriers.map((reason) => reason.detail ?? "")
+      ...designDepthPostflight.blockingReasonCarriers.map((reason) => reason.detail ?? "")
     ].join(","),
     /evaluation_set_incomplete|design-depth register payload|review_grade_assessment_missing/u
   );

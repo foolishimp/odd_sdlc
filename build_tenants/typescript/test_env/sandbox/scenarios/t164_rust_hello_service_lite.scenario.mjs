@@ -1,5 +1,6 @@
 // T-164 Rust hello service lite traversal scenario.
-// Builds a minimal Rust HTTP service and verifies it with curl in the live lane.
+// Builds a minimal Rust HTTP service and verifies it through the SDLC
+// test-execution-result edge.
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -79,53 +80,47 @@ export function t164RustHelloServiceLiteLiveScenario({
       handoffEdgeSequencePrefix: [
         "derive_intent_surface",
         "derive_lite_design_adr_surface",
-        "derive_lite_component_code_surface"
+        "derive_lite_component_code_surface",
+        "prepare_test_execution_surface",
+        "derive_test_execution_result_surface"
+      ],
+      requiredHandoffEdges: [
+        "derive_lite_component_code_surface",
+        "prepare_test_execution_surface",
+        "derive_test_execution_result_surface"
       ],
       edgeAssuranceArchiveSequencePrefix: [
         "derive_intent_surface",
         "derive_lite_design_adr_surface",
-        "derive_lite_component_code_surface"
+        "derive_lite_component_code_surface",
+        "prepare_test_execution_surface",
+        "derive_test_execution_result_surface"
       ],
-      processChecks: [
-        {
-          command: "bash",
-          args: [
-            "-lc",
-            [
-              "log=$(mktemp)",
-              "port=${HELLO_SERVICE_PORT:-$((18000 + ($$ % 1000)))}",
-              "HELLO_SERVICE_PORT=$port cargo run --quiet >\"$log\" 2>&1 &",
-              "pid=$!",
-              "trap 'kill \"$pid\" 2>/dev/null || true; rm -f \"$log\"' EXIT",
-              "for _ in $(seq 1 200); do",
-              "  body=$(curl --fail --silent \"http://127.0.0.1:$port/\" 2>/dev/null || true)",
-              "  if [ \"$body\" = \"helloworld\" ]; then",
-              "    printf '%s\\n' \"$body\"",
-              "    exit 0",
-              "  fi",
-              "  sleep 0.2",
-              "done",
-              "cat \"$log\" >&2",
-              "exit 1"
-            ].join("\n")
-          ],
-          cwd: "build_tenants/hello_world_rust_service",
-          stdout: "helloworld"
-        }
-      ],
+      executionEvidence: {
+        edgeName: "derive_test_execution_result_surface",
+        status: "succeeded",
+        commandIncludes: "cargo run",
+        stdoutIncludes: "helloworld"
+      },
       latestArchiveArtifacts: [
-        "sdlc_overlay_segment_completion.json"
+        "worker_result_report.json",
+        "declared_edge_projection_artifact.json"
       ]
     },
     liveWorker: worker,
     startTarget: "overlay:lite-design-module-implementation",
     startTargetSequence: Object.freeze([
       "overlay:bootstrap-requirements",
-      "overlay:bootstrap-requirements"
+      "overlay:bootstrap-requirements",
+      "overlay:lite-design-module-implementation",
+      "overlay:lite-design-module-implementation",
+      "overlay:lite-design-module-implementation",
+      "overlay:lite-design-module-implementation"
     ]),
     startUntil,
     maxAdvances,
     continueOnEdgeConverge: true,
-    stopAfterWorkspaceFilesExist: true
+    stopAfterWorkspaceFilesExist: false,
+    stopAfterRequiredHandoffEdges: true
   });
 }

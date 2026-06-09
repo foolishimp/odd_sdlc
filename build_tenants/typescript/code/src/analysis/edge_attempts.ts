@@ -21,7 +21,7 @@ import type {
   SdlcFdRunAnalysisByteAccount,
   SdlcFdRunAnalysisEdgeAttempt,
   SdlcFdRunAnalysisFrontierSummary,
-  SdlcFdRunAnalysisRc3StageTruth,
+  SdlcFdRunAnalysisStagedComputeTruth,
   SdlcFdRunAnalysisStageClass
 } from "./types.js";
 
@@ -301,9 +301,9 @@ function frontierSummaryFromCarriers(
   });
 }
 
-function rc3StageTruthFromCarriers(
+function stagedComputeTruthFromCarriers(
   carriers: OperatorRunCarriers
-): SdlcFdRunAnalysisRc3StageTruth {
+): SdlcFdRunAnalysisStagedComputeTruth {
   const inputs = [
     carriers.fpEvaluateResult,
     carriers.gtlAdmittedStateRef,
@@ -338,7 +338,7 @@ function rc3StageTruthFromCarriers(
       admittedStateGraphCallRef: null,
       consequenceRef: null,
       domainReadModelRefs: Object.freeze([]),
-      detail: "required RC3 stage truth artifact missing"
+      detail: "required staged compute truth artifact missing"
     });
   }
   if (
@@ -359,7 +359,7 @@ function rc3StageTruthFromCarriers(
       admittedStateGraphCallRef: null,
       consequenceRef: null,
       domainReadModelRefs: Object.freeze([]),
-      detail: "required RC3 stage truth artifact not admitted"
+      detail: "required staged compute truth artifact not admitted"
     });
   }
   const fpEvaluate = carriers.fpEvaluateResult.data;
@@ -412,7 +412,7 @@ function rc3StageTruthFromCarriers(
       consequenceRef: consequence.consequenceRef,
       domainReadModelRefs: consequence.domainReadModelRefs,
       detail:
-        "RC3 selected composition drift across evaluate/admission/consequence carriers"
+        "Selected composition drift across evaluate/admission/consequence carriers"
     });
   }
   return Object.freeze({
@@ -581,7 +581,7 @@ export function deriveEdgeAttempt(
     stdoutBytes: carriers.fileSizes.workerStdout,
     eventBytes,
     frontierSummary: frontierSummaryFromCarriers(carriers),
-    rc3StageTruth: rc3StageTruthFromCarriers(carriers),
+    stagedComputeTruth: stagedComputeTruthFromCarriers(carriers),
     workerDispatched: workerRun !== null,
     workerStatus: operatorSummary?.status ?? null
   });

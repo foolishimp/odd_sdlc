@@ -73,7 +73,7 @@ test("T-183 ticket is the admitted deletion-first implementation migration contr
 
 test("T-181 design module declares evaluator register IACS carrier truth", () => {
   const design = readRepoFile(
-    "build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_ABG_3_9_RC3_COMPUTE_STAGE_BOUNDARY.md"
+    "build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_STAGED_COMPUTE_BOUNDARY.md"
   );
 
   assert.match(design, /#### Design-Depth Evaluator Register Rule/u);
@@ -1385,14 +1385,6 @@ test("T-181 component edges read evaluator register from source-asset lineage re
       prompt,
       /Pre-return syntax check: every emitted source, test, and build\/config product file must use the language, module\/import system, file extension, test framework, and command shape declared by tenant stack authority/u
     );
-    assert.match(
-      prompt,
-      /When admitted design authority puts role=test product targets in this component-code materialization edge, treat those tests as proof materialization for this edge/u
-    );
-    assert.match(
-      prompt,
-      /If the declared test command fails because emitted test files use a different module\/import\/test syntax than tenant stack authority, repair the product files before returning/u
-    );
     assert.match(prompt, /construction_brief\.stagePressure\.designDepthEvaluatorRegisterRefs/u);
     assert.match(prompt, /compressed work-category governance/u);
     assert.match(prompt, /config\/work-category-governance\/coding_build\.md/u);
@@ -1401,7 +1393,7 @@ test("T-181 component edges read evaluator register from source-asset lineage re
   }
 });
 
-test("T-181 framework-smoke component-code prompt does not suppress admitted test execution", () => {
+test("T-181 framework-smoke component-code prompt preserves downstream test execution", () => {
   const workspaceRoot = makeWorkspace();
   try {
     const current = manifestForEdge({
@@ -1414,11 +1406,11 @@ test("T-181 framework-smoke component-code prompt does not suppress admitted tes
 
     assert.match(
       prompt,
-      /For framework-smoke Min\(F_P\) component_code_surface, materialize the source product files declared by the admitted F_P design-depth register and stagePressure\. When admitted design authority declares role=test product targets for this edge, run the declared test execution contract before returning/u
+      /For framework-smoke Min\(F_P\) component_code_surface, materialize the source product files declared by the admitted F_P design-depth register and stagePressure\. Preserve the declared test execution contract for downstream derive_test_execution_result_surface; do not run it on the component-code edge/u
     );
     assert.doesNotMatch(
       prompt,
-      /Run the declared test contract only when this edge carries execution-repair scope/u
+      /When admitted design authority declares role=test product targets for this edge, run the declared test execution contract before returning/u
     );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
@@ -1530,6 +1522,9 @@ test("T-181 analyzer uses runtime admission for evaluator sidecar", () => {
 test("T-181 installed operator declares an F_P evaluation rule for register population", () => {
   const source = readRepoFile("build_tenants/typescript/code/src/operator/installed_operator.ts");
   const handoffSource = readRepoFile("build_tenants/typescript/code/src/operator/plugins/transform/launch_contract.ts");
+  const promptEdgePolicySource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/plugins/transform/prompt_edge_policy.ts"
+  );
   const operatorIndex = readRepoFile("build_tenants/typescript/code/src/operator/index.ts");
   const evaluatePluginSource = readRepoFile(
     "build_tenants/typescript/code/src/operator/plugins/evaluate/index.ts"
@@ -1793,7 +1788,7 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(evaluateDesignDepthSource, /design_depth_fp_evaluator_register_unadmitted/u);
   assert.match(evaluateDesignDepthSource, /export function admitImplementationDesignRegisterForManifest/u);
   assert.doesNotMatch(handoffSource, /export function admitImplementationDesignRegisterForManifest/u);
-  assert.match(handoffSource, /stagePressure\.designDepthEvaluatorRegisterRefs/u);
+  assert.match(promptEdgePolicySource, /stagePressure\.designDepthEvaluatorRegisterRefs/u);
 });
 
 test("T-181 evaluator artifacts are cataloged operator-run truth", () => {

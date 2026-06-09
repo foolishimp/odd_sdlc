@@ -695,7 +695,7 @@ test("T-151 first_traversal returns the first admitted non-close consequence", a
   assert.equal("loop" in outcome, false);
   assert.equal(outcome.status, "blocked");
   assert.equal(outcome.summary.currentEdge, "derive_component_code_surface");
-  assert.equal(outcome.postflight.status, "passed");
+  assert.equal(outcome.postflight.status, "blocked");
   assert(outcome.traversalConsequence);
   assert.equal(outcome.traversalConsequence.edgeClosureDecision.disposition, "retry");
   assert.equal(

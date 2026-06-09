@@ -16,8 +16,8 @@ structure probes.
 | Surface | Binding |
 | --- | --- |
 | Package | `@abiogenesis/typescript-tenant` |
-| Version | `3.7.1-rc.1` |
-| Dependency form | local source product dependency |
+| Version | `4.0.0-rc.4` |
+| Dependency form | release snapshot package dependency |
 | odd_sdlc role | domain product over ABIogenesis substrate |
 | ABIogenesis role | GTL/ABG carrier and runtime truth authority |
 
@@ -63,15 +63,15 @@ The adapter relies on ABIogenesis TypeScript evidence:
 
 These assumptions are dependencies, not copied law.
 
-## ABG 3.7.1 Runtime, Temporal, Process Callout, Defaults, Evaluator, And Liveness Substrate
+## ABIogenesis Runtime, Temporal, Process Callout, Defaults, Evaluator, And Liveness Substrate
 
-As of ABG `3.7.1-rc.1`, worker process execution remains substrate-owned, the
+As of ABIogenesis `4.0.0-rc.4`, worker process execution remains substrate-owned, the
 first ABG defaults bundle slice remains visible installed configuration, and
 temporal/time-related runtime truth is ABG-owned event and replay projection
-truth. ABG 3.7 publishes the T-127 F_P construction evaluator substrate:
+truth. ABIogenesis publishes the T-127 F_P construction evaluator substrate:
 construction observation snapshots, action catalog rows, observation-to-action
 binding, configured priority and affect adjustment, and the construction
-priority projection. ABG 3.7.1 adds the T-129 system probe observer liveness
+priority projection. The runtime line adds the T-129 system probe observer liveness
 substrate: declared runtime probes, typed external interruption events,
 `RuntimeLivenessObserverProjection`, and replay-derived runtime invocation
 disposition.
@@ -113,13 +113,12 @@ ABG owns:
   lost-terminal process outcomes and liveness evidence
 - successful PTY `terminalSessionId` on `actor_process_started` event and
   projection truth
-- installed `.abiogenesis/config/abg.fallbacks.json` and the shipped
-  `abg.reference-fallbacks.json` source bundle for plugin traversal observer
-  fallbacks
+- installed `.abiogenesis/config/abg.config.json` and the shipped ABG config
+  bundle for plugin traversal observer defaults
 - `plugin_traversal_prompt_materialized` event truth when ABG observer fallback
   or GTL observer bindings are explicitly activated
 
-`odd_sdlc.TS` may preserve worker archive filenames as compatibility
+`odd_sdlc.TS` may preserve worker archive filenames as archive
 read-models, but their process facts are projections over ABG trace truth.
 
 `odd_sdlc.TS` must not collapse the hard safety cap and inactivity lease into a
@@ -146,18 +145,18 @@ Temporal eligibility or schedule pressure does not close vectors or advance
 graph traversal by itself; only ABG traversal/runtime events and replay
 projection can do that.
 
-ABG `3.7.1-rc.1` does not claim recurrence, window policy, cloud durable timer
+The consumed ABIogenesis substrate does not claim recurrence, window policy, cloud durable timer
 provider semantics, sticky sessions, warm pools, or automatic session affinity.
 odd_sdlc must not project any of those as product capability through this
 migration.
 
-ABG `3.7.1-rc.1` does not claim the post-3.7 T-128 installed construction
+The consumed ABIogenesis substrate does not claim automatic installed construction
 runner. The evaluator projection can rank the next lawful construction action;
 it does not itself start work, append runtime events, dispatch workers, or own
 retry iteration. odd_sdlc installed runner bridges that remain before ABG T-128
 must be treated as temporary invocation adapters, not ranking truth.
 
-ABG `3.7.1-rc.1` does not make all ABG defaults configurable, and it does not
+The consumed ABIogenesis substrate does not make all ABG defaults configurable, and it does not
 ship an odd_sdlc-specific per-edge traversal strategy carrier. odd_sdlc keeps an
 explicit fallback traversal strategy plan until that policy is repriced into
 ABG-visible evaluator input.

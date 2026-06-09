@@ -9,16 +9,34 @@ import {
   parseStringList
 } from "../../shared/validation.js";
 import { sha256Text } from "../../shared/digest.js";
+import { uniqueSorted } from "../../shared/collections.js";
+import { sdlcEdgeOutputPolicyForTargetAssetType } from "../edge_output_policy.js";
 import type {
   SdlcMaterializedProductFile,
   SdlcMaterializedProductFileRole,
   SdlcProductMaterializationContract,
+  SdlcProductMaterializationAuthorityTarget,
   SdlcWorkerHandoffManifest,
   SdlcWorkerResultMaterializationDiagnostic
 } from "../carriers.js";
-import type {
-  ProductMaterializationReplayManifestRead
+import {
+  priorHandoffManifestMatchesCurrent,
+  productMaterializationReplayArchives,
+  readProductMaterializationReplayManifest,
+  replayArchivePostflightStatus,
+  type ProductMaterializationReplayManifestRead
 } from "./replay.js";
+import {
+  declaredBuildConfigRoleForObservedFile,
+  declaredProductAuthorityRoleForObservedFile,
+  effectiveProductMaterializationRequiredRoles,
+  isTenantDeclaredToolByproductRelativePath,
+  isTenantLocalSdlcSurfaceRelativePath,
+  isTenantStackAuthoritySpecRelativePath,
+  productAuthorityTargetCoversRelativePath,
+  reconcileSdlcProductMaterializationAuthority,
+  tenantRelativeOutputArtifactPath
+} from "./authority.js";
 
 const MATERIALIZED_PRODUCT_FILE_ROLES = Object.freeze([
   "source",
@@ -173,6 +191,391 @@ export interface ProductMaterializationObservationDeps {
   }) => SdlcMaterializedProductFile;
   readonly handoffManifestRefForArchiveRoot: (archiveRoot: string) => string;
   readonly attemptRefForArchiveRoot: (archiveRoot: string) => string;
+}
+
+function parseNonNegativeInteger(input: unknown, label: string): number {
+  if (typeof input !== "number" || !Number.isInteger(input) || input < 0) {
+    throw new TypeError(`${label}: expected non-negative integer`);
+  }
+  return input;
+}
+
+function targetAdmitsTestExecutionEvidence(targetAssetType: string): boolean {
+  return sdlcEdgeOutputPolicyForTargetAssetType(targetAssetType)
+    .admitsTestExecutionEvidence;
+}
+
+function targetIgnoresExecutionByproducts(targetAssetType: string): boolean {
+  return (
+    targetAssetType === "component_code_surface" ||
+    targetAssetType === "component_test_surface" ||
+    targetAdmitsTestExecutionEvidence(targetAssetType)
+  );
+}
+
+function textIfFile(filePath: string): string | null {
+  if (!existsSync(filePath) || !statSync(filePath).isFile()) {
+    return null;
+  }
+  return readFileSync(filePath, "utf8");
+}
+
+function targetContractForMaterializedFile(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly relativePath: string;
+}): SdlcProductMaterializationAuthorityTarget | null {
+  const normalized = input.relativePath.split(path.sep).join("/");
+  const authority = reconcileSdlcProductMaterializationAuthority(input.manifest);
+  return (
+    authority.declaredProductTargetContracts.find((candidate) =>
+      productAuthorityTargetCoversRelativePath({
+        manifest: input.manifest,
+        target: candidate,
+        normalizedRelativePath: normalized
+      })
+    ) ?? null
+  );
+}
+
+function materializedFileLineageRef(input: {
+  readonly manifestRef: string;
+  readonly relativePath: string;
+  readonly digest: string;
+}): string {
+  return [
+    "materialized-product-file://odd-sdlc",
+    encodeURIComponent(input.manifestRef),
+    encodeURIComponent(input.relativePath),
+    encodeURIComponent(input.digest)
+  ].join("/");
+}
+
+function handoffManifestRefForArchiveRoot(archiveRoot: string): string {
+  return pathToFileURL(join(archiveRoot, "handoff_manifest.json")).href;
+}
+
+function attemptRefForArchiveRoot(archiveRoot: string): string {
+  return pathToFileURL(archiveRoot).href;
+}
+
+function rolePolicyRefForMaterializedRole(
+  role: SdlcMaterializedProductFileRole
+): string {
+  if (role === "source") {
+    return "target-role-policy://odd-sdlc/product-source-tree";
+  }
+  if (role === "test") {
+    return "target-role-policy://odd-sdlc/product-test-tree";
+  }
+  if (role === "build_config") {
+    return "target-role-policy://odd-sdlc/reported-build-config";
+  }
+  if (role === "design") {
+    return "target-role-policy://odd-sdlc/product-design-surface";
+  }
+  if (role === "documentation") {
+    return "target-role-policy://odd-sdlc/product-documentation";
+  }
+  return "target-role-policy://odd-sdlc/reported-other";
+}
+
+function fileWithMaterializationProvenance(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly file: SdlcMaterializedProductFile;
+  readonly materializationSource: "current_attempt" | "replay";
+  readonly sourceManifestRef: string;
+  readonly sourceHandoffManifestRef: string;
+  readonly sourceAttemptRef: string;
+  readonly overwritesMaterializationRef?: string | null | undefined;
+}): SdlcMaterializedProductFile {
+  const targetContract = targetContractForMaterializedFile({
+    manifest: input.manifest,
+    relativePath: input.file.relativePath
+  });
+  const buildConfigRole = declaredBuildConfigRoleForObservedFile({
+    manifest: input.manifest,
+    normalizedRelativePath: normalizedRelativePath(input.file.relativePath)
+  });
+  const authorityRole = targetContract?.requiredRole ?? buildConfigRole ?? null;
+  const effectiveRole =
+    input.file.role === "other" && authorityRole !== null
+      ? authorityRole
+      : input.file.role;
+  const rolePolicyRef =
+    input.materializationSource === "replay"
+      ? effectiveRole === input.file.role
+        ? input.file.rolePolicyRef
+        : targetContract?.policyRef ?? rolePolicyRefForMaterializedRole(effectiveRole)
+      : input.file.rolePolicyRef ??
+        targetContract?.policyRef ??
+        rolePolicyRefForMaterializedRole(effectiveRole);
+  return Object.freeze({
+    kind: input.file.kind,
+    role: effectiveRole,
+    relativePath: input.file.relativePath,
+    absolutePath: input.file.absolutePath,
+    digest: input.file.digest,
+    byteCount: input.file.byteCount,
+    ...(input.file.requirementTraceObligationIds === undefined
+      ? {}
+      : { requirementTraceObligationIds: input.file.requirementTraceObligationIds }),
+    materializationSource: input.materializationSource,
+    sourceManifestRef: input.sourceManifestRef,
+    sourceHandoffManifestRef: input.sourceHandoffManifestRef,
+    sourceAttemptRef: input.sourceAttemptRef,
+    ...(input.overwritesMaterializationRef === null ||
+    input.overwritesMaterializationRef === undefined
+      ? {}
+      : { overwritesMaterializationRef: input.overwritesMaterializationRef }),
+    ...(rolePolicyRef === undefined ? {} : { rolePolicyRef })
+  });
+}
+
+function currentAttemptMaterializedFile(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly file: SdlcMaterializedProductFile;
+  readonly overwritesMaterializationRef?: string | null | undefined;
+}): SdlcMaterializedProductFile {
+  return fileWithMaterializationProvenance({
+    manifest: input.manifest,
+    file: input.file,
+    materializationSource: "current_attempt",
+    sourceManifestRef: pathToFileURL(
+      input.manifest.productMaterialization.manifestFile
+    ).href,
+    sourceHandoffManifestRef: handoffManifestRefForArchiveRoot(input.manifest.archiveRoot),
+    sourceAttemptRef: attemptRefForArchiveRoot(input.manifest.archiveRoot),
+    overwritesMaterializationRef: input.overwritesMaterializationRef
+  });
+}
+
+function replayMaterializedFile(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly file: SdlcMaterializedProductFile;
+  readonly sourceManifestRef: string;
+  readonly sourceHandoffManifestRef: string;
+  readonly sourceAttemptRef: string;
+}): SdlcMaterializedProductFile {
+  return fileWithMaterializationProvenance({
+    manifest: input.manifest,
+    file: input.file,
+    materializationSource: "replay",
+    sourceManifestRef: input.sourceManifestRef,
+    sourceHandoffManifestRef: input.sourceHandoffManifestRef,
+    sourceAttemptRef: input.sourceAttemptRef
+  });
+}
+
+function currentAttemptMaterializedFileFromReplayPath(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly observedFile: SdlcObservedProductFileSnapshot;
+  readonly replayedFile: SdlcMaterializedProductFile;
+  readonly sourceManifestRef: string;
+}): SdlcMaterializedProductFile {
+  return currentAttemptMaterializedFile({
+    manifest: input.manifest,
+    file: Object.freeze({
+      ...input.replayedFile,
+      relativePath: input.observedFile.relativePath,
+      absolutePath: input.observedFile.absolutePath,
+      digest: input.observedFile.digest,
+      byteCount: input.observedFile.byteCount
+    }),
+    overwritesMaterializationRef: materializedFileLineageRef({
+      manifestRef: input.sourceManifestRef,
+      relativePath: input.replayedFile.relativePath,
+      digest: input.replayedFile.digest
+    })
+  });
+}
+
+function admitMaterializedProductFile(
+  input: unknown,
+  label: string
+): SdlcMaterializedProductFile {
+  const record = parseClosedRecord(input, label, [
+    "kind",
+    "role",
+    "relativePath",
+    "absolutePath",
+    "digest",
+    "byteCount",
+    "materializationSource",
+    "sourceManifestRef",
+    "sourceHandoffManifestRef",
+    "sourceAttemptRef",
+    "overwritesMaterializationRef",
+    "rolePolicyRef",
+    "requirementTraceObligationIds"
+  ]);
+  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
+  if (kind !== "sdlc_materialized_product_file") {
+    throw new TypeError(`${label}.kind: unexpected materialized file kind`);
+  }
+  const materializationSource =
+    record["materializationSource"] === undefined
+      ? "current_attempt"
+      : parseEnumValue(
+          record["materializationSource"],
+          `${label}.materializationSource`,
+          ["current_attempt", "replay"] as const
+        );
+  const sourceManifestRef =
+    record["sourceManifestRef"] === undefined
+      ? undefined
+      : parseNonEmptyString(record["sourceManifestRef"], `${label}.sourceManifestRef`);
+  const sourceHandoffManifestRef =
+    record["sourceHandoffManifestRef"] === undefined
+      ? undefined
+      : parseNonEmptyString(
+          record["sourceHandoffManifestRef"],
+          `${label}.sourceHandoffManifestRef`
+        );
+  const sourceAttemptRef =
+    record["sourceAttemptRef"] === undefined
+      ? undefined
+      : parseNonEmptyString(record["sourceAttemptRef"], `${label}.sourceAttemptRef`);
+  const overwritesMaterializationRef =
+    record["overwritesMaterializationRef"] === undefined
+      ? undefined
+      : parseNonEmptyString(
+          record["overwritesMaterializationRef"],
+          `${label}.overwritesMaterializationRef`
+        );
+  if (
+    materializationSource === "replay" &&
+    overwritesMaterializationRef !== undefined
+  ) {
+    throw new TypeError(
+      `${label}.overwritesMaterializationRef: replayed files cannot overwrite predecessor materialization`
+    );
+  }
+  const base = {
+    kind: "sdlc_materialized_product_file",
+    role: parseEnumValue(
+      record["role"],
+      `${label}.role`,
+      MATERIALIZED_PRODUCT_FILE_ROLES
+    ),
+    relativePath: parseNonEmptyString(record["relativePath"], `${label}.relativePath`),
+    absolutePath: resolve(
+      parseNonEmptyString(record["absolutePath"], `${label}.absolutePath`)
+    ),
+    digest: parseNonEmptyString(record["digest"], `${label}.digest`),
+    byteCount: parseNonNegativeInteger(record["byteCount"], `${label}.byteCount`),
+    ...(record["rolePolicyRef"] === undefined
+      ? {}
+      : {
+          rolePolicyRef: parseNonEmptyString(
+            record["rolePolicyRef"],
+            `${label}.rolePolicyRef`
+          )
+        }),
+    ...(record["requirementTraceObligationIds"] === undefined
+      ? {}
+      : {
+          requirementTraceObligationIds: parseStringList(
+            record["requirementTraceObligationIds"],
+            `${label}.requirementTraceObligationIds`
+          )
+        })
+  } satisfies Pick<
+    SdlcMaterializedProductFile,
+    | "kind"
+    | "role"
+    | "relativePath"
+    | "absolutePath"
+    | "digest"
+    | "byteCount"
+  > & {
+    readonly rolePolicyRef?: string;
+    readonly requirementTraceObligationIds?: readonly string[];
+  };
+  if (materializationSource === "replay") {
+    if (
+      sourceManifestRef === undefined ||
+      sourceHandoffManifestRef === undefined ||
+      sourceAttemptRef === undefined
+    ) {
+      throw new TypeError(`${label}: replayed materialized files require source lineage refs`);
+    }
+    return Object.freeze({
+      ...base,
+      materializationSource,
+      sourceManifestRef,
+      sourceHandoffManifestRef,
+      sourceAttemptRef
+    });
+  }
+  return Object.freeze({
+    ...base,
+    materializationSource,
+    ...(sourceManifestRef === undefined ? {} : { sourceManifestRef }),
+    ...(sourceHandoffManifestRef === undefined ? {} : { sourceHandoffManifestRef }),
+    ...(sourceAttemptRef === undefined ? {} : { sourceAttemptRef }),
+    ...(overwritesMaterializationRef === undefined
+      ? {}
+      : { overwritesMaterializationRef })
+  });
+}
+
+function admitReplayManifestMaterializedProductFile(
+  input: unknown,
+  label: string
+): SdlcMaterializedProductFile {
+  const record = parseClosedRecord(input, label, [
+    "kind",
+    "role",
+    "relativePath",
+    "absolutePath",
+    "digest",
+    "byteCount",
+    "materializationSource",
+    "sourceManifestRef",
+    "sourceHandoffManifestRef",
+    "sourceAttemptRef",
+    "overwritesMaterializationRef",
+    "rolePolicyRef",
+    "requirementTraceObligationIds"
+  ]);
+  if (
+    record["materializationSource"] === "replay" &&
+    record["overwritesMaterializationRef"] !== undefined
+  ) {
+    const projected: Record<string, unknown> = { ...record };
+    delete projected["overwritesMaterializationRef"];
+    return admitMaterializedProductFile(projected, label);
+  }
+  return admitMaterializedProductFile(input, label);
+}
+
+function productMaterializationObservationDeps(): ProductMaterializationObservationDeps {
+  return {
+    targetIgnoresExecutionByproducts,
+    targetAdmitsTestExecutionEvidence,
+    isTenantLocalSdlcSurfaceRelativePath,
+    isTenantStackAuthoritySpecRelativePath,
+    isTenantDeclaredToolByproductRelativePath,
+    declaredBuildConfigRoleForObservedFile,
+    declaredProductAuthorityRoleForObservedFile,
+    effectiveProductMaterializationRequiredRoles,
+    tenantRelativeOutputArtifactPath,
+    textIfFile,
+    uniqueSorted,
+    productMaterializationReplayArchives,
+    replayArchivePostflightStatus,
+    priorHandoffManifestMatchesCurrent,
+    readProductMaterializationReplayManifest: (input) =>
+      readProductMaterializationReplayManifest(input, {
+        admitReplayManifestMaterializedProductFile,
+        isTenantDeclaredToolByproductRelativePath
+      }),
+    admitReplayManifestMaterializedProductFile,
+    replayMaterializedFile,
+    currentAttemptMaterializedFileFromReplayPath,
+    handoffManifestRefForArchiveRoot,
+    attemptRefForArchiveRoot
+  };
 }
 
 function walkFiles(root: string): readonly string[] {
@@ -743,7 +1146,7 @@ export function observeProductMaterializationDeltaWithDiagnostics(
     readonly manifest: SdlcWorkerHandoffManifest;
     readonly before: SdlcProductMaterializationSnapshot;
   },
-  deps: ProductMaterializationObservationDeps
+  deps: ProductMaterializationObservationDeps = productMaterializationObservationDeps()
 ): ProductMaterializationObservationDelta {
   const after = snapshotProductMaterializationRoot(
     input.manifest.productMaterialization
@@ -912,7 +1315,7 @@ export function observeProductMaterializationDelta(
     readonly manifest: SdlcWorkerHandoffManifest;
     readonly before: SdlcProductMaterializationSnapshot;
   },
-  deps: ProductMaterializationObservationDeps
+  deps: ProductMaterializationObservationDeps = productMaterializationObservationDeps()
 ): readonly SdlcMaterializedProductFile[] {
   return observeProductMaterializationDeltaWithDiagnostics(input, deps)
     .materializedFiles;

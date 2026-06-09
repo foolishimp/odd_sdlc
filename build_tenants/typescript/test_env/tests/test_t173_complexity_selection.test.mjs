@@ -19,14 +19,16 @@ import {
   conformProjectProfileFromConstraintsText,
   constructSdlcGtlModule,
   deriveSdlcDecompositionSummary,
-  deriveSdlcTraversalHopSelection,
-  deriveSdlcWorkspaceIngressReport,
-  FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
-  projectSdlcQueryDomain,
-  projectSdlcWorkerAttachment,
-  publicStartOnce,
-  SDLC_DEFAULT_DECOMPOSITION_SUMMARY_THRESHOLDS,
-  SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF
+	  deriveSdlcTraversalHopSelection,
+	  deriveSdlcWorkspaceIngressReport,
+	  FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
+	  FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
+	  projectSdlcQueryDomain,
+	  projectSdlcWorkerAttachment,
+	  publicStartOnce,
+	  SDLC_DEFAULT_DECOMPOSITION_SUMMARY_THRESHOLDS,
+	  SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
+	  SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
 } from "../../build/semantic/code/src/index.js";
 import {
   analyzeSdlcFdRunArchive,
@@ -159,6 +161,54 @@ test("T-173 public start selects framework-smoke Min(F_P) graph from trivial pro
   assert.equal(
     outcome.executionContract.traversalDecompositionSummary?.downstreamCount,
     1
+  );
+  assert.equal(
+    outcome.executionContract.traversalHopSelection?.hopClass,
+    "single_hop"
+  );
+  assert.equal(
+    outcome.executionContract.traversalHopSelection?.pressurePreservation.mechanism,
+    "outcome_class_graph_variant"
+  );
+});
+
+test("T-173 direct lite overlay start carries reduced traversal selection", () => {
+  const { module, queryDomain, conformedProject, workspaceRoot } =
+    publicStartContext();
+  const outcome = publicStartOnce({
+    request: admitSdlcPublicStartRequest({
+      workspaceRoot,
+      target: {
+        kind: "overlay",
+        handle: SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
+      },
+      until: "first_traversal",
+      defaultRegime: "F_P"
+    }),
+    module,
+    queryDomain,
+    conformedProject,
+    workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
+  });
+
+  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert.equal(outcome.blockingReason, "fp_worker_unattached");
+  assert(outcome.executionContract);
+  assert.equal(
+    outcome.executionContract.targetGraphFunction,
+    FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE
+  );
+  assert.equal(
+    outcome.executionContract.overlayRef,
+    SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
+  );
+  assert.equal(
+    outcome.executionContract.traversalDecompositionSummary?.upstreamCount,
+    1
+  );
+  assert.equal(
+    outcome.executionContract.traversalHopSelection?.outcomeClass,
+    "framework_smoke"
   );
   assert.equal(
     outcome.executionContract.traversalHopSelection?.hopClass,
@@ -581,6 +631,8 @@ test("T-173 installed operator archives traversal selection and emits typed audi
   assert.match(source, /sdlc_traversal_hop_selection\.json/u);
   assert.match(source, /sdlc_frontdoor_decomposition_summary\.json/u);
   assert.match(source, /sdlc_frontdoor_traversal_hop_selection\.json/u);
+  assert.match(source, /readArchivedFrontDoorTraversalSelection/u);
+  assert.match(source, /sdlc_frontdoor_traversal_hop_selection/u);
   assert.match(source, /constructFdAuthorityOutcomeAdmittedEvent/u);
   assert.match(source, /odd-sdlc-frontdoor-traversal-hop-selection/u);
   assert.match(source, /emitted\.push\(frontDoorTraversalAuditEvent\)/u);

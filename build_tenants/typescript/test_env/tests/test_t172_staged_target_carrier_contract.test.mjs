@@ -20,6 +20,7 @@ import {
   constructWorkerInvocationPackage,
   constructSdlcGtlModule,
   constructSdlcTargetCarrierRows,
+  deriveSdlcStagedConstructionAuditCarriers,
   deriveWorkerHandoffManifest,
   evaluateSdlcComputeStage,
   hookContractByEdgeName,
@@ -29,9 +30,6 @@ import {
   sha256Text,
   writeHandoffFiles
 } from "../../build/semantic/code/src/index.js";
-import {
-  deriveSdlcStagedConstructionAuditCarriers
-} from "../../build/semantic/code/src/operator/plugins/transform/launch_contract.js";
 
 function makeWorkspace({ trivialProduct = false } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t172-staged-"));

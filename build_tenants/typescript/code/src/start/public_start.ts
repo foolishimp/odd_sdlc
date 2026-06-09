@@ -33,12 +33,13 @@ import {
   constructSdlcOverlayBinding,
   constructSdlcTraversalOverlayCatalog,
   FG_CONFORM_PROJECT,
-  publicSdlcOverlayStartTargets,
-  resolveSdlcTraversalOverlay,
-  SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
-  sdlcGraphFunctionBoundaryRef,
-  sdlcPublishedActionRef,
-  sdlcTraversalOverlayForGraphFunction,
+	  publicSdlcOverlayStartTargets,
+	  resolveSdlcTraversalOverlay,
+	  SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
+	  SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
+	  sdlcGraphFunctionBoundaryRef,
+	  sdlcPublishedActionRef,
+	  sdlcTraversalOverlayForGraphFunction,
   type SdlcOverlayBinding,
   type SdlcTraversalOverlay,
   type SdlcTraversalOverlayRef
@@ -423,6 +424,68 @@ function frontDoorTraversalSelection(input: {
   return Object.freeze({ summary, selection });
 }
 
+function overlayTraversalSelection(input: {
+  readonly overlay: SdlcTraversalOverlay;
+  readonly profile: SdlcConformProjectProfile;
+}): {
+  readonly summary: SdlcDecompositionSummary;
+  readonly selection: SdlcTraversalHopSelection;
+} | null {
+  if (
+    input.overlay.overlayRef !== SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF &&
+    input.overlay.overlayRef !== SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
+  ) {
+    return null;
+  }
+  const outcomeClass = traversalOutcomeClassForPublicStart(input.profile);
+  if (outcomeClass === "domain_product") {
+    return null;
+  }
+  const overlaySegment =
+    input.overlay.overlayRef === SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF
+      ? "framework-smoke-min-fp"
+      : "lite-design-module-implementation";
+  const upstreamRef =
+    `requirement://odd-sdlc/public-start/${input.profile.projectSlug}/${overlaySegment}`;
+  const summary = deriveSdlcDecompositionSummary({
+    stageId: `public_start_${overlaySegment.replaceAll("-", "_")}`,
+    upstreamKind: "requirement",
+    downstreamKind: "component",
+    thresholds: SDLC_DEFAULT_DECOMPOSITION_SUMMARY_THRESHOLDS,
+    stageUpstreamUniverseRefs: [upstreamRef],
+    requireTrivialDegenerateProduct: true,
+    rows: [
+      {
+        downstreamId: "component://framework-smoke/hello-world",
+        parentId: "module://framework-smoke",
+        ownedUpstreamRefs: [upstreamRef],
+        publicBoundaryRefs: [
+          `${input.profile.selectedOutputRoot}/src`
+        ],
+        substantiveResponsibilityRefs: [
+          "behavior://framework-smoke/hello-world"
+        ],
+        materializationTargetRefs: [
+          `${input.profile.selectedOutputRoot}/src`
+        ]
+      }
+    ]
+  });
+  const selection = deriveSdlcTraversalHopSelection({
+    selectionRef:
+      `selection://odd-sdlc/public-start/${input.profile.projectSlug}/${overlaySegment}`,
+    outcomeClass,
+    decompositionSummary: summary,
+    bundleEligible: true,
+    skippedEdgeRefs: Object.freeze([]),
+    evidenceRefs: Object.freeze([
+      "capability://odd-sdlc/trivial_product",
+      input.overlay.overlayRef
+    ])
+  });
+  return Object.freeze({ summary, selection });
+}
+
 function workspaceRootsForMaterialObservation(
   request: SdlcPublicStartRequest
 ): readonly string[] {
@@ -639,7 +702,7 @@ function evaluateInitialPublicStartAction(input: {
   let blockingReason: "target_unavailable" | "stale_query_domain" | null = null;
   let preferredTargetOutcomeRef: string | null = null;
   let requestedOverlay: SdlcTraversalOverlay | null = null;
-  const selectedTraversal = frontDoorTraversalSelection({
+  let selectedTraversal = frontDoorTraversalSelection({
     request: input.request,
     profile: input.conformedProject
   });
@@ -708,13 +771,26 @@ function evaluateInitialPublicStartAction(input: {
         preferredTargetOutcomeRef = candidates[0]?.targetOutcomeRef ?? null;
       }
     }
-  } else if (targetPolicy.resolver === "named_graph_function") {
-    const published = input.queryDomain.graphFunctions.some(
-      (graphFunction) => graphFunction.name === input.request.target.handle
-    );
-    const candidate = candidateForGraphFunction({
-      module: input.module,
-      graphFunctionName: input.request.target.handle,
+	  } else if (targetPolicy.resolver === "named_graph_function") {
+	    const published = input.queryDomain.graphFunctions.some(
+	      (graphFunction) => graphFunction.name === input.request.target.handle
+	    );
+	    const namedGraphFunction = graphFunctionByName(
+	      input.module,
+	      input.request.target.handle
+	    );
+	    if (selectedTraversal === null && namedGraphFunction !== null) {
+	      selectedTraversal = overlayTraversalSelection({
+	        overlay: sdlcTraversalOverlayForGraphFunction({
+	          catalog: getOverlayCatalog(),
+	          graphFunctionRef: sdlcGraphFunctionBoundaryRef(namedGraphFunction)
+	        }),
+	        profile: input.conformedProject
+	      });
+	    }
+	    const candidate = candidateForGraphFunction({
+	      module: input.module,
+	      graphFunctionName: input.request.target.handle,
       sourceRef
     });
     if (published && candidate === null) {
@@ -735,8 +811,8 @@ function evaluateInitialPublicStartAction(input: {
       catalog: getOverlayCatalog(),
       overlayRef: input.request.target.handle
     });
-    if (requestedOverlay === null) {
-      return Object.freeze({
+	    if (requestedOverlay === null) {
+	      return Object.freeze({
         targetGraphFunction: null,
         blockingReason: "target_unavailable",
         overlayBinding: null,
@@ -745,8 +821,14 @@ function evaluateInitialPublicStartAction(input: {
         traversalDecompositionSummary: null,
         traversalHopSelection: null
       });
-    }
-    let selectedGraphFunctionName = requestedOverlay.defaultStartTarget;
+	    }
+	    if (selectedTraversal === null) {
+	      selectedTraversal = overlayTraversalSelection({
+	        overlay: requestedOverlay,
+	        profile: input.conformedProject
+	      });
+	    }
+	    let selectedGraphFunctionName = requestedOverlay.defaultStartTarget;
     if (input.queryDomain.projectConformance?.status === "blocked") {
       const conformGraphFunction = graphFunctionByName(input.module, FG_CONFORM_PROJECT);
       const conformGraphFunctionRef =

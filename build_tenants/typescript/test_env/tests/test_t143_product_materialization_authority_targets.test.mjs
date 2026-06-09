@@ -1715,7 +1715,10 @@ test("T-143 Rust component-code report rejects runner-prefixed execution evidenc
     }
   });
 
-  assert.equal(manifest.productMaterialization.testExecutionContract, "cargo");
+  assert.equal(
+    manifest.productMaterialization.testExecutionContract,
+    "undeclared"
+  );
   assert.throws(
     () => readWorkerResultReport(manifest),
     /target asset type does not admit execution evidence/u

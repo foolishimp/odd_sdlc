@@ -11,7 +11,7 @@ const SDLC_SHELL_TOOL_TARGET_ASSET_TYPES = Object.freeze([
 export function sdlcWorkerTargetUsesShellToolProfile(input: {
   readonly targetAssetType: string;
 }): boolean {
-  return SDLC_SHELL_TOOL_TARGET_ASSET_TYPES.includes(
-    input.targetAssetType as (typeof SDLC_SHELL_TOOL_TARGET_ASSET_TYPES)[number]
+  return SDLC_SHELL_TOOL_TARGET_ASSET_TYPES.some(
+    (targetAssetType) => targetAssetType === input.targetAssetType
   );
 }
