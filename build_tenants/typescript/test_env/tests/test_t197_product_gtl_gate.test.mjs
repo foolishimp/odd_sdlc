@@ -148,6 +148,44 @@ test("T-197 product gate keeps installed-package source identity nonempty", () =
   );
 });
 
+test("T-197 design ratifies owner partition assets before Wave 1 code", () => {
+  const design = repoFile(
+    "build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_STAGED_COMPUTE_BOUNDARY.md"
+  );
+
+  for (const required of [
+    "## T-197 Owner Partition And Decommission Register",
+    "### T-197 IACS",
+    "### Structural Carrier Diagram",
+    "classDiagram",
+    "<<prime>>",
+    "<<authoritative>>",
+    "<<downstream>>",
+    "<<subordinate>>",
+    "<<effect-edge>>",
+    "<<deferred>>",
+    "### Reference-To-Target Derivation",
+    "### Decommission Register",
+    "must-not-name-governed-target",
+    "Horizontal ingress rule:"
+  ]) {
+    assert.match(design, new RegExp(required.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
+  }
+
+  for (const rowId of [
+    "A1", "A2", "A3", "A4", "A5",
+    "B1", "B2", "B3", "B4a", "B4b",
+    "C1a", "C1b", "C2", "C3",
+    "D1", "D2", "D3", "D4", "D5", "D6",
+    "H1", "H2", "H3", "H4", "H5", "H6",
+    "H7", "H8", "H9", "H10", "H11", "H12",
+    "E1", "E2", "E3", "E4", "E5",
+    "P1", "P2", "P3"
+  ]) {
+    assert.match(design, new RegExp(`\\| ${rowId} \\|`, "u"));
+  }
+});
+
 test("T-197 H1 keeps target-specific requirements filenames out of framework law", () => {
   const forbiddenPath = "specification/mapper_requirements.md";
   const sourceHits = repoFilesUnder("build_tenants/typescript/code/src")

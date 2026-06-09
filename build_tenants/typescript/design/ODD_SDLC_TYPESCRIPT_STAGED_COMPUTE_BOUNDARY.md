@@ -84,6 +84,282 @@ or topology logic to `handoff.ts`. If a helper is imported from `handoff.ts`,
 the design is not closed. Passing tests through a remaining handoff semantic
 path is non-closure evidence, not proof.
 
+## T-197 Owner Partition And Decommission Register
+
+Status: ratified design lock for T-197 W-010, W-020, W-030, and Wave 1
+A-row ownership. This section authorizes bounded refactoring work only. It does
+not by itself close any implementation row.
+
+T-197 consolidates two defect axes:
+
+- vertical authority leakage: SDLC realization code authors or selects ABG/GTL
+  runtime truth instead of consuming it
+- horizontal target-identity leakage: SDLC framework code names one governed
+  target product, ecosystem, file, command, or scenario as generic law
+
+The owner split is:
+
+| owner | owns | must not own |
+| --- | --- | --- |
+| GTL | graph language, graph algebra, module/job/role/public-start declarations, target-carrier contract declaration, prompt AssetSurface law, hook and composition declarations | runtime facts, product domain meaning, target-specific filenames |
+| ABG | program admission, selected `abg.fn_composition`, runtime events, payload ledgers, assurance fold, traversal transition, continuation, retry, correction, replay, saga/frontier runtime facts | SDLC product policy, tenant identity, target-specific requirement interpretation |
+| odd_sdlc.TS | SDLC edge meaning, graph-function catalog, overlays as product route views, prompt policy overlays, target-carrier product meaning, consequence candidates/read models, analyzer/query projections, proof interpretation | ABG runtime event authorship, final closure fold, continuation truth, second GTL contract law |
+| odd_service | future session, worker registry, dispatch routing, and client observation plane | current SDLC runtime truth or GTL/ABG contract law |
+| tenant authority | imported project truth, tenant stack, execution contract, source/test/deployment declarations | framework defaults or SDLC constitutional law |
+| proof harness | scenario setup, fixtures, negative proof, archive inspection | product runtime truth, generic target identity, closure authority |
+
+### T-197 IACS
+
+The irreducible architectural carrier set for this reconciliation boundary is:
+
+| carrier family | role | authority | owning surfaces | non-closure signal |
+| --- | --- | --- | --- | --- |
+| `GtlProgramDeclaration` | prime GTL program truth: module, graph functions, graph vectors, operators, evaluators, rules, hooks, jobs, roles | GTL authoritative, SDLC publishes | `graph/*`, `gtl_conformance/program.ts`, ABG `typecheckGtlProgram(...)` | product code skips the ABG conformance gate or feeds a partial inventory |
+| `SdlcTraversalOverlay` | product route view over GTL graph functions and vectors | SDLC downstream over GTL | `graph/overlays.ts`, public start target catalog | overlay owns closure, target movement, or runtime event truth |
+| `AbgSelectedComposition` | selected `abg.fn_composition` identity and regime binding | ABG authoritative | plugin input, selected composition helpers, runtime archives | SDLC derives selected composition from edge names, paths, or graph-function names |
+| `SdlcTransformCandidate` | transform.C product candidate/evidence refs | SDLC plugin candidate, ABG admitted | `operator/plugins/transform/*`, worker result carriers | transform writes ledgers, emits events, closes, or selects continuation |
+| `SdlcEvaluationFinding` | evaluate.C finding refs and semantic review candidates | SDLC plugin candidate, ABG admitted | `operator/plugins/evaluate/*`, review-grade and design-depth artifacts | evaluation writes final ledgers, closes, transitions, or replays |
+| `SdlcConsequenceCandidate` | product consequence candidate/read model: gain, residual pressure, edge ledger, closure decision, next-action projection | SDLC downstream candidate until ABG admission/fold/transition | `operator/traversal_consequence.ts`, consequence plugin, analyzer projections | consequence candidate is treated as final ABG fold, transition, or continuation truth |
+| `AbgRuntimeTruth` | events, frames, payload ledgers, assurance fold, transition, continuation, replay | ABG authoritative | ABG runtime package, SDLC ABG append sink, replay readers | SDLC constructs runtime lifecycle events before emit or reconstructs replay truth |
+| `SdlcImportedAuthority` | imported-source ledger, source input, requirement authority, tenant stack, execution contract | tenant authority authoritative, SDLC admits/read-models | `workspace/*`, `spec_method/entry.ts`, tenant stack specs | framework code names target files, ecosystems, or scenario brands as generic law |
+| `SdlcToolBoundary` | worker transport, CLI/PTY, shell, MCP/future external tool gate | ABG/SDLC admitted tool boundary | `operator/transport.ts`, public start worker attachment, future odd_service adapter | transport grammar becomes product law or session registry grows inside SDLC core |
+| `SdlcProofFixture` | scenario and sandbox proof data | proof-only downstream | `test_env/*`, qualification probes | fixture target identity leaks into production defaults or framework classifiers |
+
+Subordinate payloads stay subordinate unless separately promoted by a ticket:
+worker report fragments, construction brief clauses, prompt section rows,
+diagnostic strings, process observations, scenario fixture paths, archive file
+names, and target-specific examples. They may be evidence, but they are not
+prime carriers.
+
+Module ownership constraints:
+
+| module area | owner class | allowed role | hard constraint |
+| --- | --- | --- | --- |
+| `graph/*` | SDLC product over GTL | publish graph program, overlays, target contracts | no hidden controller loop or local algebra outside GTL declarations |
+| `gtl_conformance/*` | ABG consumer | build and typecheck live inventory | no test-only manifest, no product-local contract law |
+| `start/*`, `spec_method/entry.ts` | public ignition adapter | admit request, call product GTL gate, enter ABG runtime | no retry loop or traversal meaning outside ABG entrypoint |
+| `operator/plugins/transform/*` | transform plugin adapter | construct product candidates and evidence refs | no evaluation finding, ledger write, runtime event, close, transition, or replay |
+| `operator/plugins/evaluate/*` | evaluate plugin adapter | construct evaluation findings and review candidates | no final ledger write, runtime event, close, transition, or replay |
+| `operator/plugins/consequence/*`, `traversal_consequence.ts` | consequence candidate/read-model | derive product pressure and candidate projections over admitted evidence | no final ABG fold, transition, continuation, or runtime fact authorship |
+| `workspace/*` | tenant-authority ingress/read model | admit imported source, project constraints, tenant stack | must-not-name-governed-target; target filenames flow only through imported-source or tenant declarations |
+| `analysis/*`, `qualification/*` | projection/proof harness | read archives and fixtures | must-not-name-governed-target in production profiles or default gates |
+| `install/*`, `release/*` | effect shell | install/package/release evidence | no traversal selection or runtime meaning |
+| `operator/transport.ts` | worker binding adapter | lower admitted transport to ABG actor input | no odd_service session registry, no product law in backend flag grammar |
+
+### Structural Carrier Diagram
+
+```mermaid
+classDiagram
+  class GtlProgramDeclaration {
+    <<prime>>
+    <<authoritative>>
+    +Module
+    +GraphFunction
+    +GraphVector
+    +Operator
+    +Evaluator
+    +Rule
+    +Job
+    +Role
+  }
+  class SdlcTraversalOverlay {
+    <<prime>>
+    <<downstream>>
+    +overlayRef
+    +graphFunctionRefs
+    +graphVectorRefs
+    +publicStartTargets
+  }
+  class AbgSelectedComposition {
+    <<prime>>
+    <<authoritative>>
+    +compositionRef
+    +compositionDigest
+    +regimeBindingRefs
+  }
+  class SdlcTransformCandidate {
+    <<prime>>
+    <<downstream>>
+    +candidateRefs
+    +evidenceRefs
+    +targetCarrierRef
+  }
+  class SdlcEvaluationFinding {
+    <<prime>>
+    <<downstream>>
+    +findingRefs
+    +reviewGradeRef
+    +designDepthRef
+    +residualPressureRefs
+  }
+  class SdlcConsequenceCandidate {
+    <<prime>>
+    <<downstream>>
+    +gainRefs
+    +edgeLedgerRef
+    +closureDecisionRef
+    +nextActionProjectionRef
+  }
+  class AbgRuntimeTruth {
+    <<prime>>
+    <<authoritative>>
+    +runtimeEvents
+    +payloadLedgers
+    +assuranceFold
+    +transition
+    +continuation
+    +replay
+  }
+  class SdlcImportedAuthority {
+    <<prime>>
+    <<authoritative>>
+    +sourceInputs
+    +importedSources
+    +requirementAuthorities
+    +tenantStack
+    +executionContract
+  }
+  class SdlcToolBoundary {
+    <<effect-edge>>
+    +workerTransport
+    +processActorInput
+    +externalToolGate
+  }
+  class SdlcProofFixture {
+    <<deferred>>
+    <<downstream>>
+    +scenarioData
+    +sandboxFixture
+    +negativeProof
+  }
+  class PromptSectionRows {
+    <<subordinate>>
+    -textLines
+    -authorityRefs
+  }
+  class DiagnosticStrings {
+    <<subordinate>>
+    -messages
+    -toolOutputSnippets
+  }
+
+  GtlProgramDeclaration --> SdlcTraversalOverlay : product route view
+  GtlProgramDeclaration --> AbgSelectedComposition : declares hooks
+  AbgSelectedComposition --> SdlcTransformCandidate : selected transform.C
+  SdlcTransformCandidate --> SdlcEvaluationFinding : admitted candidate refs
+  SdlcEvaluationFinding --> SdlcConsequenceCandidate : finding refs
+  SdlcConsequenceCandidate --> AbgRuntimeTruth : admission and transition owned by ABG
+  AbgRuntimeTruth --> SdlcTraversalOverlay : replay-derived continuation view
+  SdlcImportedAuthority --> SdlcTransformCandidate : obligations and source refs
+  SdlcToolBoundary --> SdlcTransformCandidate : effect edge only
+  SdlcProofFixture ..> SdlcImportedAuthority : fixture input only
+  SdlcTransformCandidate *-- PromptSectionRows
+  SdlcEvaluationFinding *-- DiagnosticStrings
+```
+
+Runtime flow:
+
+```mermaid
+flowchart TD
+  GTL["GTL program declarations"] --> GATE["ABG typecheckGtlProgram"]
+  GATE --> START["SDLC public start adapter"]
+  START --> ABG0["ABG start/open graph call/open frame"]
+  ABG0 --> SEL["ABG selected abg.fn_composition"]
+  SEL --> T["plugin transform.C"]
+  T --> ADMIT_T["ABG admit transform and write ledgers"]
+  ADMIT_T --> E["plugin evaluate.C"]
+  E --> ADMIT_E["ABG admit evaluation and assurance fold"]
+  ADMIT_E --> C["plugin consequence.C product candidate"]
+  C --> ADMIT_C["ABG admit consequence projection"]
+  ADMIT_C --> NEXT["ABG traversal transition and replay continuation"]
+  NEXT --> READ["SDLC query, analyzer, and overlay read models"]
+
+  IMP["tenant imported sources and stack"] --> T
+  IMP --> E
+  IMP --> C
+```
+
+Horizontal ingress rule:
+
+```text
+tenant source file
+  -> specification/requirements/00-imported-sources.md or specification/requirements/*
+  -> SdlcSourceInput / SdlcImportedRequirementAuthority
+  -> traversal obligations / target carrier rows
+  -> transform.C and evaluate.C
+
+forbidden:
+target filename, ecosystem command, scenario brand, or downstream product name
+  -> framework classifier/default/ranker
+```
+
+### Reference-To-Target Derivation
+
+| row | current source / reference | target owner API or carrier | target site | proof lane |
+| --- | --- | --- | --- | --- |
+| B1 | `test_t194` proved ABG gate only in tests | ABG `typecheckGtlProgram(...)` and `admitGtlProgramConformanceInput(...)` | product `gtl_conformance/*`, start, spec-method, release, build preflight | `test:t194`, `test:t197`, `test:t059` |
+| A1 | `replayEventsWithGraphContinuationCursor` synthesizes vector lifecycle events | ABG continuation and replay projection | delete SDLC synthetic cursor events; consume ABG-emitted continuation facts | source negative test plus installed continuation replay |
+| A2 | `executeInstalledOperatorStartWithReentry` owns multi-attempt loop | installed UX over admitted ABG turns, or ABG continuation API after A5 | keep UX loop projection-only until A5 split; no local closure authority | single-turn/until-converged ownership test |
+| A3 | SDLC compiles DAG and calls `runEventedNativeSagaFrontier` inline | ABG frontier runtime with SDLC as thin caller, or ABG-owned entry API | ratify thin caller only if branch policy/tasks are admitted carrier inputs; otherwise move entry | source test and live path audit |
+| A4 | SDLC callers construct runtime events before `appendOddSdlcRuntimeEvents` | ABG/system event constructors and `emit()` | `appendOddSdlcRuntimeEvents` remains sink only; construct sites rehome | construct-site inventory test |
+| A5 | `traversal_consequence.ts` builds gain, ledger, close, next-action chain | SDLC consequence candidate/read model; ABG final fold, transition, continuation | split candidate construction from final runtime admission/fold/transition | three-edge chain admission-boundary test |
+| B2 | `component_depth_register.ts` local protocol enums | GTL target-carrier and declaration read model | reframe local rows as projections over GTL declarations | T-153/T-197 conformance test |
+| B3 | `prompt_assets.ts` prompt registers and clause schema | GTL AssetSurface plus SDLC overlay policy | retain SDLC policy only where GTL owns structure | prompt asset conformance tests |
+| B4a | review-grade binding constructor/admitter | ABG GTL contract-fulfillment binding API | keep imported ABI constructors/admitters | `test:t194`, review-grade binding tests |
+| B4b | review-grade command string OR clauses | typed failure class and tenant execution contract | remove redundant command-string checks | review-grade negative test |
+| C1a | worker spawn and session trajectory in `transport.ts` | future odd_service adapter; current admitted worker transport | keep thin adapter; no SDLC session registry growth | transport tests |
+| C1b | hard-coded worker backend flag grammar | declared worker capability asset | move flag grammar to admitted capability/transport args | transport argument tests |
+| C2 | install docs for converged worker UX | documentation over current public API | keep as UX docs only | install instruction tests |
+| C3 | no odd_service server | absence is target state | keep absent until separate product ticket | source grep |
+| D1 | live module lane regex over paths | tenant stack target seeds | derive lanes from admitted tenant stack | frontier lane negative test |
+| D2 | deterministic dependency traversal method pick | evaluator-selected admitted carrier | make method selected evidence, not local pick | decomposition admission test |
+| D3 | public-start bootstrap selection | admitted capability route | only remediate non-evidence method picks | narrowed public-start tests |
+| D4 | `.test.` / `.spec.` infix exclusion | tenant testing-stack roles | route through tenant stack target seeds | authority target tests |
+| D5 | bare `/src` append | declared module layout | consume tenant profile/module layout | authority target tests |
+| D6 | `"project"` directory special-case | tenant declared directory list | consume declared directory list | authority target tests |
+| H1 | `mapper_requirements.md` special cases | generic imported-source and requirement surfaces | removed from framework law; target file is tenant data only | `test:t197`, data-mapper sandbox |
+| H2 | closed analysis profile enum | admitted profile id and capability flags | open profile id; use `truthyCapability` | analyze-run profile tests |
+| H3 | enterprise-core inventory as default-looking gate | B-068 proof fixture only | contain/relocate outside production defaults | qualification reachability test |
+| H4 | scripted CDME constructor sequence | proof fixture | move to non-exported test fixture | sandbox proof test |
+| H5 | `npm test` pressure classifier | neutral test-execution contract role | use role IDs and tenant contract | prompt edge policy test |
+| H6 | Scala/SBT diagnostic needles | tenant-declared diagnostic phrases | read from tenant stack | repair reentry test |
+| H7 | review prompt names `npm test` | generic role=test language | neutral prompt text | prompt text guard |
+| H8 | `TEST35_CONCEPTUAL_STAGES` / `test35://` refs | neutral stage refs with scenario id as data | rename read-model refs | analyzer render tests |
+| H9 | test35-branded headings | neutral headings | rename renderer output | markdown render test |
+| H10 | `spark_scala` alias | tenant-declared identity | remove stale alias or make declared | project profile test |
+| H11 | data-mapper requirement example | tenant-neutral placeholder | keep only canonical requirement syntax | prompt policy test |
+| H12 | ontology-specific heading tokens | spec-method-neutral markers | remove target ontology tokens from classifier | project profile test |
+| E1 | graph-bound shard command | lawful if graph-bound | verify bind-chain stage only | bind-chain audit |
+| E2 | empty assurance stub | aligned post T-184 | keep | no action |
+| E3 | string-ref closure heuristics | typed carrier inputs | replace heuristics with typed inputs | closure state tests |
+| E4 | feature DAG topological order | lawful projection if callers stay read-only | audit callers | DAG caller tests |
+| E5 | self-qualification fixture paths | lawful fixture | keep | no action |
+| P1 | generated-asset production-path closure | selected evaluate.C review-grade evidence | prove no legacy writer/postflight/raw report bypass | generated-asset negative test |
+| P2 | data-mapper breadth live proof | T-198 successor | out of T-197 closure law | successor ticket |
+| P3 | stale proof fixture hygiene | semantic fixture sweep | delete/guard deleted handoff and alias fixtures | semantic grep and focused tests |
+
+### Decommission Register
+
+| id | decommission target | action | prerequisite | proof |
+| --- | --- | --- | --- | --- |
+| A1 | synthetic cursor event rows | delete SDLC construction; consume ABG continuation events | ABG continuation source identified | source negative test |
+| A4 | `constructVector*`, `constructGraphSpan*`, `constructFdAuthority*` before append | rehome runtime fact authorship to ABG/system APIs | construct-site inventory complete | construct-site test |
+| A3 | local live frontier ownership ambiguity | ratify thin caller or move entry to ABG API | A3 disposition test | live frontier audit |
+| A5 | mixed closure candidate/fold/transition chain | split SDLC candidates from ABG final fold/transition | T-164 three-edge proof preserved | three-edge chain test |
+| A2 | installed multi-attempt loop authority ambiguity | keep UX projection-only or move convergence to ABG continuation | A5 split clear | until-converged ownership test |
+| B2 | local component-depth contract protocol law | reframe as GTL read model | T-153 coverage row present | conformance test |
+| B3 | prompt structural schema duplication | retain only SDLC overlay policy | GTL AssetSurface row present | prompt asset tests |
+| B4b | command-string OR clauses | delete | typed failure class covers route | review-grade tests |
+| C1a/C1b | session/flag grammar in SDLC core | keep thin transport now; move capability grammar to declared asset | no odd_service registry in SDLC | transport tests |
+| D1-D6 | ecosystem/path defaults | replace with tenant stack and admitted evidence | tenant profile/source carrier available | authority tests |
+| H1 | target-specific requirement filename recognition | done; keep removed | generic imported-source route proven | T-197 H1 test |
+| H2-H12 | target names, scenario brands, ecosystem phrases | replace with neutral ids or tenant-declared data | row-specific source identified | row-specific grep/tests |
+| P1/P3 | stale proof bypasses | prove selected review path and remove stale fixture imports | B1/H1 stable | semantic proof |
+
+No decommission target may be replaced with a shim, alias, or fallback path
+that preserves the same authority under a new name. Deletion-first means the
+old authority path must fail closed before the row is marked done.
+
 ## Canonical Prompt-Source Carrier
 
 `worker_construction_brief.json` is the canonical worker prompt-source carrier.
@@ -513,7 +789,7 @@ transform.C output / admitted evidence / lineage snapshot
 Deterministic producers may create evidence, diagnostics, projections,
 admission decisions, command execution records, and ABG/system side effects.
 They must not create semantic assurance rows for ambiguous SDLC work. A
-compatibility register may remain only as an exact projection of admitted F_P
+projection register may remain only as an exact projection of admitted F_P
 truth with selected composition, selected regime, evaluator, and admission
 evidence preserved.
 
