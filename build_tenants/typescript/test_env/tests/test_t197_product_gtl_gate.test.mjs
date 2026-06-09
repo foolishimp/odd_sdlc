@@ -414,3 +414,23 @@ test("T-197 B4b keeps review-grade routing off tenant command grammar", () => {
   assert.match(source, /action\.includes\("component_test_surface"\)/u);
   assert.match(source, /action\.includes\("execution evidence"\)/u);
 });
+
+test("T-197 H2 keeps F_D run analysis profiles open and capability-driven", () => {
+  const typesSource = repoFile(
+    "build_tenants/typescript/code/src/analysis/types.ts"
+  );
+  const profilesSource = repoFile(
+    "build_tenants/typescript/code/src/analysis/profiles.ts"
+  );
+  const analyzeSource = repoFile(
+    "build_tenants/typescript/code/src/analysis/analyze.ts"
+  );
+
+  assert.doesNotMatch(typesSource, /"hello_world",\s*\n\s*"data_mapper"/u);
+  assert.doesNotMatch(profilesSource, /\bcase\s+"hello_world"\b/u);
+  assert.doesNotMatch(profilesSource, /\bcase\s+"data_mapper"\b/u);
+  assert.doesNotMatch(analyzeSource, /profile\s*===\s*"hello_world"/u);
+  assert.match(profilesSource, /\btruthyCapability\(/u);
+  assert.match(profilesSource, /"trivial_product"/u);
+  assert.match(analyzeSource, /\bprofileCapabilityContracts\b/u);
+});

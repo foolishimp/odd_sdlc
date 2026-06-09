@@ -1995,15 +1995,27 @@ test("T-161 leaves analysis untouched by start/dispatch/closure flows", () => {
   const before = new Set(SDLC_FD_RUN_ANALYSIS_DIAGNOSTIC_CODE_VALUES);
   assert.ok(before.has("retry_observed"));
   assert.ok(before.has("summary_source_drift"));
-  assert.ok(SDLC_FD_RUN_ANALYSIS_PROFILE_VALUES.includes("hello_world"));
-  assert.ok(SDLC_FD_RUN_ANALYSIS_PROFILE_VALUES.includes("data_mapper"));
+  assert.equal(SDLC_FD_RUN_ANALYSIS_PROFILE_VALUES.length, 1);
   assert.ok(SDLC_FD_RUN_ANALYSIS_PROFILE_VALUES.includes("generic"));
+  assert.equal(SDLC_FD_RUN_ANALYSIS_PROFILE_VALUES.includes("hello_world"), false);
+  assert.equal(SDLC_FD_RUN_ANALYSIS_PROFILE_VALUES.includes("data_mapper"), false);
 });
 
-test("T-161 strict profile non-zero exit code requires non-info diagnostics", () => {
-  const spec = resolveSdlcFdRunAnalysisProfile("hello_world");
+test("T-197 H2 analysis profile behavior is capability-driven, not product-name-driven", () => {
+  const spec = resolveSdlcFdRunAnalysisProfile({
+    profile: "tenant.small",
+    capabilityContracts: [
+      {
+        kind: "sdlc_fd_run_analysis_profile_capability",
+        name: "trivial_product",
+        value: "true"
+      }
+    ]
+  });
   assert.equal(spec.policy.policyStatus, "informational");
-  assert.equal(spec.policy.profilePolicyRef, "policy://odd-sdlc/analysis/profile/hello_world/v1");
+  assert.equal(spec.policy.profilePolicyRef, "policy://odd-sdlc/analysis/profile/tenant.small/v1");
+  assert.equal(spec.policy.thresholdPolicyRef, "policy://odd-sdlc/analysis/threshold/trivial_product/v1");
+  assert.equal(spec.forbidRawDisplayIdRequirementTagsInProductFiles, true);
 });
 
 test("T-161 CLI dispatch returns JSON envelope and exit code 0 on clean synthetic archive", () => {

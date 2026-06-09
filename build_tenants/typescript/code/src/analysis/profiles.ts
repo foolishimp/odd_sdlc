@@ -1,36 +1,13 @@
-// Implements: T-161
+// Implements: T-161, T-197
 
 import type {
   SdlcFdRunAnalysisProfile,
+  SdlcFdRunAnalysisProfileCapability,
   SdlcFdRunAnalysisProfileSpec,
   SdlcFdRunAnalysisThresholds
 } from "./types.js";
 
-const DEFAULT_HELLO_WORLD_THRESHOLDS: SdlcFdRunAnalysisThresholds = Object.freeze({
-  heartbeatAgeStallMs: 120_000,
-  noOutputGapStallMs: 90_000,
-  archiveGrowthZeroToleranceMs: 120_000,
-  promptContextBytesHigh: 250_000,
-  handoffGrowthHighBytes: 150_000,
-  eventSnapshotBytesHigh: 300_000,
-  unattributedTimeHighRatio: 0.5,
-  requirementFanoutSuspiciousRatio: 3,
-  productLineageFanoutSuspiciousRatio: 2
-});
-
-const DEFAULT_DATA_MAPPER_THRESHOLDS: SdlcFdRunAnalysisThresholds = Object.freeze({
-  heartbeatAgeStallMs: 240_000,
-  noOutputGapStallMs: 180_000,
-  archiveGrowthZeroToleranceMs: 240_000,
-  promptContextBytesHigh: 600_000,
-  handoffGrowthHighBytes: 600_000,
-  eventSnapshotBytesHigh: 1_500_000,
-  unattributedTimeHighRatio: 0.4,
-  requirementFanoutSuspiciousRatio: 6,
-  productLineageFanoutSuspiciousRatio: 4
-});
-
-const DEFAULT_GENERIC_THRESHOLDS: SdlcFdRunAnalysisThresholds = Object.freeze({
+const DEFAULT_THRESHOLDS: SdlcFdRunAnalysisThresholds = Object.freeze({
   heartbeatAgeStallMs: 300_000,
   noOutputGapStallMs: 240_000,
   archiveGrowthZeroToleranceMs: 300_000,
@@ -42,54 +19,86 @@ const DEFAULT_GENERIC_THRESHOLDS: SdlcFdRunAnalysisThresholds = Object.freeze({
   productLineageFanoutSuspiciousRatio: 8
 });
 
-const HELLO_WORLD_PROFILE: SdlcFdRunAnalysisProfileSpec = Object.freeze({
-  policy: Object.freeze({
-    profile: "hello_world" as const,
-    profilePolicyRef: "policy://odd-sdlc/analysis/profile/hello_world/v1",
-    thresholdPolicyRef: "policy://odd-sdlc/analysis/threshold/hello_world/v1",
-    policyStatus: "informational" as const
-  }),
-  thresholds: DEFAULT_HELLO_WORLD_THRESHOLDS,
-  expectedRetryFloor: 0,
-  enforceCanonicalLineage: true,
-  forbidRawDisplayIdRequirementTagsInProductFiles: true
+const TRIVIAL_PRODUCT_THRESHOLDS: SdlcFdRunAnalysisThresholds = Object.freeze({
+  heartbeatAgeStallMs: 120_000,
+  noOutputGapStallMs: 90_000,
+  archiveGrowthZeroToleranceMs: 120_000,
+  promptContextBytesHigh: 250_000,
+  handoffGrowthHighBytes: 150_000,
+  eventSnapshotBytesHigh: 300_000,
+  unattributedTimeHighRatio: 0.5,
+  requirementFanoutSuspiciousRatio: 3,
+  productLineageFanoutSuspiciousRatio: 2
 });
 
-const DATA_MAPPER_PROFILE: SdlcFdRunAnalysisProfileSpec = Object.freeze({
-  policy: Object.freeze({
-    profile: "data_mapper" as const,
-    profilePolicyRef: "policy://odd-sdlc/analysis/profile/data_mapper/v1",
-    thresholdPolicyRef: "policy://odd-sdlc/analysis/threshold/data_mapper/v1",
-    policyStatus: "informational" as const
-  }),
-  thresholds: DEFAULT_DATA_MAPPER_THRESHOLDS,
-  expectedRetryFloor: 1,
-  enforceCanonicalLineage: true,
-  forbidRawDisplayIdRequirementTagsInProductFiles: false
-});
+function profileToken(profile: SdlcFdRunAnalysisProfile): string {
+  const normalized = profile.trim().toLowerCase().replace(/[^a-z0-9._-]+/gu, "_");
+  return normalized.length > 0 ? normalized : "generic";
+}
 
-const GENERIC_PROFILE: SdlcFdRunAnalysisProfileSpec = Object.freeze({
-  policy: Object.freeze({
-    profile: "generic" as const,
-    profilePolicyRef: "policy://odd-sdlc/analysis/profile/generic/v1",
-    thresholdPolicyRef: "policy://odd-sdlc/analysis/threshold/generic/v1",
-    policyStatus: "informational" as const
-  }),
-  thresholds: DEFAULT_GENERIC_THRESHOLDS,
-  expectedRetryFloor: 0,
-  enforceCanonicalLineage: false,
-  forbidRawDisplayIdRequirementTagsInProductFiles: false
-});
+function capabilityValue(
+  capabilityContracts: readonly SdlcFdRunAnalysisProfileCapability[],
+  name: string
+): string | null {
+  return capabilityContracts.find((contract) => contract.name === name)?.value ?? null;
+}
 
-export function resolveSdlcFdRunAnalysisProfile(
-  profile: SdlcFdRunAnalysisProfile
-): SdlcFdRunAnalysisProfileSpec {
-  switch (profile) {
-    case "hello_world":
-      return HELLO_WORLD_PROFILE;
-    case "data_mapper":
-      return DATA_MAPPER_PROFILE;
-    case "generic":
-      return GENERIC_PROFILE;
+function truthyCapability(
+  capabilityContracts: readonly SdlcFdRunAnalysisProfileCapability[],
+  name: string
+): boolean {
+  const normalized = capabilityValue(capabilityContracts, name)?.trim().toLowerCase() ?? "";
+  return (
+    normalized === "1" ||
+    normalized === "true" ||
+    normalized === "yes" ||
+    normalized === "on"
+  );
+}
+
+function nonNegativeIntegerCapability(
+  capabilityContracts: readonly SdlcFdRunAnalysisProfileCapability[],
+  name: string
+): number {
+  const value = capabilityValue(capabilityContracts, name);
+  if (value === null) {
+    return 0;
   }
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+export function resolveSdlcFdRunAnalysisProfile(input:
+  | SdlcFdRunAnalysisProfile
+  | {
+    readonly profile: SdlcFdRunAnalysisProfile;
+    readonly capabilityContracts?: readonly SdlcFdRunAnalysisProfileCapability[];
+  }
+): SdlcFdRunAnalysisProfileSpec {
+  const profile = typeof input === "string" ? input : input.profile;
+  const capabilityContracts = Object.freeze(
+    [...(typeof input === "string" ? [] : input.capabilityContracts ?? [])]
+  );
+  const token = profileToken(profile);
+  const trivialProduct = truthyCapability(capabilityContracts, "trivial_product");
+  const enforceCanonicalLineage =
+    trivialProduct || truthyCapability(capabilityContracts, "canonical_product_lineage");
+  const thresholds = trivialProduct ? TRIVIAL_PRODUCT_THRESHOLDS : DEFAULT_THRESHOLDS;
+  const thresholdToken = trivialProduct ? "trivial_product" : "generic";
+  return Object.freeze({
+    policy: Object.freeze({
+      profile,
+      profilePolicyRef: `policy://odd-sdlc/analysis/profile/${token}/v1`,
+      thresholdPolicyRef: `policy://odd-sdlc/analysis/threshold/${thresholdToken}/v1`,
+      policyStatus: "informational" as const
+    }),
+    capabilityContracts,
+    thresholds,
+    expectedRetryFloor: nonNegativeIntegerCapability(
+      capabilityContracts,
+      "expected_retry_floor"
+    ),
+    enforceCanonicalLineage,
+    forbidRawDisplayIdRequirementTagsInProductFiles: trivialProduct
+  });
 }

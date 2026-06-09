@@ -35,6 +35,8 @@ import type {
   SdlcFdRunAnalysisCurrentStateTelemetry,
   SdlcFdRunAnalysisEdgeAttempt,
   SdlcFdRunAnalysisProfile,
+  SdlcFdRunAnalysisProfileCapability,
+  SdlcFdRunAnalysisProfileSpec,
   SdlcFdRunAnalysisResult
 } from "./types.js";
 import {
@@ -45,6 +47,7 @@ import {
 export interface SdlcFdRunAnalysisOptions {
   readonly inspectedRoot: string;
   readonly profile?: SdlcFdRunAnalysisProfile;
+  readonly profileCapabilityContracts?: readonly SdlcFdRunAnalysisProfileCapability[];
   readonly nowMs?: number;
 }
 
@@ -356,11 +359,33 @@ function maxRequirementObligationCount(
 }
 
 function outcomeClassForAnalysisProfile(
-  profile: SdlcFdRunAnalysisProfile
+  profileSpec: SdlcFdRunAnalysisProfileSpec
 ): SdlcTraversalOutcomeClass {
   return resolveSdlcTraversalOutcomeClass({
-    trivialProduct: profile === "hello_world"
+    explicitValue: profileCapabilityValue(profileSpec, "sdlc_outcome_class"),
+    trivialProduct: truthyProfileCapability(profileSpec, "trivial_product")
   }).outcomeClass;
+}
+
+function profileCapabilityValue(
+  profileSpec: SdlcFdRunAnalysisProfileSpec,
+  name: string
+): string | null {
+  return profileSpec.capabilityContracts.find((contract) => contract.name === name)
+    ?.value ?? null;
+}
+
+function truthyProfileCapability(
+  profileSpec: SdlcFdRunAnalysisProfileSpec,
+  name: string
+): boolean {
+  const normalized = profileCapabilityValue(profileSpec, name)?.trim().toLowerCase() ?? "";
+  return (
+    normalized === "1" ||
+    normalized === "true" ||
+    normalized === "yes" ||
+    normalized === "on"
+  );
 }
 
 function loadedDecompositionSummary(
@@ -401,7 +426,7 @@ function archivedTraversalSelection(
 
 function deriveTraversalSelectionForAnalysis(input: {
   readonly carriers: readonly OperatorRunCarriers[];
-  readonly profile: SdlcFdRunAnalysisProfile;
+  readonly profileSpec: SdlcFdRunAnalysisProfileSpec;
 }): SdlcTraversalHopSelection {
   const archived = archivedTraversalSelection(input.carriers);
   if (archived !== null) {
@@ -420,7 +445,7 @@ function deriveTraversalSelectionForAnalysis(input: {
   }
   return deriveSdlcTraversalHopSelection({
     selectionRef: "analysis://odd-sdlc/traversal-hop-selection",
-    outcomeClass: outcomeClassForAnalysisProfile(input.profile),
+    outcomeClass: outcomeClassForAnalysisProfile(input.profileSpec),
     decompositionSummary: summary
   });
 }
@@ -430,7 +455,13 @@ export function analyzeSdlcFdRunArchive(
 ): SdlcFdRunAnalysisResult {
   const resolved = resolveSdlcFdRunAnalysisRoot(options.inspectedRoot);
   const profile: SdlcFdRunAnalysisProfile = options.profile ?? "generic";
-  const profileSpec = resolveSdlcFdRunAnalysisProfile(profile);
+  const profileSpec =
+    options.profileCapabilityContracts === undefined
+      ? resolveSdlcFdRunAnalysisProfile(profile)
+      : resolveSdlcFdRunAnalysisProfile({
+        profile,
+        capabilityContracts: options.profileCapabilityContracts
+      });
   const nowMs = options.nowMs ?? Date.now();
   const operatorRunRootsOrdered = Object.freeze(
     [...resolved.operatorRunRoots].reverse()
@@ -479,7 +510,7 @@ export function analyzeSdlcFdRunArchive(
   const summaryDrift = deriveSummaryDrift({ carriers, attempts });
   const traversalHopSelection = deriveTraversalSelectionForAnalysis({
     carriers,
-    profile
+    profileSpec
   });
   const allDiagnosticDrafts: readonly DiagnosticDraft[] = Object.freeze([
     ...runtimeGaps.diagnostics,

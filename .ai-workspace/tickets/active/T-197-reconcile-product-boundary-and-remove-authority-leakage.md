@@ -432,7 +432,7 @@ lawful worker-backend realization (claude rejected list).
 | id | cluster | code surface | severity | verification | disposition | status |
 | --- | --- | --- | --- | --- | --- | --- |
 | H1 | R1 | `mapper_requirements.md` in `source_input.ts:41`, `project_profile.ts:954-956/1039-1041`, `launch_contract.ts:225/2621/5965`, `postflight_checks.ts:2347-2364`, `result_projection.ts:1552`, `spec_method/entry.ts:289-297` | **high** (1552 load-bearing rank) | **done 2026-06-09** — code/src grep has zero `specification/mapper_requirements.md`; `deriveSdlcSourceInput(...)` no longer classifies the target-specific filename as `requirement_surface`; generic `specification/requirements/*` remains classified as requirement authority | recognition now routes through `specification/requirements/`, `specification/REQUIREMENTS.md`, and imported-source discovery; target-specific filename remains valid only as tenant data/fixture text, not framework law | done |
-| H2 | R2 | `analysis/types.ts:19-26` closed enum `hello_world`/`data_mapper`/`generic`; `profiles.ts`, `analyze.ts:358-364` name switches | medium | claude confirmed | open profile id to admitted tenant spec; use `truthyCapability(profile,"trivial_product")` (pattern at `public_start.ts:355`) | open |
+| H2 | R2 | `analysis/types.ts:19-26` closed enum `hello_world`/`data_mapper`/`generic`; `profiles.ts`, `analyze.ts:358-364` name switches | medium | **done 2026-06-09** — F_D run analysis profile ids are open labels; only `generic` remains as the default built-in id, and trivial-product behavior now flows through explicit profile capability contracts instead of `profile === "hello_world"` / `data_mapper` switches. | analysis profile policy identity is open; product-shape behavior is capability-driven (`trivial_product`, `sdlc_outcome_class`, `expected_retry_floor`) | `test:t161` capability-driven profile proof; `test:t197` H2 source guard | done |
 | H3 | R3 | `qualification/enterprise_core_inventory.ts:5-108` `ENTERPRISE_CORE_COMPONENTS` + `ENTERPRISE_CORE_CAPABILITY_INVENTORY` as default gate | **medium, probe-only current reachability** | **verified probe-only** — current `code/src` usage is `qualification/enterprise_core_iteration_sandbox.ts`, a B-068 probe graph (`function_kind: "odd_outcome_iteration_probe"` at L286–288) whose evaluator calls `evaluateEnterpriseCoreInventory(...)` (L467–474); `test_env/sandbox/test_b068_*` is the only active test consumer. No public-start/operator live default gate caller found in active source grep. | contain as B-068 proof fixture or relocate to `test_env/`; do not treat as live default gate until a production caller is proven | open |
 | H4 | R3 | `qualification/enterprise_core_iteration_sandbox.ts:425-462` scripted CDME constructor sequence | medium | claude confirmed | move to non-exported `test_env/` fixture with synthetic names | open |
 | H5 | R4 | `prompt_edge_policy.ts:226,238` `"npm test"` pressure classifier | medium | claude confirmed load-bearing (vs rejected `launch_contract.ts:4197` inert) | match neutral SDLC pressure ids; read grammar from `testExecutionContract` | open |
@@ -501,7 +501,7 @@ Full list: claude GAP § "Rejected / Lawful-On-Inspection" (17 items).
 | REQ-F-RUNTIME-005 ABG owns frontier | SDLC compiles DAG/payload candidates and calls ABG evented saga frontier with literal authority/control carrier admission | **pass** | A3 done |
 | REQ-F-ODDSDLC-011 AC-3 tenant stack not generic law | H1 target filename fixed; `/src` append and path regex rows remain | partial | H1 done; D1, D5 open |
 | REQ-F-ODDSDLC-017 AC-2 declared validator evidence | B4b review-grade command disjuncts removed; remaining tenant command grammar in framework classifiers is H5 scope | partial | B4b done; H5 open |
-| REQ-F-ODDSDLC-032 domain identity | CDME components as default gate; named profile enum | fail | H2, H3 |
+| REQ-F-ODDSDLC-032 domain identity | H2 named analysis profile enum removed; CDME components as default gate remains probe-only H3 scope | partial | H2 done; H3 open |
 | REQ-F-ODDSDLC-046 AC-4 imported authority | H1 target filename no longer bypasses imported-sources; generic requirement surfaces remain | **pass** | H1 done |
 | REQ-F-ODDSDLC-082 evaluator-selected depth | deterministic method pick | fail | D2; D3 narrowed |
 | REQ-F-ODDSDLC-063..068 edge assurance | matrix + kernels | pass | — |
@@ -580,7 +580,7 @@ pin the current T-164 three-edge/residual-pressure proof before A5 edits
 1. **H1 / R1** — eliminate `mapper_requirements.md` from framework law (highest horizontal priority)
 2. **H3 / R3** — current reachability is probe-only; contain or relocate as a
    B-068 fixture, and keep production default gates free of CDME names
-3. **H2 / R2** — de-name analysis profile space
+3. **H2 / R2** — done 2026-06-09; analysis profile space is open and capability-driven
 4. **H5–H7, H6 / R4** — drop downstream grammar from classifiers
 5. **H8–H11 / R6–R7** — low-priority de-branding and alias cleanup
 
@@ -595,7 +595,7 @@ pin the current T-164 three-edge/residual-pressure proof before A5 edits
 3. **A1, A4** — verified synthetic runtime event authorship
 4. **A5 partial split** — closure candidate/read-model vs ABG fold/transition/ref split; coupled to T-154 and T-164 proof
 5. **A2 design-lock disposition** — installed `--until converged` loop after A5/T-154 boundary is clear
-7. **H2, H5–H7, D1, D4–D5** — remaining horizontal + ecosystem hygiene
+7. **H5–H7, D1, D4–D5** — remaining horizontal + ecosystem hygiene
 8. **B2–B3, D2–D3, C1a–C1b, H3–H12, P1/P3** — design-locked, probe-only, proof-residual, or low-severity
 
 ---
@@ -654,7 +654,7 @@ addendum `T-197 Owner Partition And Decommission Register`.
 | W-200 | Wave 2 B2-B3 plus B4b residual | **partial** — B4b command-string OR-clauses removed from review-grade routing; B2/B3 remain open | in_progress |
 | W-300 | Wave 3 C1a/C1b | B-004 link; capability asset | open |
 | W-400 | Wave 4 D-rows | source tests | open |
-| W-500 | Wave 5 H-rows (R1–R7) | H1 done by `test:t197` H1 grep/classifier proof; remaining H2-H12 open | in_progress |
+| W-500 | Wave 5 H-rows (R1–R7) | H1 done by `test:t197` H1 grep/classifier proof; H2 done by `test:t161` capability-driven analysis profile proof and `test:t197` source guard; remaining H3-H12 open | in_progress |
 | W-600 | Closure post; refresh both GAP comments | all rows terminal | open |
 
 ---

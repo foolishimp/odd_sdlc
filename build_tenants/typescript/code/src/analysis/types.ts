@@ -17,13 +17,16 @@ export type SdlcFdRunAnalysisInspectedKind =
   (typeof SDLC_FD_RUN_ANALYSIS_INSPECTED_KIND_VALUES)[number];
 
 export const SDLC_FD_RUN_ANALYSIS_PROFILE_VALUES = Object.freeze([
-  "hello_world",
-  "data_mapper",
   "generic"
 ] as const);
 
-export type SdlcFdRunAnalysisProfile =
-  (typeof SDLC_FD_RUN_ANALYSIS_PROFILE_VALUES)[number];
+export type SdlcFdRunAnalysisProfile = string;
+
+export interface SdlcFdRunAnalysisProfileCapability {
+  readonly kind: "sdlc_fd_run_analysis_profile_capability";
+  readonly name: string;
+  readonly value: string;
+}
 
 export const SDLC_FD_RUN_ANALYSIS_FORMAT_VALUES = Object.freeze([
   "json",
@@ -371,6 +374,7 @@ export interface SdlcFdRunAnalysisThresholds {
 
 export interface SdlcFdRunAnalysisProfileSpec {
   readonly policy: SdlcFdRunAnalysisProfilePolicyRefs;
+  readonly capabilityContracts: readonly SdlcFdRunAnalysisProfileCapability[];
   readonly thresholds: SdlcFdRunAnalysisThresholds;
   readonly expectedRetryFloor: number;
   readonly enforceCanonicalLineage: boolean;

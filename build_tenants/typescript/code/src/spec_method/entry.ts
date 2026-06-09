@@ -40,7 +40,6 @@ import {
   analyzeSdlcFdRunArchive,
   renderSdlcFdRunAnalysisMarkdown,
   SDLC_FD_RUN_ANALYSIS_FORMAT_VALUES,
-  SDLC_FD_RUN_ANALYSIS_PROFILE_VALUES,
   type SdlcFdRunAnalysisFormat,
   type SdlcFdRunAnalysisProfile,
   type SdlcFdRunAnalysisResult
@@ -120,9 +119,6 @@ const ODD_SDLC_SPEC_METHOD_COMMAND_SET: ReadonlySet<string> = new Set(
   ODD_SDLC_SPEC_METHOD_COMMAND_VALUES
 );
 const EMPTY_RUNTIME_EVENTS: readonly RuntimeEvent[] = Object.freeze([]);
-const SDLC_FD_RUN_ANALYSIS_PROFILE_VALUE_SET: ReadonlySet<string> = new Set(
-  SDLC_FD_RUN_ANALYSIS_PROFILE_VALUES
-);
 const SDLC_FD_RUN_ANALYSIS_FORMAT_VALUE_SET: ReadonlySet<string> = new Set(
   SDLC_FD_RUN_ANALYSIS_FORMAT_VALUES
 );
@@ -130,7 +126,7 @@ const SDLC_FD_RUN_ANALYSIS_FORMAT_VALUE_SET: ReadonlySet<string> = new Set(
 function isSdlcFdRunAnalysisProfile(
   value: string
 ): value is SdlcFdRunAnalysisProfile {
-  return SDLC_FD_RUN_ANALYSIS_PROFILE_VALUE_SET.has(value);
+  return value.trim().length > 0 && !value.startsWith("-");
 }
 
 function isSdlcFdRunAnalysisFormat(
@@ -696,9 +692,7 @@ function parseAnalyzeRunOptions(argv: readonly string[]): SpecMethodAnalyzeRunOp
     } else if (token === "--profile") {
       const value = requireOptionValue(argv, index, "--profile");
       if (!isSdlcFdRunAnalysisProfile(value)) {
-        throw new TypeError(
-          `--profile expected one of ${SDLC_FD_RUN_ANALYSIS_PROFILE_VALUES.join(", ")}`
-        );
+        throw new TypeError("--profile expected a non-empty profile id");
       }
       profile = value;
       index += 1;

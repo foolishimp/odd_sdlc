@@ -31,6 +31,7 @@ export type {
   SdlcFdRunAnalysisPolicyStatus,
   SdlcFdRunAnalysisProductiveSignal,
   SdlcFdRunAnalysisProfile,
+  SdlcFdRunAnalysisProfileCapability,
   SdlcFdRunAnalysisProfilePolicyRefs,
   SdlcFdRunAnalysisProfileSpec,
   SdlcFdRunAnalysisResult,
