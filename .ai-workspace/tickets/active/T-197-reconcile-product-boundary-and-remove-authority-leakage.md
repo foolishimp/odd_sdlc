@@ -435,9 +435,9 @@ lawful worker-backend realization (claude rejected list).
 | H2 | R2 | `analysis/types.ts:19-26` closed enum `hello_world`/`data_mapper`/`generic`; `profiles.ts`, `analyze.ts:358-364` name switches | medium | **done 2026-06-09** — F_D run analysis profile ids are open labels; only `generic` remains as the default built-in id, and trivial-product behavior now flows through explicit profile capability contracts instead of `profile === "hello_world"` / `data_mapper` switches. | analysis profile policy identity is open; product-shape behavior is capability-driven (`trivial_product`, `sdlc_outcome_class`, `expected_retry_floor`) | `test:t161` capability-driven profile proof; `test:t197` H2 source guard | done |
 | H3 | R3 | `qualification/enterprise_core_inventory.ts:5-108` `ENTERPRISE_CORE_COMPONENTS` + `ENTERPRISE_CORE_CAPABILITY_INVENTORY` as default gate | **medium, probe-only current reachability** | **verified probe-only** — current `code/src` usage is `qualification/enterprise_core_iteration_sandbox.ts`, a B-068 probe graph (`function_kind: "odd_outcome_iteration_probe"` at L286–288) whose evaluator calls `evaluateEnterpriseCoreInventory(...)` (L467–474); `test_env/sandbox/test_b068_*` is the only active test consumer. No public-start/operator live default gate caller found in active source grep. | contain as B-068 proof fixture or relocate to `test_env/`; do not treat as live default gate until a production caller is proven | open |
 | H4 | R3 | `qualification/enterprise_core_iteration_sandbox.ts:425-462` scripted CDME constructor sequence | medium | claude confirmed | move to non-exported `test_env/` fixture with synthetic names | open |
-| H5 | R4 | `prompt_edge_policy.ts:226,238` `"npm test"` pressure classifier | medium | claude confirmed load-bearing (vs rejected `launch_contract.ts:4197` inert) | match neutral SDLC pressure ids; read grammar from `testExecutionContract` | open |
+| H5 | R4 | `prompt_edge_policy.ts:226,238` `"npm test"` pressure classifier | medium | **done 2026-06-09** — current-edge downstream pressure classification no longer treats `npm test` as a pressure signal; it uses neutral target/evidence refs such as `component_test_surface`, `test-execution`, and execution evidence. Rejected `launch_contract.ts:4197` remains intentionally untouched as inert per the rejected register. | neutral SDLC pressure ids and declared execution/test surfaces are the classifier; tenant command strings are not framework law | `test:t197` H5/H7 source guard | done |
 | H6 | R4 | `repair_reentry.ts:575-578` Scala/SBT defect needles | medium | claude confirmed | tenant-declared diagnostic phrases in `TECH_STACK.*` | open |
-| H7 | R4 | `prompts.ts:1059` review prompt names `npm test` | low | claude confirmed | generic `role=test` reference | open |
+| H7 | R4 | `prompts.ts:1059` review prompt names `npm test` | low | **done 2026-06-09** — review-grade prompt now names declared test-execution-contract proof instead of `npm test` execution. | generic declared test-execution contract reference | `test:t187` prompt assertion; `test:t197` H5/H7 source guard | done |
 | H8 | R6 | `analyze.ts:211-290` `TEST35_CONCEPTUAL_STAGES` / `test35://stage/...` | low | claude confirmed | generic `sdlc://stage/...`; scenario id as data | open |
 | H9 | R6 | `render_markdown.ts:243-248` test35-branded headings | low | claude confirmed | neutral headings | open |
 | H10 | R7 | `project_profile.ts:153-159` `spark_scala` alias | low | claude confirmed | fix stale ref or tenant-declared identity | open |
@@ -500,7 +500,7 @@ Full list: claude GAP § "Rejected / Lawful-On-Inspection" (17 items).
 | REQ-F-RUNTIME-002 no shadow runtime | convergence loop + closure/consequence chain | partial — A5 installed-status leak fixed; A2 and first-class transition/ref consumption remain blocked on A5/T-154 boundary | A2, A5 |
 | REQ-F-RUNTIME-005 ABG owns frontier | SDLC compiles DAG/payload candidates and calls ABG evented saga frontier with literal authority/control carrier admission | **pass** | A3 done |
 | REQ-F-ODDSDLC-011 AC-3 tenant stack not generic law | H1 target filename fixed; `/src` append and path regex rows remain | partial | H1 done; D1, D5 open |
-| REQ-F-ODDSDLC-017 AC-2 declared validator evidence | B4b review-grade command disjuncts removed; remaining tenant command grammar in framework classifiers is H5 scope | partial | B4b done; H5 open |
+| REQ-F-ODDSDLC-017 AC-2 declared validator evidence | B4b review-grade command disjuncts removed; H5/H7 prompt-pressure npm grammar removed; remaining tenant command grammar is H6 repair-reentry and other H/D rows | partial | B4b, H5, H7 done; H6 open |
 | REQ-F-ODDSDLC-032 domain identity | H2 named analysis profile enum removed; CDME components as default gate remains probe-only H3 scope | partial | H2 done; H3 open |
 | REQ-F-ODDSDLC-046 AC-4 imported authority | H1 target filename no longer bypasses imported-sources; generic requirement surfaces remain | **pass** | H1 done |
 | REQ-F-ODDSDLC-082 evaluator-selected depth | deterministic method pick | fail | D2; D3 narrowed |
@@ -581,7 +581,7 @@ pin the current T-164 three-edge/residual-pressure proof before A5 edits
 2. **H3 / R3** — current reachability is probe-only; contain or relocate as a
    B-068 fixture, and keep production default gates free of CDME names
 3. **H2 / R2** — done 2026-06-09; analysis profile space is open and capability-driven
-4. **H5–H7, H6 / R4** — drop downstream grammar from classifiers
+4. **H5/H7 / R4** — done 2026-06-09; H6 remains for repair-reentry diagnostic needles
 5. **H8–H11 / R6–R7** — low-priority de-branding and alias cleanup
 
 **Change class:** `realization_refactor` — generic mechanisms already exist.
@@ -595,7 +595,7 @@ pin the current T-164 three-edge/residual-pressure proof before A5 edits
 3. **A1, A4** — verified synthetic runtime event authorship
 4. **A5 partial split** — closure candidate/read-model vs ABG fold/transition/ref split; coupled to T-154 and T-164 proof
 5. **A2 design-lock disposition** — installed `--until converged` loop after A5/T-154 boundary is clear
-7. **H5–H7, D1, D4–D5** — remaining horizontal + ecosystem hygiene
+7. **H6, D1, D4–D5** — remaining horizontal + ecosystem hygiene
 8. **B2–B3, D2–D3, C1a–C1b, H3–H12, P1/P3** — design-locked, probe-only, proof-residual, or low-severity
 
 ---
@@ -654,7 +654,7 @@ addendum `T-197 Owner Partition And Decommission Register`.
 | W-200 | Wave 2 B2-B3 plus B4b residual | **partial** — B4b command-string OR-clauses removed from review-grade routing; B2/B3 remain open | in_progress |
 | W-300 | Wave 3 C1a/C1b | B-004 link; capability asset | open |
 | W-400 | Wave 4 D-rows | source tests | open |
-| W-500 | Wave 5 H-rows (R1–R7) | H1 done by `test:t197` H1 grep/classifier proof; H2 done by `test:t161` capability-driven analysis profile proof and `test:t197` source guard; remaining H3-H12 open | in_progress |
+| W-500 | Wave 5 H-rows (R1–R7) | H1 done by `test:t197` H1 grep/classifier proof; H2 done by `test:t161` capability-driven analysis profile proof and `test:t197` source guard; H5/H7 done by neutral prompt-pressure policy and review-prompt source guards; remaining H3/H4/H6/H8-H12 open | in_progress |
 | W-600 | Closure post; refresh both GAP comments | all rows terminal | open |
 
 ---

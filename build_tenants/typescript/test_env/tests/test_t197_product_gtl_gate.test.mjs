@@ -434,3 +434,18 @@ test("T-197 H2 keeps F_D run analysis profiles open and capability-driven", () =
   assert.match(profilesSource, /"trivial_product"/u);
   assert.match(analyzeSource, /\bprofileCapabilityContracts\b/u);
 });
+
+test("T-197 H5/H7 keep prompt pressure policy off tenant command grammar", () => {
+  const promptPolicySource = repoFile(
+    "build_tenants/typescript/code/src/operator/plugins/transform/prompt_edge_policy.ts"
+  );
+  const reviewPromptSource = repoFile(
+    "build_tenants/typescript/code/src/operator/plugins/evaluate/prompts.ts"
+  );
+
+  assert.doesNotMatch(promptPolicySource, /text\.includes\("npm test"\)/u);
+  assert.doesNotMatch(reviewPromptSource, /npm test execution/u);
+  assert.match(promptPolicySource, /text\.includes\("component_test_surface"\)/u);
+  assert.match(promptPolicySource, /text\.includes\("execution evidence"\)/u);
+  assert.match(reviewPromptSource, /declared test-execution-contract proof/u);
+});

@@ -223,7 +223,6 @@ function isCurrentEdgeDownstreamTestPressure(input: {
       (text.includes("component_test_surface") ||
         text.includes("test-execution") ||
         text.includes("test execution") ||
-        text.includes("npm test") ||
         text.includes("generated test"))
     );
   }
@@ -234,8 +233,7 @@ function isCurrentEdgeDownstreamTestPressure(input: {
         text.includes("execution_result_surface") ||
         text.includes("runtime_execution_surface") ||
         text.includes("test-execution") ||
-        text.includes("test execution") ||
-        text.includes("npm test"))
+        text.includes("test execution"))
     );
   }
   return false;

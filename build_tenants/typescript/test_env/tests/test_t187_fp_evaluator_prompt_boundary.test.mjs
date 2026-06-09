@@ -832,7 +832,7 @@ test("T-187 review-grade evaluator prompt matches the active tool-list contract"
   assert.match(prompt, /do not run product, build, test, framework, traversal, background, or mutation commands/u);
   assert.match(
     prompt,
-    /On component_code_surface, do not mark downstream test files or npm test execution as test_overlap_missing/u
+    /On component_code_surface, do not mark downstream test files or declared test-execution-contract proof as test_overlap_missing/u
   );
   assert.match(
     prompt,
