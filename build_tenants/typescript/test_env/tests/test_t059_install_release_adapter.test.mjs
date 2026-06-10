@@ -42,7 +42,7 @@ const ABG_RELEASE_SOURCE_REF = "HEAD";
 const ABG_RELEASE_SOURCE_COMMIT = "8a82be76d9c957dc2b427ca15aa850d4ef46f1b9";
 const ABG_RELEASE_TARBALL_SHA256 =
   "6e67842357671d6fa86686279b6cd123a70904c301f0ec8aa5124971aa551fb7";
-const ABG_RELEASE_SNAPSHOT_REF = "latest";
+const ABG_RELEASE_SNAPSHOT_REF = ABG_RELEASE_VERSION;
 const ABG_RELEASE_SNAPSHOT_ROOT = resolve(
   REPO_ROOT,
   `../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/${ABG_RELEASE_SNAPSHOT_REF}`
@@ -52,7 +52,7 @@ const ABG_RELEASE_TARBALL = path.join(
   `abiogenesis-typescript-tenant-${ABG_RELEASE_VERSION}.tgz`
 );
 const ABG_RELEASE_DEPENDENCY_REF =
-  `file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/${ABG_RELEASE_SNAPSHOT_REF}/` +
+  `file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/${ABG_RELEASE_VERSION}/` +
   `abiogenesis-typescript-tenant-${ABG_RELEASE_VERSION}.tgz`;
 const ODD_SDLC_RELEASE_SNAPSHOT_ROOT = resolve(
   REPO_ROOT,
