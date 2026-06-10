@@ -47,7 +47,7 @@ export function componentDepthFieldSetForTarget(
     targetAssetType === "component_code_surface" ||
     targetAssetType === "component_realization_qualification_surface"
   ) {
-    return Object.freeze([
+    const sourceFields = [
       ...envelope,
       "componentTopologyRows[].kind=sdlc_component_topology_row",
       "componentTopologyRows[].componentId",
@@ -64,7 +64,19 @@ export function componentDepthFieldSetForTarget(
       "componentRealizationRows[].publicBoundary",
       "componentRealizationRows[].requirementIds",
       "componentRealizationRows[].sourceAssetRefs"
-    ]);
+    ];
+    if (targetAssetType === "component_code_surface") {
+      return Object.freeze([
+        ...sourceFields,
+        "testComponentTopologyRows=[]",
+        "componentTestRows=[]",
+        "componentTestQualificationRows=[]",
+        "componentExecutionFailureRegister=null",
+        "componentRepairSchedule=null",
+        "releaseDepthParity=null"
+      ]);
+    }
+    return Object.freeze(sourceFields);
   }
   if (targetAssetType === "component_test_surface") {
     return Object.freeze([
@@ -331,7 +343,7 @@ export function acceptedCarrierSchemaForReason(input: {
   readonly targetAssetType: string;
 }): { readonly schemaRef: string; readonly fieldSet: readonly string[] } | null {
   if (
-    input.reason.startsWith("component_depth_register_invalid:") ||
+    input.reason.startsWith("component_depth_register_") ||
     input.reason === "component_depth_register_missing" ||
     input.reason.startsWith("component_repair_schedule_") ||
     input.reason.startsWith("component_repair_row_open:")

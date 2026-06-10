@@ -20,6 +20,8 @@ import {
   SDLC_REVIEW_GRADE_FAILURE_CLASSES,
   type SdlcReviewGradeEdgeFulfillmentAdmission,
   type SdlcReviewGradeEdgeFulfillmentAssessment,
+  type SdlcReviewGradeDimensionObservation,
+  type SdlcReviewGradeObligationCoverageFold,
   type SdlcReviewGradeObligationFinding,
   type SdlcComponentDepthRegister,
   type SdlcComponentRealizationRow,
@@ -149,6 +151,9 @@ function reviewGradeFindingIsDownstreamStagePressure(input: {
   readonly finding: SdlcReviewGradeObligationFinding;
   readonly targetAssetType?: string | undefined;
 }): boolean {
+  const nonMaterializedPlanningSurface = reviewGradeTargetAllowsRequirementCarryover(
+    input.targetAssetType
+  );
   const carryoverStatus =
     input.finding.fulfillmentStatus === "partial" ||
     input.finding.fulfillmentStatus === "blocked";
@@ -171,10 +176,29 @@ function reviewGradeFindingIsDownstreamStagePressure(input: {
       action.includes("test/execution") ||
       action.includes("derive_test_execution_result_surface") ||
       action.includes("prepare_test_execution_surface"));
+  const actionNamesDownstreamRequirementRealization =
+    (action.includes("downstream") ||
+      action.includes("later") ||
+      action.includes("carry")) &&
+    (action.includes("design") ||
+      action.includes("materialization") ||
+      action.includes("component") ||
+      action.includes("code") ||
+      action.includes("test") ||
+      action.includes("execution") ||
+      action.includes("realization") ||
+      action.includes("closure"));
   if (input.finding.failureClass === "wrong_stage") {
     return (
-      input.targetAssetType === "component_code_surface" &&
-      actionNamesDownstreamTestOrExecution
+      (input.targetAssetType === "component_code_surface" &&
+        actionNamesDownstreamTestOrExecution) ||
+      (nonMaterializedPlanningSurface &&
+        reviewGradePlanningTargetActionNamesLawfulDownstream({
+          targetAssetType: input.targetAssetType,
+          action,
+          actionNamesDownstreamRequirementRealization,
+          actionNamesDownstreamTestOrExecution
+        }))
     );
   }
   if (
@@ -205,6 +229,46 @@ function reviewGradeFindingIsDownstreamStagePressure(input: {
     );
   }
   return false;
+}
+
+function reviewGradePlanningTargetActionNamesLawfulDownstream(input: {
+  readonly targetAssetType: string | undefined;
+  readonly action: string;
+  readonly actionNamesDownstreamRequirementRealization: boolean;
+  readonly actionNamesDownstreamTestOrExecution: boolean;
+}): boolean {
+  if (input.targetAssetType === "test_design_surface") {
+    return (
+      input.action.includes("component_test_surface") ||
+      input.action.includes("component test surface") ||
+      input.action.includes("test-execution") ||
+      input.action.includes("test execution") ||
+      input.action.includes("execution evidence") ||
+      input.action.includes("executionevidence") ||
+      input.action.includes("derive_test_execution_result_surface") ||
+      input.action.includes("prepare_test_execution_surface")
+    );
+  }
+  return input.actionNamesDownstreamRequirementRealization;
+}
+
+function reviewGradeTargetAllowsRequirementCarryover(
+  targetAssetType: string | undefined
+): boolean {
+  return (
+    targetAssetType === "intent_surface" ||
+    targetAssetType === "product_surface" ||
+    targetAssetType === "goal_surface" ||
+    targetAssetType === "requirement_surface" ||
+    targetAssetType === "uat_testcases_surface" ||
+    targetAssetType === "testcase_authority_surface" ||
+    targetAssetType === "feature_decomp_surface" ||
+    targetAssetType === "design_surface" ||
+    targetAssetType === "scenario_surface" ||
+    targetAssetType === "implementation_design_surface" ||
+    targetAssetType === "test_design_surface" ||
+    targetAssetType === "component_repair_schedule_surface"
+  );
 }
 
 export function reviewGradeFindingsAreDownstreamStagePressure(
@@ -373,7 +437,7 @@ function parseFulfillmentBinding(
     if (value === null) {
       return Object.freeze([nullSentinel(fieldName)]);
     }
-    return parseStringList(value, fieldLabel);
+    return uniqueSorted(parseStringList(value, fieldLabel));
   };
   const productTargetRef = parseBindingString(
     record["productTargetRef"],
@@ -523,6 +587,58 @@ function parseReviewFinding(
   });
 }
 
+function parseNonNegativeInteger(input: unknown, label: string): number {
+  if (typeof input !== "number" || !Number.isInteger(input) || input < 0) {
+    throw new TypeError(`${label}: expected non-negative integer`);
+  }
+  return input;
+}
+
+function parseOptionalReviewGradeDimensionObservation(
+  input: unknown,
+  label: string
+): SdlcReviewGradeDimensionObservation | null {
+  if (input === undefined || input === null) {
+    return null;
+  }
+  const record = parseClosedRecord(input, label, [
+    "dimension",
+    "status",
+    "rationale"
+  ]);
+  return Object.freeze({
+    dimension: parseNonEmptyString(record["dimension"], `${label}.dimension`),
+    status: parseNonEmptyString(record["status"], `${label}.status`),
+    rationale: parseNonEmptyString(record["rationale"], `${label}.rationale`)
+  });
+}
+
+function parseOptionalReviewGradeObligationCoverageFold(
+  input: unknown,
+  label: string
+): SdlcReviewGradeObligationCoverageFold | null {
+  if (input === undefined || input === null) {
+    return null;
+  }
+  const record = parseClosedRecord(input, label, [
+    "dimension",
+    "coveredCount",
+    "totalCount",
+    "status",
+    "rationale"
+  ]);
+  return Object.freeze({
+    dimension: parseNonEmptyString(record["dimension"], `${label}.dimension`),
+    coveredCount: parseNonNegativeInteger(
+      record["coveredCount"],
+      `${label}.coveredCount`
+    ),
+    totalCount: parseNonNegativeInteger(record["totalCount"], `${label}.totalCount`),
+    status: parseNonEmptyString(record["status"], `${label}.status`),
+    rationale: parseNonEmptyString(record["rationale"], `${label}.rationale`)
+  });
+}
+
 function parseReviewAssessment(
   input: unknown,
   label: string
@@ -536,6 +652,9 @@ function parseReviewAssessment(
     "status",
     "reviewedObligationIds",
     "findings",
+    "stageBoundaryConformance",
+    "materializationBindingRelation",
+    "obligationCoverageFold",
     "evidenceRefs",
     "summary"
   ]);
@@ -571,6 +690,18 @@ function parseReviewAssessment(
       `${label}.reviewedObligationIds`
     ),
     findings: parseArray(record["findings"], `${label}.findings`, parseReviewFinding),
+    stageBoundaryConformance: parseOptionalReviewGradeDimensionObservation(
+      record["stageBoundaryConformance"],
+      `${label}.stageBoundaryConformance`
+    ),
+    materializationBindingRelation: parseOptionalReviewGradeDimensionObservation(
+      record["materializationBindingRelation"],
+      `${label}.materializationBindingRelation`
+    ),
+    obligationCoverageFold: parseOptionalReviewGradeObligationCoverageFold(
+      record["obligationCoverageFold"],
+      `${label}.obligationCoverageFold`
+    ),
     evidenceRefs: parseStringList(record["evidenceRefs"], `${label}.evidenceRefs`),
     summary: parseNonEmptyString(record["summary"], `${label}.summary`)
   });
@@ -873,8 +1004,16 @@ function assessmentValidationErrors(input: {
   if (findingsById.size !== assessment.findings.length) {
     errors.push("review_grade_finding_duplicate");
   }
+  const sparseRequirementCarryoverAllowed =
+    reviewGradeTargetAllowsRequirementCarryover(manifest.targetAssetType);
   for (const obligation of manifest.traversalObligationContext.obligations) {
-    if (!reviewed.has(obligation.obligationId)) {
+    const requirementObligation =
+      obligation.obligationKind === "requirement" ||
+      obligation.obligationId.startsWith("requirement:");
+    if (
+      !reviewed.has(obligation.obligationId) &&
+      !(sparseRequirementCarryoverAllowed && requirementObligation)
+    ) {
       errors.push(`review_grade_obligation_unreviewed:${obligation.obligationId}`);
     }
   }

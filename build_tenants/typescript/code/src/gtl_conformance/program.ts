@@ -25,9 +25,14 @@ import type {
   GtlProgramConformanceInput,
   GtlProgramConformanceInputAdmission,
   GtlProgramConformanceReport,
+  GtlProgramComputeCompositionRow,
+  GtlProgramComputeStageBindingRow,
   GtlProgramFeatureCoverageManifest,
+  GtlProgramRuntimeBindingRow,
   GtlProgramT153FeatureKind,
-  Module
+  EnginePluginContract,
+  Module,
+  Regime
 } from "@abiogenesis/typescript-tenant";
 import {
   constructSdlcGraphFunctionCatalog,
@@ -612,9 +617,9 @@ function computeCompositionRows(vectorRows: readonly MaterializedGraphVectorRow[
             ]),
             regimeBindingRefs,
             stageBindingRefs: Object.freeze([
-              `stage-binding://odd-sdlc/${row.graphFunction.name}/transform.C`,
-              `stage-binding://odd-sdlc/${row.graphFunction.name}/evaluate.C`,
-              `stage-binding://odd-sdlc/${row.graphFunction.name}/consequence.C`
+              `stage-binding://odd-sdlc/${stringForRef(compositionRef)}/transform.C`,
+              `stage-binding://odd-sdlc/${stringForRef(compositionRef)}/evaluate.C`,
+              `stage-binding://odd-sdlc/${stringForRef(compositionRef)}/consequence.C`
             ]),
             closureContractRef,
             evidenceRefs: Object.freeze([
@@ -625,6 +630,229 @@ function computeCompositionRows(vectorRows: readonly MaterializedGraphVectorRow[
     ),
     (row) => row.compositionRef
   );
+}
+
+function regimeBindingRefsFor(
+  composition: GtlProgramComputeCompositionRow,
+  regime: Regime
+): readonly string[] {
+  const matchingRefs = composition.regimeBindingRefs.filter((ref) => {
+    switch (regime) {
+      case "F_D":
+        return ref.startsWith("fd://");
+      case "F_P":
+        return ref.startsWith("fp://") || ref.startsWith("agent://");
+      case "F_H":
+        return ref.startsWith("human://");
+    }
+  });
+  return Object.freeze(
+    matchingRefs.length === 0
+      ? [`${composition.compositionRef}#${regime}`]
+      : matchingRefs
+  );
+}
+
+function regimeDispositionRows(input: {
+  readonly composition: GtlProgramComputeCompositionRow;
+  readonly stageBindingRef: string;
+  readonly participatingRegime: Regime;
+}) {
+  return Object.freeze(
+    (["F_D", "F_P", "F_H"] as const).map((regime) => {
+      if (regime === input.participatingRegime) {
+        return Object.freeze({
+          regime,
+          disposition: "participates" as const,
+          selectedRegimeBindingRefs: regimeBindingRefsFor(input.composition, regime),
+          reasonRefs: Object.freeze([]),
+          evidenceRefs: Object.freeze([
+            input.composition.compositionRef,
+            input.stageBindingRef
+          ])
+        });
+      }
+      return Object.freeze({
+        regime,
+        disposition: "not_used" as const,
+        selectedRegimeBindingRefs: Object.freeze([]),
+        reasonRefs: Object.freeze([
+          `reason://odd-sdlc/typescript/${stringForRef(input.stageBindingRef)}/${regime}/not-used`
+        ]),
+        evidenceRefs: Object.freeze([])
+      });
+    })
+  );
+}
+
+function pluginRefsForStage(
+  pluginContracts: readonly EnginePluginContract[],
+  stageRole: "transform" | "evaluate" | "consequence"
+): readonly string[] {
+  return Object.freeze(
+    pluginContracts
+      .filter((contract) => contract.computeStageRole === stageRole)
+      .map((contract) => contract.ref)
+      .sort()
+  );
+}
+
+function pluginOutputCarriersForStage(
+  pluginContracts: readonly EnginePluginContract[],
+  stageRole: "transform" | "evaluate" | "consequence"
+): readonly string[] {
+  return Object.freeze(
+    pluginContracts
+      .filter((contract) => contract.computeStageRole === stageRole)
+      .map((contract) => contract.outputCarrier)
+      .sort()
+  );
+}
+
+function computeStageBindingRows(input: {
+  readonly computeCompositions: readonly GtlProgramComputeCompositionRow[];
+  readonly pluginContracts: readonly EnginePluginContract[];
+}): readonly GtlProgramComputeStageBindingRow[] {
+  return Object.freeze(
+    input.computeCompositions.flatMap((composition) => {
+      const transformStageRef = composition.stageBindingRefs[0];
+      const evaluateStageRef = composition.stageBindingRefs[1];
+      const consequenceStageRef = composition.stageBindingRefs[2];
+      if (
+        transformStageRef === undefined ||
+        evaluateStageRef === undefined ||
+        consequenceStageRef === undefined
+      ) {
+        throw new TypeError(
+          `${composition.compositionRef} must publish transform/evaluate/consequence stage refs`
+        );
+      }
+      return [
+        Object.freeze({
+          stageBindingRef: transformStageRef,
+          compositionRef: composition.compositionRef,
+          compositionDigest: composition.compositionDigest,
+          stageRole: "transform" as const,
+          stageNotationRef: `transform.C:${composition.compositionRef}`,
+          stagePurpose: "candidate_construction" as const,
+          computeMeans: "F_P" as const,
+          inputCarrierRefs: Object.freeze(["EnginePluginInput"]),
+          outputCarrierRefs: pluginOutputCarriersForStage(
+            input.pluginContracts,
+            "transform"
+          ),
+          predecessorStageBindingRefs: Object.freeze([]),
+          pluginContractRefs: pluginRefsForStage(input.pluginContracts, "transform"),
+          hookRefs: Object.freeze([composition.declarationSourceRef]),
+          regimeDispositions: regimeDispositionRows({
+            composition,
+            stageBindingRef: transformStageRef,
+            participatingRegime: "F_P"
+          }),
+          mayWriteLedgers: false as const,
+          mayEmitRuntimeEvents: false as const,
+          maySelectTraversal: false as const,
+          mayCloseTraversal: false as const,
+          mayOwnIterationLoop: false as const,
+          evidenceRefs: Object.freeze([
+            "workspace://build_tenants/typescript/code/src/operator/plugins/plugin_set.ts"
+          ])
+        }),
+        Object.freeze({
+          stageBindingRef: evaluateStageRef,
+          compositionRef: composition.compositionRef,
+          compositionDigest: composition.compositionDigest,
+          stageRole: "evaluate" as const,
+          stageNotationRef: `evaluate.C:${composition.compositionRef}`,
+          stagePurpose: "candidate_evaluation" as const,
+          computeMeans: "F_P" as const,
+          inputCarrierRefs: Object.freeze(["EnginePluginInput"]),
+          outputCarrierRefs: pluginOutputCarriersForStage(
+            input.pluginContracts,
+            "evaluate"
+          ),
+          predecessorStageBindingRefs: Object.freeze([transformStageRef]),
+          pluginContractRefs: pluginRefsForStage(input.pluginContracts, "evaluate"),
+          hookRefs: Object.freeze([composition.declarationSourceRef]),
+          regimeDispositions: regimeDispositionRows({
+            composition,
+            stageBindingRef: evaluateStageRef,
+            participatingRegime: "F_P"
+          }),
+          mayWriteLedgers: false as const,
+          mayEmitRuntimeEvents: false as const,
+          maySelectTraversal: false as const,
+          mayCloseTraversal: false as const,
+          mayOwnIterationLoop: false as const,
+          evidenceRefs: Object.freeze([
+            "workspace://build_tenants/typescript/code/src/operator/plugins/plugin_set.ts"
+          ])
+        }),
+        Object.freeze({
+          stageBindingRef: consequenceStageRef,
+          compositionRef: composition.compositionRef,
+          compositionDigest: composition.compositionDigest,
+          stageRole: "consequence" as const,
+          stageNotationRef: `consequence.C:${composition.compositionRef}`,
+          stagePurpose: "consequence_projection" as const,
+          computeMeans: "F_D" as const,
+          inputCarrierRefs: Object.freeze(["EnginePluginInput"]),
+          outputCarrierRefs: pluginOutputCarriersForStage(
+            input.pluginContracts,
+            "consequence"
+          ),
+          predecessorStageBindingRefs: Object.freeze([
+            transformStageRef,
+            evaluateStageRef
+          ]),
+          pluginContractRefs: pluginRefsForStage(input.pluginContracts, "consequence"),
+          hookRefs: Object.freeze([composition.declarationSourceRef]),
+          regimeDispositions: regimeDispositionRows({
+            composition,
+            stageBindingRef: consequenceStageRef,
+            participatingRegime: "F_D"
+          }),
+          mayWriteLedgers: false as const,
+          mayEmitRuntimeEvents: false as const,
+          maySelectTraversal: false as const,
+          mayCloseTraversal: false as const,
+          mayOwnIterationLoop: false as const,
+          evidenceRefs: Object.freeze([
+            "workspace://build_tenants/typescript/code/src/operator/plugins/plugin_set.ts"
+          ])
+        })
+      ];
+    })
+  );
+}
+
+function runtimeBindingRows(input: {
+  readonly module: Module;
+  readonly pluginContracts: readonly EnginePluginContract[];
+  readonly computeStageBindings: readonly GtlProgramComputeStageBindingRow[];
+}): readonly GtlProgramRuntimeBindingRow[] {
+  return Object.freeze([
+    Object.freeze({
+      bindingRef: "runtime-binding://odd-sdlc/typescript/abg-cli/start",
+      runtimeBindingKind: "abg_cli_runtime_binding" as const,
+      moduleRef: input.module.name,
+      publicStartRef: "bootstrap_release_self_test",
+      commandRef:
+        "genesis-ts start --workspace . --target graph_function:bootstrap_release_self_test --until converged",
+      pluginContractRefs: Object.freeze(
+        input.pluginContracts.map((contract) => contract.ref).sort()
+      ),
+      stageBindingRefs: Object.freeze(
+        input.computeStageBindings.map((row) => row.stageBindingRef).sort()
+      ),
+      consumesPluginsThroughAbg: true as const,
+      forbidsProductLocalIteration: true as const,
+      evidenceRefs: Object.freeze([
+        "workspace://build_tenants/typescript/code/src/install/installer.ts",
+        "workspace://build_tenants/typescript/code/src/install/instruction_files.ts"
+      ])
+    })
+  ]);
 }
 
 function hookBoundaryRows(vectorRows: readonly MaterializedGraphVectorRow[]) {
@@ -761,11 +989,14 @@ function presentT153FeatureKinds(input: {
   readonly evaluatorDeclarations: readonly unknown[];
   readonly ruleDeclarations: readonly unknown[];
   readonly computeCompositions: readonly unknown[];
+  readonly computeStageBindings: readonly unknown[];
   readonly hookBoundaries: readonly unknown[];
   readonly selectionBoundaries: readonly unknown[];
   readonly jobBindings: readonly unknown[];
   readonly roleBindings: readonly unknown[];
   readonly externalToolGates: readonly unknown[];
+  readonly publicStartTargets: readonly unknown[];
+  readonly runtimeBindings: readonly unknown[];
 }): ReadonlySet<GtlProgramT153FeatureKind> {
   const present = new Set<GtlProgramT153FeatureKind>([
     "graph_structure_interface",
@@ -774,7 +1005,6 @@ function presentT153FeatureKinds(input: {
     "edge_closure_contract_law",
     "prompt_typed_asset_law",
     "module_publication",
-    "public_start_binding",
     "active_source_identity"
   ]);
   const graphFunctions = input.module.graphFunctions;
@@ -787,8 +1017,14 @@ function presentT153FeatureKinds(input: {
   if (input.ruleDeclarations.length > 0) {
     present.add("rule_declarations");
   }
-  if (input.computeCompositions.length > 0) {
+  if (
+    input.computeCompositions.length > 0 &&
+    input.computeStageBindings.length > 0
+  ) {
     present.add("f_star_compute_composition");
+  }
+  if (input.publicStartTargets.length > 0 && input.runtimeBindings.length > 0) {
+    present.add("public_start_binding");
   }
   if (input.hookBoundaries.length > 0) {
     present.add("hook_boundaries");
@@ -1012,11 +1248,20 @@ export function constructCurrentSdlcGtlProgramConformanceInput(
   const evaluatorDeclarations = evaluatorDeclarationRows(vectorRows);
   const ruleDeclarations = ruleDeclarationRows(vectorRows);
   const computeCompositions = computeCompositionRows(vectorRows);
+  const computeStageBindings = computeStageBindingRows({
+    computeCompositions,
+    pluginContracts
+  });
   const hookBoundaries = hookBoundaryRows(vectorRows);
   const selectionBoundaries = Object.freeze([]);
   const jobBindings = jobBindingRows(module);
   const roleBindings = roleBindingRows(module);
   const externalToolGates = Object.freeze([]);
+  const runtimeBindings = runtimeBindingRows({
+    module,
+    pluginContracts,
+    computeStageBindings
+  });
   const presentFeatureKinds = presentT153FeatureKinds({
     module,
     sameObjectProofs,
@@ -1024,11 +1269,14 @@ export function constructCurrentSdlcGtlProgramConformanceInput(
     evaluatorDeclarations,
     ruleDeclarations,
     computeCompositions,
+    computeStageBindings,
     hookBoundaries,
     selectionBoundaries,
     jobBindings,
     roleBindings,
-    externalToolGates
+    externalToolGates,
+    publicStartTargets: publicStartTargetRows,
+    runtimeBindings
   });
 
   return Object.freeze({
@@ -1066,11 +1314,13 @@ export function constructCurrentSdlcGtlProgramConformanceInput(
     evaluatorDeclarations,
     ruleDeclarations,
     computeCompositions,
+    computeStageBindings,
     hookBoundaries,
     selectionBoundaries,
     jobBindings,
     roleBindings,
-    externalToolGates
+    externalToolGates,
+    runtimeBindings
   });
 }
 

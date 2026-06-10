@@ -1,4 +1,13 @@
 export {
+  createOddSdlcAbgRuntimeBindingPlugins,
+  oddSdlcAbgRuntimeWorkerTransportFromEnv,
+  resolveOddSdlcAbgRuntimeBindingPolicy
+} from "./abg_runtime_binding.js";
+export type {
+  OddSdlcAbgRuntimeBindingPluginFactoryInput,
+  OddSdlcAbgRuntimeBindingPolicyInput
+} from "./abg_runtime_binding.js";
+export {
   SDLC_COMPONENT_ATTRIBUTION_CONFIDENCE,
   SDLC_COMPONENT_CONCERN_ROLES,
   SDLC_COMPONENT_EXECUTION_FAILURE_KINDS,
@@ -599,6 +608,7 @@ export {
   deriveSdlcWorkerRetryContextFromPostActionProjection,
   deriveSdlcWorkerRetryContextFromTraversalConsequence,
   edgeAssuranceEvidenceCandidatesFor,
+  createSdlcInstalledOperatorAbgPluginSession,
   executeInstalledOperatorStart,
   executeInstalledOperatorStartWithReentry,
   installedReentryAttemptLimit,

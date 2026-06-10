@@ -1,5 +1,5 @@
 // Validates: T-180
-// Proves the ABG 4 release substrate uses the current release pointer to an immutable tarball and
+// Proves the ABG 4 release substrate uses an immutable release snapshot tarball and
 // consumes selected composition identity from ABG plugin input.
 
 import test from "node:test";
@@ -23,8 +23,8 @@ import {
   sdlcSelectedAbgFnCompositionIdentityFromEnginePluginInput
 } from "../../build/semantic/code/src/index.js";
 
-const ABG_RC_VERSION = "4.0.0-rc.6";
-const ABG_RELEASE_SNAPSHOT_REF = "latest";
+const ABG_RC_VERSION = "4.0.0-rc.14";
+const ABG_RELEASE_SNAPSHOT_REF = ABG_RC_VERSION;
 const ABG_DEPENDENCY_REF = `file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/${ABG_RELEASE_SNAPSHOT_REF}/abiogenesis-typescript-tenant-${ABG_RC_VERSION}.tgz`;
 
 const PACKAGE_ROOT = process.cwd();

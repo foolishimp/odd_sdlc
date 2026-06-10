@@ -1521,6 +1521,20 @@ export interface SdlcReviewGradeObligationFinding {
   readonly rationale: string;
 }
 
+export interface SdlcReviewGradeDimensionObservation {
+  readonly dimension: string;
+  readonly status: string;
+  readonly rationale: string;
+}
+
+export interface SdlcReviewGradeObligationCoverageFold {
+  readonly dimension: string;
+  readonly coveredCount: number;
+  readonly totalCount: number;
+  readonly status: string;
+  readonly rationale: string;
+}
+
 export interface SdlcReviewGradeEdgeFulfillmentAssessment {
   readonly kind: "sdlc_review_grade_edge_fulfillment_assessment";
   readonly assessmentVersion: "ts-review-grade-v1";
@@ -1530,6 +1544,9 @@ export interface SdlcReviewGradeEdgeFulfillmentAssessment {
   readonly status: "passed" | "blocked";
   readonly reviewedObligationIds: readonly string[];
   readonly findings: readonly SdlcReviewGradeObligationFinding[];
+  readonly stageBoundaryConformance: SdlcReviewGradeDimensionObservation | null;
+  readonly materializationBindingRelation: SdlcReviewGradeDimensionObservation | null;
+  readonly obligationCoverageFold: SdlcReviewGradeObligationCoverageFold | null;
   readonly evidenceRefs: readonly string[];
   readonly summary: string;
 }

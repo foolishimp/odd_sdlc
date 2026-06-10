@@ -270,9 +270,46 @@ export function sdlcFpEvaluateOpenObligationPressureRefs(input: {
         SdlcWorkerObligationAssessment,
         "fulfillmentStatus" | "blockingReasons"
       >[]
-    | undefined;
+	    | undefined;
 }): readonly string[] {
-  const counts = input.obligationAssessmentCounts;
+  const effectiveCountsForAssessments = (
+    assessments: readonly Pick<
+      SdlcWorkerObligationAssessment,
+      "fulfillmentStatus" | "blockingReasons"
+    >[]
+  ): SdlcFpEvaluateResult["obligationAssessmentCounts"] => {
+    let fulfilled = 0;
+    let partial = 0;
+    let blocked = 0;
+    let unassessed = 0;
+    for (const assessment of assessments) {
+      switch (assessment.fulfillmentStatus) {
+        case "fulfilled":
+          fulfilled += 1;
+          break;
+        case "partial":
+          partial += 1;
+          break;
+        case "blocked":
+          blocked += 1;
+          break;
+        case "unassessed":
+          unassessed += 1;
+          break;
+      }
+    }
+    return Object.freeze({
+      total: assessments.length,
+      fulfilled,
+      partial,
+      blocked,
+      unassessed
+    });
+  };
+  const counts =
+    input.obligationAssessments === undefined
+      ? input.obligationAssessmentCounts
+      : effectiveCountsForAssessments(input.obligationAssessments);
   const partialsAreDownstreamCarryover =
     counts.partial > 0 &&
     input.obligationAssessments !== undefined &&

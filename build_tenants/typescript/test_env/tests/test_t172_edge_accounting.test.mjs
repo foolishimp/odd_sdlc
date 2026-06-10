@@ -557,7 +557,7 @@ test("T-172 no-dispatch test execution projection writes an admitted target carr
     replayEvents: preclosedEventsBeforeEdge(basis, "prepare_test_execution_surface")
   });
 
-  assert.equal(outcome.status, "worker_invoked");
+  assert.equal(outcome.status, "converged");
   assert.equal(outcome.manifest.edgeName, "prepare_test_execution_surface");
   assert.equal(outcome.workerRun, null);
   assert.equal(outcome.postflight.status, "passed");

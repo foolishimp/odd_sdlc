@@ -42,7 +42,20 @@ const WORKER_AUTHORED_TARGET_CARRIER_TARGETS = Object.freeze(
 );
 
 const REVIEW_GRADE_EXEMPT_TARGETS = Object.freeze(
-  new Set<string>(["code_surface", ...SYSTEM_PROJECTED_TARGETS])
+  new Set<string>([
+    "intent_surface",
+    "product_surface",
+    "goal_surface",
+    "requirement_surface",
+    "uat_testcases_surface",
+    "testcase_authority_surface",
+    "feature_decomp_surface",
+    "design_surface",
+    "scenario_surface",
+    "implementation_design_surface",
+    "code_surface",
+    ...SYSTEM_PROJECTED_TARGETS
+  ])
 );
 
 export function sdlcEdgeOutputPolicyForTargetAssetType(

@@ -181,6 +181,70 @@ function runtimeIdentityFor(
   });
 }
 
+function installedAbgRuntimeBindingSource(input: {
+  readonly packageName: string;
+}): string {
+  return `import {
+  constructSdlcGtlModule,
+  createOddSdlcAbgRuntimeBindingPlugins,
+  oddSdlcAbgRuntimeWorkerTransportFromEnv,
+  resolveOddSdlcAbgRuntimeBindingPolicy
+} from ${JSON.stringify(input.packageName)};
+
+export const runtimeBinding = {
+  module: constructSdlcGtlModule(),
+  runtimeIdentity: {
+    workerId: "worker://odd-sdlc/typescript",
+    backendId: "backend://node",
+    buildId: "build://odd-sdlc/typescript",
+    resolvedRuntimeRef: "runtime://abiogenesis/typescript"
+  },
+  resolvedPolicy: {
+    resolvedPolicyBundleRef: "policy://odd-sdlc/start/F_P",
+    defaultRegime: "F_P",
+    dispatchRef: "dispatch://odd-sdlc/public-start",
+    approvalSubjectRef: null
+  },
+  fallbackConfigPath: ".abiogenesis/config/abg.config.json",
+  runId: "run://odd-sdlc/public-start",
+  workKey: "wk://odd-sdlc/public-start",
+  resolvePolicy(input) {
+    return resolveOddSdlcAbgRuntimeBindingPolicy({
+      targetGraphFunction: input.target.graphFunctionHandle
+    });
+  },
+  createPlugins(input) {
+    return createOddSdlcAbgRuntimeBindingPlugins({
+      workspaceRoot: input.workspaceRoot,
+      targetGraphFunction: input.target.graphFunctionHandle,
+      until: input.command.until,
+      replayEvents: input.replayEvents,
+      eventSink: input.eventSink,
+      workerTransport: oddSdlcAbgRuntimeWorkerTransportFromEnv()
+    });
+  }
+};
+`;
+}
+
+async function writeInstalledAbgRuntimeBinding(input: {
+  readonly targetRoot: string;
+  readonly packageName: string;
+}): Promise<string> {
+  const runtimeBindingPath = join(
+    input.targetRoot,
+    ".abiogenesis",
+    "typescript-runtime.mjs"
+  );
+  await writeTextFile(
+    runtimeBindingPath,
+    installedAbgRuntimeBindingSource({
+      packageName: input.packageName
+    })
+  );
+  return runtimeBindingPath;
+}
+
 function requireInstalledAbg(
   abgOutcome: Awaited<ReturnType<typeof installAbiogenesisTypescript>>
 ): Extract<typeof abgOutcome, { readonly kind: "installed" }> {
@@ -266,6 +330,10 @@ async function installAdmittedOddSdlcTypescript(
       "runtime",
       "odd_sdlc-typescript-installation.json"
     );
+    const abgRuntimeBindingPath = await writeInstalledAbgRuntimeBinding({
+      targetRoot: request.targetRoot,
+      packageName: installedPackageForManifest.packageName
+    });
     const installManifestPath = join(productInstallRoot, "install-manifest.json");
     const instructionFiles = await writeOddSdlcInstructionFiles({
       targetRoot: request.targetRoot,
@@ -298,6 +366,7 @@ async function installAdmittedOddSdlcTypescript(
       abgCommandPaths: abgOutcome.commandPaths,
       abgInstallManifestPath: abgOutcome.installManifestPath,
       abgInstallerManifestPath: abgOutcome.installerManifestPath,
+      abgRuntimeBindingPath,
       bootstrapGuidePath,
       instructionFiles,
       bootstrapGovernance,
@@ -322,6 +391,7 @@ async function installAdmittedOddSdlcTypescript(
         bootstrapGuidePath,
         instructionFiles,
         bootstrapGovernance,
+        abgRuntimeBindingPath,
         abgInstallManifestPath: abgOutcome.installManifestPath
       })
     );

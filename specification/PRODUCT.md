@@ -30,10 +30,8 @@ for the TypeScript line.
 
 The ABIogenesis TypeScript tenant is substrate evidence consumed through
 explicit release snapshots. The current TypeScript line consumes
-`@abiogenesis/typescript-tenant@4.0.0-rc.6` from
-`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/latest/`,
-which points at the immutable
-`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.0.0-rc.6/`
+`@abiogenesis/typescript-tenant@4.0.0-rc.14` from the immutable
+`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.0.0-rc.14/`
 release snapshot.
 That cut proves GTL/ABG carriers, graph-function iteration, traversal probes,
 evented saga-frontier execution, no-compute-basis failure taxonomy,
@@ -48,19 +46,22 @@ and retry-frontier replay that treats zero-attempt stops as evidence rather
 than fake attempt coverage. It also proves ABG's replay-derived runtime
 continuation-transition projection and primitive iteration-outcome projection,
 where typed runtime facts and assurance fold outcomes outrank terminal retry
-fallback evidence. It also proves the GTL Node-borne AssetSurface prompt-asset
+fallback evidence. It also proves the ABG public control surface projects
+`gap_stop` as a blocked terminal outcome rather than as a rejected command. It
+also proves the GTL Node-borne AssetSurface prompt-asset
 interface consumed by `odd_sdlc.TS`, where prompt asset structure is GTL law and
 SDLC prompt authority policy remains product overlay data. It also proves
 segment-scoped evaluation redispatch metadata, so downstream SDLC evaluation
 can preserve segment, dimension-cell, fold, and relation scope across ABG-owned
 redispatch instead of collapsing deep evaluation coverage back to edge-granular
-fallbacks. It also carries the clean ABG 4.0.0-rc.6 consolidation of the
+fallbacks. It also carries the clean ABG 4.0.0-rc.14 consolidation of the
 defaults/lever registry, temporal runtime-scope consolidation, iteration
 state-action algebra, prompt asset interface, and contract-fulfillment binding
 API that `odd_sdlc.TS` consumes. It also carries the ABG-owned
 `typecheckGtlProgram(...)` static GTL program conformance gate used by
 `odd_sdlc.TS` to typecheck current graph assets, prompt construction, plugin
-contracts, and active substrate identity before runtime execution. It also
+contracts, stage bindings, ABG runtime bindings, and active substrate identity
+before runtime execution. It also
 carries ABG-owned runtime authorship routes for explicit graph-vector resume
 cursor and graph-span reentry consumption, so SDLC can consume runtime-owned
 continuation/reentry facts instead of assembling those runtime facts locally.
@@ -97,6 +98,7 @@ Compressed capability reload:
 | prompt construction and typed assets | GTL `AssetSurface` and ABG payload admission | prompt text is a rendered view over typed GTL prompt assets and SDLC product policy, not a prompt-only schema |
 | target-carrier contracts and execution evidence | GTL graph-vector/target-carrier law plus ABG payload/evidence admission | target rows and `sdlc_worker_execution_evidence` must carry visible contract fields and be admitted before closure |
 | public starts, worker binding, transport, and external tools | GTL module/job/role/hook declarations plus ABG worker, transport, payload, and provenance admission | CLI, PTY, MCP, shell, and scenario harness surfaces are gated tools, not product runtime truth or GTL law |
+| command/control handoff | ABG public `start`, `gaps`, result-ingress, control-loop, worker, transport, and plugin admission | after `odd_sdlc.TS` resolves product intent into admitted GTL/ABG carriers, control remains in ABG until ABG exits; SDLC CLI must not duplicate a layered convergence, retry, yield, or replay-refresh loop |
 
 The mandatory programmatic gate for this consumption boundary is ABG
 `typecheckGtlProgram(...)`, with raw input admitted through
@@ -294,6 +296,17 @@ It is not a second SDLC runtime.
 Plain shell execution may launch the same installed entrypoint for local
 operation, but it is not a second command truth and must not accumulate SDLC
 policy, retry policy, traversal control, or old-surface adapter behavior.
+
+Layered start semantics belong to ABG. `odd_sdlc` may resolve domain target
+intent, graph overlays, worker bindings, prompt assets, and plugin contracts
+into admitted GTL/ABG carriers. Once an operator command hands control to ABG,
+ABG owns repeated traversal, retry/yield evaluation, replay refresh,
+continuation, and terminal exit. If a layered CLI is needed, it is an ABG CLI
+surface over ABG public `start` / `gaps` / result-ingress / control-loop
+commands. `odd_sdlc` must not implement a product-local loop that repeatedly
+invokes start, reads consequence projections, and decides whether to continue.
+Customization of that execution path is through GTL declarations and governed
+plugins, not through SDLC CLI control flow.
 
 The same model-backed executable may also be used as an `F_P` worker/plugin
 when ABG dispatches a graph-function edge. That worker role is distinct from
@@ -1162,8 +1175,10 @@ surfaces around that carrier:
   constitutional pressure are reviewable as one current contract rather than as
   manually reconstructed partial read models
 - `odd_sdlc start --scope ... --target next|graph_function:<published_handle>|asset:<published_handle> --until ...`
-  for lawful worksite-scoped graph advancement through the same governed graph
-  state
+  as a domain shell over one admitted ABG-backed start request. `until:
+  converged` remains an admitted GTL/ABG start intent, but full layered
+  convergence is an ABG command/control-loop responsibility, not an SDLC local
+  re-entry loop.
 - current constructive `F_P` dispatches use ABIogenesis prompt and manifest
   shapes; odd_sdlc contributes domain execution truth through declared prompt
   contexts rather than through a separate prompt-template authority surface

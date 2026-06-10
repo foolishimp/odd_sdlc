@@ -38,10 +38,12 @@ import {
   invokeSupervisedProcessActor,
   materializeGraphFunction,
   runEngineIterateAsync,
+  runtimeEventsForBasis,
   runtimeEventsForFpTransformResult,
   type ActorInvocation,
   type CanonicalRuntimeEvent,
   type EnginePluginInput,
+  type EngineRunnerPluginSet,
   type EvaluationRuleOutcome,
   type ExecutionBasis,
   type ConsequenceProjectionOutcome,
@@ -70,6 +72,7 @@ import {
   type NativeBranchTask
 } from "@abiogenesis/typescript-tenant/abg/m03";
 import {
+  CONFORM_PROJECT_OUTPUTS,
   FG_CONFORM_PROJECT,
   FG_CONFORM_PROJECT_AUTHORITY,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
@@ -321,6 +324,15 @@ import {
 import { admitTestDesignRegisterFromArtifact } from "./test_design_register.js";
 import { admitTestExecutionSurfaceRegisterFromArtifact } from "./test_execution_surface_register.js";
 const EMPTY_SCOPE_PATH: readonly string[] = Object.freeze([]);
+
+function isConformProjectGraphVectorEdge(edge: string): boolean {
+  if (edge === FG_CONFORM_PROJECT) {
+    return true;
+  }
+  return CONFORM_PROJECT_OUTPUTS.some(
+    (targetAssetType) => edge === `${FG_CONFORM_PROJECT}__${targetAssetType}`
+  );
+}
 
 export type SdlcInstalledReentryDisposition = "retry" | "yield" | "other";
 
@@ -3276,13 +3288,17 @@ function writeRuntimeLivenessObserverProjection(input: {
   readonly processResult: SupervisedProcessActorResult;
   readonly policy: ReturnType<typeof workerInactivityPolicy>;
 }): RuntimeLivenessObserverProjection {
+  const basisScopedProcessEvents = runtimeEventsForBasis(
+    input.basis,
+    input.processResult.events
+  );
   const projection = deriveRuntimeLivenessObserverProjection({
     basis: input.basis,
     runtimeProjection: deriveRuntimeAggregateProjection(
       input.basis,
-      input.processResult.events
+      basisScopedProcessEvents
     ),
-    events: input.processResult.events,
+    events: basisScopedProcessEvents,
     probeContracts: input.processResult.probeContracts,
     policy: workerRuntimeWatchdogPolicy({
       policy: input.policy,
@@ -5260,7 +5276,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       )
     );
     return constructEvaluationRuleOutcome({
-      status: "blocked",
+      status: "accepted",
       ruleRef: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
       ruleRole: "semantic_judgment",
       computeMeans: "F_P",
@@ -7617,8 +7633,19 @@ function abgTraversalTransitionProjectionRef(input: {
   readonly runtimeProjection: RuntimeAggregateProjection;
   readonly currentVectorIndex: number;
   readonly nextVectorIndex: number | null;
+  readonly closureDisposition: SdlcEdgeClosureDisposition;
   readonly terminal: SdlcAbgTerminalTransitionProjection | null;
 }): string {
+  if (input.closureDisposition === "close") {
+    return deriveRuntimeContinuationTransitionProjectionFromDisposition({
+      basis: input.basis,
+      runtimeProjection: input.runtimeProjection,
+      vectorIndex: input.currentVectorIndex,
+      disposition: "close",
+      reason: "edge_close",
+      reasonRefs: Object.freeze(["edge-closure-decision:close"])
+    }).projectionRef;
+  }
   const terminalKind = input.terminal?.terminalKind ?? null;
   const terminalReason =
     typeof input.terminal?.reason === "string" ? input.terminal.reason : null;
@@ -7887,9 +7914,13 @@ function deriveInstalledTraversalConsequence(input: {
           productEvidenceRefs: worksiteEvidence.productEvidenceRefs,
           livenessProjectionRefs: worksiteEvidence.livenessProjectionRefs
         });
-  const abgRuntimeTransitionProjectionSource = deriveRuntimeAggregateProjection(
+  const basisScopedRuntimeEvents = runtimeEventsForBasis(
     input.basis,
     Object.freeze([...input.replayEvents, ...input.emittedEvents])
+  );
+  const abgRuntimeTransitionProjectionSource = deriveRuntimeAggregateProjection(
+    input.basis,
+    basisScopedRuntimeEvents
   );
   const closureStateTransition = deriveSdlcClosureStateTransition({
     abgRuntimeTransitionContext: {
@@ -8037,7 +8068,7 @@ function deriveInstalledTraversalConsequence(input: {
           const projectionScopeSegment = candidateProjectionScopeSegment(candidates);
           const evaluator = deriveOddSdlcEvaluateNextReport({
             basis: input.basis,
-            events: Object.freeze([...input.replayEvents, ...input.emittedEvents]),
+            events: basisScopedRuntimeEvents,
             intentEventRefs: constructionIntent.intentEventRefs,
             productAssetModelRef: constructionIntent.productAssetModelRef,
             episodeId:
@@ -8095,6 +8126,7 @@ function deriveInstalledTraversalConsequence(input: {
     runtimeProjection: abgRuntimeTransitionProjectionSource,
     currentVectorIndex: input.state.manifest.vectorIndex,
     nextVectorIndex: input.nextVectorIndex,
+    closureDisposition: closureDecision.disposition,
     terminal: input.engineTerminal
   });
   const admittedStateRef: GtlAdmittedStateRef = Object.freeze({
@@ -8503,6 +8535,973 @@ function writeRunArchive(input: {
       ""
     ].join("\n")
   });
+}
+
+export interface SdlcInstalledOperatorAbgPluginSessionInput {
+  readonly workspaceRoot: string;
+  readonly start: SdlcPublicStartOutcome;
+  readonly workerTransport: string | null;
+  readonly replayEvents: readonly RuntimeEvent[];
+  readonly effectiveReplayEvents: readonly RuntimeEvent[];
+  readonly basis: ExecutionBasis;
+  readonly eventGraphEvents?: readonly RuntimeEvent[];
+  readonly retryContextOverride?: SdlcWorkerRetryContext | undefined;
+  readonly eventSink?: ((event: RuntimeEvent) => void) | undefined;
+}
+
+export interface SdlcInstalledOperatorAbgPluginSession {
+  readonly plugins: EngineRunnerPluginSet;
+  readonly emittedEvents: readonly RuntimeEvent[];
+}
+
+interface SdlcInstalledOperatorAbgPluginSessionInternal
+  extends SdlcInstalledOperatorAbgPluginSession {
+  readonly transport: SdlcWorkerTransportContract | null;
+  readonly emitted: RuntimeEvent[];
+  readonly dispatchState: { current: SdlcAbgOwnedFpDispatchState | null };
+  readonly designDepthFpEvaluatorAdmissionEvidenceRefsForState: (
+    state: SdlcAbgOwnedFpDispatchState
+  ) => readonly string[];
+}
+
+function createSdlcInstalledOperatorAbgPluginSessionInternal(
+  input: SdlcInstalledOperatorAbgPluginSessionInput
+): SdlcInstalledOperatorAbgPluginSessionInternal {
+  const basis = input.basis;
+  const effectiveReplayEvents = input.effectiveReplayEvents;
+  const emitted: RuntimeEvent[] = [];
+  const emitRuntimeEvent = (event: RuntimeEvent): void => {
+    emitted.push(event);
+    input.eventSink?.(event);
+  };
+  const emitRuntimeEvents = (events: readonly RuntimeEvent[]): void => {
+    for (const event of events) {
+      emitRuntimeEvent(event);
+    }
+  };
+  const transport =
+    input.workerTransport === null ? null : admitWorkerTransport(input.workerTransport);
+  const executionContract = input.start.executionContract;
+  if (executionContract === null) {
+    throw new TypeError(
+      "installed operator ABG plugin session requires an execution contract"
+    );
+  }
+  const dispatchState: { current: SdlcAbgOwnedFpDispatchState | null } = {
+    current: null
+  };
+  const designDepthFpEvaluatorAdmissionEvidenceByArchiveRoot = new Map<
+    string,
+    readonly string[]
+  >();
+  const designDepthFpEvaluatorAdmissionEvidenceRefsForState = (
+    state: SdlcAbgOwnedFpDispatchState
+  ): readonly string[] =>
+    designDepthFpEvaluatorAdmissionEvidenceByArchiveRoot.get(
+      state.manifest.archiveRoot
+    ) ?? Object.freeze([]);
+  const admitDispatchConsequence = (
+    state: SdlcAbgOwnedFpDispatchState,
+    nextVectorIndex: number | null = null
+  ): SdlcInstalledOperatorTraversalConsequence => {
+    const consequence = deriveInstalledTraversalConsequence({
+      basis,
+      start: input.start,
+      state,
+      replayEvents: effectiveReplayEvents,
+      emittedEvents: emitted,
+      engineTerminal: null,
+      nextVectorIndex,
+      fpEvaluatorAdmissionEvidenceRefs:
+        designDepthFpEvaluatorAdmissionEvidenceRefsForState(state)
+    });
+    writeTraversalConsequenceArchive({
+      manifest: state.manifest,
+      consequence
+    });
+    return consequence;
+  };
+  const publishDispatchState = (
+    state: SdlcAbgOwnedFpDispatchState
+  ): SdlcInstalledOperatorTraversalConsequence => {
+    dispatchState.current = state;
+    return admitDispatchConsequence(state);
+  };
+  const dispatchThroughInstalledOperator = async (
+    pluginInput: EnginePluginInput
+  ): Promise<FpDispatchOutcome> => {
+      const selectedComposition =
+        sdlcSelectedAbgFnCompositionIdentityFromEnginePluginInput(pluginInput);
+      const contract = hookContractByEdgeName(pluginInput.edge);
+      const projectedRetryContext = mergedRetryContext({
+        projected: sdlcWorkerRetryContextFromAbgRetryContext(
+          pluginInput.retryContext
+        ),
+        override: deriveSdlcWorkerRetryContextFromPostActionProjection({
+          nextActionProjection: executionContract.nextActionProjection,
+          vectorIndex: pluginInput.vectorIndex
+        }),
+        vectorIndex: pluginInput.vectorIndex
+      });
+      const retryContextWithRuntimeGaps =
+        mergeSdlcWorkerRetryContextWithRuntimeGapRegister({
+          projected: projectedRetryContext,
+          workspaceRoot: input.workspaceRoot,
+          vectorIndex: pluginInput.vectorIndex,
+          edgeName: pluginInput.edge,
+          targetAssetType: contract.targetAssetType
+        });
+      const manifest = deriveWorkerHandoffManifest({
+        workspaceRoot: input.workspaceRoot,
+        overlayRef: executionContract.overlayRef,
+        overlayBindingRef: executionContract.overlayBindingRef,
+        graphCatalogDigestRef: executionContract.overlayBinding.graphCatalogDigestRef,
+        graphFunctionName: executionContract.targetGraphFunction,
+        edgeName: pluginInput.edge,
+        vectorIndex: pluginInput.vectorIndex,
+        contract,
+        fpTransformRequest: pluginInput.fpTransformRequest,
+        traversalAttemptEnvelope: pluginInput.traversalAttemptEnvelope,
+        conformedProject: executionContract.conformedProject,
+        retryContext: mergedRetryContext({
+          projected: retryContextWithRuntimeGaps,
+          override: input.retryContextOverride,
+          vectorIndex: pluginInput.vectorIndex
+        }),
+        outputAuthorityProjections: pluginInput.outputAuthorityProjections,
+        traversalHopSelection: executionContract.traversalHopSelection
+      });
+      const beforeMaterialization = snapshotProductMaterializationRoot(
+        manifest.productMaterialization
+      );
+      const handoffFiles = writeHandoffFiles(manifest);
+      writeFrontDoorTraversalSelectionAudit({
+        basis,
+        manifest,
+        summary: executionContract.traversalDecompositionSummary,
+        selection: executionContract.traversalHopSelection
+      });
+      const expectedAssessmentIds =
+        pluginInput.expectedAssessmentIds.length === 0
+          ? vectorEvaluatorNames({ basis, vectorIndex: pluginInput.vectorIndex })
+          : pluginInput.expectedAssessmentIds;
+      const fulfillmentFor = (input: {
+        readonly workerRun: SdlcWorkerRunResult | null;
+        readonly fulfillmentStatus: "fulfilled" | "partial" | "blocked" | "unfulfilled";
+        readonly fulfillmentDetail: string;
+        readonly blockingReasons: readonly string[];
+        readonly evidenceRefs: readonly string[];
+      }): Readonly<Record<string, unknown>> => {
+        if (input.workerRun === null) {
+          return deterministicFulfillmentArtifact({
+            manifest,
+            basis,
+            expectedAssessmentIds,
+            fulfillmentStatus: input.fulfillmentStatus,
+            fulfillmentDetail: input.fulfillmentDetail,
+            blockingReasons: input.blockingReasons,
+            evidenceRefs: input.evidenceRefs
+          });
+        }
+        if (transport === null) {
+          throw new TypeError("worker fulfillment requires admitted worker transport");
+        }
+        return fulfillmentArtifact({
+          manifest,
+          transport,
+          basis,
+          expectedAssessmentIds,
+          fulfillmentStatus: input.fulfillmentStatus,
+          fulfillmentDetail: input.fulfillmentDetail,
+          blockingReasons: input.blockingReasons,
+          evidenceRefs: input.evidenceRefs
+        });
+      };
+      const completeReportDispatch = async (input: {
+        readonly workerRun: SdlcWorkerRunResult | null;
+        readonly workerReport: SdlcWorkerResultReport;
+        readonly hookWorkerContractRef: string;
+        readonly passedFulfillmentDetail: string;
+        readonly deferConstructorUntilConsequence?: boolean | undefined;
+      }) => {
+        const diagnosticState: SdlcAbgOwnedFpDispatchState = {
+          status: "worker_invoked",
+          manifest,
+          selectedComposition,
+          workerRun: input.workerRun,
+          workerReport: input.workerReport,
+          postflight: null,
+          assuranceSatisfaction: null,
+          gapDossier: null,
+          hookOutcome: null,
+          blockingReason: null,
+          blockingReasonCarriers: Object.freeze([]),
+          currentEdge: pluginInput.edge
+        };
+        const diagnostics = await runSdlcPostTransformDiagnosticFlow({
+          state: diagnosticState,
+          basis,
+          edgeAccountingRow,
+          eventSink: (event) => {
+            emitRuntimeEvent(event);
+          },
+          postflightRelativePath: "postflight.json",
+          writeMaterializationManifest: true
+        });
+        const postflight = diagnostics.postflight;
+        const assuranceGate = diagnostics.assuranceGate;
+
+        let hookOutcome: SdlcHookTurnOutcome | null = null;
+        if (input.deferConstructorUntilConsequence !== true) {
+          const constructorResult = constructorResultFromWorkerOutput({
+            manifest,
+            report: input.workerReport,
+            operationType: defaultOperationForTarget(contract.targetAssetType)
+          });
+          writeSdlcSystemArtifact({
+            archiveRoot: manifest.archiveRoot,
+            relativePath: "constructor_result.json",
+            payload: constructorResult
+          });
+          const currentHookOutcome = runSdlcHookTurn({
+            contract,
+            invocation: minimalSdlcHookInvocationForContract({
+              contract,
+              targetAssetId: constructorResult.outputIdentity.assetId,
+              fpWorkerContractRef: input.hookWorkerContractRef
+            }),
+            constructorResult
+          });
+          hookOutcome = currentHookOutcome;
+          writeSdlcSystemArtifact({
+            archiveRoot: manifest.archiveRoot,
+            relativePath: "hook_outcome.json",
+            payload: currentHookOutcome
+          });
+          if (currentHookOutcome.postflight?.status !== "passed") {
+            const hookDiagnosticReasonCarriers = Object.freeze(
+              currentHookOutcome.postflight === null ||
+                currentHookOutcome.postflight === undefined
+                ? [
+                    makeSdlcBlockingReason({
+                      code: "hook_diagnostic_missing",
+                      evidenceRefs: [
+                        pathToFileURL(join(manifest.archiveRoot, "hook_outcome.json")).href
+                      ]
+                    })
+                  ]
+                : currentHookOutcome.postflight.blockingReasons.map((reason) =>
+                    makeSdlcBlockingReason({
+                      code: "hook_diagnostic_failed",
+                      detail: reason,
+                      evidenceRefs: currentHookOutcome.postflight?.evidenceRefs ?? []
+                    })
+                  )
+            );
+            const hookDiagnostics = Object.freeze({
+              kind: "sdlc_operator_postflight_result" as const,
+              status: "passed" as const,
+              blockingReasons: Object.freeze([]),
+              blockingReasonCarriers: hookDiagnosticReasonCarriers,
+              evidenceRefs: Object.freeze([
+                ...(currentHookOutcome.postflight?.evidenceRefs ?? [])
+              ])
+            });
+            writeSdlcSystemArtifact({
+              archiveRoot: manifest.archiveRoot,
+              relativePath: "hook_diagnostics.json",
+              payload: hookDiagnostics
+            });
+          }
+        }
+        const current: SdlcAbgOwnedFpDispatchState = {
+          status: "worker_invoked",
+          manifest,
+          selectedComposition,
+          workerRun: input.workerRun,
+          workerReport: input.workerReport,
+          postflight,
+          assuranceSatisfaction: assuranceGate.satisfaction,
+          gapDossier: null,
+          hookOutcome,
+          blockingReason: null,
+          blockingReasonCarriers: activePostflightBlockingReasonCarriers(postflight),
+          currentEdge: null
+        };
+        const consequence = shouldDeferDispatchConsequenceToFpEvaluator(current)
+          ? null
+          : publishDispatchState(current);
+        if (consequence?.edgeClosureDecision.disposition === "block") {
+          return constructFpDispatchOutcome({
+            status: "blocked",
+            resultRef: consequence.nextActionProjection.nextActionProjectionRef,
+            attachedResultArtifact: null,
+            evidenceRefs: uniqueSorted([
+              ...postflight.evidenceRefs,
+              consequence.nextActionProjection.nextActionProjectionRef
+            ]),
+            reason:
+              consequence.edgeClosureDecision.reasonRefs.join(",") ||
+              "post_action_blocked"
+          });
+        }
+        if (consequence === null) {
+          dispatchState.current = current;
+        }
+        return constructFpDispatchOutcome({
+          status: "dispatched",
+          resultRef: dispatchResultRef(manifest),
+          attachedResultArtifact: fulfillmentFor({
+            workerRun: input.workerRun,
+            fulfillmentStatus: "fulfilled",
+            fulfillmentDetail: input.passedFulfillmentDetail,
+            blockingReasons: Object.freeze([]),
+            evidenceRefs: postflight.evidenceRefs
+          }),
+          evidenceRefs: uniqueSorted([
+            ...postflight.evidenceRefs,
+            ...(consequence === null
+              ? [pathToFileURL(input.workerReport.outputFile).href]
+            : [consequence.nextActionProjection.nextActionProjectionRef])
+          ])
+        });
+      };
+      const reportAdmissionDiagnosticReason = (
+        postflight: SdlcPostflightResult
+      ): string =>
+        postflight.blockingReasonCarriers
+          .map((carrier) => legacyBlockingReasonCode(carrier))
+          .join(",") || "worker_report_admission_failed";
+      const completeReportAdmissionFailure = (input: {
+        readonly workerRun: SdlcWorkerRunResult | null;
+        readonly postflight: SdlcPostflightResult;
+      }): FpDispatchOutcome => {
+        writeSdlcSystemArtifact({
+          archiveRoot: manifest.archiveRoot,
+          relativePath: "worker_report_admission_postflight.json",
+          payload: input.postflight
+        });
+        const current: SdlcAbgOwnedFpDispatchState = {
+          status: "worker_report_rejected",
+          manifest,
+          selectedComposition,
+          workerRun: input.workerRun,
+          workerReport: null,
+          postflight: input.postflight,
+          assuranceSatisfaction: null,
+          gapDossier: null,
+          hookOutcome: null,
+          blockingReason: null,
+          blockingReasonCarriers: input.postflight.blockingReasonCarriers,
+          currentEdge: pluginInput.edge
+        };
+        const consequence = publishDispatchState(current);
+        const reason = reportAdmissionDiagnosticReason(input.postflight);
+        return constructFpDispatchOutcome({
+          status: "blocked",
+          resultRef: consequence.nextActionProjection.nextActionProjectionRef,
+          attachedResultArtifact: runtimeFailureArtifact({
+            failureClass: "contract_failure",
+            detail: reason
+          }),
+          evidenceRefs: uniqueSorted([
+            ...input.postflight.evidenceRefs,
+            consequence.nextActionProjection.nextActionProjectionRef
+          ]),
+          reason
+        });
+      };
+      const edgeAccountingRow = sdlcExecutiveEdgeAccountingRowFor(pluginInput.edge);
+      const workerDispatchAllowed = edgeAccountingRow?.workerDispatchAllowed ?? true;
+      if (!workerDispatchAllowed) {
+        if (!sdlcInstalledOperatorProjectsOutput(manifest.targetAssetType)) {
+          throw new TypeError(
+            `${pluginInput.edge}: no-dispatch edge is missing declared edge-output projection policy`
+          );
+        }
+        let workerReport: SdlcWorkerResultReport | null = null;
+        try {
+          workerReport = noDispatchReport({
+            manifest,
+            report: buildDeclaredEdgeProjectionPendingReport({ manifest })
+          });
+          writeSdlcSystemArtifact({
+            archiveRoot: manifest.archiveRoot,
+            relativePath: "worker_result_report.json",
+            payload: workerReport
+          });
+          writeSdlcSystemArtifact({
+            archiveRoot: manifest.archiveRoot,
+            relativePath: "post_transform_observation.json",
+            payload: {
+              kind: "sdlc_post_transform_observation",
+              sourceFunction: "system.edge_policy_projection",
+              generatedFunction:
+                "consequence.edge_projection.writeDeclaredEdgeProjectionOutput",
+              previousReportAdmissionError: null,
+              materializedFileCount: workerReport.materializedFiles.length,
+              outputFile: workerReport.outputFile,
+              digest: workerReport.digest
+            }
+          });
+        } catch (error: unknown) {
+          const rejectionPostflight = deterministicReportAdmissionPostflight({
+            manifest,
+            reason:
+              error instanceof Error ? error.message : "worker_report_rejected"
+          });
+          return completeReportAdmissionFailure({
+            workerRun: null,
+            postflight: rejectionPostflight
+          });
+        }
+        workerReport = workerResultReportWithFpStageRefs({
+          manifest,
+          report: workerReport
+        });
+        workerReport = noDispatchReport({ manifest, report: workerReport });
+        writeSdlcSystemArtifact({
+          archiveRoot: manifest.archiveRoot,
+          relativePath: "worker_result_report.json",
+          payload: workerReport
+        });
+        return completeReportDispatch({
+          workerRun: null,
+          workerReport,
+          hookWorkerContractRef: "worker-dispatch://installed-operator/no-dispatch",
+          passedFulfillmentDetail: "installed operator deterministic edge passed",
+          deferConstructorUntilConsequence: true
+        });
+      }
+      if (transport === null) {
+        throw new TypeError("worker dispatch requires admitted worker transport");
+      }
+      const workerRun = await invokeWorkerThroughAbgProcessActor({
+        transport,
+        manifest,
+        manifestPath: handoffFiles.manifestPath,
+        promptPath: handoffFiles.promptPath,
+        pluginInput,
+        basis,
+        eventSink: (event) => {
+          emitRuntimeEvent(event);
+        }
+      });
+      if (workerRun.status !== 0) {
+        const failurePostflight = constructWorkerProcessFailurePostflight({
+          manifest,
+          workerRun
+        });
+        const stopForRuntimeTriage = workerRuntimeTriageStop(failurePostflight);
+        writeSdlcSystemArtifact({
+          archiveRoot: manifest.archiveRoot,
+          relativePath: "worker_process_failure_postflight.json",
+          payload: failurePostflight
+        });
+        const gapDossier = constructPostflightGapDossier({
+          manifest,
+          postflight: failurePostflight
+        });
+        writePostflightGapDossier({ manifest, gapDossier });
+        const current: SdlcAbgOwnedFpDispatchState = {
+          status: "worker_failed",
+          manifest,
+          selectedComposition,
+          workerRun,
+          workerReport: null,
+          postflight: failurePostflight,
+          assuranceSatisfaction: null,
+          gapDossier,
+          hookOutcome: null,
+          blockingReason: failurePostflight.blockingReasons.join(","),
+          blockingReasonCarriers: failurePostflight.blockingReasonCarriers,
+          currentEdge: pluginInput.edge
+        };
+        const consequence = publishDispatchState(current);
+        return constructFpDispatchOutcome({
+          status: "blocked",
+          resultRef: stopForRuntimeTriage
+            ? consequence.nextActionProjection.nextActionProjectionRef
+            : gapDossier.currentGapDossierRef,
+          attachedResultArtifact: stopForRuntimeTriage
+            ? null
+            : runtimeFailureArtifact({
+                failureClass: workerFailureRuntimeFailureClass(failurePostflight),
+                detail: failurePostflight.blockingReasons.join(",")
+              }),
+          evidenceRefs: uniqueSorted([
+            ...failurePostflight.evidenceRefs,
+            consequence.nextActionProjection.nextActionProjectionRef
+          ]),
+          reason: failurePostflight.blockingReasons.join(",")
+        });
+      }
+      let workerReport: SdlcWorkerResultReport | null = null;
+      try {
+        workerReport = buildPostTransformWorkerResultReport({
+          manifest,
+          before: beforeMaterialization
+        });
+        writeSdlcSystemArtifact({
+          archiveRoot: manifest.archiveRoot,
+          relativePath: "worker_result_report.json",
+          payload: workerReport
+        });
+        writeSdlcSystemArtifact({
+          archiveRoot: manifest.archiveRoot,
+          relativePath: "post_transform_observation.json",
+          payload: {
+            kind: "sdlc_post_transform_observation",
+            sourceFunction: "worker.F_P.transform",
+            generatedFunction: "buildPostTransformWorkerResultReport",
+            previousReportAdmissionError: null,
+            materializedFileCount: workerReport.materializedFiles.length,
+            outputFile: workerReport.outputFile,
+            digest: workerReport.digest
+          }
+        });
+      } catch (error: unknown) {
+        if (workerReport === null) {
+          const rejectionPostflight = workerReportAdmissionPostflight({
+            manifest,
+            workerRun,
+            reason:
+              error instanceof Error ? error.message : "worker_report_rejected"
+          });
+          return completeReportAdmissionFailure({
+            workerRun,
+            postflight: rejectionPostflight
+          });
+        }
+      }
+      if (workerReport === null) {
+        throw new TypeError("worker report admission did not produce a report");
+      }
+      workerReport = workerResultReportWithFpStageRefs({
+        manifest,
+        report: workerReport
+      });
+      writeSdlcSystemArtifact({
+        archiveRoot: manifest.archiveRoot,
+        relativePath: "worker_result_report.json",
+        payload: workerReport
+      });
+      const fpTransformResult = writeWorkerFpTransformResult({
+        manifest,
+        report: workerReport
+      });
+      if (fpTransformResult !== null && manifest.fpTransformRequest !== null) {
+        emitRuntimeEvents(runtimeEventsForFpTransformResult({
+            basis,
+            request: manifest.fpTransformRequest,
+            result: fpTransformResult
+          }));
+      }
+      return completeReportDispatch({
+        workerRun,
+        workerReport,
+        hookWorkerContractRef: transport.raw,
+        passedFulfillmentDetail: "installed operator postflight passed"
+      });
+  };
+  const evaluateFpForInstalledOperatorState = async (
+    pluginInput: EnginePluginInput
+  ): Promise<FpEvaluationOutcome> => {
+      if (dispatchState.current === null) {
+        return constructFpEvaluationOutcome({
+          status: "blocked",
+          reason: "missing installed operator transform state for evaluate.C"
+        });
+      }
+      const fpEvaluatorAdmissionEvidenceRefs =
+        designDepthFpEvaluatorAdmissionEvidenceRefsForState(dispatchState.current);
+      dispatchState.current = await refreshDesignDepthStateFromFpEvaluatorRegister({
+        state: dispatchState.current,
+        basis,
+        edgeAccountingRow:
+          dispatchState.current.currentEdge === null
+            ? null
+            : sdlcExecutiveEdgeAccountingRowFor(dispatchState.current.currentEdge),
+        eventSink: (event) => {
+          emitRuntimeEvent(event);
+        },
+        fpEvaluatorAdmissionEvidenceRefs
+      });
+      return fpEvaluationOutcomeForDispatchState({
+        pluginInput,
+        state: dispatchState.current
+      });
+  };
+  const projectConsequenceForInstalledOperatorState = (
+    pluginInput: EnginePluginInput
+  ): ConsequenceProjectionOutcome => {
+      if (dispatchState.current === null) {
+        if (
+          pluginInput.regime === "F_D" &&
+          isConformProjectGraphVectorEdge(pluginInput.edge)
+        ) {
+          const archiveRoot = join(
+            input.workspaceRoot,
+            deriveSdlcConformProjectProfileFromWorkspace(input.workspaceRoot)
+              .runtimeLayout.operatorRunRoot,
+            operatorRunId()
+          );
+          const managedTraversalManifest =
+            deriveConformProjectManagedTraversalManifest({
+              workspaceRoot: input.workspaceRoot
+            });
+          const report = materializeSdlcProjectConformance({
+            workspaceRoot: input.workspaceRoot
+          });
+          writeSdlcSystemArtifact({
+            archiveRoot,
+            relativePath: "managed_traversal_manifest.json",
+            payload: managedTraversalManifest
+          });
+          writeSdlcSystemArtifact({
+            archiveRoot,
+            relativePath: "conform_project_report.json",
+            payload: report
+          });
+          const manifestRef = pathToFileURL(
+            join(archiveRoot, "managed_traversal_manifest.json")
+          ).href;
+          const reportRef = pathToFileURL(
+            join(archiveRoot, "conform_project_report.json")
+          ).href;
+          if (report.status !== "passed") {
+            return constructConsequenceProjectionOutcome({
+              status: "blocked",
+              reason: report.conformanceGaps.join(",") || "project_conformance_gaps",
+              evidenceRefs: uniqueSorted([
+                pluginInput.sourceProjectionRef,
+                manifestRef,
+                reportRef,
+                ...report.materializedTopologyRefs
+              ])
+            });
+          }
+          return constructConsequenceProjectionOutcome({
+            status: "projected",
+            consequenceRef: reportRef,
+            domainReadModelRefs: uniqueSorted([
+              manifestRef,
+              reportRef,
+              ...report.materializedTopologyRefs
+            ]),
+            evidenceRefs: uniqueSorted([
+              pluginInput.sourceProjectionRef,
+              manifestRef,
+              reportRef,
+              ...report.materializedTopologyRefs
+            ])
+          });
+        }
+        return constructConsequenceProjectionOutcome({
+          status: "blocked",
+          reason: "missing installed operator transform state for consequence.C"
+        });
+      }
+      const selectedComposition =
+        sdlcSelectedAbgFnCompositionIdentityFromEnginePluginInput(pluginInput);
+      if (
+        selectedComposition.compositionRef !==
+          dispatchState.current.selectedComposition.compositionRef ||
+        selectedComposition.compositionDigest !==
+          dispatchState.current.selectedComposition.compositionDigest ||
+        selectedComposition.compositionSelectionRef !==
+          dispatchState.current.selectedComposition.compositionSelectionRef
+      ) {
+        return constructConsequenceProjectionOutcome({
+          status: "blocked",
+          reason: "selected composition drift for consequence.C"
+        });
+      }
+      let declaredEdgeProjectionRefs: readonly string[];
+      try {
+        declaredEdgeProjectionRefs = writeDeclaredEdgeProjectionFromConsequence({
+          manifest: dispatchState.current.manifest
+        });
+      } catch (error: unknown) {
+        return constructConsequenceProjectionOutcome({
+          status: "blocked",
+          reason:
+            error instanceof Error
+              ? error.message
+              : "declared edge-output projection failed"
+        });
+      }
+      const consequenceState = stateWithConsequenceProjectedExecutionEvidence({
+        state: dispatchState.current
+      });
+      const previousWorkerReport = dispatchState.current.workerReport;
+      dispatchState.current = consequenceState;
+      if (
+        consequenceState.workerReport !== null &&
+        consequenceState.workerReport !== previousWorkerReport
+      ) {
+        writeSdlcSystemArtifact({
+          archiveRoot: consequenceState.manifest.archiveRoot,
+          relativePath: "worker_result_report.json",
+          payload: consequenceState.workerReport
+        });
+      }
+      const consequence = deriveInstalledTraversalConsequence({
+        basis,
+        start: input.start,
+        state: consequenceState,
+        replayEvents: effectiveReplayEvents,
+        admittedAssetEvents: input.eventGraphEvents ?? input.replayEvents,
+        emittedEvents: emitted,
+        engineTerminal: null,
+        nextVectorIndex:
+          pluginInput.vectorIndex + 1 < basis.graph.vectors.length
+            ? pluginInput.vectorIndex + 1
+            : null,
+        fpEvaluatorAdmissionEvidenceRefs:
+          designDepthFpEvaluatorAdmissionEvidenceRefsForState(consequenceState)
+      });
+      writeTraversalConsequenceArchive({
+        manifest: consequenceState.manifest,
+        consequence
+      });
+      return constructConsequenceProjectionOutcome({
+        status: "projected",
+        consequenceRef: consequence.consequenceProjection.consequenceRef,
+        domainReadModelRefs: uniqueSorted([
+          ...consequence.consequenceProjection.domainReadModelRefs,
+          ...declaredEdgeProjectionRefs
+        ]),
+        evidenceRefs: uniqueSorted([
+          pluginInput.sourceProjectionRef,
+          consequence.admittedStateRef.compositionRef,
+          consequence.consequenceProjection.consequenceRef,
+          ...consequence.consequenceProjection.domainReadModelRefs,
+          ...declaredEdgeProjectionRefs
+        ])
+      });
+  };
+  const evaluateDesignDepthForInstalledOperatorState = async (
+    pluginInput: EnginePluginInput
+  ): Promise<EvaluationRuleOutcome> => {
+      if (dispatchState.current === null) {
+        return constructEvaluationRuleOutcome({
+          status: "accepted",
+          ruleRef: DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
+          ruleRole: "semantic_judgment",
+          computeMeans: "F_P",
+          evidenceRefs: Object.freeze([pluginInput.sourceProjectionRef]),
+          findingRefs: Object.freeze([
+            "finding://odd-sdlc/evaluate/design-depth-register/not-applicable/no-transform-state"
+          ]),
+          selectedCompositionRef: pluginInput.selectedCompositionRef,
+          selectedCompositionDigest: pluginInput.selectedCompositionDigest,
+          selectedCompositionSelectionRef:
+            pluginInput.selectedCompositionSelectionRef,
+          selectedRegimeBindingRef: pluginInput.selectedRegimeBindingRef,
+          compositionContributionRef:
+            pluginInput.selectedRegimeBindingRef ??
+            pluginInput.selectedCompositionRef,
+          reason: "design-depth evaluator rule has no transform state for this vector"
+        });
+      }
+      if (
+        dispatchState.current.manifest.targetAssetType !==
+        "implementation_design_surface"
+      ) {
+        return constructEvaluationRuleOutcome({
+          status: "accepted",
+          ruleRef: DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
+          ruleRole: "semantic_judgment",
+          computeMeans: "F_P",
+          evidenceRefs: Object.freeze([pluginInput.sourceProjectionRef]),
+          findingRefs: Object.freeze([
+            `finding://odd-sdlc/${manifestRefSegment(dispatchState.current.manifest)}/evaluate/design-depth-register/not-applicable`
+          ]),
+          selectedCompositionRef: pluginInput.selectedCompositionRef,
+          selectedCompositionDigest: pluginInput.selectedCompositionDigest,
+          selectedCompositionSelectionRef:
+            pluginInput.selectedCompositionSelectionRef,
+          selectedRegimeBindingRef: pluginInput.selectedRegimeBindingRef,
+          compositionContributionRef:
+            pluginInput.selectedRegimeBindingRef ??
+            pluginInput.selectedCompositionRef,
+          reason: "design-depth evaluator rule not applicable to non-design edge"
+        });
+      }
+      if (transport === null) {
+        return constructEvaluationRuleOutcome({
+          status: "blocked",
+          ruleRef: DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
+          ruleRole: "semantic_judgment",
+          computeMeans: "F_P",
+          evidenceRefs: Object.freeze([pluginInput.sourceProjectionRef]),
+          selectedCompositionRef: pluginInput.selectedCompositionRef,
+          selectedCompositionDigest: pluginInput.selectedCompositionDigest,
+          selectedCompositionSelectionRef:
+            pluginInput.selectedCompositionSelectionRef,
+          selectedRegimeBindingRef: pluginInput.selectedRegimeBindingRef,
+          compositionContributionRef:
+            pluginInput.selectedRegimeBindingRef ??
+            pluginInput.selectedCompositionRef,
+          reason: "fp_worker_unattached"
+        });
+      }
+      const outcome = await materializeDesignDepthRegisterWithFpEvaluator({
+        transport,
+        manifest: dispatchState.current.manifest,
+        pluginInput,
+        basis,
+        eventSink: (event) => {
+          emitRuntimeEvent(event);
+        }
+      });
+      const ruleOutcomeRef = writeDesignDepthFpEvaluatorRuleOutcomeProof({
+        manifest: dispatchState.current.manifest,
+        outcome
+      });
+      if (outcome.status === "accepted") {
+        designDepthFpEvaluatorAdmissionEvidenceByArchiveRoot.set(
+          dispatchState.current.manifest.archiveRoot,
+          Object.freeze([ruleOutcomeRef])
+        );
+      } else {
+        dispatchState.current = stateWithBlockedDesignDepthFpEvaluatorOutcome({
+          state: dispatchState.current,
+          outcome,
+          ruleOutcomeRef
+        });
+      }
+      return outcome;
+  };
+  const evaluateReviewGradeForInstalledOperatorState = async (
+    pluginInput: EnginePluginInput
+  ): Promise<EvaluationRuleOutcome> => {
+      if (dispatchState.current === null) {
+        return constructEvaluationRuleOutcome({
+          status: "accepted",
+          ruleRef: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
+          ruleRole: "semantic_judgment",
+          computeMeans: "F_P",
+          evidenceRefs: Object.freeze([pluginInput.sourceProjectionRef]),
+          findingRefs: Object.freeze([
+            "finding://odd-sdlc/evaluate/review-grade-edge-fulfillment/not-applicable/no-transform-state"
+          ]),
+          selectedCompositionRef: pluginInput.selectedCompositionRef,
+          selectedCompositionDigest: pluginInput.selectedCompositionDigest,
+          selectedCompositionSelectionRef:
+            pluginInput.selectedCompositionSelectionRef,
+          selectedRegimeBindingRef: pluginInput.selectedRegimeBindingRef,
+          compositionContributionRef:
+            pluginInput.selectedRegimeBindingRef ??
+            pluginInput.selectedCompositionRef,
+          reason: "review-grade edge fulfillment rule has no transform state for this vector"
+        });
+      }
+      if (!reviewGradeEdgeFulfillmentAssessmentRequired(dispatchState.current.manifest)) {
+        return constructEvaluationRuleOutcome({
+          status: "accepted",
+          ruleRef: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
+          ruleRole: "semantic_judgment",
+          computeMeans: "F_P",
+          evidenceRefs: Object.freeze([pluginInput.sourceProjectionRef]),
+          findingRefs: Object.freeze([
+            `finding://odd-sdlc/${manifestRefSegment(dispatchState.current.manifest)}/evaluate/review-grade-edge-fulfillment/not-applicable`
+          ]),
+          selectedCompositionRef: pluginInput.selectedCompositionRef,
+          selectedCompositionDigest: pluginInput.selectedCompositionDigest,
+          selectedCompositionSelectionRef:
+            pluginInput.selectedCompositionSelectionRef,
+          selectedRegimeBindingRef: pluginInput.selectedRegimeBindingRef,
+          compositionContributionRef:
+            pluginInput.selectedRegimeBindingRef ??
+            pluginInput.selectedCompositionRef,
+          reason: "review-grade edge fulfillment rule not required for this vector"
+        });
+      }
+      if (transport === null) {
+        return constructEvaluationRuleOutcome({
+          status: "blocked",
+          ruleRef: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
+          ruleRole: "semantic_judgment",
+          computeMeans: "F_P",
+          evidenceRefs: Object.freeze([pluginInput.sourceProjectionRef]),
+          selectedCompositionRef: pluginInput.selectedCompositionRef,
+          selectedCompositionDigest: pluginInput.selectedCompositionDigest,
+          selectedCompositionSelectionRef:
+            pluginInput.selectedCompositionSelectionRef,
+          selectedRegimeBindingRef: pluginInput.selectedRegimeBindingRef,
+          compositionContributionRef:
+            pluginInput.selectedRegimeBindingRef ??
+            pluginInput.selectedCompositionRef,
+          reason: "fp_worker_unattached"
+        });
+      }
+      const outcome = await materializeReviewGradeEdgeFulfillmentWithFpEvaluator({
+        transport,
+        manifest: dispatchState.current.manifest,
+        pluginInput,
+        eventSink: (event) => {
+          emitRuntimeEvent(event);
+        }
+      });
+      if (dispatchState.current !== null) {
+        dispatchState.current = stateWithReviewGradePostflight(dispatchState.current);
+      }
+      if (
+        dispatchState.current !== null &&
+        dispatchState.current.workerReport !== null
+      ) {
+        const assessmentPath = join(
+          dispatchState.current.manifest.archiveRoot,
+          REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE
+        );
+        const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+          manifest: dispatchState.current.manifest,
+          outputFile: assessmentPath
+        });
+        if (admission.status === "admitted" && admission.assessment !== null) {
+          const workerReport = workerReportWithReviewGradeAssessment({
+            report: dispatchState.current.workerReport,
+            assessment: admission.assessment,
+            targetAssetType: dispatchState.current.manifest.targetAssetType
+          });
+          dispatchState.current = Object.freeze({
+            ...dispatchState.current,
+            workerReport
+          });
+          writeSdlcSystemArtifact({
+            archiveRoot: dispatchState.current.manifest.archiveRoot,
+            relativePath: "worker_result_report.json",
+            payload: workerReport
+          });
+        }
+      }
+      return outcome;
+  };
+
+  const plugins = createSdlcAbgPluginSet({
+    dispatch: dispatchThroughInstalledOperator,
+    evaluateFp: evaluateFpForInstalledOperatorState,
+    projectConsequence: projectConsequenceForInstalledOperatorState,
+    evaluateDesignDepth: evaluateDesignDepthForInstalledOperatorState,
+    evaluateReviewGradeEdgeFulfillment:
+      evaluateReviewGradeForInstalledOperatorState
+  });
+  return Object.freeze({
+    plugins,
+    emittedEvents: emitted,
+    emitted,
+    transport,
+    dispatchState,
+    designDepthFpEvaluatorAdmissionEvidenceRefsForState
+  });
+}
+
+export function createSdlcInstalledOperatorAbgPluginSession(
+  input: SdlcInstalledOperatorAbgPluginSessionInput
+): SdlcInstalledOperatorAbgPluginSession {
+  return createSdlcInstalledOperatorAbgPluginSessionInternal(input);
 }
 
 export async function executeInstalledOperatorStart(input: {
@@ -8981,860 +9980,34 @@ function compactRuntimeEventArchivePayload(
     });
   }
 
-  const transport =
-    input.workerTransport === null ? null : admitWorkerTransport(input.workerTransport);
-  const executionContract = input.start.executionContract;
-  const dispatchState: { current: SdlcAbgOwnedFpDispatchState | null } = {
-    current: null
-  };
-  const emitted: RuntimeEvent[] = [];
-  const designDepthFpEvaluatorAdmissionEvidenceByArchiveRoot = new Map<
-    string,
-    readonly string[]
-  >();
-  const designDepthFpEvaluatorAdmissionEvidenceRefsForState = (
-    state: SdlcAbgOwnedFpDispatchState
-  ): readonly string[] =>
-    designDepthFpEvaluatorAdmissionEvidenceByArchiveRoot.get(
-      state.manifest.archiveRoot
-    ) ?? Object.freeze([]);
-  const admitDispatchConsequence = (
-    state: SdlcAbgOwnedFpDispatchState,
-    nextVectorIndex: number | null = null
-  ): SdlcInstalledOperatorTraversalConsequence => {
-    const consequence = deriveInstalledTraversalConsequence({
-      basis,
-      start: input.start,
-      state,
-      replayEvents: effectiveReplayEvents,
-      emittedEvents: emitted,
-      engineTerminal: null,
-      nextVectorIndex,
-      fpEvaluatorAdmissionEvidenceRefs:
-        designDepthFpEvaluatorAdmissionEvidenceRefsForState(state)
-    });
-    writeTraversalConsequenceArchive({
-      manifest: state.manifest,
-      consequence
-    });
-    return consequence;
-  };
-  const publishDispatchState = (
-    state: SdlcAbgOwnedFpDispatchState
-  ): SdlcInstalledOperatorTraversalConsequence => {
-    dispatchState.current = state;
-    return admitDispatchConsequence(state);
-  };
-  const dispatchThroughInstalledOperator = async (
-    pluginInput: EnginePluginInput
-  ): Promise<FpDispatchOutcome> => {
-      const selectedComposition =
-        sdlcSelectedAbgFnCompositionIdentityFromEnginePluginInput(pluginInput);
-      const contract = hookContractByEdgeName(pluginInput.edge);
-      const projectedRetryContext = mergedRetryContext({
-        projected: sdlcWorkerRetryContextFromAbgRetryContext(
-          pluginInput.retryContext
-        ),
-        override: deriveSdlcWorkerRetryContextFromPostActionProjection({
-          nextActionProjection: executionContract.nextActionProjection,
-          vectorIndex: pluginInput.vectorIndex
-        }),
-        vectorIndex: pluginInput.vectorIndex
-      });
-      const retryContextWithRuntimeGaps =
-        mergeSdlcWorkerRetryContextWithRuntimeGapRegister({
-          projected: projectedRetryContext,
-          workspaceRoot: input.workspaceRoot,
-          vectorIndex: pluginInput.vectorIndex,
-          edgeName: pluginInput.edge,
-          targetAssetType: contract.targetAssetType
-        });
-      const manifest = deriveWorkerHandoffManifest({
-        workspaceRoot: input.workspaceRoot,
-        overlayRef: executionContract.overlayRef,
-        overlayBindingRef: executionContract.overlayBindingRef,
-        graphCatalogDigestRef: executionContract.overlayBinding.graphCatalogDigestRef,
-        graphFunctionName: executionContract.targetGraphFunction,
-        edgeName: pluginInput.edge,
-        vectorIndex: pluginInput.vectorIndex,
-        contract,
-        fpTransformRequest: pluginInput.fpTransformRequest,
-        traversalAttemptEnvelope: pluginInput.traversalAttemptEnvelope,
-        conformedProject: executionContract.conformedProject,
-        retryContext: mergedRetryContext({
-          projected: retryContextWithRuntimeGaps,
-          override: input.retryContextOverride,
-          vectorIndex: pluginInput.vectorIndex
-        }),
-        outputAuthorityProjections: pluginInput.outputAuthorityProjections,
-        traversalHopSelection: executionContract.traversalHopSelection
-      });
-      const beforeMaterialization = snapshotProductMaterializationRoot(
-        manifest.productMaterialization
-      );
-      const handoffFiles = writeHandoffFiles(manifest);
-      writeFrontDoorTraversalSelectionAudit({
-        basis,
-        manifest,
-        summary: executionContract.traversalDecompositionSummary,
-        selection: executionContract.traversalHopSelection
-      });
-      const expectedAssessmentIds =
-        pluginInput.expectedAssessmentIds.length === 0
-          ? vectorEvaluatorNames({ basis, vectorIndex: pluginInput.vectorIndex })
-          : pluginInput.expectedAssessmentIds;
-      const fulfillmentFor = (input: {
-        readonly workerRun: SdlcWorkerRunResult | null;
-        readonly fulfillmentStatus: "fulfilled" | "partial" | "blocked" | "unfulfilled";
-        readonly fulfillmentDetail: string;
-        readonly blockingReasons: readonly string[];
-        readonly evidenceRefs: readonly string[];
-      }): Readonly<Record<string, unknown>> => {
-        if (input.workerRun === null) {
-          return deterministicFulfillmentArtifact({
-            manifest,
-            basis,
-            expectedAssessmentIds,
-            fulfillmentStatus: input.fulfillmentStatus,
-            fulfillmentDetail: input.fulfillmentDetail,
-            blockingReasons: input.blockingReasons,
-            evidenceRefs: input.evidenceRefs
-          });
-        }
-        if (transport === null) {
-          throw new TypeError("worker fulfillment requires admitted worker transport");
-        }
-        return fulfillmentArtifact({
-          manifest,
-          transport,
-          basis,
-          expectedAssessmentIds,
-          fulfillmentStatus: input.fulfillmentStatus,
-          fulfillmentDetail: input.fulfillmentDetail,
-          blockingReasons: input.blockingReasons,
-          evidenceRefs: input.evidenceRefs
-        });
-      };
-      const completeReportDispatch = async (input: {
-        readonly workerRun: SdlcWorkerRunResult | null;
-        readonly workerReport: SdlcWorkerResultReport;
-        readonly hookWorkerContractRef: string;
-        readonly passedFulfillmentDetail: string;
-        readonly deferConstructorUntilConsequence?: boolean | undefined;
-      }) => {
-        const diagnosticState: SdlcAbgOwnedFpDispatchState = {
-          status: "worker_invoked",
-          manifest,
-          selectedComposition,
-          workerRun: input.workerRun,
-          workerReport: input.workerReport,
-          postflight: null,
-          assuranceSatisfaction: null,
-          gapDossier: null,
-          hookOutcome: null,
-          blockingReason: null,
-          blockingReasonCarriers: Object.freeze([]),
-          currentEdge: pluginInput.edge
-        };
-        const diagnostics = await runSdlcPostTransformDiagnosticFlow({
-          state: diagnosticState,
-          basis,
-          edgeAccountingRow,
-          eventSink: (event) => {
-            emitted.push(event);
-          },
-          postflightRelativePath: "postflight.json",
-          writeMaterializationManifest: true
-        });
-        const postflight = diagnostics.postflight;
-        const assuranceGate = diagnostics.assuranceGate;
-
-        let hookOutcome: SdlcHookTurnOutcome | null = null;
-        if (input.deferConstructorUntilConsequence !== true) {
-          const constructorResult = constructorResultFromWorkerOutput({
-            manifest,
-            report: input.workerReport,
-            operationType: defaultOperationForTarget(contract.targetAssetType)
-          });
-          writeSdlcSystemArtifact({
-            archiveRoot: manifest.archiveRoot,
-            relativePath: "constructor_result.json",
-            payload: constructorResult
-          });
-          const currentHookOutcome = runSdlcHookTurn({
-            contract,
-            invocation: minimalSdlcHookInvocationForContract({
-              contract,
-              targetAssetId: constructorResult.outputIdentity.assetId,
-              fpWorkerContractRef: input.hookWorkerContractRef
-            }),
-            constructorResult
-          });
-          hookOutcome = currentHookOutcome;
-          writeSdlcSystemArtifact({
-            archiveRoot: manifest.archiveRoot,
-            relativePath: "hook_outcome.json",
-            payload: currentHookOutcome
-          });
-          if (currentHookOutcome.postflight?.status !== "passed") {
-            const hookDiagnosticReasonCarriers = Object.freeze(
-              currentHookOutcome.postflight === null ||
-                currentHookOutcome.postflight === undefined
-                ? [
-                    makeSdlcBlockingReason({
-                      code: "hook_diagnostic_missing",
-                      evidenceRefs: [
-                        pathToFileURL(join(manifest.archiveRoot, "hook_outcome.json")).href
-                      ]
-                    })
-                  ]
-                : currentHookOutcome.postflight.blockingReasons.map((reason) =>
-                    makeSdlcBlockingReason({
-                      code: "hook_diagnostic_failed",
-                      detail: reason,
-                      evidenceRefs: currentHookOutcome.postflight?.evidenceRefs ?? []
-                    })
-                  )
-            );
-            const hookDiagnostics = Object.freeze({
-              kind: "sdlc_operator_postflight_result" as const,
-              status: "passed" as const,
-              blockingReasons: Object.freeze([]),
-              blockingReasonCarriers: hookDiagnosticReasonCarriers,
-              evidenceRefs: Object.freeze([
-                ...(currentHookOutcome.postflight?.evidenceRefs ?? [])
-              ])
-            });
-            writeSdlcSystemArtifact({
-              archiveRoot: manifest.archiveRoot,
-              relativePath: "hook_diagnostics.json",
-              payload: hookDiagnostics
-            });
-          }
-        }
-        const current: SdlcAbgOwnedFpDispatchState = {
-          status: "worker_invoked",
-          manifest,
-          selectedComposition,
-          workerRun: input.workerRun,
-          workerReport: input.workerReport,
-          postflight,
-          assuranceSatisfaction: assuranceGate.satisfaction,
-          gapDossier: null,
-          hookOutcome,
-          blockingReason: null,
-          blockingReasonCarriers: activePostflightBlockingReasonCarriers(postflight),
-          currentEdge: null
-        };
-        const consequence = shouldDeferDispatchConsequenceToFpEvaluator(current)
-          ? null
-          : publishDispatchState(current);
-        if (consequence?.edgeClosureDecision.disposition === "block") {
-          return constructFpDispatchOutcome({
-            status: "blocked",
-            resultRef: consequence.nextActionProjection.nextActionProjectionRef,
-            attachedResultArtifact: null,
-            evidenceRefs: uniqueSorted([
-              ...postflight.evidenceRefs,
-              consequence.nextActionProjection.nextActionProjectionRef
-            ]),
-            reason:
-              consequence.edgeClosureDecision.reasonRefs.join(",") ||
-              "post_action_blocked"
-          });
-        }
-        if (consequence === null) {
-          dispatchState.current = current;
-        }
-        return constructFpDispatchOutcome({
-          status: "dispatched",
-          resultRef: dispatchResultRef(manifest),
-          attachedResultArtifact: fulfillmentFor({
-            workerRun: input.workerRun,
-            fulfillmentStatus: "fulfilled",
-            fulfillmentDetail: input.passedFulfillmentDetail,
-            blockingReasons: Object.freeze([]),
-            evidenceRefs: postflight.evidenceRefs
-          }),
-          evidenceRefs: uniqueSorted([
-            ...postflight.evidenceRefs,
-            ...(consequence === null
-              ? [pathToFileURL(input.workerReport.outputFile).href]
-            : [consequence.nextActionProjection.nextActionProjectionRef])
-          ])
-        });
-      };
-      const reportAdmissionDiagnosticReason = (
-        postflight: SdlcPostflightResult
-      ): string =>
-        postflight.blockingReasonCarriers
-          .map((carrier) => legacyBlockingReasonCode(carrier))
-          .join(",") || "worker_report_admission_failed";
-      const completeReportAdmissionFailure = (input: {
-        readonly workerRun: SdlcWorkerRunResult | null;
-        readonly postflight: SdlcPostflightResult;
-      }): FpDispatchOutcome => {
-        writeSdlcSystemArtifact({
-          archiveRoot: manifest.archiveRoot,
-          relativePath: "worker_report_admission_postflight.json",
-          payload: input.postflight
-        });
-        const current: SdlcAbgOwnedFpDispatchState = {
-          status: "worker_report_rejected",
-          manifest,
-          selectedComposition,
-          workerRun: input.workerRun,
-          workerReport: null,
-          postflight: input.postflight,
-          assuranceSatisfaction: null,
-          gapDossier: null,
-          hookOutcome: null,
-          blockingReason: null,
-          blockingReasonCarriers: input.postflight.blockingReasonCarriers,
-          currentEdge: pluginInput.edge
-        };
-        const consequence = publishDispatchState(current);
-        const reason = reportAdmissionDiagnosticReason(input.postflight);
-        return constructFpDispatchOutcome({
-          status: "blocked",
-          resultRef: consequence.nextActionProjection.nextActionProjectionRef,
-          attachedResultArtifact: runtimeFailureArtifact({
-            failureClass: "contract_failure",
-            detail: reason
-          }),
-          evidenceRefs: uniqueSorted([
-            ...input.postflight.evidenceRefs,
-            consequence.nextActionProjection.nextActionProjectionRef
-          ]),
-          reason
-        });
-      };
-      const edgeAccountingRow = sdlcExecutiveEdgeAccountingRowFor(pluginInput.edge);
-      const workerDispatchAllowed = edgeAccountingRow?.workerDispatchAllowed ?? true;
-      if (!workerDispatchAllowed) {
-        if (!sdlcInstalledOperatorProjectsOutput(manifest.targetAssetType)) {
-          throw new TypeError(
-            `${pluginInput.edge}: no-dispatch edge is missing declared edge-output projection policy`
-          );
-        }
-        let workerReport: SdlcWorkerResultReport | null = null;
-        try {
-          workerReport = noDispatchReport({
-            manifest,
-            report: buildDeclaredEdgeProjectionPendingReport({ manifest })
-          });
-          writeSdlcSystemArtifact({
-            archiveRoot: manifest.archiveRoot,
-            relativePath: "worker_result_report.json",
-            payload: workerReport
-          });
-          writeSdlcSystemArtifact({
-            archiveRoot: manifest.archiveRoot,
-            relativePath: "post_transform_observation.json",
-            payload: {
-              kind: "sdlc_post_transform_observation",
-              sourceFunction: "system.edge_policy_projection",
-              generatedFunction:
-                "consequence.edge_projection.writeDeclaredEdgeProjectionOutput",
-              previousReportAdmissionError: null,
-              materializedFileCount: workerReport.materializedFiles.length,
-              outputFile: workerReport.outputFile,
-              digest: workerReport.digest
-            }
-          });
-        } catch (error: unknown) {
-          const rejectionPostflight = deterministicReportAdmissionPostflight({
-            manifest,
-            reason:
-              error instanceof Error ? error.message : "worker_report_rejected"
-          });
-          return completeReportAdmissionFailure({
-            workerRun: null,
-            postflight: rejectionPostflight
-          });
-        }
-        workerReport = workerResultReportWithFpStageRefs({
-          manifest,
-          report: workerReport
-        });
-        workerReport = noDispatchReport({ manifest, report: workerReport });
-        writeSdlcSystemArtifact({
-          archiveRoot: manifest.archiveRoot,
-          relativePath: "worker_result_report.json",
-          payload: workerReport
-        });
-        return completeReportDispatch({
-          workerRun: null,
-          workerReport,
-          hookWorkerContractRef: "worker-dispatch://installed-operator/no-dispatch",
-          passedFulfillmentDetail: "installed operator deterministic edge passed",
-          deferConstructorUntilConsequence: true
-        });
-      }
-      if (transport === null) {
-        throw new TypeError("worker dispatch requires admitted worker transport");
-      }
-      const workerRun = await invokeWorkerThroughAbgProcessActor({
-        transport,
-        manifest,
-        manifestPath: handoffFiles.manifestPath,
-        promptPath: handoffFiles.promptPath,
-        pluginInput,
-        basis,
-        eventSink: (event) => {
-          emitted.push(event);
-        }
-      });
-      if (workerRun.status !== 0) {
-        const failurePostflight = constructWorkerProcessFailurePostflight({
-          manifest,
-          workerRun
-        });
-        const stopForRuntimeTriage = workerRuntimeTriageStop(failurePostflight);
-        writeSdlcSystemArtifact({
-          archiveRoot: manifest.archiveRoot,
-          relativePath: "worker_process_failure_postflight.json",
-          payload: failurePostflight
-        });
-        const gapDossier = constructPostflightGapDossier({
-          manifest,
-          postflight: failurePostflight
-        });
-        writePostflightGapDossier({ manifest, gapDossier });
-        const current: SdlcAbgOwnedFpDispatchState = {
-          status: "worker_failed",
-          manifest,
-          selectedComposition,
-          workerRun,
-          workerReport: null,
-          postflight: failurePostflight,
-          assuranceSatisfaction: null,
-          gapDossier,
-          hookOutcome: null,
-          blockingReason: failurePostflight.blockingReasons.join(","),
-          blockingReasonCarriers: failurePostflight.blockingReasonCarriers,
-          currentEdge: pluginInput.edge
-        };
-        const consequence = publishDispatchState(current);
-        return constructFpDispatchOutcome({
-          status: "blocked",
-          resultRef: stopForRuntimeTriage
-            ? consequence.nextActionProjection.nextActionProjectionRef
-            : gapDossier.currentGapDossierRef,
-          attachedResultArtifact: stopForRuntimeTriage
-            ? null
-            : runtimeFailureArtifact({
-                failureClass: workerFailureRuntimeFailureClass(failurePostflight),
-                detail: failurePostflight.blockingReasons.join(",")
-              }),
-          evidenceRefs: uniqueSorted([
-            ...failurePostflight.evidenceRefs,
-            consequence.nextActionProjection.nextActionProjectionRef
-          ]),
-          reason: failurePostflight.blockingReasons.join(",")
-        });
-      }
-      let workerReport: SdlcWorkerResultReport | null = null;
-      try {
-        workerReport = buildPostTransformWorkerResultReport({
-          manifest,
-          before: beforeMaterialization
-        });
-        writeSdlcSystemArtifact({
-          archiveRoot: manifest.archiveRoot,
-          relativePath: "worker_result_report.json",
-          payload: workerReport
-        });
-        writeSdlcSystemArtifact({
-          archiveRoot: manifest.archiveRoot,
-          relativePath: "post_transform_observation.json",
-          payload: {
-            kind: "sdlc_post_transform_observation",
-            sourceFunction: "worker.F_P.transform",
-            generatedFunction: "buildPostTransformWorkerResultReport",
-            previousReportAdmissionError: null,
-            materializedFileCount: workerReport.materializedFiles.length,
-            outputFile: workerReport.outputFile,
-            digest: workerReport.digest
-          }
-        });
-      } catch (error: unknown) {
-        if (workerReport === null) {
-          const rejectionPostflight = workerReportAdmissionPostflight({
-            manifest,
-            workerRun,
-            reason:
-              error instanceof Error ? error.message : "worker_report_rejected"
-          });
-          return completeReportAdmissionFailure({
-            workerRun,
-            postflight: rejectionPostflight
-          });
-        }
-      }
-      if (workerReport === null) {
-        throw new TypeError("worker report admission did not produce a report");
-      }
-      workerReport = workerResultReportWithFpStageRefs({
-        manifest,
-        report: workerReport
-      });
-      writeSdlcSystemArtifact({
-        archiveRoot: manifest.archiveRoot,
-        relativePath: "worker_result_report.json",
-        payload: workerReport
-      });
-      const fpTransformResult = writeWorkerFpTransformResult({
-        manifest,
-        report: workerReport
-      });
-      if (fpTransformResult !== null && manifest.fpTransformRequest !== null) {
-        emitted.push(
-          ...runtimeEventsForFpTransformResult({
-            basis,
-            request: manifest.fpTransformRequest,
-            result: fpTransformResult
-          })
-        );
-      }
-      return completeReportDispatch({
-        workerRun,
-        workerReport,
-        hookWorkerContractRef: transport.raw,
-        passedFulfillmentDetail: "installed operator postflight passed"
-      });
-  };
-  const evaluateFpForInstalledOperatorState = async (
-    pluginInput: EnginePluginInput
-  ): Promise<FpEvaluationOutcome> => {
-      if (dispatchState.current === null) {
-        return constructFpEvaluationOutcome({
-          status: "blocked",
-          reason: "missing installed operator transform state for evaluate.C"
-        });
-      }
-      const fpEvaluatorAdmissionEvidenceRefs =
-        designDepthFpEvaluatorAdmissionEvidenceRefsForState(dispatchState.current);
-      dispatchState.current = await refreshDesignDepthStateFromFpEvaluatorRegister({
-        state: dispatchState.current,
-        basis,
-        edgeAccountingRow:
-          dispatchState.current.currentEdge === null
-            ? null
-            : sdlcExecutiveEdgeAccountingRowFor(dispatchState.current.currentEdge),
-        eventSink: (event) => {
-          emitted.push(event);
-        },
-        fpEvaluatorAdmissionEvidenceRefs
-      });
-      return fpEvaluationOutcomeForDispatchState({
-        pluginInput,
-        state: dispatchState.current
-      });
-  };
-  const projectConsequenceForInstalledOperatorState = (
-    pluginInput: EnginePluginInput
-  ): ConsequenceProjectionOutcome => {
-      if (dispatchState.current === null) {
-        return constructConsequenceProjectionOutcome({
-          status: "blocked",
-          reason: "missing installed operator transform state for consequence.C"
-        });
-      }
-      const selectedComposition =
-        sdlcSelectedAbgFnCompositionIdentityFromEnginePluginInput(pluginInput);
-      if (
-        selectedComposition.compositionRef !==
-          dispatchState.current.selectedComposition.compositionRef ||
-        selectedComposition.compositionDigest !==
-          dispatchState.current.selectedComposition.compositionDigest ||
-        selectedComposition.compositionSelectionRef !==
-          dispatchState.current.selectedComposition.compositionSelectionRef
-      ) {
-        return constructConsequenceProjectionOutcome({
-          status: "blocked",
-          reason: "selected composition drift for consequence.C"
-        });
-      }
-      let declaredEdgeProjectionRefs: readonly string[];
-      try {
-        declaredEdgeProjectionRefs = writeDeclaredEdgeProjectionFromConsequence({
-          manifest: dispatchState.current.manifest
-        });
-      } catch (error: unknown) {
-        return constructConsequenceProjectionOutcome({
-          status: "blocked",
-          reason:
-            error instanceof Error
-              ? error.message
-              : "declared edge-output projection failed"
-        });
-      }
-      const consequenceState = stateWithConsequenceProjectedExecutionEvidence({
-        state: dispatchState.current
-      });
-      const previousWorkerReport = dispatchState.current.workerReport;
-      dispatchState.current = consequenceState;
-      if (
-        consequenceState.workerReport !== null &&
-        consequenceState.workerReport !== previousWorkerReport
-      ) {
-        writeSdlcSystemArtifact({
-          archiveRoot: consequenceState.manifest.archiveRoot,
-          relativePath: "worker_result_report.json",
-          payload: consequenceState.workerReport
-        });
-      }
-      const consequence = deriveInstalledTraversalConsequence({
-        basis,
-        start: input.start,
-        state: consequenceState,
-        replayEvents: effectiveReplayEvents,
-        admittedAssetEvents: input.eventGraphEvents ?? input.replayEvents,
-        emittedEvents: emitted,
-        engineTerminal: null,
-        nextVectorIndex:
-          pluginInput.vectorIndex + 1 < basis.graph.vectors.length
-            ? pluginInput.vectorIndex + 1
-            : null,
-        fpEvaluatorAdmissionEvidenceRefs:
-          designDepthFpEvaluatorAdmissionEvidenceRefsForState(consequenceState)
-      });
-      writeTraversalConsequenceArchive({
-        manifest: consequenceState.manifest,
-        consequence
-      });
-      return constructConsequenceProjectionOutcome({
-        status: "projected",
-        consequenceRef: consequence.consequenceProjection.consequenceRef,
-        domainReadModelRefs: uniqueSorted([
-          ...consequence.consequenceProjection.domainReadModelRefs,
-          ...declaredEdgeProjectionRefs
-        ]),
-        evidenceRefs: uniqueSorted([
-          pluginInput.sourceProjectionRef,
-          consequence.admittedStateRef.compositionRef,
-          consequence.consequenceProjection.consequenceRef,
-          ...consequence.consequenceProjection.domainReadModelRefs,
-          ...declaredEdgeProjectionRefs
-        ])
-      });
-  };
-  const evaluateDesignDepthForInstalledOperatorState = async (
-    pluginInput: EnginePluginInput
-  ): Promise<EvaluationRuleOutcome> => {
-      if (dispatchState.current === null) {
-        return constructEvaluationRuleOutcome({
-          status: "accepted",
-          ruleRef: DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
-          ruleRole: "semantic_judgment",
-          computeMeans: "F_P",
-          evidenceRefs: Object.freeze([pluginInput.sourceProjectionRef]),
-          findingRefs: Object.freeze([
-            "finding://odd-sdlc/evaluate/design-depth-register/not-applicable/no-transform-state"
-          ]),
-          selectedCompositionRef: pluginInput.selectedCompositionRef,
-          selectedCompositionDigest: pluginInput.selectedCompositionDigest,
-          selectedCompositionSelectionRef:
-            pluginInput.selectedCompositionSelectionRef,
-          selectedRegimeBindingRef: pluginInput.selectedRegimeBindingRef,
-          compositionContributionRef:
-            pluginInput.selectedRegimeBindingRef ??
-            pluginInput.selectedCompositionRef,
-          reason: "design-depth evaluator rule has no transform state for this vector"
-        });
-      }
-      if (
-        dispatchState.current.manifest.targetAssetType !==
-        "implementation_design_surface"
-      ) {
-        return constructEvaluationRuleOutcome({
-          status: "accepted",
-          ruleRef: DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
-          ruleRole: "semantic_judgment",
-          computeMeans: "F_P",
-          evidenceRefs: Object.freeze([pluginInput.sourceProjectionRef]),
-          findingRefs: Object.freeze([
-            `finding://odd-sdlc/${manifestRefSegment(dispatchState.current.manifest)}/evaluate/design-depth-register/not-applicable`
-          ]),
-          selectedCompositionRef: pluginInput.selectedCompositionRef,
-          selectedCompositionDigest: pluginInput.selectedCompositionDigest,
-          selectedCompositionSelectionRef:
-            pluginInput.selectedCompositionSelectionRef,
-          selectedRegimeBindingRef: pluginInput.selectedRegimeBindingRef,
-          compositionContributionRef:
-            pluginInput.selectedRegimeBindingRef ??
-            pluginInput.selectedCompositionRef,
-          reason: "design-depth evaluator rule not applicable to non-design edge"
-        });
-      }
-      if (transport === null) {
-        return constructEvaluationRuleOutcome({
-          status: "blocked",
-          ruleRef: DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
-          ruleRole: "semantic_judgment",
-          computeMeans: "F_P",
-          evidenceRefs: Object.freeze([pluginInput.sourceProjectionRef]),
-          selectedCompositionRef: pluginInput.selectedCompositionRef,
-          selectedCompositionDigest: pluginInput.selectedCompositionDigest,
-          selectedCompositionSelectionRef:
-            pluginInput.selectedCompositionSelectionRef,
-          selectedRegimeBindingRef: pluginInput.selectedRegimeBindingRef,
-          compositionContributionRef:
-            pluginInput.selectedRegimeBindingRef ??
-            pluginInput.selectedCompositionRef,
-          reason: "fp_worker_unattached"
-        });
-      }
-      const outcome = await materializeDesignDepthRegisterWithFpEvaluator({
-        transport,
-        manifest: dispatchState.current.manifest,
-        pluginInput,
-        basis,
-        eventSink: (event) => {
-          emitted.push(event);
-        }
-      });
-      const ruleOutcomeRef = writeDesignDepthFpEvaluatorRuleOutcomeProof({
-        manifest: dispatchState.current.manifest,
-        outcome
-      });
-      if (outcome.status === "accepted") {
-        designDepthFpEvaluatorAdmissionEvidenceByArchiveRoot.set(
-          dispatchState.current.manifest.archiveRoot,
-          Object.freeze([ruleOutcomeRef])
-        );
-      } else {
-        dispatchState.current = stateWithBlockedDesignDepthFpEvaluatorOutcome({
-          state: dispatchState.current,
-          outcome,
-          ruleOutcomeRef
-        });
-      }
-      return outcome;
-  };
-  const evaluateReviewGradeForInstalledOperatorState = async (
-    pluginInput: EnginePluginInput
-  ): Promise<EvaluationRuleOutcome> => {
-      if (dispatchState.current === null) {
-        return constructEvaluationRuleOutcome({
-          status: "accepted",
-          ruleRef: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
-          ruleRole: "semantic_judgment",
-          computeMeans: "F_P",
-          evidenceRefs: Object.freeze([pluginInput.sourceProjectionRef]),
-          findingRefs: Object.freeze([
-            "finding://odd-sdlc/evaluate/review-grade-edge-fulfillment/not-applicable/no-transform-state"
-          ]),
-          selectedCompositionRef: pluginInput.selectedCompositionRef,
-          selectedCompositionDigest: pluginInput.selectedCompositionDigest,
-          selectedCompositionSelectionRef:
-            pluginInput.selectedCompositionSelectionRef,
-          selectedRegimeBindingRef: pluginInput.selectedRegimeBindingRef,
-          compositionContributionRef:
-            pluginInput.selectedRegimeBindingRef ??
-            pluginInput.selectedCompositionRef,
-          reason: "review-grade edge fulfillment rule has no transform state for this vector"
-        });
-      }
-      if (!reviewGradeEdgeFulfillmentAssessmentRequired(dispatchState.current.manifest)) {
-        return constructEvaluationRuleOutcome({
-          status: "accepted",
-          ruleRef: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
-          ruleRole: "semantic_judgment",
-          computeMeans: "F_P",
-          evidenceRefs: Object.freeze([pluginInput.sourceProjectionRef]),
-          findingRefs: Object.freeze([
-            `finding://odd-sdlc/${manifestRefSegment(dispatchState.current.manifest)}/evaluate/review-grade-edge-fulfillment/not-applicable`
-          ]),
-          selectedCompositionRef: pluginInput.selectedCompositionRef,
-          selectedCompositionDigest: pluginInput.selectedCompositionDigest,
-          selectedCompositionSelectionRef:
-            pluginInput.selectedCompositionSelectionRef,
-          selectedRegimeBindingRef: pluginInput.selectedRegimeBindingRef,
-          compositionContributionRef:
-            pluginInput.selectedRegimeBindingRef ??
-            pluginInput.selectedCompositionRef,
-          reason: "review-grade edge fulfillment rule not required for this vector"
-        });
-      }
-      if (transport === null) {
-        return constructEvaluationRuleOutcome({
-          status: "blocked",
-          ruleRef: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
-          ruleRole: "semantic_judgment",
-          computeMeans: "F_P",
-          evidenceRefs: Object.freeze([pluginInput.sourceProjectionRef]),
-          selectedCompositionRef: pluginInput.selectedCompositionRef,
-          selectedCompositionDigest: pluginInput.selectedCompositionDigest,
-          selectedCompositionSelectionRef:
-            pluginInput.selectedCompositionSelectionRef,
-          selectedRegimeBindingRef: pluginInput.selectedRegimeBindingRef,
-          compositionContributionRef:
-            pluginInput.selectedRegimeBindingRef ??
-            pluginInput.selectedCompositionRef,
-          reason: "fp_worker_unattached"
-        });
-      }
-      const outcome = await materializeReviewGradeEdgeFulfillmentWithFpEvaluator({
-        transport,
-        manifest: dispatchState.current.manifest,
-        pluginInput,
-        eventSink: (event) => {
-          emitted.push(event);
-        }
-      });
-      if (dispatchState.current !== null) {
-        dispatchState.current = stateWithReviewGradePostflight(dispatchState.current);
-      }
-      if (
-        dispatchState.current !== null &&
-        dispatchState.current.workerReport !== null
-      ) {
-        const assessmentPath = join(
-          dispatchState.current.manifest.archiveRoot,
-          REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE
-        );
-        const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
-          manifest: dispatchState.current.manifest,
-          outputFile: assessmentPath
-        });
-        if (admission.status === "admitted" && admission.assessment !== null) {
-          const workerReport = workerReportWithReviewGradeAssessment({
-            report: dispatchState.current.workerReport,
-            assessment: admission.assessment,
-            targetAssetType: dispatchState.current.manifest.targetAssetType
-          });
-          dispatchState.current = Object.freeze({
-            ...dispatchState.current,
-            workerReport
-          });
-          writeSdlcSystemArtifact({
-            archiveRoot: dispatchState.current.manifest.archiveRoot,
-            relativePath: "worker_result_report.json",
-            payload: workerReport
-          });
-        }
-      }
-      return outcome;
-  };
+  const session = createSdlcInstalledOperatorAbgPluginSessionInternal({
+    workspaceRoot: input.workspaceRoot,
+    start: input.start,
+    workerTransport: input.workerTransport,
+    replayEvents: input.replayEvents,
+    effectiveReplayEvents,
+    basis,
+    ...(input.eventGraphEvents === undefined
+      ? {}
+      : { eventGraphEvents: input.eventGraphEvents }),
+    ...(input.retryContextOverride === undefined
+      ? {}
+      : { retryContextOverride: input.retryContextOverride })
+  });
+  const emitted = session.emitted;
+  const transport = session.transport;
+  const designDepthFpEvaluatorAdmissionEvidenceRefsForState =
+    session.designDepthFpEvaluatorAdmissionEvidenceRefsForState;
   const engineResult = await runEngineIterateAsync({
     basis,
     runtimeEvents: effectiveReplayEvents,
     eventSink: (event) => {
       emitted.push(event);
     },
-    plugins: createSdlcAbgPluginSet({
-      dispatch: dispatchThroughInstalledOperator,
-      evaluateFp: evaluateFpForInstalledOperatorState,
-      projectConsequence: projectConsequenceForInstalledOperatorState,
-      evaluateDesignDepth: evaluateDesignDepthForInstalledOperatorState,
-      evaluateReviewGradeEdgeFulfillment:
-        evaluateReviewGradeForInstalledOperatorState
-    }),
+    plugins: session.plugins,
     maxAttachedFpAttempts: 3
   });
-  const completedDispatchState = dispatchState.current;
+  const completedDispatchState = session.dispatchState.current;
   if (completedDispatchState === null) {
     const eventsToAppend = Object.freeze([
       ...replayCursor.cursorEvents,
@@ -9916,10 +10089,14 @@ function compactRuntimeEventArchivePayload(
     consequence: traversalConsequence
   });
   const closureDisposition = traversalConsequence.edgeClosureDecision.disposition;
+  const effectiveTerminalKind =
+    closureDisposition === "close"
+      ? "converged"
+      : (terminal?.terminalKind ?? null);
   const status = deriveSdlcInstalledOperatorStatusFromAbgTerminal({
     stateStatus: completedDispatchState.status,
     closureDisposition,
-    terminalKind: terminal?.terminalKind ?? null
+    terminalKind: effectiveTerminalKind
   });
   const blockingReason =
     status === "blocked" && terminal?.reason !== null && terminal?.reason !== undefined

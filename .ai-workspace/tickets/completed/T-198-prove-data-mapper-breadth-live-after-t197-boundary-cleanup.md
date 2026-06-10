@@ -3,8 +3,8 @@ id: T-198
 title: Prove data-mapper breadth live after T-197 boundary cleanup
 type: chore
 ticket_category: ordinary
-status: backlog
-proof_status: not_started
+status: completed
+proof_status: passed
 goal: prove the data_mapper breadth lane on the reconciled SDLC boundary without making T-197's owner-partition cleanup wait on broad live-lane cost
 build_tenant: typescript
 owner: odd_sdlc
@@ -19,7 +19,8 @@ re_entry_point: tests_proof
 priority: medium
 triaged_at: 2026-06-09
 created_at: 2026-06-09
-updated_at: 2026-06-09
+updated_at: 2026-06-11
+completed_at: 2026-06-11
 governance_scope: STDO Method
 source_documents:
   - .ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md
@@ -98,3 +99,48 @@ Start only after T-197 Wave 0 B1 and H1 are complete or explicitly scoped out.
 Use the operator archive as the proof surface. Do not cite a live lane as clean
 unless the archive carries graph-owned `sdlc_worker_execution_evidence` and final
 process lifecycle evidence.
+
+## Closure Evidence - 2026-06-11
+
+Command:
+
+```bash
+ODD_SDLC_TS_T164_DATA_MAPPER_FULL_CAPABILITY_LIVE=1 npm run test:t164:data-mapper-full-capability-live
+```
+
+Archive:
+
+```text
+build_tenants/typescript/test_env/test_runs/full_external_data_mapper_sandbox/20260610T202608490Z_pid46762
+```
+
+Result:
+
+- live harness exited `0`.
+- `run_summary.json` records `terminalReason: "abg_reported_converged"`.
+- ABG start records `status: "converged"`, `stopped_by: "converged"`,
+  `control_outcome.kind: "converged"`, `stop_class.kind: "converged"`, and
+  `live_status.runStatus: "converged"`.
+- The final graph edge is `derive_test_execution_result_surface` targeting
+  `test_execution_result_surface`.
+- The final edge carries `executionEvidence.kind:
+  "sdlc_worker_execution_evidence"` with command `sbt test`, status
+  `succeeded`, `testsObserved: 1`, `passedCount: 1`, and `failedCount: 0`.
+- Generated Scala/Spark source and build configuration are present under the
+  sandbox `build_tenants/scala_spark/`, including `build.sbt`,
+  `CdmeCompiler.scala`, `AdjointAnalysis.scala`, `TopologyModel.scala`,
+  `ProofContracts.scala`, `TypeSystem.scala`, and `ValidationPlanner.scala`.
+  SBT emitted compiled classes under `target/scala-2.13/classes`.
+- Semantic proof on the same revision: `npm run test:semantic` passed
+  `969/969`.
+
+## Closure Checklist
+
+- [x] Data-mapper live archive path is recorded and reviewable.
+- [x] Operator archive records ABG-owned convergence rather than harness-only
+  process completion.
+- [x] Execution-result closure is backed by graph-owned
+  `sdlc_worker_execution_evidence`.
+- [x] Generated assets include real Scala source and compiled SBT output, not
+  only placeholder surfaces.
+- [x] Semantic proof is green on the same revision.

@@ -65,10 +65,9 @@ import {
 } from "../release/index.js";
 import {
   deriveSdlcPostCloseOverlayContinuationActionInput,
-  executeInstalledOperatorStartWithReentry,
+  executeInstalledOperatorStart,
   readOddSdlcRuntimeEvents,
-  readOddSdlcRuntimeEventsSync,
-  type SdlcInstalledOperatorStartOutcome
+  readOddSdlcRuntimeEventsSync
 } from "../operator/index.js";
 import {
   SDLC_PUBLIC_START_UNTIL_VALUES,
@@ -1682,46 +1681,6 @@ function startOutcomeFor(
   });
 }
 
-function replayNextActionFromOutcome(
-  outcome: SdlcInstalledOperatorStartOutcome
-): Parameters<typeof startOutcomeFor>[1] | undefined {
-  const consequence = outcome.traversalConsequence;
-  if (consequence === null) {
-    return undefined;
-  }
-  const projection = consequence.nextActionProjection;
-  if (
-    projection.choosesNextTraversal !== true ||
-    projection.selectedActionRef === null ||
-    projection.nextGraphFunctionRef === null ||
-    projection.nextGraphVectorRef === null
-  ) {
-    return undefined;
-  }
-  return Object.freeze({
-    nextActionProjectionRef: projection.nextActionProjectionRef,
-    selectedActionRef: projection.selectedActionRef,
-    nextGraphFunctionRef: projection.nextGraphFunctionRef,
-    nextGraphVectorRef: projection.nextGraphVectorRef,
-    closureDecisionRef: consequence.edgeClosureDecision.decisionRef,
-    overlayRef: projection.overlayRef,
-    overlayBindingRef: projection.overlayBindingRef
-  });
-}
-
-function replayNextActionRequiresFreshTargetTraversal(input: {
-  readonly latestOutcome: SdlcInstalledOperatorStartOutcome;
-  readonly replayNextAction: NonNullable<Parameters<typeof startOutcomeFor>[1]>;
-}): boolean {
-  return (
-    selectedActionRequiresFreshTargetTraversal(
-      input.replayNextAction.selectedActionRef
-    ) &&
-    input.replayNextAction.nextGraphFunctionRef !==
-      input.latestOutcome.summary.graphFunctionName
-  );
-}
-
 function selectedActionRequiresFreshTargetTraversal(
   selectedActionRef: string | null
 ): boolean {
@@ -2027,7 +1986,7 @@ async function installedStartPayloadFor(
   if (request.workerTransport === null && !deterministicTransition) {
     return start;
   }
-  return executeInstalledOperatorStartWithReentry({
+  return executeInstalledOperatorStart({
     workspaceRoot: outputWorkspaceRoot,
     sourceWorkspaceRoot: request.workspaceRoot,
     start,
@@ -2039,43 +1998,7 @@ async function installedStartPayloadFor(
           ? EMPTY_RUNTIME_EVENTS
         : replayEventsForBasis(start.executionContract.basis, runtimeEvents),
     eventGraphEvents: runtimeEvents,
-    requestedUntil: request.until,
-    requireInstalledTopology: true,
-    refreshReplayState: async (latestOutcome) => {
-      const refreshedEvents = await readOddSdlcRuntimeEvents(outputWorkspaceRoot);
-      const replayNextAction = replayNextActionFromOutcome(latestOutcome);
-      const refreshedStart =
-        replayNextAction === undefined
-          ? startOutcomeForObservedReplay({
-              request,
-              events: refreshedEvents
-            })
-          : startOutcomeFor(request, replayNextAction);
-      if (isSpecMethodBlockingPayload(refreshedStart)) {
-        return Object.freeze({
-          start,
-          replayEvents: EMPTY_RUNTIME_EVENTS,
-          eventGraphEvents: refreshedEvents
-        });
-      }
-      return Object.freeze({
-        start: refreshedStart,
-        replayEvents:
-          refreshedStart.executionContract === null
-            ? Object.freeze([])
-            : replayNextAction !== undefined &&
-                replayNextActionRequiresFreshTargetTraversal({
-                  latestOutcome,
-                  replayNextAction
-                })
-              ? EMPTY_RUNTIME_EVENTS
-            : replayEventsForBasis(
-              refreshedStart.executionContract.basis,
-              refreshedEvents
-            ),
-        eventGraphEvents: refreshedEvents
-      });
-    }
+    requireInstalledTopology: true
   });
 }
 

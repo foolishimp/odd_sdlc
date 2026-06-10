@@ -999,6 +999,97 @@ test("T-187 INTENT trace prose does not mint duplicate requirement obligations",
   }
 });
 
+test("T-187 active tenant scope filters inactive tenant requirements before review-grade", () => {
+  const workspaceRoot = makeConformanceWorkspace(
+    "t187-active-tenant-obligation-scope",
+    [
+      "project:",
+      "  name: data_mapper",
+      "active_tenant: scala_spark",
+      "selected_output_root: build_tenants/scala_spark",
+      "build_tenants:",
+      "  scala_spark:",
+      "    output_dir: build_tenants/scala_spark",
+      "    language: scala",
+      "    build_tool: sbt"
+    ].join("\n")
+  );
+  try {
+    mkdirSync(path.join(workspaceRoot, "specification/requirements"), {
+      recursive: true
+    });
+    writeFileSync(
+      path.join(workspaceRoot, "specification/requirements/00-imported-sources.md"),
+      [
+        "# Imported Sources",
+        "",
+        "- `workspace://specification/mapper_requirements.md`"
+      ].join("\n"),
+      "utf8"
+    );
+    writeFileSync(
+      path.join(workspaceRoot, "specification/mapper_requirements.md"),
+      [
+        "# Mapper Requirements",
+        "",
+        "#### REQ-BT-001: Active Build Tenant",
+        "A workspace MUST declare exactly one active build tenant.",
+        "",
+        "#### REQ-BT-002: Scala Spark Tenant Contract",
+        "If the active tenant is `scala_spark`, the pipeline enforces Spark-tier obligations.",
+        "",
+        "#### REQ-BT-003: DBT Tenant Contract",
+        "If the active tenant is `dbt`, the pipeline enforces DBT-tier obligations.",
+        "",
+        "#### REQ-BT-004: CLI Runner Contract",
+        "Every build tenant MUST expose a CLI runner."
+      ].join("\n"),
+      "utf8"
+    );
+
+    const contract = hookContractByEdgeName("derive_lite_component_code_surface");
+    const manifest = deriveWorkerHandoffManifest({
+      workspaceRoot,
+      graphFunctionName: "lite_design_module_implementation",
+      edgeName: contract.edgeName,
+      vectorIndex: 1,
+      contract,
+      traversalAttemptEnvelope: {
+        kind: "traversal_attempt_envelope",
+        envelopeVersion: "ts-traversal-attempt-v1",
+        envelopeRef: "envelope://odd-sdlc/t187/active-tenant-scope",
+        profileRef: "profile://odd-sdlc/t187/active-tenant-scope",
+        strategyDirectiveRef: "strategy://odd-sdlc/full_breadth/t187",
+        selectedScheduleItemRefs: [],
+        phaseGateRefs: [],
+        requiredProgressArtifactRefs: [],
+        retryBudgetRemaining: 1,
+        mustExitAfterBoundedAttempt: false
+      },
+      runId: "t187-active-tenant-scope"
+    });
+    const obligationIds = manifest.traversalObligationContext.obligations.map(
+      (obligation) => obligation.obligationId
+    );
+
+    assert(
+      obligationIds.some((obligationId) => obligationId.endsWith(".req_bt_002")),
+      JSON.stringify(obligationIds, null, 2)
+    );
+    assert(
+      obligationIds.some((obligationId) => obligationId.endsWith(".req_bt_004")),
+      JSON.stringify(obligationIds, null, 2)
+    );
+    assert.equal(
+      obligationIds.some((obligationId) => obligationId.endsWith(".req_bt_003")),
+      false,
+      JSON.stringify(obligationIds, null, 2)
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
 test("T-187 work-category governance also bounds terminal output", () => {
   for (const source of workCategoryGovernanceSources) {
     assert.match(

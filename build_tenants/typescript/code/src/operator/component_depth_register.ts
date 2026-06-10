@@ -754,6 +754,45 @@ function requiredRowsPresent(input: {
   }
 }
 
+function rawArrayLength(input: Readonly<Record<string, unknown>>, field: string): number {
+  const value = input[field];
+  return Array.isArray(value) ? value.length : 0;
+}
+
+function targetStageOccupancyReasons(input: {
+  readonly targetAssetType: ComponentDepthTarget;
+  readonly candidate: unknown;
+}): readonly string[] {
+  const record = recordValue(input.candidate);
+  if (record === null) {
+    return Object.freeze([]);
+  }
+  switch (input.targetAssetType) {
+    case "component_code_surface":
+      return Object.freeze([
+        ...(rawArrayLength(record, "testComponentTopologyRows") > 0
+          ? ["component_depth_register_component_code_test_topology_rows_wrong_stage"]
+          : []),
+        ...(rawArrayLength(record, "componentTestRows") > 0
+          ? ["component_depth_register_component_code_test_rows_wrong_stage"]
+          : []),
+        ...(rawArrayLength(record, "componentTestQualificationRows") > 0
+          ? ["component_depth_register_component_code_test_qualification_rows_wrong_stage"]
+          : [])
+      ]);
+    case "component_realization_qualification_surface":
+    case "component_test_surface":
+    case "component_test_qualification_surface":
+    case "component_repair_schedule_surface":
+    case "release_depth_parity_surface":
+      return Object.freeze([]);
+    default: {
+      const exhaustive: never = input.targetAssetType;
+      throw new TypeError(`Unsupported component-depth target ${exhaustive}`);
+    }
+  }
+}
+
 export function admitComponentDepthRegisterFromArtifact(input: {
   readonly targetAssetType: string;
   readonly outputFile: string;
@@ -787,6 +826,20 @@ export function admitComponentDepthRegisterFromArtifact(input: {
       continue;
     }
     try {
+      const targetStageReasons = targetStageOccupancyReasons({
+        targetAssetType: input.targetAssetType,
+        candidate
+      });
+      if (targetStageReasons.length > 0) {
+        return Object.freeze({
+          kind: "sdlc_component_depth_register_admission" as const,
+          status: "rejected" as const,
+          targetAssetType: input.targetAssetType,
+          register: null,
+          blockingReasons: targetStageReasons,
+          evidenceRefs
+        });
+      }
       const register = parseRegister(candidate, "component_depth_register");
       if (register.targetAssetType !== input.targetAssetType) {
         errors.push(

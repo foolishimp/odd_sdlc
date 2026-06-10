@@ -413,6 +413,7 @@ function compactComponentDepthDirective(
         componentTopologyRowsDirective,
         componentRealizationRowsDirective,
         "For component_code_surface, payload.componentRealizationRows must contain only source/implementation rows whose product file role is source. Role=test targets, test/ paths, proof-test targets, and execution evidence belong to component_test_surface or later test-execution edges, not to this carrier.",
+        "For component_code_surface, represent test-stage fields as payload.testComponentTopologyRows=[], payload.componentTestRows=[], payload.componentTestQualificationRows=[], payload.componentExecutionFailureRegister=null, payload.componentRepairSchedule=null, and payload.releaseDepthParity=null.",
         "Do not emit payload.componentRepairSchedule on component_code_surface. If Current evaluated gaps mention componentRepairSchedule on this target, remove the stale optional schedule from the component-code carrier; repair scheduling belongs only to component_repair_schedule_surface and release_depth_parity_surface.",
         "Materialize source only against the admitted implementation decomposition summary and module dependency map named by targetCarrierProjection.requiredStagedAuthorityRefs.",
         "Preserve source component boundaries from the composite implementation design authority.",
@@ -902,7 +903,8 @@ export function outcomeDirectivesForWorker(
         directives.push(
           "When declared product file targets are empty, derive the product source target set from admitted composite implementation design authority and materialize source files at payload.componentRealizationRows[].relativePath.",
           "Exclude role=test fileTargetRows, validator/proof-test component topology rows, and any test/ path from component_code_surface componentRealizationRows; those targets are consumed by component_test_surface.",
-          "Build config files alone never satisfy required role source for component_code_surface; create source-role product files first, then add build/project files only as supporting materialization declared by admitted design authority."
+          "Build config files alone never satisfy required role source for component_code_surface; create source-role product files first, then add build/project files only as supporting materialization declared by admitted design authority.",
+          "For component_code_surface, do not emit row-count-only executor scaffolds, print-only public runners, or requirement-comment shells. Source-role files must contain executable domain behavior matching the admitted module topology."
         );
       }
       if (manifest.graphFunctionName !== FG_MATERIALIZE_DECLARED_PRODUCT_ASSET) {

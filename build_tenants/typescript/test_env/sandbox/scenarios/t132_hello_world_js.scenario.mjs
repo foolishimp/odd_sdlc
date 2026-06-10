@@ -8,6 +8,8 @@ import { fileURLToPath } from "node:url";
 import {
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+  FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
+  FG_PREPARE_TEST_EXECUTION_SURFACE,
   FG_CONFORM_PROJECT,
   SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF
 } from "../../../build/semantic/code/src/index.js";
@@ -52,7 +54,9 @@ export const T132_HELLO_WORLD_JS_FULL_LIFECYCLE_EDGES = Object.freeze([
 
 export const T132_HELLO_WORLD_JS_MIN_FP_EDGES = Object.freeze([
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
-  FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+  FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+  FG_PREPARE_TEST_EXECUTION_SURFACE,
+  FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
 ]);
 
 export const t132HelloWorldJsScenario = Object.freeze({
@@ -102,44 +106,22 @@ export function t132HelloWorldJsLiveScenario({
       ],
       exactHandoffEdgeSequence: T132_HELLO_WORLD_JS_MIN_FP_EDGES,
       handoffEdgeSequencePrefix: T132_HELLO_WORLD_JS_MIN_FP_EDGES,
+      requiredHandoffEdges: [
+        FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+        FG_PREPARE_TEST_EXECUTION_SURFACE,
+        FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
+      ],
       edgeAssuranceArchiveSequencePrefix: T132_HELLO_WORLD_JS_MIN_FP_EDGES,
       firstHandoffOverlayRef: SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
+      executionEvidence: {
+        edgeName: FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
+        status: "succeeded",
+        commandIncludes: "node",
+        stdoutIncludes: "Hello, world!"
+      },
       latestArchiveArtifacts: [
-        "sdlc_decomposition_summary.json",
-        "sdlc_implementation_decomposition_summary.json",
-        "sdlc_module_dependency_map.json",
-        "sdlc_module_dependency_traversal_selection.json",
-        "sdlc_traversal_hop_selection.json",
-        "worker_result_report.json"
-      ],
-      latestArchiveJsonAssertions: [
-        {
-          file: "sdlc_decomposition_summary.json",
-          equals: {
-            kind: "sdlc_decomposition_summary",
-            admissionDecision: "admit",
-            upstreamCount: 1,
-            downstreamCount: 1,
-            upstreamPerDownstreamRatio: 1,
-            downstreamPerUpstreamRatio: 1,
-            blockingReasons: []
-          }
-        },
-        {
-          file: "sdlc_traversal_hop_selection.json",
-          equals: {
-            kind: "sdlc_traversal_hop_selection",
-            outcomeClass: "framework_smoke",
-            hopClass: "single_hop",
-            blockingReasons: [],
-            "complexityAssessment.inputObligationCount": 1,
-            "complexityAssessment.outputRowCount": 1,
-            "complexityAssessment.upstreamPerDownstreamRatio": 1,
-            "complexityAssessment.downstreamPerUpstreamRatio": 1,
-            "pressurePreservation.admissionDecision": "admit",
-            "pressurePreservation.mechanism": "outcome_class_graph_variant"
-          }
-        }
+        "worker_result_report.json",
+        "declared_edge_projection_artifact.json"
       ],
       processChecks: [
         {

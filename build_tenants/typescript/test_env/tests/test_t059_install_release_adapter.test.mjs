@@ -16,7 +16,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path, { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   deriveOddSdlcTypescriptReleaseCut,
@@ -37,11 +37,11 @@ const ABG_TYPESCRIPT_ROOT = resolve(
   REPO_ROOT,
   "../abiogenesis/build_tenants/abiogenesis/typescript"
 );
-const ABG_RELEASE_VERSION = "4.0.0-rc.7";
-const ABG_RELEASE_SOURCE_REF = "main";
-const ABG_RELEASE_SOURCE_COMMIT = "e348aa996bd0eae541acebdf44866c38cc37b9e9";
+const ABG_RELEASE_VERSION = "4.0.0-rc.14";
+const ABG_RELEASE_SOURCE_REF = "HEAD";
+const ABG_RELEASE_SOURCE_COMMIT = "891b93d4568cb9b000e1e27803a3d43dda3db41a";
 const ABG_RELEASE_TARBALL_SHA256 =
-  "52f3836a900e2fb73c243244e59d174efcd8922525cf676f9edb015d635da2b1";
+  "361813d383517bd5481778bf76e03b5689e381c0d749b2fb22b7d65fe4c6b9e9";
 const ABG_RELEASE_SNAPSHOT_REF = ABG_RELEASE_VERSION;
 const ABG_RELEASE_SNAPSHOT_ROOT = resolve(
   REPO_ROOT,
@@ -154,6 +154,51 @@ function installedAbgConfigPath(targetRoot) {
   return path.join(targetRoot, ".abiogenesis/config/abg.config.json");
 }
 
+async function assertInstalledAbgRuntimeBinding(input) {
+  const { targetRoot, bindingPath, installedPackageName } = input;
+  assert.equal(
+    bindingPath,
+    path.join(targetRoot, ".abiogenesis/typescript-runtime.mjs")
+  );
+  assert.equal(existsSync(bindingPath), true, "missing installed ABG runtime binding");
+  const bindingSource = readFileSync(bindingPath, "utf8");
+  assert(bindingSource.includes(`from "${installedPackageName}"`));
+  assert(bindingSource.includes("createPlugins(input)"));
+  assert(bindingSource.includes("createOddSdlcAbgRuntimeBindingPlugins"));
+  assert(bindingSource.includes("oddSdlcAbgRuntimeWorkerTransportFromEnv"));
+  assert(bindingSource.includes("resolvePolicy(input)"));
+  assert(bindingSource.includes("resolveOddSdlcAbgRuntimeBindingPolicy"));
+  assert(!bindingSource.includes("executeInstalledOperatorStartWithReentry"));
+  assert(!bindingSource.includes("odd-sdlc-ts start"));
+
+  const imported = await import(pathToFileURL(bindingPath).href);
+  assert.equal(typeof imported.runtimeBinding, "object");
+  assert.equal(typeof imported.runtimeBinding.createPlugins, "function");
+  assert.equal(typeof imported.runtimeBinding.resolvePolicy, "function");
+  assert.equal(imported.runtimeBinding.fallbackConfigPath, ".abiogenesis/config/abg.config.json");
+  assert.equal(imported.runtimeBinding.resolvedPolicy.defaultRegime, "F_P");
+  const conformancePolicy = imported.runtimeBinding.resolvePolicy({
+    target: { graphFunctionHandle: "Fg_conform_project" }
+  });
+  assert.equal(conformancePolicy.defaultRegime, "F_D");
+  assert.equal(conformancePolicy.dispatchRef, null);
+  assert.equal(
+    conformancePolicy.resolvedPolicyBundleRef,
+    "policy://odd-sdlc/start/F_D"
+  );
+  const litePolicy = imported.runtimeBinding.resolvePolicy({
+    target: { graphFunctionHandle: "lite_design_module_implementation" }
+  });
+  assert.equal(litePolicy.defaultRegime, "F_P");
+  assert.equal(litePolicy.dispatchRef, "dispatch://odd-sdlc/public-start");
+  assert.equal(litePolicy.resolvedPolicyBundleRef, "policy://odd-sdlc/start/F_P");
+  assert.equal(imported.runtimeBinding.runtimeIdentity.resolvedRuntimeRef, "runtime://abiogenesis/typescript");
+  assert.equal(
+    imported.runtimeBinding.module.graphFunctions.some((entry) => entry.name === "lite_design_module_implementation"),
+    true
+  );
+}
+
 function assertBootstrapGovernanceText(text) {
   for (const alias of [
     "STDO law",
@@ -233,6 +278,7 @@ test("T-059 API installs odd_sdlc.TS and ABG runtime into a target workspace", a
   assert.equal(existsSync(outcome.installManifestPath), true);
   assert.equal(existsSync(outcome.normalizationPath), true);
   assert.equal(existsSync(outcome.bootstrapGuidePath), true);
+  assert.equal(existsSync(outcome.manifest.abgRuntimeBindingPath), true);
   const packageJson = readJson(path.join(targetRoot, "package.json"));
   assert.equal(
     packageJson.dependencies["@odd-sdlc/typescript-tenant"],
@@ -267,8 +313,19 @@ test("T-059 API installs odd_sdlc.TS and ABG runtime into a target workspace", a
   );
   assert.equal(manifest.packageName, "@odd-sdlc/typescript-tenant");
   assert(manifest.runtimeIdentity.substrateRuntimeRef.includes("@abiogenesis/typescript-tenant"));
+  assert.equal(
+    manifest.abgRuntimeBindingPath,
+    path.join(targetRoot, ".abiogenesis/typescript-runtime.mjs")
+  );
+  await assertInstalledAbgRuntimeBinding({
+    targetRoot,
+    bindingPath: manifest.abgRuntimeBindingPath,
+    installedPackageName: outcome.installedPackage.packageName
+  });
   assertBootstrapGovernanceCarrier(manifest.bootstrapGovernance);
-  assertBootstrapGovernanceCarrier(readJson(outcome.normalizationPath).bootstrapGovernance);
+  const normalization = readJson(outcome.normalizationPath);
+  assert.equal(normalization.abgRuntimeBindingPath, manifest.abgRuntimeBindingPath);
+  assertBootstrapGovernanceCarrier(normalization.bootstrapGovernance);
 
   const run = spawnSync(oddSdlcCommand, ["gaps", "--workspace", targetRoot], {
     cwd: targetRoot,

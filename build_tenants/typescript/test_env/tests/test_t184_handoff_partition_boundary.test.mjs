@@ -609,13 +609,22 @@ test("T-184 long process archives have durable started/interrupted lifecycle fac
     assert.match(installedOperatorSource, new RegExp(artifactPath, "u"));
   }
 
-  for (const source of [t164LiveSource, resumeSource, externalRunnerSource]) {
+  assert.match(
+    t164LiveSource,
+    /ABG-owned layered command\/control lane, not an odd_sdlc local start loop/u
+  );
+  for (const source of [externalRunnerSource]) {
     assert.match(source, /lifecycleStatus: "started"/u);
     assert.match(source, /lifecycleStatus: "completed"/u);
     assert.match(source, /status: null/u);
     assert.match(source, /endedAt: null/u);
     assert.match(source, /hostPid: process\.pid/u);
   }
+  assert.match(resumeSource, /Resume helper retired by T-197 A2/u);
+  assert.match(
+    resumeSource,
+    /Use or implement the ABG-owned layered command\/control lane instead/u
+  );
 });
 
 test("T-184 operator summary separates obligation review from semantic admission", () => {

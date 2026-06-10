@@ -242,6 +242,40 @@ test("T-188 downstream carryover partials do not become edge-local closure press
   assert.deepStrictEqual(pressureRefs, []);
 });
 
+test("T-188 review-grade downstream carryover overrides stale pre-review F_P counts", () => {
+  const pressureRefs = sdlcFpEvaluateOpenObligationPressureRefs({
+    runRef: "20260601T000000000Z_pid188",
+    status: "admitted_with_open_obligations",
+    obligationAssessmentCounts: {
+      total: 3,
+      fulfilled: 1,
+      partial: 0,
+      blocked: 2,
+      unassessed: 0
+    },
+    obligationAssessments: [
+      {
+        fulfillmentStatus: "fulfilled",
+        blockingReasons: []
+      },
+      {
+        fulfillmentStatus: "partial",
+        blockingReasons: [
+          "requirement_carried_for_downstream_closure:data_mapper.requirements.req_acc_001"
+        ]
+      },
+      {
+        fulfillmentStatus: "partial",
+        blockingReasons: [
+          "requirement_recorded_for_future_closure:data_mapper.requirements.req_trv_001"
+        ]
+      }
+    ]
+  });
+
+  assert.deepStrictEqual(pressureRefs, []);
+});
+
 test("T-188 component repair triage gap becomes closure pressure", () => {
   const pressureRefs = componentDepthResidualPressureRefs({
     runRef: "20260601T000000000Z_pid188",

@@ -17,6 +17,10 @@ import {
   liveOperatorRuntimePolicy
 } from "./operator_runtime_policy.mjs";
 import { canonicalDataMapperFixtureRoot } from "../fixtures/data_mapper_fixture.mjs";
+import {
+  FG_CONFORM_PROJECT,
+  FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE
+} from "../../build/semantic/code/src/index.js";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(SCRIPT_DIR, "../..");
@@ -32,14 +36,13 @@ const LANE_NAME =
   "full_external_data_mapper_sandbox";
 const DATA_MAPPER_TEMPLATE_ROOT = canonicalDataMapperFixtureRoot();
 const WORKER_TRANSPORT = RUNTIME_POLICY.liveHarnessDataMapperWorkerTransport;
-const MAX_STEPS = Number.parseInt(
-  process.env["ODD_SDLC_TS_DATA_MAPPER_MAX_STEPS"] ?? "56",
-  10
-);
 const COMMAND_TIMEOUT_MS = configuredLiveTimeoutMs(
   "ODD_SDLC_TS_DATA_MAPPER_COMMAND_TIMEOUT_MS",
-  RUNTIME_POLICY.liveHarnessCommandTimeoutMs
+  RUNTIME_POLICY.liveHarnessFullCapabilityCommandTimeoutMs
 );
+const TARGET_GRAPH_FUNCTION =
+  process.env["ODD_SDLC_TS_DATA_MAPPER_TARGET_GRAPH_FUNCTION"] ??
+  FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE;
 
 function archiveTimestamp() {
   return new Date().toISOString().replaceAll("-", "").replaceAll(":", "").replace(".", "");
@@ -133,7 +136,8 @@ function runCommand(input) {
     result.stderr ?? "",
     "utf8"
   );
-  if (result.status !== 0) {
+  const acceptedStatuses = input.acceptedStatuses ?? Object.freeze([0]);
+  if (!acceptedStatuses.includes(result.status)) {
     throw new Error(
       `${input.label} failed: ${result.stderr || JSON.stringify(record, null, 2)}`
     );
@@ -148,18 +152,6 @@ function specPayload(parsed, label) {
   return parsed.payload;
 }
 
-function edgeSummary(payload) {
-  return {
-    status: payload.status ?? null,
-    currentEdge: payload.projection?.currentEdge ?? payload.summary?.currentEdge ?? null,
-    graphFunctionName: payload.summary?.graphFunctionName ?? null,
-    postflight: payload.postflight?.status ?? null,
-    assurance: payload.assuranceSatisfaction?.status ?? null,
-    blockingReason: payload.summary?.blockingReason ?? payload.blockingReason ?? null,
-    archiveRoot: payload.archiveRoot ?? payload.summary?.archiveRoot ?? null
-  };
-}
-
 function installedCommandFromInstallPayload(payload, workspace) {
   const commandPath = payload.commandPaths?.find(
     (candidate) => path.basename(candidate) === "odd-sdlc-ts"
@@ -168,6 +160,16 @@ function installedCommandFromInstallPayload(payload, workspace) {
     return commandPath;
   }
   return path.join(workspace, "node_modules/.bin/odd-sdlc-ts");
+}
+
+function installedAbgCommandFromInstallPayload(payload, workspace, commandName) {
+  const commandPath = payload.commandPaths?.find(
+    (candidate) => path.basename(candidate) === commandName
+  );
+  if (commandPath !== undefined) {
+    return commandPath;
+  }
+  return path.join(workspace, "node_modules/.bin", commandName);
 }
 
 function findProductMaterializationPackages(workspace) {
@@ -207,6 +209,58 @@ function readDirEntries(dirPath) {
     : [];
 }
 
+function abgStartArgs(targetGraphFunction) {
+  return [
+    "start",
+    "--workspace",
+    ".",
+    "--scope",
+    "workspace",
+    "--target",
+    `graph_function:${targetGraphFunction}`,
+    "--until",
+    "converged"
+  ];
+}
+
+function summaryStepFromStart(phase, start) {
+  return {
+    phase,
+    status: start.status ?? null,
+    target: start.target ?? null,
+    resolvedTarget: start.resolved_target ?? null,
+    edge: start.edge ?? null,
+    stoppedBy: start.stopped_by ?? null,
+    stopClass: start.stop_class ?? null,
+    liveStatus: start.live_status ?? null,
+    eventKinds: start.event_kinds ?? []
+  };
+}
+
+function isLawfulAbgGapStop(start) {
+  return (
+    start?.status === "blocked" &&
+    start?.stopped_by === "blocked" &&
+    start?.control_outcome?.kind === "blocked" &&
+    start?.control_outcome?.stopDetail?.kind === "gap_stop" &&
+    start?.live_status?.runStatus === "blocked" &&
+    start?.live_status?.reason === "gap_stop" &&
+    start?.stop_class?.kind === "blocked"
+  );
+}
+
+function terminalReasonFromStart(start) {
+  if (start?.status === "converged") {
+    return "abg_reported_converged";
+  }
+  if (isLawfulAbgGapStop(start)) {
+    return "abg_reported_lawful_gap_stop";
+  }
+  throw new Error(
+    `ABG start returned non-lawful terminal: ${JSON.stringify(start, null, 2)}`
+  );
+}
+
 function main() {
   const testRunRoot = resolve(
     process.env["ODD_SDLC_TS_TEST_RUN_ROOT"] ?? DEFAULT_TEST_RUN_ROOT
@@ -221,15 +275,18 @@ function main() {
     ...process.env,
     ODD_SDLC_TS_OUTPUT: "json",
     ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE: "pty-terminal",
-    ABG_TS_AGENT_EXECUTOR_PROFILE: "pty-terminal"
+    ABG_TS_AGENT_EXECUTOR_PROFILE: "pty-terminal",
+    ODD_SDLC_TS_WORKER_TRANSPORT: WORKER_TRANSPORT,
+    ODD_SDLC_TS_DATA_MAPPER_WORKER: WORKER_TRANSPORT
   };
   const summary = {
     kind: "odd_sdlc_full_external_data_mapper_sandbox_run",
+    commandBinding: "abg_cli_start_until_converged",
     archiveRoot,
     workspace,
     templateRoot: DATA_MAPPER_TEMPLATE_ROOT,
     workerTransport: WORKER_TRANSPORT,
-    maxSteps: MAX_STEPS,
+    targetGraphFunction: TARGET_GRAPH_FUNCTION,
     steps: []
   };
   writeJson(path.join(archiveRoot, "run_summary.json"), summary);
@@ -258,78 +315,50 @@ function main() {
   );
   const installedCommand = installedCommandFromInstallPayload(installPayload, workspace);
   assertExists(installedCommand, "installed odd-sdlc-ts command");
+  const installManifest =
+    installPayload.manifest ??
+    (typeof installPayload.installManifestPath === "string"
+      ? readJsonFile(installPayload.installManifestPath)
+      : null);
+  const abgRuntimeBindingPath = installManifest?.abgRuntimeBindingPath ?? null;
+  const genesisCommand = installedAbgCommandFromInstallPayload(
+    installPayload,
+    workspace,
+    "genesis-ts"
+  );
+  assertExists(genesisCommand, "installed genesis-ts command");
+  assertExists(abgRuntimeBindingPath, "installed ABG runtime binding");
   summary.installedCommand = installedCommand;
+  summary.abgCommand = genesisCommand;
   summary.installManifestPath = installPayload.installManifestPath ?? null;
+  summary.abgRuntimeBindingPath = abgRuntimeBindingPath;
   writeJson(path.join(archiveRoot, "run_summary.json"), summary);
 
-  let autonomousNextStartAttempted = false;
-  for (let step = 0; step < MAX_STEPS; step += 1) {
-    const gapsLabel = `step-${String(step).padStart(2, "0")}-gaps`;
-    const gaps = specPayload(
-      runCommand({
-        label: gapsLabel,
-        command: installedCommand,
-        args: ["gaps", "--workspace", "."],
-        cwd: workspace,
-        env: baseEnv,
-        archiveRoot
-      }),
-      gapsLabel
-    );
-    const gapsSummary = { step, phase: "gaps", ...edgeSummary(gaps) };
-    summary.steps.push(gapsSummary);
-    writeJson(path.join(archiveRoot, "run_summary.json"), summary);
-    const currentEdge = gaps.projection?.currentEdge ?? null;
-    if (currentEdge === null) {
-      if (autonomousNextStartAttempted) {
-        summary.terminalReason = "odd_sdlc_reported_no_current_edge_after_autonomous_next";
-        break;
-      }
-      autonomousNextStartAttempted = true;
-    }
+  const conformStart = runCommand({
+    label: "abg-conform-project-until-converged",
+    command: genesisCommand,
+    args: abgStartArgs(FG_CONFORM_PROJECT),
+    cwd: workspace,
+    env: baseEnv,
+    archiveRoot
+  });
+  summary.steps.push(summaryStepFromStart("abg-conform-project", conformStart));
+  summary.abgConformProject = conformStart;
+  writeJson(path.join(archiveRoot, "run_summary.json"), summary);
 
-    const startArgs =
-      currentEdge === "Fg_conform_project"
-        ? ["start", "--workspace", ".", "--until", "blocked"]
-        : [
-            "start",
-            "--workspace",
-            ".",
-            "--target",
-            "next",
-            "--until",
-            "first_traversal",
-            "--worker",
-            WORKER_TRANSPORT
-          ];
-    const requestedEdge = currentEdge ?? "target:next";
-    const startLabel = `step-${String(step).padStart(2, "0")}-start-${requestedEdge.replace(/[^a-z0-9_-]/giu, "_")}`;
-    const start = specPayload(
-      runCommand({
-        label: startLabel,
-        command: installedCommand,
-        args: startArgs,
-        cwd: workspace,
-        env: baseEnv,
-        archiveRoot
-      }),
-      startLabel
-    );
-    const startSummary = edgeSummary(start);
-    summary.steps.push({
-      step,
-      phase: "start",
-      requestedEdge,
-      ...startSummary
-    });
-    summary.productMaterializationPackages = findProductMaterializationPackages(workspace);
-    writeJson(path.join(archiveRoot, "run_summary.json"), summary);
-    if (startSummary.status === "converged" && startSummary.currentEdge === null) {
-      summary.terminalReason = "odd_sdlc_reported_converged";
-      writeJson(path.join(archiveRoot, "run_summary.json"), summary);
-      break;
-    }
-  }
+  const start = runCommand({
+    label: "abg-start-until-converged",
+    command: genesisCommand,
+    args: abgStartArgs(TARGET_GRAPH_FUNCTION),
+    cwd: workspace,
+    env: baseEnv,
+    archiveRoot,
+    acceptedStatuses: Object.freeze([0, 4])
+  });
+  summary.steps.push(summaryStepFromStart("abg-start", start));
+  summary.abgStart = start;
+  summary.productMaterializationPackages = findProductMaterializationPackages(workspace);
+  summary.terminalReason = terminalReasonFromStart(start);
   writeJson(path.join(archiveRoot, "run_summary.json"), summary);
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 }

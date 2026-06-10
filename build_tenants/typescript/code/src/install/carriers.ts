@@ -55,6 +55,7 @@ export interface OddSdlcTypescriptInstallManifest {
   readonly abgCommandPaths: readonly string[];
   readonly abgInstallManifestPath: string;
   readonly abgInstallerManifestPath: string;
+  readonly abgRuntimeBindingPath: string;
   readonly bootstrapGuidePath: string;
   readonly instructionFiles: readonly OddSdlcInstructionFileWrite[];
   readonly bootstrapGovernance: OddSdlcBootstrapGovernance;

@@ -2695,6 +2695,12 @@ function concreteRequirementBodySnippet(input: {
     const nextMarker = REQUIREMENT_MARKER_TOKEN_EXPRESSION.exec(line)?.[0];
     if (
       nextMarker !== undefined &&
+      normalizeRequirementId(nextMarker) !== requirementId
+    ) {
+      return null;
+    }
+    if (
+      nextMarker !== undefined &&
       markerOnlySnippet(line, nextMarker)
     ) {
       return null;
@@ -2711,10 +2717,37 @@ function requirementMarkerSnippet(input: {
   readonly marker: string;
 }): string {
   const snippet = lineSnippetForOffset(input.content, input.offset);
-  if (!markerOnlySnippet(snippet, input.marker)) {
+  if (
+    !markerOnlySnippet(snippet, input.marker) &&
+    !markerHeadingSnippet(snippet, input.marker)
+  ) {
     return snippet;
   }
   return concreteRequirementBodySnippet(input) ?? snippet;
+}
+
+function localRequirementHeadingSnippet(input: {
+  readonly content: string;
+  readonly offset: number;
+  readonly requirementId: string;
+}): string {
+  const heading = lineSnippetForOffset(input.content, input.offset);
+  const nextNewline = input.content.indexOf("\n", input.offset);
+  const bodyStart = nextNewline < 0 ? input.content.length : nextNewline + 1;
+  for (const rawLine of input.content.slice(bodyStart).split("\n")) {
+    const line = rawLine.replace(/\s+/gu, " ").trim();
+    if (line.length === 0) {
+      continue;
+    }
+    if (/^---+$/u.test(line) || /^#{1,6}\s+/u.test(line)) {
+      break;
+    }
+    return `${normalizeRequirementId(input.requirementId)}: ${heading} ${line}`.slice(
+      0,
+      320
+    );
+  }
+  return heading;
 }
 
 function markerOnlySnippet(snippet: string, marker: string): boolean {
@@ -2724,6 +2757,23 @@ function markerOnlySnippet(snippet: string, marker: string): boolean {
     .replaceAll("`", "")
     .trim();
   return normalized === marker || normalized === normalizeRequirementId(marker);
+}
+
+function markerHeadingSnippet(snippet: string, marker: string): boolean {
+  const normalized = snippet
+    .replace(/^#+\s*/u, "")
+    .replace(/^[-*]\s*/u, "")
+    .replaceAll("`", "")
+    .trim();
+  const requirementId = normalizeRequirementId(marker);
+  return (
+    normalized.startsWith(`${marker}:`) ||
+    normalized.startsWith(`${marker} -`) ||
+    normalized.startsWith(`${marker} `) ||
+    normalized.startsWith(`${requirementId}:`) ||
+    normalized.startsWith(`${requirementId} -`) ||
+    normalized.startsWith(`${requirementId} `)
+  );
 }
 
 function authorityRefsFor(input: {
@@ -3067,11 +3117,16 @@ function requirementObligations(input: {
       });
     }
     for (const match of source.content.matchAll(LOCAL_REQUIREMENT_HEADING_EXPRESSION)) {
+      const requirementId = match[1] ?? "R-000";
       const marker = localRequirementMarker({
-        requirementId: match[1] ?? "R-000",
+        requirementId,
         title: match[2] ?? "requirement"
       });
-      const snippet = lineSnippetForOffset(source.content, match.index ?? 0);
+      const snippet = localRequirementHeadingSnippet({
+        content: source.content,
+        offset: match.index ?? 0,
+        requirementId
+      });
       recordRequirement({
         marker,
         sourceRef: ref,
@@ -3115,6 +3170,33 @@ function requirementObligations(input: {
         });
       })
   );
+}
+
+function tenantScopeForRequirementObligation(
+  obligation: SdlcTraversalObligation
+): string | null {
+  if (
+    obligation.obligationKind !== "requirement" &&
+    !obligation.obligationId.startsWith("requirement:")
+  ) {
+    return null;
+  }
+  const text = [
+    obligation.obligationId,
+    obligation.summary,
+    ...obligation.payload.sourceSnippets
+  ].join("\n");
+  const match =
+    /active\s+tenant\s+is\s+`?([a-z0-9][a-z0-9_-]*)`?/iu.exec(text);
+  return match?.[1]?.toLowerCase() ?? null;
+}
+
+function obligationInActiveTenantScope(input: {
+  readonly activeTenant: string;
+  readonly obligation: SdlcTraversalObligation;
+}): boolean {
+  const tenantScope = tenantScopeForRequirementObligation(input.obligation);
+  return tenantScope === null || tenantScope === input.activeTenant.toLowerCase();
 }
 
 function priorGapReasonCodes(
@@ -3448,11 +3530,16 @@ function deriveTraversalObligationContext(input: {
     );
   }
   const scopedObligations = Object.freeze(
-    obligations.filter((obligation) =>
-      sdlcTraversalObligationInFeatureScope({
-        featureScope: input.featureScope,
-        obligation
-      })
+    obligations.filter(
+      (obligation) =>
+        obligationInActiveTenantScope({
+          activeTenant: input.materialization.activeTenant,
+          obligation
+        }) &&
+        sdlcTraversalObligationInFeatureScope({
+          featureScope: input.featureScope,
+          obligation
+        })
     )
   );
   const scopedAuthorityRefs = scopedAuthorityRefsForFeatureScope({

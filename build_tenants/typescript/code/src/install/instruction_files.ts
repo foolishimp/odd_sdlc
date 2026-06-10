@@ -4,6 +4,7 @@ import { deliverBootloader, type BootloaderWriter } from "@abiogenesis/typescrip
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import type { OddSdlcBootstrapGovernance, OddSdlcInstructionFileWrite } from "./carriers.js";
+import { FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE } from "../graph/catalog.js";
 
 const ODD_SDLC_BOOTLOADER_START = "<!-- ODD_SDLC_BOOTLOADER_START -->";
 const ODD_SDLC_BOOTLOADER_END = "<!-- ODD_SDLC_BOOTLOADER_END -->";
@@ -147,9 +148,8 @@ function buildInstructionContent(input: OddSdlcInstructionFilesInput): string {
     "## Start Here",
     `- when the operator says \`gaps\`, run \`${oddSdlcCommand} gaps --workspace .\``,
     "- `start` is an operator shell over ABG-owned graph execution; do not treat odd_sdlc as a second traversal runtime",
-    `- when the operator says \`start\` for live completion on Claude, run the ABG-backed start path with \`${oddSdlcCommand} start --workspace . --target next --until converged --worker process://claude\``,
-    `- when the operator says \`start\` for live completion on Codex, run the ABG-backed start path with \`${oddSdlcCommand} start --workspace . --target next --until converged --worker process://codex\``,
-    `- use \`${oddSdlcCommand} start --workspace . --target next --until blocked\` only when you intentionally want a bounded frontier inspection rather than full ABG-owned graph execution`,
+    `- when the operator says \`start\`, resolve the SDLC domain boundary with \`${oddSdlcCommand} start --workspace . --target next --until blocked --worker process://claude\` or \`${oddSdlcCommand} start --workspace . --target next --until blocked --worker process://codex\`, matching the active worker`,
+    `- for layered execution to convergence, hand control to the ABG command binding \`${genesisCommand} start --workspace . --scope workspace --target graph_function:${FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE} --until converged\`; do not create an odd_sdlc-local start/retry loop`,
     `- inspect the RC surface with \`${oddSdlcCommand} rc-report\``,
     `- ABG command binding: \`${genesisCommand}\``,
     `- ABIogenesis command binding: \`${abiogenesisCommand}\``,

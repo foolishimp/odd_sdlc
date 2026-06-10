@@ -211,7 +211,7 @@ test("T-197 design ratifies owner partition assets before Wave 1 code", () => {
     "### Decommission Register",
     "### W-105 Construct-Site Sufficiency Inventory",
     "ABG route / dependency",
-    "ABI 4.0.0-rc.7",
+    "ABI 4.0.0-rc.14",
     "runtime continuation transition projection refs",
     "22/22 edge-contract tests and 1/1 Rust-service sandbox proof",
     "must-not-name-governed-target",
@@ -237,6 +237,8 @@ test("T-197 design ratifies owner partition assets before Wave 1 code", () => {
     ".ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md"
   );
   assert.match(ticket, /\| W-105 \| Wave 1 pre-realization gate \|/u);
+  assert.match(ticket, /\| W-115 \| A2 command\/control hard break \|/u);
+  assert.match(ticket, /\| W-116 \| Retire or rehome legacy local re-entry helper \|/u);
   assert.match(ticket, /ABG T-154 filed and completed for explicit resume cursor/u);
   assert.match(ticket, /npm run test:t164` passed 22\/22 edge-contract \+ 1\/1 Rust-service sandbox/u);
 });
@@ -324,12 +326,23 @@ test("T-197 W-110 routes conform-project F_D advance through ABG runner ownershi
   const source = repoFile(
     "build_tenants/typescript/code/src/operator/installed_operator.ts"
   );
+  const conformVectorGuard = sourceFunction(
+    source,
+    "isConformProjectGraphVectorEdge"
+  );
 
   assert.match(source, /\bappendFdConformanceRuntimeEvents\b/u);
   assert.match(source, /\brunEngineIterateAsync\b/u);
   assert.match(source, /\bconstructFdEvaluationOutcome\b/u);
   assert.match(source, /\bdefaultFdEvaluatorPlugin\.contract\b/u);
   assert.match(source, /until:\s*"first_traversal"/u);
+  assert.match(source, /\bisConformProjectGraphVectorEdge\(pluginInput\.edge\)/u);
+  assert.match(conformVectorGuard, /\bCONFORM_PROJECT_OUTPUTS\.some\b/u);
+  assert.match(conformVectorGuard, /`\$\{FG_CONFORM_PROJECT\}__\$\{targetAssetType\}`/u);
+  assert.doesNotMatch(
+    source,
+    /pluginInput\.edge === FG_CONFORM_PROJECT && pluginInput\.regime === "F_D"/u
+  );
   assert.doesNotMatch(source, /\bruntimeEventsForIterationDecision\b/u);
 });
 
@@ -433,9 +446,35 @@ test("T-197 A5 gates installed convergence on ABG terminal convergence", () => {
     source,
     /\bfunction abgTraversalTransitionProjectionRef\b/u
   );
+  assert.match(source, /\bruntimeEventsForBasis\b/u);
+  assert.doesNotMatch(
+    source,
+    /deriveRuntimeAggregateProjection\(\s*input\.basis,\s*Object\.freeze\(\[\.\.\.input\.replayEvents,\s*\.\.\.input\.emittedEvents\]\)/u
+  );
+  assert.match(
+    source,
+    /const basisScopedProcessEvents\s*=\s*runtimeEventsForBasis\(\s*input\.basis,\s*input\.processResult\.events\s*\)/u
+  );
+  assert.doesNotMatch(
+    source,
+    /deriveRuntimeAggregateProjection\(\s*input\.basis,\s*input\.processResult\.events\s*\)/u
+  );
+  assert.match(source, /events:\s*basisScopedProcessEvents/u);
   assert.match(
     source,
     /traversalTransitionRef\s*=\s*abgTraversalTransitionProjectionRef/u
+  );
+  assert.match(
+    source,
+    /closureDisposition:\s*closureDecision\.disposition/u
+  );
+  assert.match(
+    source,
+    /input\.closureDisposition === "close"[\s\S]*?disposition:\s*"close"[\s\S]*?reason:\s*"edge_close"/u
+  );
+  assert.match(
+    source,
+    /const effectiveTerminalKind\s*=[\s\S]*?closureDisposition === "close"[\s\S]*?\?\s*"converged"/u
   );
   assert.match(
     source,
@@ -452,23 +491,56 @@ test("T-197 A5 gates installed convergence on ABG terminal convergence", () => {
   );
 });
 
-test("T-197 A2 keeps until-converged as installed UX over admitted start turns", () => {
+test("T-197 A2 keeps SDLC start as shell over one admitted ABG boundary", () => {
+  const product = repoFile("specification/PRODUCT.md");
+  const entry = repoFile(
+    "build_tenants/typescript/code/src/spec_method/entry.ts"
+  );
+  const installedStartPayload = sourceFunction(entry, "installedStartPayloadFor");
+  const instructions = repoFile(
+    "build_tenants/typescript/code/src/install/instruction_files.ts"
+  );
+
+  assert.match(product, /control remains in ABG until ABG exits/u);
+  assert.match(product, /must not implement a product-local loop/u);
+  assert.match(installedStartPayload, /\bexecuteInstalledOperatorStart\(/u);
+  assert.doesNotMatch(
+    installedStartPayload,
+    /\bexecuteInstalledOperatorStartWithReentry\b/u
+  );
+  assert.doesNotMatch(installedStartPayload, /\brefreshReplayState\b/u);
+  assert.doesNotMatch(
+    installedStartPayload,
+    /\binstalledStartShouldContinueForRequestedUntil\b/u
+  );
+  assert.doesNotMatch(
+    entry,
+    /import\s*\{[\s\S]*executeInstalledOperatorStartWithReentry/u
+  );
+  assert.match(
+    instructions,
+    /\$\{genesisCommand\} start --workspace \. --scope workspace --target graph_function:\$\{FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE\} --until converged/u
+  );
+  assert.match(
+    instructions,
+    /import \{ FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE \} from "\.\.\/graph\/catalog\.js";/u
+  );
+  assert.doesNotMatch(instructions, /\$\{oddSdlcCommand\}[^`]*--until converged/u);
+});
+
+test("T-197 review-grade semantic gaps remain ABG retry pressure, not evaluator stop", () => {
   const source = repoFile(
     "build_tenants/typescript/code/src/operator/installed_operator.ts"
   );
-  const loop = sourceFunction(source, "executeInstalledOperatorStartWithReentry");
+  const openFindingsBranch = source.match(
+    /if \(admission\.assessment\.status === "blocked" \|\| openFindings\.length > 0\) \{[\s\S]*?return constructEvaluationRuleOutcome\(\{[\s\S]*?\n    \}\);\n  \}/u
+  );
 
-  assert.match(loop, /\bsdlcOperatorRuntimePolicy\(\)/u);
-  assert.match(loop, /\bexecuteInstalledOperatorStart\(/u);
-  assert.match(loop, /\binstalledStartShouldContinueForRequestedUntil\b/u);
-  assert.match(loop, /\bderiveSdlcWorkerRetryContextFromTraversalConsequence\b/u);
-  assert.match(loop, /\binput\.refreshReplayState\(latest\)/u);
-  assert.doesNotMatch(loop, /\bconstruct[A-Za-z0-9_]*Event\s*\(/u);
-  assert.doesNotMatch(loop, /\bappendOddSdlcRuntimeEvents\b/u);
-  assert.doesNotMatch(loop, /\brunEngineIterateAsync\b/u);
-  assert.doesNotMatch(loop, /\brunEventedNativeSagaFrontier\b/u);
-  assert.doesNotMatch(loop, /\bapplyExplicitGraphVectorResumeCursor\b/u);
-  assert.doesNotMatch(loop, /\bapplyGraphSpanReentryRoute\b/u);
+  assert.notEqual(openFindingsBranch, null);
+  assert.match(openFindingsBranch[0], /code:\s*"review_grade_edge_fulfillment_blocked"/u);
+  assert.match(openFindingsBranch[0], /status:\s*"accepted"/u);
+  assert.match(openFindingsBranch[0], /\bresidualPressureRefs\b/u);
+  assert.doesNotMatch(openFindingsBranch[0], /status:\s*"blocked"/u);
 });
 
 test("T-197 B2 keeps component-depth as GTL target-carrier read model", () => {

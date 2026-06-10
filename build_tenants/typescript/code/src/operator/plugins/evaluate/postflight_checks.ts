@@ -2608,8 +2608,6 @@ function materializedProductFileSatisfiesDeclaredTarget(input: {
   );
 }
 
-
-
 export function evaluateMaterializedProductFiles(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly report: SdlcWorkerResultReport;

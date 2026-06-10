@@ -1166,16 +1166,14 @@ test("T-160 cross-graph repair reentry does not replay already-closed target bas
     "utf8"
   );
 
-  assert.match(source, /function replayNextActionRequiresFreshTargetTraversal/);
   assert.match(source, /function selectedActionRequiresFreshTargetTraversal/);
   assert.match(source, /function startOutcomeRequiresFreshTargetTraversal/);
   assert.match(source, /decision\.disposition !== "repair"/);
   assert.match(source, /selectedActionRef\?\.includes\("\/post_repair_reentry\/"\)/);
   assert.match(source, /selectedActionRef\?\.includes\("\/post_repair\/"\)/);
   assert.match(source, /selectedActionRef\?\.includes\("\/post_close_overlay_continuation\/"\)/);
-  assert.match(source, /latestOutcome\.summary\.graphFunctionName/);
+  assert.match(source, /completedGraphFunctionName/);
   assert.match(source, /startOutcomeRequiresFreshTargetTraversal\(start\)/);
-  assert.match(source, /replayNextActionRequiresFreshTargetTraversal\(/);
   assert.match(source, /EMPTY_RUNTIME_EVENTS/);
   assert.match(operatorSource, /function postActionArchiveRefFromSelectedActionRef/);
   assert.match(operatorSource, /function decodedArchiveRefForScope/);

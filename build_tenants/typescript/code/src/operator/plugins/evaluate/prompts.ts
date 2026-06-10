@@ -86,7 +86,7 @@ function edgeAuthorityCompressionPromptLines(): readonly string[] {
 }
 
 const ABG_ITERATION_OUTCOME_FOLD_REF =
-  "package:@abiogenesis/typescript-tenant@4.0.0-rc.6#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows";
+  "package:@abiogenesis/typescript-tenant@4.0.0-rc.14#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows";
 
 interface EvaluatePromptLineGroups {
   readonly preAuthorityLines: readonly string[];
@@ -411,7 +411,8 @@ function compactReviewGradePromptLineGroups(input: {
       "- reviewedObligationIds: admitted obligation ids from worker_result_report obligation assessments or invocation package inline obligations only.",
       "- findings[]: one finding per reviewed obligation id.",
       "- evidenceRefs: refs for assessment, generated assets, accepted authority, and review evidence.",
-      "- summary: one compact sentence. No extra top-level keys.",
+      "- summary: one compact sentence.",
+      "- Optional top-level observation fields, when useful: stageBoundaryConformance { dimension, status, rationale }, materializationBindingRelation { dimension, status, rationale }, obligationCoverageFold { dimension, coveredCount, totalCount, status, rationale }. No other top-level keys are allowed.",
       "",
       "Finding shape:",
       "- kind: \"sdlc_review_grade_obligation_finding\"",
@@ -432,6 +433,7 @@ function compactReviewGradePromptLineGroups(input: {
       "- File existence, tags, digests, or smoke output are evidence, not proof by themselves.",
       "- Mark trace_missing when a generated product file has no lineage in the asset, selected target carrier, worker report, or product materialization manifest.",
       "- Mark semantic_not_realized when behavior is absent, stubbed, placeholder, disconnected from the public boundary, or contradicts tenant stack authority.",
+      "- On component_code_surface, mark semantic_not_realized when source-role files are only row-count arithmetic, print-only runners, requirement-comment shells, or other scaffolds that do not implement the admitted module responsibility through a public behavior boundary.",
       "- Mark boundary_collapsed when generated source collapses accepted components back into a coarse facade.",
       "- Mark wrong_stage for lawful downstream carryover only. Test execution or runtime proof absent on component_code_surface is wrong_stage when source/build_config obligations are otherwise fulfilled and no test/execution product target is declared on this edge.",
       "- On component_code_surface, inspect every role=source materialized file and declared build/config support before deciding executable or public-boundary evidence is absent.",
@@ -1000,6 +1002,7 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     "- findings[]: one sdlc_review_grade_obligation_finding per reviewed obligation id",
     "- evidenceRefs: refs for the assessment, generated assets, accepted authority, and review evidence",
     "- summary: one compact sentence",
+    "- Optional top-level observation fields, when useful: stageBoundaryConformance { dimension, status, rationale }, materializationBindingRelation { dimension, status, rationale }, obligationCoverageFold { dimension, coveredCount, totalCount, status, rationale }.",
     "- No other top-level keys are allowed.",
     "",
     "Finding shape:",
@@ -1040,6 +1043,7 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     "- Mark partial or blocked when an asset exists but does not plausibly implement the accepted responsibility.",
     "- Mark boundary_collapsed when generated source collapses multiple accepted component rows back into a coarse facade.",
     "- Mark semantic_not_realized when requirement tags are present but the behavior is absent, stubbed, placeholder, or not connected to the exported/public boundary.",
+    "- For component_code_surface, mark semantic_not_realized when source-role files are only row-count arithmetic, print-only runners, requirement-comment shells, or other scaffolds that do not implement the admitted module responsibility through a public behavior boundary.",
     "- Mark semantic_not_realized when accepted authority requires executable/script/program behavior but the source only exports a helper or function and has no entrypoint path that runs the product behavior when the file is invoked. A test calling a helper is overlap evidence, not executable-product proof.",
     "- For non-materialized planning surfaces such as intent, requirement, design, schedule, or test-design surfaces, do not mark downstream implementation/runtime obligations semantic_not_realized merely because implementation behavior is absent on the current edge.",
     "- For non-materialized planning surfaces, the declared output file is the generated asset under review. If worker_result_report.materializedFiles is empty, inspect worker_result_report.outputFile or the manifest outputFile before marking trace_missing or semantic_not_realized; materializedFiles=[] is not by itself a missing-asset blocker on these edges.",

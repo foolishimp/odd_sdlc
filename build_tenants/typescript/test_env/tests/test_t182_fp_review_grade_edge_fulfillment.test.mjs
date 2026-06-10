@@ -349,7 +349,7 @@ test("T-183 ticket absorbs review-grade fulfillment into the one edge ledger sur
   );
 });
 
-test("T-182 review-grade assessment is required for generated worker assets", () => {
+test("T-182 review-grade assessment is required for materialized semantic assets", () => {
   const workspaceRoot = makeWorkspace();
   try {
     const intentManifest = manifestForEdge(
@@ -377,10 +377,10 @@ test("T-182 review-grade assessment is required for generated worker assets", ()
       "derive_code_surface",
       "t182-projection-code"
     );
-    assert.equal(reviewGradeEdgeFulfillmentAssessmentRequired(intentManifest), true);
+    assert.equal(reviewGradeEdgeFulfillmentAssessmentRequired(intentManifest), false);
     assert.equal(reviewGradeEdgeFulfillmentAssessmentRequired(codeManifest), true);
     assert.equal(reviewGradeEdgeFulfillmentAssessmentRequired(testManifest), true);
-    assert.equal(reviewGradeEdgeFulfillmentAssessmentRequired(designManifest), true);
+    assert.equal(reviewGradeEdgeFulfillmentAssessmentRequired(designManifest), false);
     assert.equal(
       reviewGradeEdgeFulfillmentAssessmentRequired(codeProjectionManifest),
       false
@@ -511,6 +511,42 @@ test("T-182 admits full review-grade findings and rejects missing or weak assess
       accepted.assessment.findings[0].fulfillmentBinding.functionOrEntrypointRef,
       "entrypoint://t182/app-main"
     );
+
+    const dimensionPath = writeAssessment(
+      manifest,
+      reviewGradeAssessment(manifest, {
+        stageBoundaryConformance: {
+          dimension:
+            "evaluation-dimension://odd-sdlc/evaluate_review_grade/local-stage-boundary-conformance",
+          status: "conformed",
+          rationale: "Generated asset stayed inside the declared transform unit."
+        },
+        materializationBindingRelation: {
+          dimension:
+            "evaluation-dimension://odd-sdlc/evaluate_review_grade/materialization-binding-relation",
+          status: "not_applicable",
+          rationale: "No component-code materialization binding was required."
+        },
+        obligationCoverageFold: {
+          dimension:
+            "evaluation-dimension://odd-sdlc/evaluate_review_grade/obligation-coverage-fold",
+          coveredCount: manifest.traversalObligationContext.obligations.length,
+          totalCount: manifest.traversalObligationContext.obligations.length,
+          status: "complete",
+          rationale: "Every declared obligation has one finding."
+        }
+      })
+    );
+    const dimensionAdmission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest,
+      outputFile: dimensionPath
+    });
+    assert.equal(dimensionAdmission.status, "admitted");
+    assert.equal(
+      dimensionAdmission.assessment.stageBoundaryConformance.status,
+      "conformed"
+    );
+    assert.equal(dimensionAdmission.assessment.obligationCoverageFold.status, "complete");
 
     const scopedObligation = manifest.traversalObligationContext.obligations.find(
       (obligation) =>
@@ -904,6 +940,24 @@ test("T-182 admits full review-grade findings and rejects missing or weak assess
       /review_grade_obligation_unreviewed/u
     );
 
+    const uatManifest = manifestForEdge(
+      workspaceRoot,
+      "derive_uat_testcases_surface",
+      "sparse-uat-review"
+    );
+    const sparseUat = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest: uatManifest,
+      outputFile: path.join(
+        uatManifest.archiveRoot,
+        REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE
+      )
+    });
+    assert.equal(
+      reviewGradeEdgeFulfillmentAssessmentRequired(uatManifest),
+      false
+    );
+    assert.equal(sparseUat.status, "not_required");
+
     const tagOnlyPretendPass = {
       ...base,
       status: "passed",
@@ -1101,6 +1155,75 @@ test("T-150 canonicalizes prompt-shaped review-grade bindings through admitted G
   }
 });
 
+test("T-197 review-grade binding canonicalizes duplicate prompt evidence refs before GTL admission", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_code_surface",
+      "t197-review-grade-duplicate-evidence"
+    );
+    mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+    writeFileSync(
+      manifest.outputFile,
+      "# Component Code Surface\n\nGenerated component-code carrier.\n",
+      "utf8"
+    );
+
+    const base = reviewGradeAssessment(manifest);
+    const duplicateRef = pathToFileURL(manifest.outputFile).href;
+    const assessmentWithDuplicateBindingRefs = {
+      ...base,
+      findings: base.findings.map((finding) =>
+        finding.obligationId === "target_asset:component_code_surface"
+          ? {
+              ...finding,
+              fulfillmentBinding: {
+                ...finding.fulfillmentBinding,
+                realizationEvidenceRefs: [
+                  ...finding.fulfillmentBinding.realizationEvidenceRefs,
+                  duplicateRef
+                ],
+                evidenceRefs: [
+                  ...finding.fulfillmentBinding.evidenceRefs,
+                  duplicateRef
+                ]
+              }
+            }
+          : finding
+      )
+    };
+    const outputFile = writeAssessment(
+      manifest,
+      assessmentWithDuplicateBindingRefs
+    );
+    const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest,
+      outputFile
+    });
+
+    assert.equal(
+      admission.status,
+      "admitted",
+      admission.blockingReasons.join("\n")
+    );
+    const targetFinding = admission.assessment.findings.find(
+      (finding) => finding.obligationId === "target_asset:component_code_surface"
+    );
+    assert.ok(targetFinding);
+    assert.equal(
+      targetFinding.fulfillmentBinding.evidenceRefs.length,
+      new Set(targetFinding.fulfillmentBinding.evidenceRefs).size
+    );
+    assert.equal(
+      targetFinding.fulfillmentBinding.realizationEvidenceRefs.length,
+      new Set(targetFinding.fulfillmentBinding.realizationEvidenceRefs).size
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
 test("T-195 review-grade binding fails closed for unmatched module obligations", () => {
   const workspaceRoot = makeWorkspace();
   try {
@@ -1286,6 +1409,60 @@ test("T-182 admits blocked semantic review as retry pressure with required actio
     assert.equal(
       admission.assessment.findings[0].requiredAction,
       "Add a test that executes the accepted component responsibility and cites the requirement id."
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-182 component-code semantic depth is F_P review pressure, not F_D postflight", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_code_surface",
+      "t182-component-code-shallow-review"
+    );
+    const base = reviewGradeAssessment(manifest);
+    const blockedAssessment = {
+      ...base,
+      status: "blocked",
+      findings: base.findings.map((finding, index) =>
+        index === 0
+          ? {
+              ...finding,
+              fulfillmentStatus: "blocked",
+              failureClass: "semantic_not_realized",
+              requiredAction:
+                "Replace shallow source scaffolding with executable product behavior connected to the accepted component public boundary.",
+              fulfillmentBinding: null,
+              rationale:
+                "F_P review found requirement tags and files, but no realized behavior at the admitted public boundary."
+            }
+          : finding
+      )
+    };
+    const outputFile = writeAssessment(manifest, blockedAssessment);
+    const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest,
+      outputFile
+    });
+    assert.equal(admission.status, "admitted");
+    assert.equal(admission.assessment.status, "blocked");
+    assert.equal(
+      admission.assessment.findings[0].failureClass,
+      "semantic_not_realized"
+    );
+    const pressureRefs = reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+      runRef: "run://t182/component-code-shallow-review",
+      targetAssetType: "component_code_surface",
+      assessment: admission.assessment
+    });
+    assert.equal(pressureRefs.length, 1);
+    assert.match(pressureRefs[0], /review-grade/u);
+    assert.match(
+      pressureRefs[0],
+      new RegExp(encodeURIComponent(base.findings[0].obligationId), "u")
     );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
@@ -1486,6 +1663,74 @@ test("T-182 wrong-stage review findings are downstream pressure, not same-edge r
           ...base,
           status: "blocked",
           findings: [blockedDownstreamExecutionCarryFinding]
+        }
+      }),
+      []
+    );
+    const requirementSurfaceCarryFinding = {
+      ...wrongStageFindings[0],
+      requiredAction:
+        "Carry this requirement into the downstream design/materialization/test-execution edge that realizes it, preserving admitted id and authority refs until closure."
+    };
+    for (const targetAssetType of [
+      "intent_surface",
+      "product_surface",
+      "goal_surface",
+      "requirement_surface",
+      "component_repair_schedule_surface"
+    ]) {
+      assert.equal(
+        reviewGradeFindingsAreDownstreamStagePressure(
+          [requirementSurfaceCarryFinding],
+          { targetAssetType }
+        ),
+        true
+      );
+      assert.deepEqual(
+        reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+          runRef: `t164-${targetAssetType}-downstream-realization-carry`,
+          targetAssetType,
+          assessment: {
+            ...base,
+            status: "blocked",
+            findings: [requirementSurfaceCarryFinding]
+          }
+        }),
+        []
+      );
+    }
+    assert.notDeepEqual(
+      reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+        runRef: "t164-repair-schedule-current-edge-open",
+        targetAssetType: "component_repair_schedule_surface",
+        assessment: {
+          ...base,
+          status: "blocked",
+          findings: [
+            {
+              ...requirementSurfaceCarryFinding,
+              requiredAction:
+                "Add missing admitted no-repair evidence to the current component repair schedule surface."
+            }
+          ]
+        }
+      }),
+      []
+    );
+    assert.notDeepEqual(
+      reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+        runRef: "t164-requirement-current-edge-open",
+        targetAssetType: "requirement_surface",
+        assessment: {
+          ...base,
+          status: "blocked",
+          findings: [
+            {
+              ...requirementSurfaceCarryFinding,
+              requiredAction:
+                "Add missing requirement text and accepted authority to the current requirement surface."
+            }
+          ]
         }
       }),
       []

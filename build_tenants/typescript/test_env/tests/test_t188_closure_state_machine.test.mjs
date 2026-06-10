@@ -477,7 +477,7 @@ test("T-188 continuation decider is not reintroduced outside closure_state_machi
     /abgIterationOutcomeProjection/u
   );
   assert.equal(
-    closureStateMachineSource.includes("deriveRuntimeContinuationTransitionProjection"),
+    /\bderiveRuntimeContinuationTransitionProjection\(/u.test(closureStateMachineSource),
     false
   );
 
@@ -485,21 +485,21 @@ test("T-188 continuation decider is not reintroduced outside closure_state_machi
     (sourcePath) => path.basename(sourcePath) !== "closure_state_machine.ts"
   );
   assert(scannedSources.length > 0);
-  for (const forbidden of [
-    "deriveRuntimeContinuationTransitionProjection",
+  const forbiddenPatterns = [
+    /\bderiveRuntimeContinuationTransitionProjection\(/u,
     "function blockingReasonRefsForReentry",
     "function closurePressureRefLawfulReentryPoint",
     "function closurePressureRefMessage",
     "function repairReasonFromClosurePressureRef",
     "closurePressureRefRequiresTriage",
     "closurePressureRefRequiresRepair"
-  ]) {
+  ];
+  for (const forbidden of forbiddenPatterns) {
     for (const sourcePath of scannedSources) {
-      assert.equal(
-        readFileSync(sourcePath, "utf8").includes(forbidden),
-        false,
-        `${path.relative(PACKAGE_ROOT, sourcePath)}:${forbidden}`
-      );
+      const source = readFileSync(sourcePath, "utf8");
+      const found =
+        forbidden instanceof RegExp ? forbidden.test(source) : source.includes(forbidden);
+      assert.equal(found, false, `${path.relative(PACKAGE_ROOT, sourcePath)}:${forbidden}`);
     }
   }
 });

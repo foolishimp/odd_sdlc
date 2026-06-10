@@ -255,6 +255,47 @@ test("T-188 component-code prompt publishes topology row fields required by admi
     prompt,
     /sourceAssetRefs must name the design or source authority/u
   );
+  assert.match(prompt, /payload\.componentTestRows=\[\]/u);
+  assert.match(prompt, /payload\.componentTestQualificationRows=\[\]/u);
+});
+
+test("T-197 rejects component-test rows on component-code target before row alias parsing", () => {
+  const register = {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_code_surface",
+    componentRealizationRows: [
+      componentRow()
+    ],
+    componentTestRows: [
+      {
+        kind: "sdlc_component_realization_row",
+        componentId: "hello_world_javascript_test",
+        moduleName: "hello_world_javascript",
+        relativePath: "test/hello.test.js",
+        publicBoundary: "node --test test/hello.test.js",
+        requirementIds: ["REQ-T197-LIVE-001"],
+        sourceAssetRefs: ["workspace://design/component_code_surface.md"]
+      }
+    ]
+  };
+  const { outputFile } = writeMarkdownCarrierArtifact(
+    register,
+    "component_code_surface"
+  );
+
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: "component_code_surface",
+    outputFile
+  });
+
+  assert.equal(admission.status, "rejected");
+  const reasons = admission.blockingReasons.join("\n");
+  assert.match(
+    reasons,
+    /component_depth_register_component_code_test_rows_wrong_stage/u
+  );
+  assert.doesNotMatch(reasons, /componentTestRows\[0\]\.componentId: unexpected field/u);
 });
 
 test("T-188 component-test prompt keeps source topology rows out of test carrier", () => {

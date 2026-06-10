@@ -1579,6 +1579,83 @@ test("T-066 code-surface handoff admits tenant-root product source materializati
   ]);
 });
 
+test("T-164 component-code postflight does not use F_D source-semantic gates", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "t164-data-mapper-shallow-code"
+  });
+  writeHandoffFiles(manifest);
+
+  const output = writeOutputSurface(manifest, "component_code_surface");
+  const shallowSource = [
+    ...requirementTraceLines(manifest),
+    "package cdme.executor",
+    "",
+    "import cdme.compiler.CompilePlan",
+    "",
+    "trait SparkDataFrameHandle {",
+    "  def name: String",
+    "  def rowCount: Long",
+    "}",
+    "",
+    "final case class ExecutionContext(runId: String, inputs: Map[String, SparkDataFrameHandle], outputRoute: String)",
+    "final case class ExecutionTelemetry(runId: String, rowsRead: Long, rowsWritten: Long, errors: Vector[String])",
+    "final case class ExecutionResult(context: ExecutionContext, telemetry: ExecutionTelemetry)",
+    "",
+    "object SparkPlanExecutor {",
+    "  def execute(plan: CompilePlan, context: ExecutionContext): ExecutionResult = {",
+    "    val rowsRead = context.inputs.values.map(_.rowCount).sum",
+    "    val rowsWritten = math.max(0L, rowsRead - plan.morphisms.count(_.cardinality.max.contains(0)).toLong)",
+    "    ExecutionResult(context, ExecutionTelemetry(context.runId, rowsRead, rowsWritten, Vector.empty))",
+    "  }",
+    "}"
+  ].join("\n");
+  const productFile = path.join(
+    manifest.productMaterialization.tenantRoot,
+    "cdme-executor/src/main/scala/cdme/executor/SparkPlanExecutor.scala"
+  );
+  mkdirSync(dirname(productFile), { recursive: true });
+  writeFileSync(productFile, `${shallowSource}\n`, "utf8");
+  const materializedFiles = [
+    {
+      kind: "sdlc_materialized_product_file",
+      role: "source",
+      relativePath: path.relative(manifest.productMaterialization.tenantRoot, productFile),
+      absolutePath: productFile,
+      digest: sha256Text(`${shallowSource}\n`),
+      byteCount: Buffer.byteLength(`${shallowSource}\n`, "utf8"),
+      requirementTraceObligationIds: requirementObligationIds(manifest)
+    }
+  ];
+  writeReport({
+    manifest,
+    digest: output.digest,
+    summary: "component code source fixture",
+    materializedFiles
+  });
+
+  const report = readWorkerResultReport(manifest);
+  writeProductMaterializationManifest({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
+
+  assert.equal(postflight.status, "passed");
+  assert.equal(
+    postflight.blockingReasonCarriers.some((reason) =>
+      reason.code.includes("semantic") || reason.code.includes("semantics")
+    ),
+    false,
+    JSON.stringify(postflight.blockingReasonCarriers, null, 2)
+  );
+});
+
 test("T-172 no-dispatch surface postflight admits replayed materialization lineage", () => {
   const workspace = makeWorkspace();
   const contract = hookContractByEdgeName("qualify_component_realization_surface");
