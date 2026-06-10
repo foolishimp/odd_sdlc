@@ -380,6 +380,8 @@ function parseFulfillmentBinding(
     `${label}.productTargetRef`,
     "productTargetRef"
   );
+  const productTargetFieldFallback = (fieldName: string): string =>
+    `${productTargetRef}#${fieldName}`;
   const requirementRef = parseBindingStringWithFallback(
     record["requirementRef"],
     `${label}.requirementRef`,
@@ -407,7 +409,8 @@ function parseFulfillmentBinding(
       "designObligationRef",
       nonRequirementObligation
         ? nonRequirementFallbackRef("designObligationRef")
-        : null
+        : productTargetFieldFallback("designObligationRef"),
+      { admitNullAsFallback: true }
     ),
     componentRef: parseBindingStringWithFallback(
       record["componentRef"],
@@ -415,7 +418,8 @@ function parseFulfillmentBinding(
       "componentRef",
       nonRequirementObligation
         ? nonRequirementFallbackRef("componentRef")
-        : null
+        : productTargetFieldFallback("componentRef"),
+      { admitNullAsFallback: true }
     ),
     productTargetRef,
     outputSurfaceRef: parseBindingString(
@@ -430,7 +434,7 @@ function parseFulfillmentBinding(
       nonRequirementObligation
         ? nonRequirementFallbackRef("functionOrEntrypointRef")
         : productTargetRef,
-      { admitNullAsFallback: !nonRequirementObligation }
+      { admitNullAsFallback: true }
     ),
     realizationEvidenceRefs: parseBindingStringList(
       record["realizationEvidenceRefs"],

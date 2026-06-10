@@ -33,6 +33,7 @@ import {
   deriveAdvancementTransition,
   deriveIterationAdvanceDecision,
   deriveRuntimeAggregateProjection,
+  deriveRuntimeContinuationTransitionProjectionFromDisposition,
   deriveRuntimeLivenessObserverProjection,
   invokeSupervisedProcessActor,
   materializeGraphFunction,
@@ -52,6 +53,7 @@ import {
   type Module,
   type RuntimeEvent,
   type RuntimeFailureClass,
+  type RuntimeAggregateProjection,
   type RuntimeLivenessObserverProjection,
   type SupervisedProcessActorResult,
   type TerminalKind,
@@ -7610,6 +7612,66 @@ export function deriveSdlcInstalledOperatorStatusFromAbgTerminal(input: {
   return input.stateStatus;
 }
 
+function abgTraversalTransitionProjectionRef(input: {
+  readonly basis: ExecutionBasis;
+  readonly runtimeProjection: RuntimeAggregateProjection;
+  readonly currentVectorIndex: number;
+  readonly nextVectorIndex: number | null;
+  readonly terminal: SdlcAbgTerminalTransitionProjection | null;
+}): string {
+  const terminalKind = input.terminal?.terminalKind ?? null;
+  const terminalReason =
+    typeof input.terminal?.reason === "string" ? input.terminal.reason : null;
+  if (terminalKind === "converged" || terminalKind === "nothing_to_do") {
+    return deriveRuntimeContinuationTransitionProjectionFromDisposition({
+      basis: input.basis,
+      runtimeProjection: input.runtimeProjection,
+      vectorIndex: input.currentVectorIndex,
+      disposition: "close",
+      reason: "edge_close",
+      reasonRefs: terminalReason === null ? Object.freeze([]) : [terminalReason]
+    }).projectionRef;
+  }
+  if (terminalKind === "yielded") {
+    return deriveRuntimeContinuationTransitionProjectionFromDisposition({
+      basis: input.basis,
+      runtimeProjection: input.runtimeProjection,
+      vectorIndex: input.currentVectorIndex,
+      disposition: "yield_continuation",
+      reason: "traversal_yield",
+      reasonRefs: terminalReason === null ? Object.freeze([]) : [terminalReason]
+    }).projectionRef;
+  }
+  if (terminalKind === "gap_stop") {
+    return deriveRuntimeContinuationTransitionProjectionFromDisposition({
+      basis: input.basis,
+      runtimeProjection: input.runtimeProjection,
+      vectorIndex: input.currentVectorIndex,
+      disposition: "block",
+      reason: "runtime_blocked",
+      reasonRefs: terminalReason === null ? Object.freeze([]) : [terminalReason]
+    }).projectionRef;
+  }
+  if (input.nextVectorIndex !== null) {
+    return deriveRuntimeContinuationTransitionProjectionFromDisposition({
+      basis: input.basis,
+      runtimeProjection: input.runtimeProjection,
+      vectorIndex: input.nextVectorIndex,
+      disposition: "advance_vector",
+      reason: "default_iteration_advance",
+      reasonRefs: [`next-vector:${input.nextVectorIndex}`]
+    }).projectionRef;
+  }
+  return deriveRuntimeContinuationTransitionProjectionFromDisposition({
+    basis: input.basis,
+    runtimeProjection: input.runtimeProjection,
+    vectorIndex: input.currentVectorIndex,
+    disposition: "close",
+    reason: "edge_close",
+    reasonRefs: Object.freeze(["no-next-vector"])
+  }).projectionRef;
+}
+
 function deriveInstalledTraversalConsequence(input: {
   readonly basis: ExecutionBasis;
   readonly start: SdlcPublicStartOutcome;
@@ -8028,6 +8090,13 @@ function deriveInstalledTraversalConsequence(input: {
       `workspace-fingerprint://odd-sdlc/post-action/${runRef}`,
     workspaceDeltaRef: `workspace-delta://odd-sdlc/${runRef}`
   });
+  const traversalTransitionRef = abgTraversalTransitionProjectionRef({
+    basis: input.basis,
+    runtimeProjection: abgRuntimeTransitionProjectionSource,
+    currentVectorIndex: input.state.manifest.vectorIndex,
+    nextVectorIndex: input.nextVectorIndex,
+    terminal: input.engineTerminal
+  });
   const admittedStateRef: GtlAdmittedStateRef = Object.freeze({
     compositionRef: selectedComposition.compositionRef,
     compositionDigest: selectedComposition.compositionDigest,
@@ -8042,7 +8111,10 @@ function deriveInstalledTraversalConsequence(input: {
       processEventsRef(input.state.manifest)
     ]),
     ledgerRefs: uniqueSorted([ledger.ledgerVersionRef, closureDecision.decisionRef]),
-    projectionRefs: uniqueSorted([nextActionProjection.nextActionProjectionRef])
+    projectionRefs: uniqueSorted([
+      traversalTransitionRef,
+      nextActionProjection.nextActionProjectionRef
+    ])
   });
   const consequenceProjection: GtlConsequenceProjectionRef = Object.freeze({
     consequenceRef: `consequence://odd-sdlc/${runRef}/traversal`,
@@ -8051,10 +8123,11 @@ function deriveInstalledTraversalConsequence(input: {
     compositionSelectionRef: selectedComposition.compositionSelectionRef,
     assuranceDecisionRef:
       closureDecision.edgeAssuranceDecisionRef ?? closureDecision.decisionRef,
-    traversalTransitionRef: nextActionProjection.nextActionProjectionRef,
+    traversalTransitionRef,
     domainReadModelRefs: uniqueSorted([
       ledger.ledgerVersionRef,
       closureDecision.decisionRef,
+      traversalTransitionRef,
       nextActionProjection.nextActionProjectionRef,
       ...(overlaySegmentCompletion === null
         ? []

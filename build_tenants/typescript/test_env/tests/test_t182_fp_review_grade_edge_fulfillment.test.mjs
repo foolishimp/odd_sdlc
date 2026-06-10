@@ -693,7 +693,7 @@ test("T-182 admits full review-grade findings and rejects missing or weak assess
               ...finding,
               fulfillmentBinding: {
                 ...finding.fulfillmentBinding,
-                functionOrEntrypointRef: null
+                realizationEvidenceRefs: null
               }
             }
           : finding
@@ -712,6 +712,128 @@ test("T-182 admits full review-grade findings and rejects missing or weak assess
     assert.match(
       promptNullBinding.blockingReasons.join("\n"),
       /review_grade_fulfillment_binding_prompt_null/u
+    );
+
+    const rawFileTargetManifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_code_surface",
+      "t182-live-file-target-null-binding"
+    );
+    const rawBase = reviewGradeAssessment(rawFileTargetManifest);
+    const rawRequirementFinding = rawBase.findings.find((finding) =>
+      finding.obligationId.startsWith("requirement:")
+    );
+    const rawDownstreamFinding = rawBase.findings.find(
+      (finding) =>
+        finding.obligationId.startsWith("requirement:") &&
+        finding.obligationId !== rawRequirementFinding.obligationId
+    );
+    const rawSourceFinding = rawBase.findings.find(
+      (finding) => finding.obligationId === "source_asset:implementation_design_surface"
+    );
+    assert.ok(rawRequirementFinding);
+    assert.ok(rawDownstreamFinding);
+    assert.ok(rawSourceFinding);
+    const rawFileTargetAssessment = {
+      ...rawBase,
+      status: "blocked",
+      findings: rawBase.findings.map((finding) => {
+        if (finding.obligationId === rawRequirementFinding.obligationId) {
+          return {
+            ...finding,
+            fulfillmentBinding: {
+              ...finding.fulfillmentBinding,
+              componentRef: null,
+              productTargetRef: "workspace://build_tenants/hello_world_rust_service/Cargo.toml",
+              outputSurfaceRef: "workspace://build_tenants/hello_world_rust_service/Cargo.toml",
+              functionOrEntrypointRef: null,
+              realizationEvidenceRefs: [
+                "workspace://build_tenants/hello_world_rust_service/Cargo.toml"
+              ],
+              testOrExecutionEvidenceRefs: []
+            }
+          };
+        }
+        if (finding.obligationId === rawSourceFinding.obligationId) {
+          return {
+            ...finding,
+            fulfillmentBinding: {
+              ...finding.fulfillmentBinding,
+              requirementRef: null,
+              productRequirementRef: null,
+              componentRef: null,
+              productTargetRef:
+                "workspace://build_tenants/hello_world_rust_service/design/adrs/ADR-002-implementation-design-surface.md",
+              outputSurfaceRef:
+                "workspace://build_tenants/hello_world_rust_service/design/component_code_surface.md",
+              functionOrEntrypointRef: null,
+              realizationEvidenceRefs: [
+                "workspace://build_tenants/hello_world_rust_service/design/adrs/ADR-002-implementation-design-surface.md",
+                "workspace://build_tenants/hello_world_rust_service/design/component_code_surface.md"
+              ],
+              testOrExecutionEvidenceRefs: []
+            }
+          };
+        }
+        if (finding.obligationId === rawDownstreamFinding.obligationId) {
+          return {
+            ...finding,
+            fulfillmentStatus: "blocked",
+            failureClass: "wrong_stage",
+            requiredAction:
+              "Carry the HTTP smoke proof obligation forward to the downstream test-execution surface; source/build_config obligations are fulfilled and this component_code_surface edge declares no test execution product target.",
+            fulfillmentBinding: null
+          };
+        }
+        return finding;
+      })
+    };
+    const rawFileTargetPath = writeAssessment(
+      rawFileTargetManifest,
+      rawFileTargetAssessment
+    );
+    const rawFileTargetAdmission =
+      admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+        manifest: rawFileTargetManifest,
+        outputFile: rawFileTargetPath
+      });
+    assert.equal(
+      rawFileTargetAdmission.status,
+      "admitted",
+      rawFileTargetAdmission.blockingReasons.join("\n")
+    );
+    const admittedRawRequirement =
+      rawFileTargetAdmission.assessment.findings.find(
+        (finding) => finding.obligationId === rawRequirementFinding.obligationId
+      );
+    const admittedRawSource = rawFileTargetAdmission.assessment.findings.find(
+      (finding) => finding.obligationId === rawSourceFinding.obligationId
+    );
+    assert.ok(admittedRawRequirement);
+    assert.ok(admittedRawSource);
+    assert.equal(
+      admittedRawRequirement.fulfillmentBinding.componentRef,
+      "workspace://build_tenants/hello_world_rust_service/Cargo.toml#componentRef"
+    );
+    assert.equal(
+      admittedRawRequirement.fulfillmentBinding.functionOrEntrypointRef,
+      "workspace://build_tenants/hello_world_rust_service/Cargo.toml"
+    );
+    assert.equal(
+      admittedRawSource.fulfillmentBinding.requirementRef,
+      rawSourceFinding.obligationId
+    );
+    assert.equal(
+      admittedRawSource.fulfillmentBinding.functionOrEntrypointRef,
+      "binding-fallback://odd-sdlc/review-grade/source_asset%3Aimplementation_design_surface/functionOrEntrypointRef"
+    );
+    assert.deepEqual(
+      reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+        runRef: "t182-live-file-target-null-binding",
+        targetAssetType: "component_code_surface",
+        assessment: rawFileTargetAdmission.assessment
+      }),
+      []
     );
 
     const undeclaredRequirementBinding = {

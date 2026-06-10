@@ -29,6 +29,28 @@ function repoFile(relativePath) {
   return readFileSync(path.join(REPO_ROOT, relativePath), "utf8");
 }
 
+function sourceFunction(source, functionName) {
+  const nameIndex = source.indexOf(`function ${functionName}`);
+  assert.notEqual(nameIndex, -1, `${functionName} must exist`);
+  const signatureEnd = source.indexOf("):", nameIndex);
+  assert.notEqual(signatureEnd, -1, `${functionName} must have a return type`);
+  const bodyStart = source.indexOf("{", signatureEnd);
+  assert.notEqual(bodyStart, -1, `${functionName} must have a body`);
+  let depth = 0;
+  for (let index = bodyStart; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(nameIndex, index + 1);
+      }
+    }
+  }
+  assert.fail(`${functionName} body was not closed`);
+}
+
 function repoFilesUnder(relativePath) {
   const root = path.join(REPO_ROOT, relativePath);
   const files = [];
@@ -189,7 +211,8 @@ test("T-197 design ratifies owner partition assets before Wave 1 code", () => {
     "### Decommission Register",
     "### W-105 Construct-Site Sufficiency Inventory",
     "ABG route / dependency",
-    "T-154-expose-runtime-authorship-routes-for-downstream-resume-and-span-reentry.md",
+    "ABI 4.0.0-rc.7",
+    "runtime continuation transition projection refs",
     "22/22 edge-contract tests and 1/1 Rust-service sandbox proof",
     "must-not-name-governed-target",
     "Horizontal ingress rule:"
@@ -214,7 +237,7 @@ test("T-197 design ratifies owner partition assets before Wave 1 code", () => {
     ".ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md"
   );
   assert.match(ticket, /\| W-105 \| Wave 1 pre-realization gate \|/u);
-  assert.match(ticket, /ABG T-154 filed for explicit resume cursor/u);
+  assert.match(ticket, /ABG T-154 filed and completed for explicit resume cursor/u);
   assert.match(ticket, /npm run test:t164` passed 22\/22 edge-contract \+ 1\/1 Rust-service sandbox/u);
 });
 
@@ -402,11 +425,94 @@ test("T-197 A5 gates installed convergence on ABG terminal convergence", () => {
     source,
     /input\.terminalKind === "gap_stop"[\s\S]*?return "blocked";/u
   );
+  assert.match(
+    source,
+    /\bderiveRuntimeContinuationTransitionProjectionFromDisposition\b/u
+  );
+  assert.match(
+    source,
+    /\bfunction abgTraversalTransitionProjectionRef\b/u
+  );
+  assert.match(
+    source,
+    /traversalTransitionRef\s*=\s*abgTraversalTransitionProjectionRef/u
+  );
+  assert.match(
+    source,
+    /traversalTransitionRef,\s*\n\s*domainReadModelRefs/u
+  );
   assert.doesNotMatch(source, /\bclosedWithoutNextTraversal\b/u);
+  assert.doesNotMatch(
+    source,
+    /traversalTransitionRef:\s*nextActionProjection\.nextActionProjectionRef/u
+  );
   assert.doesNotMatch(
     source,
     /terminal(?:\?\.terminalKind|Kind) === "gap_stop"[\s\S]{0,120}return "converged";/u
   );
+});
+
+test("T-197 A2 keeps until-converged as installed UX over admitted start turns", () => {
+  const source = repoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+  const loop = sourceFunction(source, "executeInstalledOperatorStartWithReentry");
+
+  assert.match(loop, /\bsdlcOperatorRuntimePolicy\(\)/u);
+  assert.match(loop, /\bexecuteInstalledOperatorStart\(/u);
+  assert.match(loop, /\binstalledStartShouldContinueForRequestedUntil\b/u);
+  assert.match(loop, /\bderiveSdlcWorkerRetryContextFromTraversalConsequence\b/u);
+  assert.match(loop, /\binput\.refreshReplayState\(latest\)/u);
+  assert.doesNotMatch(loop, /\bconstruct[A-Za-z0-9_]*Event\s*\(/u);
+  assert.doesNotMatch(loop, /\bappendOddSdlcRuntimeEvents\b/u);
+  assert.doesNotMatch(loop, /\brunEngineIterateAsync\b/u);
+  assert.doesNotMatch(loop, /\brunEventedNativeSagaFrontier\b/u);
+  assert.doesNotMatch(loop, /\bapplyExplicitGraphVectorResumeCursor\b/u);
+  assert.doesNotMatch(loop, /\bapplyGraphSpanReentryRoute\b/u);
+});
+
+test("T-197 B2 keeps component-depth as GTL target-carrier read model", () => {
+  const source = repoFile(
+    "build_tenants/typescript/code/src/operator/component_depth_register.ts"
+  );
+
+  assert.match(source, /\bSDLC_COMPONENT_DEPTH_REGISTER_CONTRACT_TRACE\b/u);
+  assert.match(source, /owner:\s*"downstream_product_read_model"/u);
+  assert.match(source, /"REQ-L-GTL3-CONTRACT-LAW-API"/u);
+  assert.match(source, /"REQ-L-GTL3-GRAPHVECTOR"/u);
+  assert.match(source, /\bsdlcTargetCarrierOutputKind\b/u);
+  assert.match(source, /\bsdlcTargetCarrierContractRef\b/u);
+  assert.match(
+    source,
+    /expected:\s*sdlcTargetCarrierContractRef\(\{\s*edgeRef,\s*targetAssetType\s*\}\)/u
+  );
+  assert.doesNotMatch(source, /export\s+(?:interface|type)\s+Gtl/u);
+  assert.doesNotMatch(source, /constructGtlContract/u);
+});
+
+test("T-197 B3 keeps prompt assets as GTL AssetSurface rows plus SDLC policy", () => {
+  const source = repoFile(
+    "build_tenants/typescript/code/src/operator/prompt_assets.ts"
+  );
+  const input = constructCurrentSdlcGtlProgramConformanceInput();
+
+  assert.match(source, /\badmitAssetSurface\b/u);
+  assert.match(source, /\bconstructAssetSurface\b/u);
+  assert.match(source, /\bconstructNode\b/u);
+  assert.match(source, /rendered Markdown is a view over a GTL Node\/AssetSurface/u);
+  assert.doesNotMatch(source, /export\s+interface\s+AssetSurface\b/u);
+
+  assert.equal(input.promptAssets.length, 3);
+  for (const row of input.promptAssets) {
+    assert.match(row.assetSurface.kind, /^gtl\.asset_surface\/odd_sdlc\.prompt\//u);
+    assert.equal(row.gtlNode.assetSurface, row.assetSurface);
+    assert.match(row.gtlNode.id, /^node:\/\/odd-sdlc\/prompt\//u);
+    assert.match(row.renderedViewDigest, /^sha256:/u);
+    assert.ok(row.assetSurface.constructorRefs.length > 0);
+    assert.ok(row.assetSurface.rendererRefs.length > 0);
+    assert.ok(row.assetSurface.proofObligationRefs.length > 0);
+    assert.ok(row.assetSurface.authoritySlots.length > 0);
+  }
 });
 
 test("T-197 B4b keeps review-grade routing off tenant command grammar", () => {
