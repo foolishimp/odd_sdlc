@@ -285,8 +285,9 @@ This is the operative plan for executing T-197 after the Grok/Claude reviews.
 | 6 | W-040 P-series residuals: P1/P3 stay here; P2 is deferred to T-198 | proof cleanup | terminal P rows or explicit successor |
 | 7 | W-600 closure | closure | all ledger rows terminal; deterministic + installed proof green |
 
-Critical path: Phase 0 -> Phase 1 design lock -> A4/A1 -> A5 with T-164 gate
--> closure. Fast wins that may run before design lock: B1 and H1.
+Critical path status: Phase 0, Phase 1 design lock, A4/A1/A5, B1, B2/B3,
+H1/H2/H5/H7, and rc.7 live proof are done. Remaining closure work is W-040
+P-residuals plus the still-open C/D/H rows in the work ledger.
 
 Phase 0 dispositions recorded on 2026-06-09:
 
