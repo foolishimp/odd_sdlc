@@ -473,6 +473,29 @@ lawful worker-backend realization (claude rejected list).
 | E5 | `rc_qualification.ts`, non-exported sandbox paths | lawful self-qualification / fixtures | keep; claude rejected re-flag | done |
 | E6 | nonlocal product gap routing from review-grade / consequence fold | data_mapper live 20260610T231659499Z proved ABG control was lawful, but component-code review kept same-edge retrying when F_D found product semantic gaps whose lawful repair surface may be upstream or outside the current traversal | **missing primitive** — add typed triage and forced re-entry routing: F_D must be able to classify a gap as `current_edge_repair`, `upstream_reentry`, `downstream_deferred`, or `external_blocked`; when it selects `upstream_reentry`, the result must name the lawful repair graph/vector/asset and ABG must receive a yield/gap_stop basis for that re-entry instead of another current-edge retry | open |
 
+#### E6 Non-Convergence Interpretation
+
+The 20260610 data_mapper run did not converge for two distinct reasons that
+must remain separate in later implementation work.
+
+1. Immediate product reason: `F_D` rejected the generated
+   `derive_lite_component_code_surface` output as semantically incomplete. The
+   final review was `reviewStatus=blocked`, `reviewed=160`, `blocked=160`,
+   dominated by `semantic_not_realized`. This means the non-convergence was not
+   caused by the absence of the E6 primitive; the generated product surface was
+   still insufficient.
+2. Runtime routing reason: after `F_D` found those product gaps, ABG had no
+   typed way to classify the repair surface as nonlocal and yield to an
+   upstream graph/vector/asset re-entry basis. The lawful terminal result was
+   therefore `blocked/gap_stop` after same-edge attempts, not continued
+   convergence through an upstream repair path.
+
+Required future behavior: product incompleteness remains an `F_D` finding, but
+`F_D` consequence must be able to say whether the gap is same-edge repairable,
+upstream-reentry repairable, downstream-deferred, or externally blocked. When
+the gap is upstream-reentry repairable, ABG must own the re-entry/yield route;
+SDLC must not recreate that route as a local installed loop.
+
 ---
 
 ### Proof Residuals Transferred From T-184 (P-series)
@@ -672,7 +695,7 @@ addendum `T-197 Owner Partition And Decommission Register`.
 | W-300 | Wave 3 C1a/C1b | B-004 link; capability asset | open |
 | W-400 | Wave 4 D-rows | source tests | open |
 | W-500 | Wave 5 H-rows (R1–R7) | H1 done by `test:t197` H1 grep/classifier proof; H2 done by `test:t161` capability-driven analysis profile proof and `test:t197` source guard; H5/H7 done by neutral prompt-pressure policy and review-prompt source guards; remaining H3/H4/H6/H8-H12 open | in_progress |
-| W-510 | Register nonlocal repair-surface yield rule | E6 added from data_mapper live archive `build_tenants/typescript/test_env/test_runs/full_external_data_mapper_sandbox/20260610T231659499Z_pid95502`; no runtime change in this slice | done |
+| W-510 | Register nonlocal repair-surface yield rule | E6 added from data_mapper live archive `build_tenants/typescript/test_env/test_runs/full_external_data_mapper_sandbox/20260610T231659499Z_pid95502`; context clarified that immediate non-convergence was product semantic incompleteness while the broader ABG/GTL gap is missing typed upstream re-entry/yield routing; no runtime change in this slice | done |
 | W-600 | Closure post; refresh both GAP comments | all rows terminal | open |
 
 ---
