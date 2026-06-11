@@ -107,37 +107,6 @@ export interface SdlcOperatorSummary {
   readonly archiveRoot: string | null;
 }
 
-export interface SdlcInstalledOperatorStartLoopAttempt {
-  readonly kind: "sdlc_installed_operator_start_loop_attempt";
-  readonly attemptIndex: number;
-  readonly status: SdlcInstalledOperatorStatus;
-  readonly currentEdge: string | null;
-  readonly closureDisposition: string | null;
-  readonly reentryBasisRef: string | null;
-  readonly blockingReason: string | null;
-  readonly nextLawfulAction: string;
-  readonly archiveRoot: string | null;
-  readonly retryEligible: boolean;
-  readonly emittedRuntimeEventKinds: readonly RuntimeEvent["kind"][];
-}
-
-export interface SdlcInstalledOperatorStartLoop {
-  readonly kind: "sdlc_installed_operator_start_loop";
-  readonly requestedUntil: string;
-  readonly maxAttempts: number;
-  readonly attemptCount: number;
-  readonly terminalReason:
-    | "first_traversal_closed"
-    | "converged"
-    | "blocked"
-    | "retry_not_planned"
-    | "retry_guard_exhausted"
-    | "yield_guard_exhausted"
-    | "reentry_guard_exhausted";
-  readonly exhaustedDisposition: "retry" | "yield" | "other" | null;
-  readonly attempts: readonly SdlcInstalledOperatorStartLoopAttempt[];
-}
-
 export interface SdlcInstalledOperatorTraversalConsequence {
   readonly kind: "sdlc_installed_operator_traversal_consequence";
   readonly selectedComposition: SdlcSelectedAbgFnCompositionIdentity;
@@ -2179,5 +2148,4 @@ export interface SdlcInstalledOperatorStartOutcome {
   readonly eventLogPath: string;
   readonly archiveRoot: string | null;
   readonly traversalConsequence: SdlcInstalledOperatorTraversalConsequence | null;
-  readonly loop?: SdlcInstalledOperatorStartLoop | undefined;
 }

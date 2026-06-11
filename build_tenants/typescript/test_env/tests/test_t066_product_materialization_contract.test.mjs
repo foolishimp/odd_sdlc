@@ -5232,6 +5232,205 @@ test("T-160 product materialization authority admits plain Product Files section
   ]);
 });
 
+test("T-164 lite component-code edge keeps multi-module product targets full-breadth", () => {
+  const workspace = makeWorkspace();
+  writeFileSync(
+    path.join(workspace, "specification/PRODUCT.md"),
+    [
+      "# Product",
+      "",
+      "- active tenant: scala_spark",
+      "- selected output root: build_tenants/scala_spark",
+      "",
+      "## Product Files",
+      "",
+      "- `build_tenants/scala_spark/build.sbt` role=build_config",
+      "- `build_tenants/scala_spark/project` role=build_config",
+      "- `build_tenants/scala_spark/cdme-compiler/src/main/scala/cdme/compiler/Compiler.scala` role=source",
+      "- `build_tenants/scala_spark/cdme-assurance/src/main/scala/cdme/assurance/Assurance.scala` role=source",
+      "- `build_tenants/scala_spark/cdme-executor/src/main/scala/cdme/executor/Executor.scala` role=source"
+    ].join("\n"),
+    "utf8"
+  );
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const tenantRoot = path.join(workspace, constraints.selectedOutputRoot);
+  const implementationDesignFile = path.join(
+    tenantRoot,
+    "design/adrs/ADR-002-implementation-design-surface.md"
+  );
+  const register = {
+    kind: "sdlc_design_depth_register",
+    registerVersion: "ts-design-depth-v1",
+    targetAssetType: "implementation_design_surface",
+    stackProfileRows: [
+      {
+        kind: "sdlc_stack_profile_row",
+        stackRef: "stack://t164/scala-sbt",
+        language: "scala",
+        buildTool: "sbt"
+      }
+    ],
+    implementationModuleRows: [
+      {
+        kind: "sdlc_implementation_module_row",
+        moduleName: "cdme-compiler",
+        moduleRef: "module://t164/cdme-compiler"
+      },
+      {
+        kind: "sdlc_implementation_module_row",
+        moduleName: "cdme-assurance",
+        moduleRef: "module://t164/cdme-assurance"
+      },
+      {
+        kind: "sdlc_implementation_module_row",
+        moduleName: "cdme-executor",
+        moduleRef: "module://t164/cdme-executor"
+      }
+    ],
+    aggregateDomainModelRows: [],
+    moduleSchemaFragments: [],
+    moduleStateDiagramFragments: [],
+    aggregateDomainModel: null,
+    sunnyDaySequenceRows: [],
+    aggregateSunnyDaySequence: null,
+    componentTopologyRows: [
+      {
+        kind: "sdlc_component_topology_row",
+        componentId: "cmp.cdme.compiler",
+        moduleName: "cdme-compiler",
+        relativePath:
+          "cdme-compiler/src/main/scala/cdme/compiler/Compiler.scala",
+        concernRole: "compiler",
+        publicBoundary: "Compiler",
+        requirementIds: ["REQ-T164-COMPILER"],
+        sourceAssetRefs: ["fixture://t164/compiler"]
+      },
+      {
+        kind: "sdlc_component_topology_row",
+        componentId: "cmp.cdme.assurance",
+        moduleName: "cdme-assurance",
+        relativePath:
+          "cdme-assurance/src/main/scala/cdme/assurance/Assurance.scala",
+        concernRole: "assurance",
+        publicBoundary: "Assurance",
+        requirementIds: ["REQ-T164-ASSURANCE"],
+        sourceAssetRefs: ["fixture://t164/assurance"]
+      },
+      {
+        kind: "sdlc_component_topology_row",
+        componentId: "cmp.cdme.executor",
+        moduleName: "cdme-executor",
+        relativePath:
+          "cdme-executor/src/main/scala/cdme/executor/Executor.scala",
+        concernRole: "executor",
+        publicBoundary: "Executor",
+        requirementIds: ["REQ-T164-EXECUTOR"],
+        sourceAssetRefs: ["fixture://t164/executor"]
+      }
+    ],
+    componentRealizationRows: [
+      {
+        kind: "sdlc_component_realization_row",
+        componentId: "cmp.cdme.compiler",
+        moduleName: "cdme-compiler",
+        relativePath:
+          "cdme-compiler/src/main/scala/cdme/compiler/Compiler.scala",
+        publicBoundary: "Compiler",
+        trancheId: "tranche:compiler",
+        firstProductFileToChange:
+          "cdme-compiler/src/main/scala/cdme/compiler/Compiler.scala",
+        upstreamComponentIds: [],
+        requirementIds: ["REQ-T164-COMPILER"],
+        sourceAssetRefs: ["fixture://t164/compiler"]
+      },
+      {
+        kind: "sdlc_component_realization_row",
+        componentId: "cmp.cdme.assurance",
+        moduleName: "cdme-assurance",
+        relativePath:
+          "cdme-assurance/src/main/scala/cdme/assurance/Assurance.scala",
+        publicBoundary: "Assurance",
+        trancheId: "tranche:assurance",
+        firstProductFileToChange:
+          "cdme-assurance/src/main/scala/cdme/assurance/Assurance.scala",
+        upstreamComponentIds: ["cmp.cdme.compiler"],
+        requirementIds: ["REQ-T164-ASSURANCE"],
+        sourceAssetRefs: ["fixture://t164/assurance"]
+      },
+      {
+        kind: "sdlc_component_realization_row",
+        componentId: "cmp.cdme.executor",
+        moduleName: "cdme-executor",
+        relativePath:
+          "cdme-executor/src/main/scala/cdme/executor/Executor.scala",
+        publicBoundary: "Executor",
+        trancheId: "tranche:executor",
+        firstProductFileToChange:
+          "cdme-executor/src/main/scala/cdme/executor/Executor.scala",
+        upstreamComponentIds: ["cmp.cdme.compiler"],
+        requirementIds: ["REQ-T164-EXECUTOR"],
+        sourceAssetRefs: ["fixture://t164/executor"]
+      }
+    ],
+    fileTargetRows: [
+      {
+        kind: "sdlc_file_target_row",
+        relativePath: "build.sbt",
+        role: "build_config"
+      },
+      {
+        kind: "sdlc_file_target_row",
+        relativePath:
+          "cdme-compiler/src/main/scala/cdme/compiler/Compiler.scala",
+        role: "source"
+      },
+      {
+        kind: "sdlc_file_target_row",
+        relativePath:
+          "cdme-assurance/src/main/scala/cdme/assurance/Assurance.scala",
+        role: "source"
+      },
+      {
+        kind: "sdlc_file_target_row",
+        relativePath:
+          "cdme-executor/src/main/scala/cdme/executor/Executor.scala",
+        role: "source"
+      }
+    ],
+    designCompletenessVerdict: null
+  };
+  const outputContent = `${JSON.stringify(register, null, 2)}\n`;
+  mkdirSync(dirname(implementationDesignFile), { recursive: true });
+  writeFileSync(implementationDesignFile, outputContent, "utf8");
+  writeAdmittedImplementationDesignArchive({
+    workspaceRoot: workspace,
+    register,
+    outputContent
+  });
+
+  const contract = hookContractByEdgeName(FG_DERIVE_LITE_COMPONENT_CODE_SURFACE);
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "lite_design_module_implementation",
+    edgeName: contract.edgeName,
+    vectorIndex: 1,
+    contract,
+    projectConstraints: constraints,
+    runId: "t164-lite-component-code-full-design-targets"
+  });
+
+  assert.equal(manifest.traversalStrategyDecision.selectedStrategy, "full_breadth");
+  assert.equal(manifest.featureScope.mode, "full_breadth");
+  assert.deepStrictEqual(manifest.featureScope.deferredModuleNames, []);
+  assert.deepStrictEqual(declaredProductFileTargets(manifest), [
+    "build_tenants/scala_spark/build.sbt",
+    "build_tenants/scala_spark/cdme-assurance/src/main/scala/cdme/assurance/Assurance.scala",
+    "build_tenants/scala_spark/cdme-compiler/src/main/scala/cdme/compiler/Compiler.scala",
+    "build_tenants/scala_spark/cdme-executor/src/main/scala/cdme/executor/Executor.scala",
+    "build_tenants/scala_spark/project"
+  ]);
+});
+
 test("T-187 declared product targets outrank tenant tool-local directory rules", () => {
   const workspace = makeWorkspace();
   writeFileSync(

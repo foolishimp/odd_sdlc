@@ -1463,8 +1463,10 @@ test("T-120 Spec Method entry does not own installed retry control", () => {
   assert(!entry.includes("retryContextOverride"));
   assert(!entry.includes("MAX_INSTALLED_START_SELF_HEAL_ATTEMPTS"));
   assert(!entry.includes("sdlc_installed_operator_start_loop_attempt"));
-  assert.match(installedOperator, /executeInstalledOperatorStartWithReentry/u);
+  assert(!installedOperator.includes("executeInstalledOperatorStartWithReentry"));
+  assert(!installedOperator.includes("sdlc_installed_operator_start_loop"));
   assert.match(installedOperator, /sdlcOperatorRuntimePolicy/u);
-  assert.match(installedOperator, /installedRetryReentryAttemptLimits/u);
+  assert(!installedOperator.includes("installedRetryReentryAttemptLimits"));
+  assert(!installedOperator.includes("installedReentryAttemptLimit"));
   assert(!installedOperator.includes("MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS"));
 });

@@ -23,11 +23,6 @@ import {
   deriveWorkerHandoffManifest,
   evaluateSdlcComputeStage,
   hookContractByEdgeName,
-  installedReentryAttemptLimit,
-  installedReentryAttemptLimitForOutcome,
-  installedReentryDispositionForOutcome,
-  installedReentryGuardScopeForAttempt,
-  installedRepeatedBlockerAttemptLimitForOutcome,
   observeProductMaterializationDelta,
   promptForHandoff,
   readWorkerResultReport,
@@ -592,111 +587,21 @@ function writeWorkerResultReport(input) {
   );
 }
 
-test("T-143 installed loop circuit breakers come from runtime policy config", () => {
+test("T-143 runtime policy does not carry installed local-loop controls", () => {
   const policy = sdlcOperatorRuntimePolicy();
   const config = JSON.parse(
     readFileSync(sdlcOperatorRuntimePolicyConfigPath(), "utf8")
   );
+  const source = installedOperatorSource();
 
-  assert.equal(
-    policy.installedConvergenceAttemptLimit,
-    config.installedReentry.convergenceAttemptLimit
-  );
-  assert.equal(
-    policy.installedYieldReentryAttemptLimit,
-    config.installedReentry.yieldReentryAttemptLimit
-  );
-  assert.equal(
-    policy.installedOtherReentryAttemptLimit,
-    config.installedReentry.otherReentryAttemptLimit
-  );
-  assert.deepEqual(
-    policy.installedRetryReentryAttemptLimits,
-    config.installedReentry.retryReentryAttemptLimits
-  );
-  assert.deepEqual(
-    policy.installedRepeatedBlockerAttemptLimits,
-    config.installedReentry.repeatedBlockerAttemptLimits
-  );
-  assert.equal(
-    installedReentryAttemptLimit("retry"),
-    policy.installedRetryReentryAttemptLimits.broad
-  );
-  assert.equal(
-    installedReentryAttemptLimit("yield"),
-    policy.installedYieldReentryAttemptLimit
-  );
-  assert.equal(
-    installedReentryAttemptLimit("other"),
-    policy.installedOtherReentryAttemptLimit
-  );
-});
-
-test("T-188 installed retry brakes scale down for framework-smoke profiles", () => {
-  const smokeOutcome = {
-    manifest: {
-      proportionalityProfile: {
-        outcomeClass: "framework_smoke",
-        profileClass: "degenerate"
-      }
-    },
-    summary: {
-      graphFunctionName: "framework_smoke_min_fp"
-    }
-  };
-  const compactOutcome = {
-    manifest: {
-      proportionalityProfile: {
-        outcomeClass: "internal_lite",
-        profileClass: "compact"
-      }
-    },
-    summary: {
-      graphFunctionName: "data_mapper_lite"
-    }
-  };
-  const broadOutcome = {
-    manifest: {
-      proportionalityProfile: {
-        outcomeClass: "domain_product",
-        profileClass: "broad"
-      }
-    },
-    summary: {
-      graphFunctionName: "data_mapper_full"
-    }
-  };
-  const policy = sdlcOperatorRuntimePolicy();
-
-  assert.equal(
-    installedReentryAttemptLimitForOutcome({
-      disposition: "retry",
-      outcome: smokeOutcome
-    }),
-    policy.installedRetryReentryAttemptLimits.frameworkSmoke
-  );
-  assert.equal(
-    installedReentryAttemptLimitForOutcome({
-      disposition: "retry",
-      outcome: compactOutcome
-    }),
-    policy.installedRetryReentryAttemptLimits.compact
-  );
-  assert.equal(
-    installedReentryAttemptLimitForOutcome({
-      disposition: "retry",
-      outcome: broadOutcome
-    }),
-    policy.installedRetryReentryAttemptLimits.broad
-  );
-  assert.equal(
-    installedRepeatedBlockerAttemptLimitForOutcome(smokeOutcome),
-    policy.installedRepeatedBlockerAttemptLimits.frameworkSmoke
-  );
-  assert.equal(
-    installedRepeatedBlockerAttemptLimitForOutcome(compactOutcome),
-    policy.installedRepeatedBlockerAttemptLimits.compact
-  );
+  assert.equal("installedReentry" in config, false);
+  assert.equal("installedConvergenceAttemptLimit" in policy, false);
+  assert.equal("installedRetryReentryAttemptLimits" in policy, false);
+  assert.equal("installedRepeatedBlockerAttemptLimits" in policy, false);
+  assert.equal(source.includes("installedReentryAttemptLimit"), false);
+  assert.equal(source.includes("installedReentryGuardScopeForAttempt"), false);
+  assert.equal(source.includes("yield_guard_exhausted"), false);
+  assert.equal(source.includes("retry_guard_exhausted"), false);
 });
 
 test("T-143 installed tool execution uses tenant tech-stack environment declarations", () => {
@@ -732,81 +637,6 @@ test("T-143 installed tool execution uses tenant tech-stack environment declarat
   ]);
   assert.equal(existsSync(path.join(toolCacheRoot, "example-tool")), true);
   assert.equal(existsSync(path.join(toolCacheRoot, "example-home")), true);
-});
-
-test("T-143 installed loop retry guard is scoped per graph edge", () => {
-  assert.equal(
-    installedReentryGuardScopeForAttempt({
-      disposition: "retry",
-      currentEdge: "derive_design_surface",
-      nextLawfulAction: "construction-action://retry/design",
-      reentryBasisRef: "basis://design"
-    }),
-    "retry:edge:derive_design_surface"
-  );
-  assert.notEqual(
-    installedReentryGuardScopeForAttempt({
-      disposition: "retry",
-      currentEdge: "derive_design_surface",
-      nextLawfulAction: "construction-action://retry/design",
-      reentryBasisRef: "basis://design"
-    }),
-    installedReentryGuardScopeForAttempt({
-      disposition: "retry",
-      currentEdge: "derive_requirement_surface",
-      nextLawfulAction: "construction-action://retry/requirements",
-      reentryBasisRef: "basis://requirements"
-    })
-  );
-});
-
-test("T-143 installed loop classifies closure disposition for re-entry budget", () => {
-  assert.equal(
-    installedReentryDispositionForOutcome({
-      traversalConsequence: {
-        edgeClosureDecision: {
-          disposition: "retry"
-        }
-      }
-    }),
-    "retry"
-  );
-  assert.equal(
-    installedReentryDispositionForOutcome({
-      traversalConsequence: {
-        edgeClosureDecision: {
-          disposition: "yield"
-        }
-      }
-    }),
-    "yield"
-  );
-  assert.equal(
-    installedReentryDispositionForOutcome({
-      traversalConsequence: {
-        edgeClosureDecision: {
-          disposition: "repair"
-        }
-      }
-    }),
-    "other"
-  );
-  assert.equal(
-    installedReentryDispositionForOutcome({
-      traversalConsequence: null
-    }),
-    null
-  );
-});
-
-test("T-143 installed loop records exhausted retry or yield disposition", () => {
-  const source = installedOperatorSource();
-
-  assert.equal(source.includes("reentryDispositionCountsByScope"), true);
-  assert.equal(source.includes("installedReentryGuardScopeForAttempt"), true);
-  assert.equal(source.includes("yield_guard_exhausted"), true);
-  assert.equal(source.includes("retry_guard_exhausted"), true);
-  assert.equal(source.includes("exhaustedDisposition"), true);
 });
 
 test("T-143 derives declared product targets from conformed PRODUCT authority", () => {

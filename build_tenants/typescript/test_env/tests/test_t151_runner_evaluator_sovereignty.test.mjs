@@ -15,9 +15,7 @@ import {
   constructSdlcGtlModule,
   deriveSdlcConformProjectProfileFromWorkspace,
   deriveSdlcWorkspaceIngressReport,
-  executeInstalledOperatorStartWithReentry,
-  installedStartRequestsYieldResume,
-  installedStartShouldContinueForRequestedUntil,
+  executeInstalledOperatorStart,
   materializeSdlcProjectConformance,
   projectSdlcQueryDomain,
   projectSdlcWorkerAttachment,
@@ -677,23 +675,16 @@ test("T-151 first_traversal returns the first admitted non-close consequence", a
   const start = makeStart(workspace);
   const basis = start.executionContract.basis;
   const workerScript = writeUnassessedObligationWorkerScript(workspace);
-  let refreshCalls = 0;
 
-  const outcome = await executeInstalledOperatorStartWithReentry({
+  const outcome = await executeInstalledOperatorStart({
     workspaceRoot: workspace,
     start,
     workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`,
-    replayEvents: preclosedEventsBeforeEdge(basis, "derive_component_code_surface"),
-    requestedUntil: "first_traversal",
-    refreshReplayState: async () => {
-      refreshCalls += 1;
-      throw new Error("first_traversal must return before runner re-entry");
-    }
+    replayEvents: preclosedEventsBeforeEdge(basis, "derive_component_code_surface")
   });
 
-  assert.equal(refreshCalls, 0);
-  assert.equal("loop" in outcome, false);
-  assert.equal(outcome.status, "worker_invoked");
+  assert.equal(Object.hasOwn(outcome, "loop"), false);
+  assert.equal(outcome.status, "blocked");
   assert.equal(outcome.summary.currentEdge, "derive_component_code_surface");
   assert.equal(outcome.postflight.status, "blocked");
   assert(outcome.traversalConsequence);
@@ -722,57 +713,23 @@ test("T-151 first_traversal returns the first admitted non-close consequence", a
   );
 });
 
-test("T-164 converged start follows deterministic conformance to downstream graph work", async () => {
+test("T-164 conform-project start stops at one admitted boundary before downstream graph work", async () => {
   const workspace = makeUnderstructuredConformWorkspace();
   const start = makeConformStart(workspace);
-  let refreshCalls = 0;
 
-  const outcome = await executeInstalledOperatorStartWithReentry({
+  const outcome = await executeInstalledOperatorStart({
     workspaceRoot: workspace,
     start,
     workerTransport: null,
-    replayEvents: [],
-    requestedUntil: "converged",
-    refreshReplayState: async () => {
-      refreshCalls += 1;
-      return {
-        start: {
-          kind: "sdlc_public_start_blocked",
-          status: "blocked",
-          blockingReason: "test_downstream_probe",
-          stopPredicate: "gap_stop",
-          executionContract: null,
-          emittedRuntimeEventKinds: []
-        },
-        replayEvents: [],
-        eventGraphEvents: []
-      };
-    }
+    replayEvents: []
   });
 
-  assert.equal(refreshCalls, 1);
-  assert.equal(outcome.status, "blocked");
-  assert.equal("loop" in outcome, true);
-  assert.equal(outcome.loop.attemptCount, 2);
-  assert.equal(outcome.loop.attempts[0].status, "converged");
+  assert.equal(outcome.status, "converged");
+  assert.equal(Object.hasOwn(outcome, "loop"), false);
   assert.equal(
-    outcome.loop.attempts[0].nextLawfulAction,
+    outcome.summary.nextLawfulAction,
     "rerun_start_for_downstream_graph"
   );
-  assert.deepStrictEqual(outcome.loop.attempts[0].emittedRuntimeEventKinds, [
-    "basis_admitted",
-    "graph_call_opened",
-    "frame_opened",
-    "vector_traversal_planned",
-    "payload_observed",
-    "payload_validated",
-    "fd_authority_outcome_admitted",
-    "vector_evaluated",
-    "vector_closed",
-    "fd_advance_ready",
-    "payload_observed",
-    "payload_validated"
-  ]);
   assert.deepStrictEqual(outcome.emittedRuntimeEventKinds, [
     "basis_admitted",
     "graph_call_opened",
@@ -789,57 +746,17 @@ test("T-164 converged start follows deterministic conformance to downstream grap
   ]);
 });
 
-test("T-164 converged start treats yield resume basis as same-edge continuation", () => {
-  const yieldOutcome = {
-    status: "postflight_failed",
-    summary: {
-      nextLawfulAction: "disposition://yield"
-    },
-    traversalConsequence: {
-      edgeClosureDecision: {
-        disposition: "yield",
-        yieldResumeBasis: {
-          resumeBasisRef: "resume-basis://t151/yield",
-          currentEdgeRef: "edge://t151/current",
-          admittedProgressRefs: ["file://t151/progress.scala"],
-          livenessProjectionRef: "liveness://t151/current",
-          resumePolicyRef: "resume-policy://t151/operator-iterate"
-        }
-      },
-      nextActionProjection: {
-        choosesNextTraversal: false,
-        selectedActionRef: null,
-        nextGraphFunctionRef: null,
-        nextGraphVectorRef: null
-      }
-    }
-  };
-
-  assert.equal(installedStartRequestsYieldResume(yieldOutcome), true);
-  assert.equal(
-    installedStartShouldContinueForRequestedUntil({
-      requestedUntil: "converged",
-      outcome: yieldOutcome
-    }),
-    true
-  );
-  assert.equal(
-    installedStartShouldContinueForRequestedUntil({
-      requestedUntil: "first_traversal",
-      outcome: yieldOutcome
-    }),
-    false
-  );
-});
-
-test("T-151 installed runner source does not gate first_traversal on worker_invoked", () => {
+test("T-151 installed runner source exposes no local requested-until loop", () => {
   const source = readFileSync(
     new URL("../../code/src/operator/installed_operator.ts", import.meta.url),
     "utf8"
   );
 
   assert.equal(source.includes('latest.status === "worker_invoked"'), false);
-  assert.equal(source.includes("latest.traversalConsequence !== null"), true);
+  assert.equal(source.includes("latest.traversalConsequence !== null"), false);
+  assert.equal(source.includes("requestedUntil"), false);
+  assert.equal(source.includes("refreshReplayState"), false);
+  assert.equal(source.includes("sdlc_installed_operator_start_loop"), false);
   assert.equal(source.includes("completedDispatchState.nextLawfulAction"), false);
   assert.equal(source.includes("nextLawfulActions.includes"), false);
 });

@@ -211,7 +211,7 @@ test("T-197 design ratifies owner partition assets before Wave 1 code", () => {
     "### Decommission Register",
     "### W-105 Construct-Site Sufficiency Inventory",
     "ABG route / dependency",
-    "ABI 4.0.0-rc.14",
+    "ABI 4.0.0-rc.15",
     "runtime continuation transition projection refs",
     "22/22 edge-contract tests and 1/1 Rust-service sandbox proof",
     "must-not-name-governed-target",
@@ -496,6 +496,19 @@ test("T-197 A2 keeps SDLC start as shell over one admitted ABG boundary", () => 
   const entry = repoFile(
     "build_tenants/typescript/code/src/spec_method/entry.ts"
   );
+  const operatorIndex = repoFile(
+    "build_tenants/typescript/code/src/operator/index.ts"
+  );
+  const installedOperator = repoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+  const carriers = repoFile("build_tenants/typescript/code/src/operator/carriers.ts");
+  const runtimePolicy = repoFile(
+    "build_tenants/typescript/code/src/operator/runtime_policy.ts"
+  );
+  const runtimePolicyConfig = repoFile(
+    "build_tenants/typescript/config/operator-runtime-policy.json"
+  );
   const installedStartPayload = sourceFunction(entry, "installedStartPayloadFor");
   const instructions = repoFile(
     "build_tenants/typescript/code/src/install/instruction_files.ts"
@@ -517,6 +530,16 @@ test("T-197 A2 keeps SDLC start as shell over one admitted ABG boundary", () => 
     entry,
     /import\s*\{[\s\S]*executeInstalledOperatorStartWithReentry/u
   );
+  assert.doesNotMatch(
+    installedOperator,
+    /\bexecuteInstalledOperatorStartWithReentry\b/u
+  );
+  assert.doesNotMatch(operatorIndex, /\bexecuteInstalledOperatorStartWithReentry\b/u);
+  assert.doesNotMatch(carriers, /\bSdlcInstalledOperatorStartLoop\b/u);
+  assert.doesNotMatch(carriers, /\bsdlc_installed_operator_start_loop\b/u);
+  assert.doesNotMatch(runtimePolicy, /\binstalledReentry\b/u);
+  assert.doesNotMatch(runtimePolicy, /\binstalledRetryReentryAttemptLimits\b/u);
+  assert.doesNotMatch(runtimePolicyConfig, /"installedReentry"/u);
   assert.match(
     instructions,
     /\$\{genesisCommand\} start --workspace \. --scope workspace --target graph_function:\$\{FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE\} --until converged/u

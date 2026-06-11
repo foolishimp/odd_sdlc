@@ -20,19 +20,6 @@ export interface SdlcOperatorRuntimePolicy {
   readonly executionShardTimeoutMs: number;
   readonly executionShardInactivityTimeoutMs: number;
   readonly installedOperatorShardTimeoutCapMs: number | null;
-  readonly installedConvergenceAttemptLimit: number;
-  readonly installedYieldReentryAttemptLimit: number;
-  readonly installedOtherReentryAttemptLimit: number;
-  readonly installedRetryReentryAttemptLimits: {
-    readonly frameworkSmoke: number;
-    readonly compact: number;
-    readonly broad: number;
-  };
-  readonly installedRepeatedBlockerAttemptLimits: {
-    readonly frameworkSmoke: number;
-    readonly compact: number;
-    readonly broad: number;
-  };
   readonly liveHarnessCommandTimeoutMs: number;
   readonly liveHarnessFullCapabilityCommandTimeoutMs: number;
   readonly liveHarnessLifecycleCommandTimeoutMs: number;
@@ -61,21 +48,6 @@ interface SdlcOperatorRuntimePolicyConfig {
   readonly executionShard: {
     readonly timeoutMs: number;
     readonly inactivityTimeoutMs: number;
-  };
-  readonly installedReentry: {
-    readonly convergenceAttemptLimit: number;
-    readonly yieldReentryAttemptLimit: number;
-    readonly otherReentryAttemptLimit: number;
-    readonly retryReentryAttemptLimits: {
-      readonly frameworkSmoke: number;
-      readonly compact: number;
-      readonly broad: number;
-    };
-    readonly repeatedBlockerAttemptLimits: {
-      readonly frameworkSmoke: number;
-      readonly compact: number;
-      readonly broad: number;
-    };
   };
   readonly liveHarness: {
     readonly commandTimeoutMs: number;
@@ -181,21 +153,6 @@ function readSdlcOperatorRuntimePolicyConfig(): SdlcOperatorRuntimePolicyConfig 
     "executionShard",
     "operator-runtime-policy.json"
   );
-  const installedReentry = recordField(
-    raw,
-    "installedReentry",
-    "operator-runtime-policy.json"
-  );
-  const retryReentryAttemptLimits = recordField(
-    installedReentry,
-    "retryReentryAttemptLimits",
-    "operator-runtime-policy.json.installedReentry"
-  );
-  const repeatedBlockerAttemptLimits = recordField(
-    installedReentry,
-    "repeatedBlockerAttemptLimits",
-    "operator-runtime-policy.json.installedReentry"
-  );
   const liveHarness = recordField(raw, "liveHarness", "operator-runtime-policy.json");
   cachedConfig = Object.freeze({
     kind: "odd_sdlc_operator_runtime_policy",
@@ -268,57 +225,6 @@ function readSdlcOperatorRuntimePolicyConfig(): SdlcOperatorRuntimePolicyConfig 
         "inactivityTimeoutMs",
         "operator-runtime-policy.json.executionShard"
       )
-    }),
-    installedReentry: Object.freeze({
-      convergenceAttemptLimit: positiveIntegerField(
-        installedReentry,
-        "convergenceAttemptLimit",
-        "operator-runtime-policy.json.installedReentry"
-      ),
-      yieldReentryAttemptLimit: positiveIntegerField(
-        installedReentry,
-        "yieldReentryAttemptLimit",
-        "operator-runtime-policy.json.installedReentry"
-      ),
-      otherReentryAttemptLimit: positiveIntegerField(
-        installedReentry,
-        "otherReentryAttemptLimit",
-        "operator-runtime-policy.json.installedReentry"
-      ),
-      retryReentryAttemptLimits: Object.freeze({
-        frameworkSmoke: positiveIntegerField(
-          retryReentryAttemptLimits,
-          "frameworkSmoke",
-          "operator-runtime-policy.json.installedReentry.retryReentryAttemptLimits"
-        ),
-        compact: positiveIntegerField(
-          retryReentryAttemptLimits,
-          "compact",
-          "operator-runtime-policy.json.installedReentry.retryReentryAttemptLimits"
-        ),
-        broad: positiveIntegerField(
-          retryReentryAttemptLimits,
-          "broad",
-          "operator-runtime-policy.json.installedReentry.retryReentryAttemptLimits"
-        )
-      }),
-      repeatedBlockerAttemptLimits: Object.freeze({
-        frameworkSmoke: positiveIntegerField(
-          repeatedBlockerAttemptLimits,
-          "frameworkSmoke",
-          "operator-runtime-policy.json.installedReentry.repeatedBlockerAttemptLimits"
-        ),
-        compact: positiveIntegerField(
-          repeatedBlockerAttemptLimits,
-          "compact",
-          "operator-runtime-policy.json.installedReentry.repeatedBlockerAttemptLimits"
-        ),
-        broad: positiveIntegerField(
-          repeatedBlockerAttemptLimits,
-          "broad",
-          "operator-runtime-policy.json.installedReentry.repeatedBlockerAttemptLimits"
-        )
-      })
     }),
     liveHarness: Object.freeze({
       commandTimeoutMs: positiveIntegerField(
@@ -409,46 +315,6 @@ export function sdlcOperatorRuntimePolicy(): SdlcOperatorRuntimePolicy {
       installedOperatorShardTimeoutCapMs === null
         ? null
         : Math.max(minimumOperatorTimeoutMs, installedOperatorShardTimeoutCapMs),
-    installedConvergenceAttemptLimit: configuredPositiveInteger(
-      "ODD_SDLC_INSTALLED_CONVERGENCE_ATTEMPT_LIMIT",
-      config.installedReentry.convergenceAttemptLimit
-    ),
-    installedYieldReentryAttemptLimit: configuredPositiveInteger(
-      "ODD_SDLC_INSTALLED_YIELD_REENTRY_ATTEMPT_LIMIT",
-      config.installedReentry.yieldReentryAttemptLimit
-    ),
-    installedOtherReentryAttemptLimit: configuredPositiveInteger(
-      "ODD_SDLC_INSTALLED_OTHER_REENTRY_ATTEMPT_LIMIT",
-      config.installedReentry.otherReentryAttemptLimit
-    ),
-    installedRetryReentryAttemptLimits: Object.freeze({
-      frameworkSmoke: configuredPositiveInteger(
-        "ODD_SDLC_INSTALLED_FRAMEWORK_SMOKE_RETRY_REENTRY_ATTEMPT_LIMIT",
-        config.installedReentry.retryReentryAttemptLimits.frameworkSmoke
-      ),
-      compact: configuredPositiveInteger(
-        "ODD_SDLC_INSTALLED_COMPACT_RETRY_REENTRY_ATTEMPT_LIMIT",
-        config.installedReentry.retryReentryAttemptLimits.compact
-      ),
-      broad: configuredPositiveInteger(
-        "ODD_SDLC_INSTALLED_BROAD_RETRY_REENTRY_ATTEMPT_LIMIT",
-        config.installedReentry.retryReentryAttemptLimits.broad
-      )
-    }),
-    installedRepeatedBlockerAttemptLimits: Object.freeze({
-      frameworkSmoke: configuredPositiveInteger(
-        "ODD_SDLC_INSTALLED_FRAMEWORK_SMOKE_REPEATED_BLOCKER_ATTEMPT_LIMIT",
-        config.installedReentry.repeatedBlockerAttemptLimits.frameworkSmoke
-      ),
-      compact: configuredPositiveInteger(
-        "ODD_SDLC_INSTALLED_COMPACT_REPEATED_BLOCKER_ATTEMPT_LIMIT",
-        config.installedReentry.repeatedBlockerAttemptLimits.compact
-      ),
-      broad: configuredPositiveInteger(
-        "ODD_SDLC_INSTALLED_BROAD_REPEATED_BLOCKER_ATTEMPT_LIMIT",
-        config.installedReentry.repeatedBlockerAttemptLimits.broad
-      )
-    }),
     liveHarnessCommandTimeoutMs: configuredTimeoutMs(
       "ODD_SDLC_TS_LIVE_COMMAND_TIMEOUT_MS",
       config.liveHarness.commandTimeoutMs,

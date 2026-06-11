@@ -881,7 +881,7 @@ test("T-184 no-dispatch projection defers output reads until consequence", () =>
     "function stateWithReviewGradePostflight"
   );
   const reviewGradeStateEnd = installedOperatorSource.indexOf(
-    "export function installedReentryGuardScopeForAttempt",
+    "export function deriveSdlcWorkerRetryContextFromTraversalConsequence",
     reviewGradeStateStart
   );
   const reviewGradeStateSource = installedOperatorSource.slice(

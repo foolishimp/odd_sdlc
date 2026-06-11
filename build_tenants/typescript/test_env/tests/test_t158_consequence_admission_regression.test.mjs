@@ -680,7 +680,7 @@ test("T-158 non-close F_P dispatch publishes consequence before returning dispat
     replayEvents: preclosedEventsBeforeEdge(basis, "derive_component_code_surface")
   });
 
-  assert.equal(outcome.status, "worker_invoked");
+  assert.equal(outcome.status, "blocked");
   assert.equal(outcome.summary.currentEdge, "derive_component_code_surface");
   assert(outcome.archiveRoot);
   assert(outcome.traversalConsequence);

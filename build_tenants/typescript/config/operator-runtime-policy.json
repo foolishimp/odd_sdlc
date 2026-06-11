@@ -22,21 +22,6 @@
     "timeoutMs": 3600000,
     "inactivityTimeoutMs": 3600000
   },
-  "installedReentry": {
-    "convergenceAttemptLimit": 4000,
-    "yieldReentryAttemptLimit": 400,
-    "otherReentryAttemptLimit": 100,
-    "retryReentryAttemptLimits": {
-      "frameworkSmoke": 3,
-      "compact": 12,
-      "broad": 100
-    },
-    "repeatedBlockerAttemptLimits": {
-      "frameworkSmoke": 3,
-      "compact": 6,
-      "broad": 20
-    }
-  },
   "liveHarness": {
     "commandTimeoutMs": 3600000,
     "fullCapabilityCommandTimeoutMs": 43200000,

@@ -94,8 +94,6 @@ export type {
   SdlcImplementationDesignBinding,
   SdlcImplementationModuleRow,
   SdlcImplementationStackProfileRow,
-  SdlcInstalledOperatorStartLoop,
-  SdlcInstalledOperatorStartLoopAttempt,
   SdlcInstalledOperatorStartOutcome,
   SdlcInstalledOperatorStatus,
   SdlcInstalledOperatorTraversalConsequence,
@@ -610,14 +608,6 @@ export {
   edgeAssuranceEvidenceCandidatesFor,
   createSdlcInstalledOperatorAbgPluginSession,
   executeInstalledOperatorStart,
-  executeInstalledOperatorStartWithReentry,
-  installedReentryAttemptLimit,
-  installedReentryAttemptLimitForOutcome,
-  installedReentryDispositionForOutcome,
-  installedReentryGuardScopeForAttempt,
-  installedRepeatedBlockerAttemptLimitForOutcome,
-  installedStartRequestsYieldResume,
-  installedStartShouldContinueForRequestedUntil,
   mergeSdlcWorkerRetryContextWithRuntimeGapRegister,
   normalizePostCloseContinuationVectorIndex,
   sdlcWorkerRetryContextFromAbgRetryContext,
@@ -626,7 +616,6 @@ export {
   sdlcRequirementObligationBelongsToDownstreamComponentSurface
 } from "./installed_operator.js";
 export type {
-  SdlcInstalledReentryDisposition,
   SdlcPostProductMaterializationActionResolution,
   SdlcPublishedProductMaterializationAction,
   SdlcPublishedProductMaterializationActionStatus,

@@ -241,13 +241,15 @@ test("T-135 unpublished target cannot fabricate an executable construction inten
   assert.equal(outcome.executionContract, null);
 });
 
-test("T-135 installed reentry loop consumes evaluate_next truth, not local gap strings", () => {
+test("T-135 installed operator no longer exposes local reentry loop predicates", () => {
   const source = readFileSync(
     new URL("../../code/src/operator/installed_operator.ts", import.meta.url),
     "utf8"
   );
 
-  assert.equal(source.includes("installedStartHasEvaluateNextTraversalTruth"), true);
+  assert.equal(source.includes("installedStartHasEvaluateNextTraversalTruth"), false);
+  assert.equal(source.includes("installedStartShouldContinueForRequestedUntil"), false);
+  assert.equal(source.includes("installedStartRequestsYieldResume"), false);
   assert.equal(source.includes("installedStartHasSameEdgeRetryTruth"), false);
   assert.equal(source.includes("retry_same_edge_with_gap_dossier"), false);
   assert.equal(source.includes("plan_repair_reentry_with_gap_dossier"), false);

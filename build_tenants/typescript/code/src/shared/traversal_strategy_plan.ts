@@ -56,7 +56,7 @@ const ODD_SDLC_DEFAULT_TRAVERSAL_EDGE_STRATEGIES: Readonly<
   scenario_surface: "full_breadth",
   implementation_design_surface: "full_breadth",
   derive_lite_design_adr_surface: "steel_thread",
-  derive_lite_component_code_surface: "steel_thread",
+  derive_lite_component_code_surface: "full_breadth",
   code_surface: "full_breadth",
   test_execution_result_surface: "full_breadth",
   test_run_archive_surface: "full_breadth",
