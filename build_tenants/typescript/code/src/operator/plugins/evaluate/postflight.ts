@@ -9,6 +9,7 @@ import {
   type GtlEvaluationFindingRef
 } from "@abiogenesis/typescript-tenant";
 import {
+  legacyBlockingReasonCode,
   makeSdlcBlockingReason,
   type SdlcBlockingReason
 } from "../../../shared/blocking_reason.js";
@@ -47,6 +48,22 @@ import type {
   SdlcWorkerHandoffManifest,
   SdlcWorkerResultReport
 } from "../../carriers.js";
+
+function activeComputeStageBlockingReasonCarriers(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly blockingReasonCarriers: readonly SdlcBlockingReason[];
+}): readonly SdlcBlockingReason[] {
+  if (input.manifest.targetAssetType !== "test_execution_result_surface") {
+    return Object.freeze([]);
+  }
+  return Object.freeze(
+    input.blockingReasonCarriers.filter(
+      (reason) =>
+        reason.code === "test_execution_evidence_missing" ||
+        reason.code === "test_execution_evidence_invalid"
+    )
+  );
+}
 
 export function evaluateSdlcComputeStage(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
@@ -187,10 +204,18 @@ export function evaluateSdlcComputeStage(input: {
       blockingReasonCarriers
     });
   }
+  const activeBlockingReasonCarriers = activeComputeStageBlockingReasonCarriers({
+    manifest: input.manifest,
+    blockingReasonCarriers
+  });
   return Object.freeze({
     kind: "sdlc_operator_postflight_result",
-    status: "passed",
-    blockingReasons: Object.freeze([]),
+    status: activeBlockingReasonCarriers.length > 0 ? "blocked" : "passed",
+    blockingReasons: Object.freeze(
+      activeBlockingReasonCarriers.map((reason) =>
+        legacyBlockingReasonCode(reason)
+      )
+    ),
     blockingReasonCarriers: Object.freeze(blockingReasonCarriers),
     evidenceRefs: Object.freeze(evidenceRefs)
   });

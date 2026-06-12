@@ -6323,6 +6323,43 @@ test("T-171 full component-code defers execution evidence to graph test-executio
   );
 });
 
+test("T-171 test-execution result blocks when governed execution evidence is missing", () => {
+  const workspace = makeExecutionWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_test_execution_result_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 17,
+    contract,
+    projectConstraints: constraints,
+    runId: "t171-test-execution-missing-evidence"
+  });
+  assert(manifest.productMaterialization.executionShards.length > 0);
+  writeHandoffFiles(manifest);
+  const output = writeOutputSurface(manifest, "test_execution_result_surface");
+  writeReport({
+    manifest,
+    digest: output.digest,
+    summary: "test execution result without governed execution evidence",
+    materializedFiles: [],
+    executionEvidence: null
+  });
+
+  const report = readWorkerResultReport(manifest);
+  writeProductMaterializationManifest({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
+
+  assert.equal(postflight.status, "blocked");
+  assert(postflight.blockingReasons.includes("test_execution_evidence_missing"));
+  const missingExecutionEvidence = postflight.blockingReasonCarriers.find(
+    (reason) => reason.code === "test_execution_evidence_missing"
+  );
+  assert.equal(missingExecutionEvidence?.reasonClass, "code_to_test");
+  assert.equal(missingExecutionEvidence?.lawfulReentryPoint, "same_edge_retry");
+});
+
 test("T-102 test-run archive validates execution evidence against source edge shards", () => {
   const workspace = makeExecutionWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);

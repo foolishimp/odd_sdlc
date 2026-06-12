@@ -87,8 +87,26 @@ test("T-183 lineage completeness is review-grade F_P pressure, not F_D postfligh
     postflightSource.indexOf("return Object.freeze({", postflightSource.indexOf("function evaluateSdlcComputeStage")),
     postflightSource.indexOf("function obligationAssessmentCounts")
   );
-  assert.match(postflightReturn, /status: "passed"/u);
-  assert.match(postflightReturn, /blockingReasons: Object\.freeze\(\[\]\)/u);
+  assert.match(
+    postflightSource,
+    /function activeComputeStageBlockingReasonCarriers/u
+  );
+  assert.match(
+    postflightSource,
+    /input\.manifest\.targetAssetType !== "test_execution_result_surface"/u
+  );
+  assert.match(
+    postflightSource,
+    /reason\.code === "test_execution_evidence_missing"/u
+  );
+  assert.match(
+    postflightReturn,
+    /status:\s*activeBlockingReasonCarriers\.length > 0 \? "blocked" : "passed"/u
+  );
+  assert.match(
+    postflightReturn,
+    /blockingReasons:\s*Object\.freeze\(\s*activeBlockingReasonCarriers\.map/u
+  );
   assert.doesNotMatch(postflightReturn, /status: blockingReasons\.length/u);
 
   const postflightChecksSource = readRepoFile(
