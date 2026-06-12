@@ -165,6 +165,9 @@ function reviewGradeFindingIsDownstreamStagePressure(input: {
   ) {
     return false;
   }
+  if (input.finding.repairSurfaceTriage?.disposition === "downstream_deferred") {
+    return true;
+  }
   const action = input.finding.requiredAction?.toLowerCase() ?? "";
   const actionNamesDownstreamTestOrExecution =
     (action.includes("downstream") ||

@@ -1799,6 +1799,42 @@ test("T-182 wrong-stage review findings are downstream pressure, not same-edge r
       }),
       []
     );
+    const explicitDownstreamTriageCarryFinding = {
+      ...wrongStageFindings[0],
+      requiredAction:
+        "Resolve this carried requirement on the downstream closure/materialization edge while preserving current component-code lineage and target-carrier refs.",
+      repairSurfaceTriage: {
+        kind: "sdlc_repair_surface_triage",
+        disposition: "downstream_deferred",
+        repairGraphFunctionRef: null,
+        repairGraphVectorRef: null,
+        repairAssetRef: null,
+        evidenceRefs: wrongStageFindings[0].evidenceRefs,
+        rationale:
+          "Review-grade evaluator classified this as downstream closure pressure, not current-edge source repair."
+      }
+    };
+    assert.equal(
+      reviewGradeFindingsAreDownstreamStagePressure(
+        [explicitDownstreamTriageCarryFinding],
+        {
+          targetAssetType: "component_code_surface"
+        }
+      ),
+      true
+    );
+    assert.deepEqual(
+      reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+        runRef: "t197-code-downstream-triage-carry",
+        targetAssetType: "component_code_surface",
+        assessment: {
+          ...base,
+          status: "blocked",
+          findings: [explicitDownstreamTriageCarryFinding]
+        }
+      }),
+      []
+    );
     const requirementSurfaceCarryFinding = {
       ...wrongStageFindings[0],
       requiredAction:
