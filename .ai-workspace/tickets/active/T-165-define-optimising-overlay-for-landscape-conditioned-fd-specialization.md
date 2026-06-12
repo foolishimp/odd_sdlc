@@ -26,7 +26,7 @@ re_entry_point: design
 priority: high
 triaged_at: 2026-05-14
 created_at: 2026-05-14
-updated_at: 2026-06-11
+updated_at: 2026-06-12
 governance_scope: STDO Method
 source_ticket: .ai-workspace/tickets/backlog/T-162-first-class-ticket-workflow-for-governed-change.md
 source_documents:
@@ -867,3 +867,341 @@ Remaining scope is P2/P3 only. This ticket stays active until the single-node
 smoke path and general deterministic specialization phases are either
 implemented here or split into successor tickets with this ticket repriced to
 P1 closure.
+
+## Workflow Addendum 2026-06-12: ABG-Owned Zoom-In Decomposition
+
+The data-mapper live lane exposed a depth defect in the current workflow shape:
+an upstream review edge can lawfully mark feature pressure as
+`downstream_deferred`, but that pressure is not yet forced into a durable child
+graph. The run can therefore reach build/test command success while the
+feature obligation has not decomposed into requirement-bound design, code, test,
+execution, and evidence rows.
+
+The optimizer must embed a repeatable zoom-in workflow over graph functions.
+This sits above ABG as an SDLC/product overlay that selects and constructs the
+next graph-function zoom-in. It does not become a runtime loop, event store,
+dispatcher, closure authority, or substitute for ABG traversal truth. ABG still
+owns graph calls, frames, vectors, continuations, payload ledgers, event
+lineage, replay, projection mechanics, and closure fold. SDLC owns the domain
+meaning of the decomposition and consolidation carriers.
+
+The lawful motion is:
+
+```text
+req[1]
+  -> req.n.dec[m]
+  -> ledger.req.n.dec[m]
+  -> design.consolidate.req[n]
+  -> req.n.consolidate[]
+  -> recurse while any child remains non-leaf
+```
+
+Meaning:
+
+- `req[1]` is the parent requirement pressure.
+- `req.n.dec[m]` is a depth-n decomposition into child obligations.
+- `ledger.req.n.dec[m]` is the durable parent/child edge ledger, carrying owner
+  stage, closure criteria, graph-function refs, ABG run refs, and evidence refs.
+- `design.consolidate.req[n]` commits child obligations into target design,
+  source, test, execution, and proof assets.
+- `req.n.consolidate[]` is a derived roll-up from closed child rows. It is not
+  an authored assertion and cannot close the parent while any child is open or
+  untraced.
+
+Each child decomposition row is an ABG-addressable graph-function start or
+resume over existing graph functions, or over an admitted generated subgraph
+overlay. The zoom-in is therefore a repeatable expansion of a graph-function
+edge into ABG atomic units:
+
+```text
+graph call
+  -> frame
+  -> vector
+  -> payload observation/admission
+  -> evaluation
+  -> closure or continuation
+  -> provenance/event refs
+```
+
+The workflow guarantee is edge traversal, not prose obligation tracking. A
+downstream-deferred row must emit a decomposition mandate. The mandate must
+trace:
+
+```text
+parent obligation
+  -> child obligation
+  -> design target
+  -> code target
+  -> test case
+  -> source test file
+  -> execution shard
+  -> admitted evidence
+  -> child closure
+  -> parent consolidation
+```
+
+Closure law additions:
+
+- Parent closure is derived only from child closure evidence and ABG
+  event/provenance refs.
+- `downstream_deferred` is not a terminal status. It must create or reference a
+  decomposition row.
+- Build or test command success can close materialization proof only. It cannot
+  close feature depth unless requirement-bound test rows, source test refs,
+  execution shard refs, and admitted evidence are present.
+- A test-execution surface with empty `testcaseIds`, `sourceTestFileRefs`, or
+  `requirementIds` cannot close a feature child row.
+- Consolidation must name the child rows it closes and the parent pressure it
+  re-prices.
+
+Data-mapper example:
+
+```text
+REQ-ENG-003
+  -> ENG-003.dec.1.load-topology
+  -> ENG-003.dec.2.spark-read
+  -> ENG-003.dec.3.transform-edge
+  -> ENG-003.dec.4.ledger-write
+  -> ENG-003.consolidate.engine-execution
+```
+
+The 2026-06-12 data-mapper run showed why this matters. `REQ-ENG-003` carried
+real engine-execution pressure, but the generated code used local file loading
+and fabricated topology while the downstream test surface admitted generic
+`sbt test` success without requirement-bound source tests. The future optimized
+workflow must prevent that convergence path by turning the deferred engine
+pressure into child rows before code/test closure can be admitted.
+
+### Traversal Strategy Proportionality
+
+The simple implementation would explode every current traversal into a fixed
+multistage traversal. That is not the target design. Fixed explosion preserves
+depth only by making every edge expensive and loses the distinction between a
+small lawful edge and a large edge that needs recursive decomposition.
+
+The consequence surface must instead admit a traversal strategy decision:
+
+```text
+SdlcTraversalStrategyDecision
+  parentObligationRef
+  sourceNodeRef
+  targetNodeRef
+  selectedStrategy:
+    simple_traversal
+    depth_traversal
+    simple_then_depth
+    depth_then_simple
+    non_admit
+  selectedGraphFunctionRef
+  fallbackGraphFunctionRef
+  depthTraversalFunctionRef?
+  proportionalityBasisRefs
+  edgeContractRefs
+  evidencePolicyRef
+  stopPolicyRef
+  escalationPolicyRef
+  nonAdmissionReasonRefs
+```
+
+The decision is an admitted carrier, not an imperative branch. It lets the
+optimizer select the cheapest lawful path while preserving a replayable
+fallback:
+
+```text
+gap / consequence pressure
+  -> F_D admit traversal strategy
+  -> simple traversal or depth traversal
+  -> ABG executes selected graph function
+  -> simple close, lawful stop, or residual pressure
+  -> residual pressure may admit depth traversal
+```
+
+### Required Feature: Consequence-To-Construction Zoom Bridge
+
+The missing implementation feature is the typed handoff from consequence
+selection to ABG construction/re-entry execution.
+
+The consequence plugin is allowed to inspect residual pressure, the current
+traversal strategy envelope, the graph-function catalog, candidate families,
+refinement boundaries, overlays, and prior execution evidence. It must not run
+the selected child traversal itself. Its job is to admit or reject a traversal
+action selection that ABG can execute through construction intent, graph-call,
+graph-span re-entry, or child-frame mechanics.
+
+The required bridge is:
+
+```text
+residual consequence pressure
+  -> SdlcTraversalStrategyDecision
+  -> SdlcConsequenceTraversalAction
+  -> ABG construction intent admission
+  -> graph function invocation / graph-span re-entry / child frame
+  -> child traversal events and provenance
+  -> foldback to parent consolidation
+```
+
+`SdlcConsequenceTraversalAction` must be a typed carrier, or a direct lawful
+projection into the equivalent ABG construction action/intention carrier. It
+must include:
+
+```text
+SdlcConsequenceTraversalAction
+  consequenceRef
+  strategyDecisionRef
+  parentObligationRef
+  actionKind:
+    invoke_graph_function
+    continue_graph_call
+    repair_same_edge
+    reenter_graph_span
+    invoke_prior_vector
+    invoke_later_vector
+    non_admit
+  selectedGraphFunctionRef
+  selectedOverlayRef?
+  selectedCandidateFamilyRef?
+  selectedRefinementBoundaryRef?
+  selectedTraversalTargetRef?
+  sourceNodeRef
+  targetNodeRef
+  graphVectorRef?
+  graphSpanRef?
+  reentryTargetRef?
+  inputAssetRefs
+  expectedOutputAssetRefs
+  requiredAuthorityRefs
+  proportionalityBasisRefs
+  evidencePolicyRef
+  foldbackPolicyRef
+  nonAdmissionReasonRefs
+```
+
+The bridge must preserve this separation:
+
+- SDLC/product consequence selects the domain-meaningful traversal action.
+- F_D admits the selected action and its authority refs.
+- ABG owns execution: graph call, frame, vector cursor, graph-span re-entry,
+  child traversal, events, replay, projection, and foldback.
+- Parent closure reads the admitted child/foldback evidence. It does not read
+  consequence prose.
+
+This is the place where the optimizer chooses between simple and depth
+traversal. The consequence plugin may pick the most appropriate graph function
+for the overlay, but that selection becomes executable only after it is admitted
+as a construction/re-entry action. ABG now has the executable action bridge;
+this ticket owns the SDLC optimizer/data-mapper consumption of that bridge in
+P2/P3.
+
+ABG follow-through status, 2026-06-12:
+
+- `abiogenesis` T-152 now implements the ABG substrate bridge as
+  `ConsequenceTraversalAction`, carried by admitted `ConsequenceProjectionOutcome`
+  and projected into existing construction action/intent carriers.
+- T-152 now also implements runner consumption: `engine_runner.ts` consumes
+  `ConsequenceProjectionOutcome.traversalAction`, projects it into construction
+  observation/action/binding/priority/admitted-intent carriers, and invokes
+  `runConstructionIntentStep(...)` so ABG applies graph-span re-entry through
+  replay-visible events.
+- The focused ABG regression is
+  `build_tenants/abiogenesis/typescript/test_env/tests/test_t152_consequence_traversal_action_bridge.test.mjs`.
+- This proves the substrate handoff: consequence selection -> admission ->
+  construction action/intent -> graph re-entry execution -> replay-visible child
+  provenance. It does not by itself wire the SDLC optimizer/data-mapper lane to
+  consume the bridge; that remains P2/P3 SDLC work below.
+
+`simple_then_depth` is the important operating mode for feature work. The
+system may first attempt the normal edge. If the edge leaves residual feature
+pressure, missing child obligations, or missing requirement-bound test evidence,
+the consequence must be allowed to admit the depth traversal function between
+the existing source and target graph nodes:
+
+```text
+Fg_single_typed_traversal
+  -> residual feature-depth pressure
+  -> Fg_decompose_depth_between_nodes
+  -> child graph-function starts/resumes
+  -> child closure evidence
+  -> parent consolidation
+```
+
+This makes depth a proportional escalation, not the default cost of every
+traversal.
+
+The depth traversal function should be specified as a graph function over an
+existing graph:
+
+```text
+Fg_decompose_depth_between_nodes(
+  sourceNodeRef,
+  targetNodeRef,
+  parentObligationRef,
+  graphCatalogDigestRef,
+  edgeContractRefs,
+  depthPolicyRef,
+  evidencePolicyRef
+) -> DepthTraversalOutcome
+```
+
+`DepthTraversalOutcome` must include:
+
+```text
+status: admitted | rejected | blocked
+depthPlanRef
+decompositionTraceRegisterRef
+childObligationRefs
+graphVectorRefs
+requiredLedgerRefs
+consolidationRef
+nonAdmissionReasonRefs
+```
+
+The expected ABG position is that the required atomic mechanics already exist:
+graph functions and vectors are addressable, graph calls can start or resume
+from admitted refs, payloads/events/provenance can be carried through child
+executions, and closure can fold over child execution evidence. This ticket
+must not assume that the high-zoom use case is proven merely because those
+lower-level mechanics exist. P2/P3 must include a proof gate that exercises the
+depth traversal function live. If ABG cannot start/resume the child graph
+function path, preserve child event/provenance refs, or fold child closure back
+into parent consolidation, the correct outcome is an ABG/GTL gap ticket or
+patch. SDLC must not compensate by adding a local recursive controller.
+
+Acceptance additions for P2/P3:
+
+- Introduce or ratify a `sdlc_decomposition_trace_register` equivalent for
+  parent/child requirement decomposition, owner edge, graph-function refs,
+  closure criteria, evidence refs, and consolidation refs.
+- Introduce or ratify `SdlcTraversalStrategyDecision` so consequence can admit
+  `simple_traversal`, `depth_traversal`, `simple_then_depth`,
+  `depth_then_simple`, or `non_admit` by proportionality.
+- Introduce or ratify `SdlcConsequenceTraversalAction`, or bind directly to the
+  ABG `ConsequenceTraversalAction`/construction-intent bridge, so a consequence
+  decision can become an executable ABG graph-function invocation, graph-span
+  re-entry, or child-frame traversal without an SDLC-owned runtime loop.
+- Introduce or ratify `Fg_decompose_depth_between_nodes` as a graph function
+  over existing graph nodes, not as an SDLC-owned loop.
+- Persist downstream-deferred review rows into that register instead of leaving
+  them as advisory review text.
+- Add a focused SDLC bridge test where `operator/traversal_consequence.ts`
+  observes residual feature-depth pressure, emits or binds to the ABG
+  consequence traversal action, ABG applies graph cursor/re-entry or child
+  graph-function invocation, and the emitted child event/provenance refs fold
+  back to parent consolidation.
+- Make downstream design, build, and test edges consume the register and block
+  parent closure on untraced or unclosed child rows.
+- Reject feature-depth closure when requirement-bound test rows, source test
+  refs, execution shard refs, or admitted evidence are absent.
+- Prove with a data-mapper focused regression that `REQ-ENG-003` cannot converge
+  through command-only `sbt test` evidence.
+- Prove the ABG high-zoom path live: admitted strategy decision, depth traversal
+  start/resume, child graph-function execution, child event/provenance capture,
+  child closure fold, and parent consolidation.
+- If the high-zoom path exposes missing ABG/GTL mechanics, open or patch the
+  ABG/GTL gap rather than implementing a local SDLC traversal controller.
+
+Non-goals:
+
+- no external orchestrator above ABG
+- no SDLC-owned ABG runtime loop
+- no generated-sandbox product patching as proof
+- no generic obligation prose masquerading as feature-depth evidence
