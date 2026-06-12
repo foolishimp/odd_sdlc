@@ -1947,6 +1947,27 @@ function stateWithConsequenceProjectedExecutionEvidence(input: {
   });
 }
 
+function reportWithDeclaredNoDispatchProjection(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly report: SdlcWorkerResultReport;
+}): SdlcWorkerResultReport {
+  if (input.manifest.targetAssetType !== "test_execution_result_surface") {
+    return input.report;
+  }
+  writeDeclaredEdgeProjectionFromConsequence({
+    manifest: input.manifest
+  });
+  const executionEvidence = admittedTestExecutionResultOutput(input.manifest);
+  if (executionEvidence === null) {
+    return input.report;
+  }
+  return Object.freeze({
+    ...input.report,
+    executionEvidence,
+    executionEvidenceErrors: Object.freeze([])
+  });
+}
+
 function manifestCapabilityValue(
   manifest: SdlcWorkerHandoffManifest,
   name: string
@@ -8894,6 +8915,10 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
           report: workerReport
         });
         workerReport = noDispatchReport({ manifest, report: workerReport });
+        workerReport = reportWithDeclaredNoDispatchProjection({
+          manifest,
+          report: workerReport
+        });
         writeSdlcSystemArtifact({
           archiveRoot: manifest.archiveRoot,
           relativePath: "worker_result_report.json",
