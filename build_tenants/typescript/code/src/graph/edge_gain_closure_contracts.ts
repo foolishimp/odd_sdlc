@@ -7,6 +7,7 @@
 // Investigates: T-164
 
 import {
+  FG_BOOTSTRAP_SDLC_ENTRY,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE
 } from "./catalog.js";
@@ -377,6 +378,22 @@ function secondaryOutputContracts(input: {
 }
 
 export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
+  contract({
+    edgeRef: FG_BOOTSTRAP_SDLC_ENTRY,
+    category: "conformance",
+    closureClassification: "close_capable",
+    sourceAssetTypes: ["type.unstructured"],
+    targetAssetType: "sdlc_bootstrap_traversal_outcome",
+    compositionRole: "prerequisite",
+    authorityBasisRefs: [
+      "authority://odd-sdlc/t165-optimising-overlay",
+      "authority://odd-sdlc/public-start"
+    ],
+    proofLaneRefs: ["test://odd-sdlc/t165/bootstrap-entry-optimising-overlay"],
+    residualPressureRefs: [
+      "pressure://odd-sdlc/t165/bootstrap-entry-generic-fp-fallback"
+    ]
+  }),
   contract({
     edgeRef: FG_SINGLE_TYPED_TRAVERSAL,
     category: "generic_traversal_library",

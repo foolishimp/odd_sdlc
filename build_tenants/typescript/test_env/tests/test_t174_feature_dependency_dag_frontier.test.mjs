@@ -27,7 +27,6 @@ import {
   isSdlcLiveFpParallelMaterializationFrontier,
   materializeSdlcProjectConformance,
   normalizeSdlcLiveFpParallelMaterializationTarget,
-  classifySdlcLiveParallelModuleLane,
   resolveSdlcLiveFpParallelBatchSize,
   selectSdlcDependencyMapTraversal,
   sdlcLiveParallelMaterializationTargetKey,
@@ -1220,10 +1219,6 @@ test("T-174 data-mapper-style Scala modules form batched independent dev frontie
     policy: "parallel_when_partitioned"
   });
   assert.equal(traversal.selectedMethod, "parallel");
-  assert.equal(
-    classifySdlcLiveParallelModuleLane("cdme-compiler/src/main/scala"),
-    "dev"
-  );
   assert.equal(
     sdlcLiveParallelMaterializationTargetKey("cdme-adjoint/src/main/scala"),
     "cdme-adjoint/src/main/scala"

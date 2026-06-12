@@ -189,20 +189,6 @@ export function sdlcLiveParallelMaterializationTargetKey(targetRef: string): str
   return normalizePathLikeRef(targetRef) || "target";
 }
 
-export function classifySdlcLiveParallelModuleLane(targetRef: string): "dev" | null {
-  const normalized = targetRef.trim().replace(/^\.\//u, "");
-  if (/\/src\/test\//u.test(normalized) || /^test\//u.test(normalized)) {
-    return null;
-  }
-  if (/^src\//u.test(normalized)) {
-    return /\/index\.[cm]?[jt]sx?$/u.test(normalized) ? null : "dev";
-  }
-  if (/(?:^|\/)[^/]+\/src\/(?!test\/)/u.test(normalized)) {
-    return "dev";
-  }
-  return null;
-}
-
 export function resolveSdlcLiveFpParallelBatchSize(input: {
   readonly laneCount: number;
   readonly requestedBatchSize?: number | null | undefined;

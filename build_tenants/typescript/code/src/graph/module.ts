@@ -29,6 +29,7 @@ import {
   LITE_FUNCTION_CATALOG,
   LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE_STEPS,
   OPERATIONAL_FUNCTION_CATALOG,
+  OPTIMISING_FUNCTION_CATALOG,
   OPTIMIZED_FULL_TRAVERSAL_EXECUTIVE_STEPS,
   SDLC_REUSABLE_GRAPH_FUNCTION_CATALOG,
   SDLC_FUNCTION_CATALOG,
@@ -42,6 +43,7 @@ import type { SdlcReusableGraphFunctionCatalogEntry } from "./library.js";
 import { sdlcTargetCarrierDeclarationForTarget } from "./target_carrier_contracts.js";
 import {
   activeOddSdlcTraversalStrategyPlan,
+  defaultSdlcTraversalContinuationConfigForName,
   defaultSdlcTraversalScopeRefsForName,
   defaultSdlcTraversalStrategyForName,
   type OddSdlcTraversalStrategyPlanConfig,
@@ -55,7 +57,7 @@ const BUILDER_OPERATOR = admitOperator({
   tags: ["odd_sdlc", "builder"]
 });
 
-function scalarValue(value: string | boolean): SerializedAttrValue {
+function scalarValue(value: string | boolean | number): SerializedAttrValue {
   return Object.freeze({
     kind: "scalar",
     value
@@ -162,6 +164,31 @@ function enforcementPrimitivesForStrategy(
   return Object.freeze(["atomic_attempt", "single_vertical_slice"]);
 }
 
+function continuationEntriesForStrategy(input: {
+  readonly name: string;
+  readonly strategy: OddSdlcDefaultTraversalStrategy;
+  readonly traversalStrategyPlan: OddSdlcTraversalStrategyPlanConfig;
+}): readonly SerializedAttrEntry[] {
+  if (input.strategy !== "full_breadth") {
+    return Object.freeze([]);
+  }
+  const config = defaultSdlcTraversalContinuationConfigForName(
+    input.name,
+    input.traversalStrategyPlan
+  );
+  if (config === null) {
+    return Object.freeze([]);
+  }
+  return Object.freeze([
+    attr("same_edge_until", scalarValue(config.sameEdgeUntil)),
+    attr(
+      "max_attempts_without_new_signal",
+      scalarValue(config.maxAttemptsWithoutNewSignal)
+    ),
+    attr("max_total_attempts", scalarValue(config.maxTotalAttempts))
+  ]);
+}
+
 function traversalModulationDeclaration(
   name: string,
   traversalStrategyPlan: OddSdlcTraversalStrategyPlanConfig
@@ -170,6 +197,11 @@ function traversalModulationDeclaration(
     name,
     traversalStrategyPlan
   );
+  const continuationEntries = continuationEntriesForStrategy({
+    name,
+    strategy,
+    traversalStrategyPlan
+  });
   return attr(
     "abg.traversal_strategy",
     hookRefValue(`strategy://odd_sdlc/${name}/${strategy}`, [
@@ -184,7 +216,8 @@ function traversalModulationDeclaration(
         stringListValue(
           defaultSdlcTraversalScopeRefsForName(name, traversalStrategyPlan)
         )
-      )
+      ),
+      ...continuationEntries
     ])
   );
 }
@@ -640,6 +673,10 @@ export function constructSdlcGtlModule(input: {
       reusableGraphFunctionForEntry(entry, traversalStrategyPlan)
     )
   );
+  const optimisingFunctions = leafFunctions(
+    OPTIMISING_FUNCTION_CATALOG,
+    traversalStrategyPlan
+  );
   const bootstrapFunctions = leafFunctions(
     BOOTSTRAP_RELEASE_FUNCTION_CATALOG,
     traversalStrategyPlan
@@ -718,6 +755,7 @@ export function constructSdlcGtlModule(input: {
   });
   const graphFunctions = Object.freeze([
     ...libraryFunctions,
+    ...optimisingFunctions,
     bootstrapExecutive,
     operationalExecutive,
     bootstrapRequirementsExecutive,

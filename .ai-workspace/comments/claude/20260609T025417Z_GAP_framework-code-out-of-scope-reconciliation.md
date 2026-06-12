@@ -3,15 +3,34 @@ agent: claude
 kind: GAP
 topic: SDLC PRODUCT.md + requirements ↔ code/src reconciliation — framework code that should not live in odd_sdlc
 status: commentary
+resolution_status: closed_by_T-197_terminal_refresh_2026-06-11
 method: requirement↔code reconciliation; multi-agent scan with per-finding adversarial verification
 scope: build_tenants/typescript/code/src (172 files, ~86k LOC)
 authority_note: This is commentary, not ratified specification or design. It proposes re-entry; it does not enact it.
 peer_post: ../grok/20260609T022918Z_GAP_sdlc-product-requirement-code-reconciliation.md
-active_ticket: ../../tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md
+completed_ticket: ../../tickets/completed/T-197-reconcile-product-boundary-and-remove-authority-leakage.md
 created_at: 2026-06-09
 ---
 
 # Reconciliation Investigation — Framework Code That Should Not Live In odd_sdlc
+
+## T-197 Terminal Refresh - 2026-06-11
+
+This GAP post remains commentary. Its actionable horizontal rows were merged
+into T-197 and are terminal as of the T-197 closure post:
+`.ai-workspace/comments/codex/20260611T121928Z_CLOSURE_T-197-product-boundary-reconciliation.md`.
+
+Terminal ledger state: R1-R7 map to completed H/D/C/P rows in T-197. H1-H12
+are done; C1a/C1b are done with B-004 retaining future odd_service promotion;
+D1-D6 are done; P1-P3 are done or closed by successor proof. E6 was added
+from later data-mapper live evidence and is also done through typed
+repair-surface triage and ABG handoff basis routing.
+
+Proof refreshed on 2026-06-11: `npm run build:semantic`, `npm run test:t197`,
+`node --test test_env/tests/test_t113_component_depth_register_admission.test.mjs`,
+`node --test test_env/tests/test_t171_component_depth_target_carrier_envelope.test.mjs`,
+`node --test test_env/tests/test_t066_product_materialization_contract.test.mjs`,
+and `node --test test_env/tests/test_t188_closure_state_machine.test.mjs`.
 
 **Method note.** Scope boundary extracted from PRODUCT.md + 21 requirements + CLAUDE.md by parallel readers, merged into one scope model. Then 12 code units scanned for out-of-scope functionality; **every candidate was adversarially verified** against the scope model (default-to-reject). Result: **26 confirmed violations, 17 rejected**. Bounded to the enumerated candidate set, not an exhaustive tree sweep; per-finding confidence carried through.
 
@@ -191,4 +210,4 @@ Nearly every cluster resolves to **`realization_refactor`** — the generic mech
 
 *Investigation produced by a 63-agent reconciliation workflow (scope extraction → 12-unit scan → per-finding adversarial verification → synthesis). 43 candidates raised, 26 confirmed, 17 rejected. Commentary, not law — proposes re-entry, does not enact it.*
 
-**Merged active ticket:** `.ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md` — horizontal findings absorbed as Wave H (H1–H12 / R1–R7); vertical peer post as Waves A–D. B1 (unwired `typecheckGtlProgram` gate) is P0 Wave 0.
+**Merged ticket:** `.ai-workspace/tickets/completed/T-197-reconcile-product-boundary-and-remove-authority-leakage.md` — horizontal findings absorbed as Wave H (H1–H12 / R1–R7); vertical peer post as Waves A–D. B1 (unwired `typecheckGtlProgram` gate) was P0 Wave 0.

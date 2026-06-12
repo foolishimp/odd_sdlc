@@ -385,7 +385,7 @@ function compactComponentDepthDirective(
 ): string | null {
   const projection = manifest.targetCarrierProjection;
   const envelopeDirective =
-    `Emit a fenced \`json component_depth_register\` selected target-carrier envelope with ` +
+    `Emit a whole-file JSON component_depth_register selected target-carrier envelope with ` +
     `\`kind:"${projection.outputCarrierKind}"\`, ` +
     `\`targetAssetType:"${manifest.targetAssetType}"\`, ` +
     `\`edgeRef:"${manifest.edgeName}"\`, ` +
@@ -395,6 +395,7 @@ function compactComponentDepthDirective(
     `\`payload.registerVersion:"ts-component-depth-v1"\`, ` +
     `\`payload.targetAssetType:"${manifest.targetAssetType}"\`. ` +
     "The payload field set is closed: use only kind, registerVersion, targetAssetType, componentTopologyRows, componentRealizationRows, testComponentTopologyRows, componentTestRows, componentTestQualificationRows, componentExecutionFailureRegister, componentRepairSchedule, and releaseDepthParity. " +
+    "Do not wrap the component_depth_register carrier in Markdown fences. " +
     "Do not place materializedFiles, summaries, execution evidence, worker reports, product-file observations, or tenant-stack authority inside payload; cite evidence only on the selected carrier envelope or in prose.";
   const componentTopologyRowsDirective =
     "When emitting payload.componentTopologyRows, each row must carry kind=sdlc_component_topology_row, componentId, moduleName, relativePath, publicBoundary, concernRole, requirementIds, and sourceAssetRefs; " +
@@ -816,6 +817,7 @@ export function outcomeDirectivesForWorker(
         : "Deferred modules: none.",
       `Required roles: ${listForPrompt(effectiveProductMaterializationRequiredRoles(manifest))}.`,
       `Build/test contracts: ${manifest.productMaterialization.buildExecutionContract} / ${manifest.productMaterialization.testExecutionContract}.`,
+      "SDLC code-depth rule: admitted UAT/scenario authority plus build/test execution is the primary repair signal for executable product behavior; obligation rows are trace/provenance and do not close behavior by themselves.",
       productFileTargets.length === 0
         ? manifest.targetAssetType === "component_test_surface"
           ? "Declared product file targets: pending component-test register; componentTestRows[].relativePath becomes the test product target set for this edge."
@@ -847,7 +849,7 @@ export function outcomeDirectivesForWorker(
       "For every declared product file target with role source, test, or build_config that supports an active requirement, embed parseable requirement tags in the file when the file syntax permits and mirror the same obligation ids in the target carrier/component rows. Build_config files are not exempt.",
       "For product files that cannot carry native comments, such as strict structured configuration files, carry lineage in the target carrier/table using component/file rows and evidence refs; do not rely on worker prose.",
       "When a product file is evidence for a fulfilled requirement, carry parseable requirement tags in that file when syntax permits and cite the same obligation ids in the target carrier/component rows.",
-    "For source files, put requirement tags at the top of the file using valid native comment syntax, one exact canonical id per line, for example `// requirement:data_mapper.requirements.req_dq_001`; canonical ids already include the `requirement:` prefix, so do not write `requirement:requirement:...`; do not rely on the report alone for product-file lineage."
+      "For source files, put requirement tags at the top of the file using valid native comment syntax, one exact canonical id per line, for example `// requirement:tenant.requirements.req_example_001`; canonical ids already include the `requirement:` prefix, so do not write `requirement:requirement:...`; do not rely on the report alone for product-file lineage."
     );
     directives.push(
       ...tenantStackAuthorityRepairDirectives({
@@ -876,8 +878,12 @@ export function outcomeDirectivesForWorker(
           : manifest.graphFunctionName === FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE
           ? "For framework-smoke Min(F_P) component_code_surface, materialize the source product files declared by the admitted F_P design-depth register and stagePressure. Preserve the declared test execution contract for downstream derive_test_execution_result_surface; do not run it on the component-code edge. Keep componentRealizationRows source-role only."
           : manifest.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
-          ? "For lite component_code_surface, materialize only the bounded source implementation files declared by construction_brief.stagePressure.designDepthEvaluatorRegisterRefs and the required staged authority refs. Do not infer topology from ADR prose alone and do not expand into release or test-execution surfaces."
+          ? "For lite component_code_surface, materialize only the bounded source implementation files declared by construction_brief.stagePressure.designDepthEvaluatorRegisterRefs and the required staged authority refs. Do not infer topology from ADR prose alone and do not publish release, component-test, or test-execution carriers from this edge; use admitted UAT/scenario and build/test contracts only as repair probes and evidence for source behavior."
           : "For component_code_surface, materialize implementation/source files for each source-role declared component and record Component Realization Register evidence. Do not create test files, test component rows, repair schedules, or execution evidence on this edge."
+      );
+      directives.push(
+        "For component_code_surface, force depth by iterating between the smallest admitted UAT/scenario probe, the declared build/test command or execution shard, and source repair. Capture command logs under allowed write roots, repair source/build_config from observed failures, and rerun until the probe passes or the remaining blocker is an external tool/cache/environment failure.",
+        "Do not report a requirement as behavior-fulfilled merely because it is mapped to a component_depth_register row, lineage tag, manifest entry, or worker obligation assessment. Public behavior must be accountable to a source boundary plus scenario/build-test/evaluator evidence, or else be carried as explicit downstream pressure."
       );
       if (
         manifest.inputAssetTypes.includes("implementation_design_surface") &&

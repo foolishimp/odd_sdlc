@@ -22,6 +22,27 @@ git diff --stat -- code/src test_env/tests package.json
 
 Do not start a new sandbox when an existing sandbox has a resumable failure. Patch the active sandbox and resume from the failed node.
 
+For the code-depth isolation lane, use the copied-archive runner instead of a
+fresh template:
+
+```bash
+npm run test:t199:data-mapper-code-depth-resume-live
+```
+
+That lane is valid only when the seed archive already carries substantive prior
+events, ledgers, handoffs, design-depth register, and code-generation target
+authority. Override the seed with
+`ODD_SDLC_TS_T199_DATA_MAPPER_SEED_ARCHIVE_ROOT` only for an existing
+data_mapper archive that passes that gate.
+
+The code-depth isolation lane is a clean first codegen tranche over the prior
+graph, not a full tenant closure rerun. Keep the prior graph inputs and edge
+authority, but prune copied build/tool byproducts (`target`, `.bloop`,
+`.metals`, `.scala-build`, `sbt-boot`, `sbt-global`, `ivy2`, `coursier`,
+`scalac-classes`) before execution. Review-grade residuals for broad
+tenant-stack modules or missing lineage traces are product pressure unless they
+prove a framework prompt, admission, replay, or closure defect.
+
 ## Failure Classification
 
 Classify generated workspace compile, test, source, lineage, and tenant-stack failures as F_P worksite repair pressure by default.

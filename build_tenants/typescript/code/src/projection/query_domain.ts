@@ -24,9 +24,14 @@ import { sortedStrings } from "../shared/collections.js";
 import {
   constructSdlcGraphFunctionCatalog,
   constructSdlcTraversalOverlayCatalog,
+  constructSdlcOptimisingOverlay,
   constructSdlcGtlModule,
   constructSdlcTargetCarrierRegistry,
   SDLC_EDGE_GAIN_CLOSURE_CONTRACTS,
+  SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
+  FG_BOOTSTRAP_SDLC_ENTRY,
+  SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
+  SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
   publicSdlcOverlayStartTargets,
   projectSdlcTargetCarrierReadModel,
   sdlcGraphFunctionBoundaryRef,
@@ -35,6 +40,7 @@ import {
   sdlcTargetOutcomeRef,
   type SdlcEdgeGainClosureContract,
   type SdlcGraphFunctionCatalog,
+  type SdlcOptimisingOverlay,
   type SdlcTargetCarrierDiagnostic,
   type SdlcTargetCarrierReadModel,
   type SdlcTraversalOverlayCatalog
@@ -335,6 +341,7 @@ export interface SdlcQueryDomainProjection {
   readonly functions: SdlcGraphFunctionCatalog["functions"];
   readonly programs: SdlcGraphFunctionCatalog["executives"];
   readonly traversalOverlays: SdlcTraversalOverlayCatalog;
+  readonly optimisingOverlays: readonly SdlcOptimisingOverlay[];
   readonly graphFunctions: readonly SdlcGraphFunctionSurface[];
   readonly startTargets: readonly SdlcStartTargetSurface[];
   readonly assetOwnership: readonly SdlcAssetOwnershipSurface[];
@@ -1402,6 +1409,30 @@ export function projectSdlcQueryDomain(input: {
     graphCatalog: catalog
   });
   const graphFunctionSurfaces = graphFunctionSurface(input.module);
+  const bootstrapEntryGraphFunction = input.module.graphFunctions.find(
+    (graphFunction) => graphFunction.name === FG_BOOTSTRAP_SDLC_ENTRY
+  );
+  if (bootstrapEntryGraphFunction === undefined) {
+    throw new TypeError(`${FG_BOOTSTRAP_SDLC_ENTRY}: unpublished graph function`);
+  }
+  const bootstrapEntryGraphFunctionRef =
+    sdlcGraphFunctionBoundaryRef(bootstrapEntryGraphFunction);
+  const optimisingOverlays = Object.freeze([
+    constructSdlcOptimisingOverlay({
+      childOverlayRefs: Object.freeze([
+        SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
+        SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
+        SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF
+      ]),
+      candidateGraphFunctionRefs: Object.freeze([
+        bootstrapEntryGraphFunctionRef,
+        ...traversalOverlays.overlays.flatMap((overlay) =>
+          overlay.termination.terminalGraphFunctionRefs
+        )
+      ]),
+      genericFallbackOverlayRef: SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF
+    })
+  ]);
   const assetOwnershipRows = assetOwnership(catalog);
   const domainDefaults = constructSdlcDomainDefaultsCarrier();
   const publishedGraphVectorRefs = publishedGraphVectorRefsForModule(input.module);
@@ -1434,6 +1465,7 @@ export function projectSdlcQueryDomain(input: {
     functions: catalog.functions,
     programs: catalog.executives,
     traversalOverlays,
+    optimisingOverlays,
     graphFunctions: graphFunctionSurfaces,
     startTargets: startTargets({
       module: input.module,

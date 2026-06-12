@@ -36,6 +36,17 @@
       "pip",
       "pip3"
     ],
+    "workspaceLocalDirectories": [
+      ".ai-workspace/runtime/odd_sdlc/tool-cache/sbt-boot",
+      ".ai-workspace/runtime/odd_sdlc/tool-cache/sbt-global",
+      ".ai-workspace/runtime/odd_sdlc/tool-cache/ivy2",
+      ".ai-workspace/runtime/odd_sdlc/tool-cache/coursier"
+    ],
+    "environmentVariables": {
+      "COURSIER_CACHE": "${workspaceRoot}/.ai-workspace/runtime/odd_sdlc/tool-cache/coursier",
+      "IVY_HOME": "${workspaceRoot}/.ai-workspace/runtime/odd_sdlc/tool-cache/ivy2",
+      "SBT_OPTS": "-Dsbt.boot.directory=${workspaceRoot}/.ai-workspace/runtime/odd_sdlc/tool-cache/sbt-boot -Dsbt.global.base=${workspaceRoot}/.ai-workspace/runtime/odd_sdlc/tool-cache/sbt-global -Dsbt.ivy.home=${workspaceRoot}/.ai-workspace/runtime/odd_sdlc/tool-cache/ivy2 -Divy.home=${workspaceRoot}/.ai-workspace/runtime/odd_sdlc/tool-cache/ivy2"
+    },
     "policy": "Scala/SBT tenant helper execution uses declared JVM/SBT tooling; Python is disabled for this tenant."
   },
   "testingTechStack": {
@@ -69,6 +80,17 @@
         "pip",
         "pip3"
       ],
+      "workspaceLocalDirectories": [
+        ".ai-workspace/runtime/odd_sdlc/tool-cache/sbt-boot",
+        ".ai-workspace/runtime/odd_sdlc/tool-cache/sbt-global",
+        ".ai-workspace/runtime/odd_sdlc/tool-cache/ivy2",
+        ".ai-workspace/runtime/odd_sdlc/tool-cache/coursier"
+      ],
+      "environmentVariables": {
+        "COURSIER_CACHE": "${workspaceRoot}/.ai-workspace/runtime/odd_sdlc/tool-cache/coursier",
+        "IVY_HOME": "${workspaceRoot}/.ai-workspace/runtime/odd_sdlc/tool-cache/ivy2",
+        "SBT_OPTS": "-Dsbt.boot.directory=${workspaceRoot}/.ai-workspace/runtime/odd_sdlc/tool-cache/sbt-boot -Dsbt.global.base=${workspaceRoot}/.ai-workspace/runtime/odd_sdlc/tool-cache/sbt-global -Dsbt.ivy.home=${workspaceRoot}/.ai-workspace/runtime/odd_sdlc/tool-cache/ivy2 -Divy.home=${workspaceRoot}/.ai-workspace/runtime/odd_sdlc/tool-cache/ivy2"
+      },
       "policy": "Scala/SBT test execution uses declared JVM/SBT tooling; Python is disabled for this tenant."
     }
   }

@@ -17,6 +17,7 @@ export {
   SDLC_DESIGN_COMPLETENESS_STATUSES,
   SDLC_DOMAIN_ATTRIBUTE_CARDINALITIES,
   SDLC_DOMAIN_ENTITY_OWNERSHIP,
+  SDLC_REPAIR_SURFACE_TRIAGE_DISPOSITIONS,
   SDLC_REVIEW_GRADE_FAILURE_CLASSES,
   SDLC_TEST_CASE_KINDS,
   SDLC_TEST_EXECUTION_LANES
@@ -117,6 +118,8 @@ export type {
   SdlcReleaseDepthParityAssessment,
   SdlcReleaseDepthParityStatus,
   SdlcReplayedMaterializedProductFile,
+  SdlcRepairSurfaceTriageCarrier,
+  SdlcRepairSurfaceTriageDisposition,
   SdlcRequirementFunctionFulfillmentBinding,
   SdlcRetrievalHint,
   SdlcReviewGradeEdgeFulfillmentAdmission,
@@ -445,6 +448,7 @@ export type {
 
 export {
   deriveSdlcClosureStateTransition,
+  makeSdlcClosureResidualPressureCarrier,
   sdlcClosureBlockingReasonRefsForReentry,
   sdlcClosureStateBucketForLawfulReentryPoint,
   syntheticGapDossierFromClosureRefs,
@@ -452,6 +456,7 @@ export {
 } from "./closure_state_machine.js";
 export type {
   SdlcClosureAbgRuntimeTransitionContext,
+  SdlcClosureResidualPressureCarrier,
   SdlcClosureStateMachineBucket,
   SdlcClosureStateTransition,
   SdlcClosureStateTransitionExplanation
@@ -535,7 +540,6 @@ export type {
 } from "./feature_dependency_dag.js";
 
 export {
-  classifySdlcLiveParallelModuleLane,
   constructSdlcLiveFpParallelMaterializationFrontier,
   deriveSdlcLiveFpParallelMaterializationBranchOverrides,
   isSdlcLiveFpParallelMaterializationFrontier,
@@ -584,9 +588,13 @@ export {
   reviewGradeEdgeFulfillmentAssessmentPressureRefs,
   reviewGradeEdgeFulfillmentAssessmentRequired,
   reviewGradeEdgeFulfillmentOpenPressureRefs,
+  reviewGradeEdgeFulfillmentRepairSurfaceTriageRows,
   reviewGradeFindingsAreDownstreamStagePressure,
   reviewGradeReadOnlyInputMutationReasons,
   snapshotReviewGradeReadOnlyInputFiles
+} from "./review_grade_edge_fulfillment.js";
+export type {
+  SdlcReviewGradeRepairSurfaceTriageRow
 } from "./review_grade_edge_fulfillment.js";
 
 export {

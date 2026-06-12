@@ -102,6 +102,16 @@ function componentDepthTargetCarrierFor(register) {
   };
 }
 
+function writeCarrierArtifact(register, name = register.targetAssetType) {
+  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t113-"));
+  const outputFile = path.join(root, `${name}.json`);
+  const carrier = componentDepthTargetCarrierFor(register);
+  const content = `${JSON.stringify(carrier, null, 2)}\n`;
+  mkdirSync(path.dirname(outputFile), { recursive: true });
+  writeFileSync(outputFile, content, "utf8");
+  return { outputFile, content };
+}
+
 function writeMarkdownCarrierArtifact(register, name = register.targetAssetType) {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t113-"));
   const outputFile = path.join(root, `${name}.md`);
@@ -279,7 +289,7 @@ test("T-197 rejects component-test rows on component-code target before row alia
       }
     ]
   };
-  const { outputFile } = writeMarkdownCarrierArtifact(
+  const { outputFile } = writeCarrierArtifact(
     register,
     "component_code_surface"
   );
@@ -439,7 +449,7 @@ test("T-113 admits repair and release-depth rows on current component-depth targ
   );
 });
 
-test("T-188 admits Markdown-fenced component-depth target carrier payloads", () => {
+test("T-197 rejects Markdown-fenced component-depth target carrier payloads", () => {
   const register = {
     kind: "sdlc_component_depth_register",
     registerVersion: "ts-component-depth-v1",
@@ -462,14 +472,11 @@ test("T-188 admits Markdown-fenced component-depth target carrier payloads", () 
     outputFile
   });
 
-  assert.equal(admission.status, "admitted");
-  assert.equal(
-    admission.register.componentRepairSchedule.scheduleStatus,
-    "triage_gap"
-  );
+  assert.equal(admission.status, "rejected");
+  assert.match(admission.blockingReasons.join("\n"), /component_depth_register_missing/u);
 });
 
-test("T-194 admits live plain-fence labeled component-depth target carrier payloads", () => {
+test("T-197 rejects plain-fence labeled component-depth target carrier payloads", () => {
   const register = {
     kind: "sdlc_component_depth_register",
     registerVersion: "ts-component-depth-v1",
@@ -492,11 +499,8 @@ test("T-194 admits live plain-fence labeled component-depth target carrier paylo
     outputFile
   });
 
-  assert.equal(admission.status, "admitted");
-  assert.equal(
-    admission.register.componentRepairSchedule.scheduleStatus,
-    "triage_gap"
-  );
+  assert.equal(admission.status, "rejected");
+  assert.match(admission.blockingReasons.join("\n"), /component_depth_register_missing/u);
 });
 
 test("T-153 rejects component-depth wrappers that are not GTL target-carrier envelopes", () => {
@@ -513,21 +517,14 @@ test("T-153 rejects component-depth wrappers that are not GTL target-carrier env
     }
   };
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t153-"));
-  const outputFile = path.join(root, "component_repair_schedule_surface.md");
+  const outputFile = path.join(root, "component_repair_schedule_surface.json");
   const carrier = {
     ...componentDepthTargetCarrierFor(register),
     contractRef: "contract://odd-sdlc/local-component-depth-wrapper"
   };
   writeFileSync(
     outputFile,
-    [
-      "# Invalid component-depth wrapper",
-      "",
-      "```json component_depth_register",
-      JSON.stringify(carrier, null, 2),
-      "```",
-      ""
-    ].join("\n"),
+    `${JSON.stringify(carrier, null, 2)}\n`,
     "utf8"
   );
 
@@ -569,7 +566,7 @@ test("T-188 target-carrier payload rejection reports payload schema only", () =>
       }
     ]
   };
-  const { outputFile } = writeMarkdownCarrierArtifact(
+  const { outputFile } = writeCarrierArtifact(
     register,
     "component_test_surface"
   );

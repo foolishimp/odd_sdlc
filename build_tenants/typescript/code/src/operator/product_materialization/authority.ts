@@ -218,9 +218,6 @@ function declaredProductTargetLooksLikeDirectory(input: string): boolean {
   if (lower === "src" || lower.endsWith("/src")) {
     return true;
   }
-  if (lower === "project" || lower.endsWith("/project")) {
-    return true;
-  }
   if (
     (lower.startsWith("src/") || lower.includes("/src/")) &&
     path.posix.extname(basename).length === 0
@@ -447,11 +444,6 @@ function targetsFromProductAuthorityFields(input: {
   );
 }
 
-function firstCodeSpan(input: string): string | null {
-  const match = /`([^`]+)`/u.exec(input);
-  return match?.[1]?.trim() ?? null;
-}
-
 function markdownTableCells(input: string): readonly string[] | null {
   const trimmed = input.trim();
   if (!trimmed.startsWith("|") || !trimmed.endsWith("|")) {
@@ -470,32 +462,14 @@ function markdownTableCells(input: string): readonly string[] | null {
   return Object.freeze(cells);
 }
 
-function moduleNameFromMarkdownLine(input: string): string | null {
-  const codeSpan = firstCodeSpan(input);
-  const candidate = codeSpan ??
-    input
-      .replace(/^[-*]\s+/u, "")
-      .replace(/[*_`]/gu, "")
-      .trim();
-  if (
-    candidate.length === 0 ||
-    candidate.includes("/") ||
-    /^module$/iu.test(candidate) ||
-    !/^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(candidate)
-  ) {
-    return null;
-  }
-  return candidate;
-}
-
 function targetsFromDeclaredModuleTargets(input: {
   readonly body: string;
   readonly selectedOutputRoot: string;
 }): readonly DeclaredProductTargetSeed[] {
   const targets = new Map<string, DeclaredProductTargetSeed>();
-  const addDirectory = (pathValue: string): void => {
+  const addTarget = (pathValue: string): void => {
     const normalized = normalizeDeclaredProductFileTarget({
-      value: `${pathValue.replace(/\/+$/u, "")}/`,
+      value: pathValue,
       selectedOutputRoot: input.selectedOutputRoot
     });
     if (
@@ -509,18 +483,29 @@ function targetsFromDeclaredModuleTargets(input: {
   for (const line of input.body.split(/\r?\n/u)) {
     const cells = markdownTableCells(line);
     if (cells !== null && cells.length >= 2) {
-      const moduleName = moduleNameFromMarkdownLine(cells[0] ?? "");
-      if (moduleName !== null) {
-        addDirectory(`${input.selectedOutputRoot}/${moduleName}/src`);
+      for (const cell of cells.slice(1)) {
+        for (const match of cell.matchAll(/`([^`]+)`/gu)) {
+          const codeSpan = match[1];
+          if (codeSpan !== undefined) {
+            addTarget(codeSpan);
+          }
+        }
       }
       continue;
     }
     if (!/^\s*[-*]\s+/u.test(line)) {
       continue;
     }
-    const moduleName = moduleNameFromMarkdownLine(line);
-    if (moduleName !== null) {
-      addDirectory(`${input.selectedOutputRoot}/${moduleName}/src`);
+    let addedCodeSpan = false;
+    for (const match of line.matchAll(/`([^`]+)`/gu)) {
+      const codeSpan = match[1];
+      if (codeSpan !== undefined) {
+        addTarget(codeSpan);
+        addedCodeSpan = true;
+      }
+    }
+    if (!addedCodeSpan && line.includes("/")) {
+      addTarget(line.replace(/^[-*]\s+/u, "").trim());
     }
   }
 
@@ -841,6 +826,7 @@ function targetContractsFromSeeds(input: {
 }
 
 interface TenantStackAuthority {
+  readonly targetSeeds: readonly TenantStackTargetSeed[];
   readonly buildConfigSeeds: readonly TenantStackTargetSeed[];
   readonly sourceRefs: readonly string[];
   readonly reasonRefs: readonly string[];
@@ -1132,6 +1118,7 @@ function tenantStackTargetSeed(input: {
   readonly stackSection: TenantStackTargetSeed["stackSection"];
   readonly value: string;
   readonly role: SdlcMaterializedProductFileRole;
+  readonly targetKind?: SdlcProductMaterializationAuthorityTarget["targetKind"] | undefined;
 }): TenantStackTargetSeed | null {
   const selectedOutputRoot = normalizedSelectedOutputRoot(
     input.manifest.productMaterialization.selectedOutputRoot
@@ -1161,6 +1148,7 @@ function tenantStackTargetSeed(input: {
   }
   return Object.freeze({
     ...normalized,
+    targetKind: input.targetKind ?? normalized.targetKind,
     requiredRole: input.role,
     policyRef: `target-role-policy://odd-sdlc/tenant-stack/${input.stackSection}/${input.role}`,
     sourceRef: input.sourceRef,
@@ -1208,12 +1196,114 @@ function tenantStackBuildConfigSeedsFromJson(input: {
     "testStack",
     "test_stack"
   ];
+  const implementationSourceRootKeys = [
+    "sourceRoots",
+    "source_roots",
+    "sourceDirectories",
+    "source_directories",
+    "moduleRoots",
+    "module_roots"
+  ];
+  const implementationSourceFileKeys = [
+    "sourceFiles",
+    "source_files",
+    "sourceTargets",
+    "source_targets"
+  ];
+  const moduleLayoutKeys = ["moduleLayout", "module_layout"];
+  const testingRootKeys = [
+    "testRoots",
+    "test_roots",
+    "testingRoots",
+    "testing_roots",
+    "testDirectories",
+    "test_directories",
+    "testingDirectories",
+    "testing_directories"
+  ];
+  const testingFileKeys = [
+    "testFiles",
+    "test_files",
+    "testingFiles",
+    "testing_files",
+    "testTargets",
+    "test_targets",
+    "testingTargets",
+    "testing_targets"
+  ];
   const values = [
     ...objectFieldsStringList(record, implementationBuildConfigKeys).map((value) =>
-      Object.freeze({ value, stackSection: "implementation" as const })
+      Object.freeze({
+        value,
+        stackSection: "implementation" as const,
+        role: "build_config" as const
+      })
     ),
     ...objectFieldsStringList(record, testingBuildConfigKeys).map((value) =>
-      Object.freeze({ value, stackSection: "testing" as const })
+      Object.freeze({
+        value,
+        stackSection: "testing" as const,
+        role: "build_config" as const
+      })
+    ),
+    ...objectFieldsStringList(record, implementationSourceRootKeys).map((value) =>
+      Object.freeze({
+        value,
+        stackSection: "implementation" as const,
+        role: "source" as const,
+        targetKind: "directory" as const
+      })
+    ),
+    ...objectFieldsStringList(record, implementationSourceFileKeys).map((value) =>
+      Object.freeze({
+        value,
+        stackSection: "implementation" as const,
+        role: "source" as const
+      })
+    ),
+    ...moduleLayoutKeys.flatMap((key) => {
+      const nested = objectRecord(record[key]);
+      return nested === null
+        ? Object.freeze<readonly {
+            readonly value: string;
+            readonly stackSection: TenantStackTargetSeed["stackSection"];
+            readonly role: SdlcMaterializedProductFileRole;
+            readonly targetKind?: SdlcProductMaterializationAuthorityTarget["targetKind"];
+          }[]>([])
+        : [
+            ...objectFieldsStringList(nested, implementationSourceRootKeys).map(
+              (value) =>
+                Object.freeze({
+                  value,
+                  stackSection: "implementation" as const,
+                  role: "source" as const,
+                  targetKind: "directory" as const
+                })
+            ),
+            ...objectFieldsStringList(nested, implementationSourceFileKeys).map(
+              (value) =>
+                Object.freeze({
+                  value,
+                  stackSection: "implementation" as const,
+                  role: "source" as const
+                })
+            )
+          ];
+    }),
+    ...objectFieldsStringList(record, testingRootKeys).map((value) =>
+      Object.freeze({
+        value,
+        stackSection: "testing" as const,
+        role: "test" as const,
+        targetKind: "directory" as const
+      })
+    ),
+    ...objectFieldsStringList(record, testingFileKeys).map((value) =>
+      Object.freeze({
+        value,
+        stackSection: "testing" as const,
+        role: "test" as const
+      })
     ),
     ...nestedTestingStackKeys.flatMap((key) => {
       const nested = objectRecord(record[key]);
@@ -1221,13 +1311,36 @@ function tenantStackBuildConfigSeedsFromJson(input: {
         ? Object.freeze<readonly {
             readonly value: string;
             readonly stackSection: TenantStackTargetSeed["stackSection"];
+            readonly role: SdlcMaterializedProductFileRole;
+            readonly targetKind?: SdlcProductMaterializationAuthorityTarget["targetKind"];
           }[]>([])
-        : objectFieldsStringList(nested, [
-            ...implementationBuildConfigKeys,
-            ...testingBuildConfigKeys
-          ]).map((value) =>
-            Object.freeze({ value, stackSection: "testing" as const })
-          );
+        : [
+            ...objectFieldsStringList(nested, [
+              ...implementationBuildConfigKeys,
+              ...testingBuildConfigKeys
+            ]).map((value) =>
+              Object.freeze({
+                value,
+                stackSection: "testing" as const,
+                role: "build_config" as const
+              })
+            ),
+            ...objectFieldsStringList(nested, testingRootKeys).map((value) =>
+              Object.freeze({
+                value,
+                stackSection: "testing" as const,
+                role: "test" as const,
+                targetKind: "directory" as const
+              })
+            ),
+            ...objectFieldsStringList(nested, testingFileKeys).map((value) =>
+              Object.freeze({
+                value,
+                stackSection: "testing" as const,
+                role: "test" as const
+              })
+            )
+          ];
     })
   ];
   return tenantStackBuildConfigSeedsFromValues({
@@ -1287,7 +1400,8 @@ function tenantStackBuildConfigSeedsFromMarkdown(input: {
         value,
         stackSection: input.sourceRef.includes("TESTING_TECH_STACK")
           ? "testing" as const
-          : "implementation" as const
+          : "implementation" as const,
+        role: "build_config" as const
       })
     ),
     declaresStackSemantics: markdownDeclaresTenantStackSemantics(input.markdown),
@@ -1302,6 +1416,8 @@ function tenantStackBuildConfigSeedsFromValues(input: {
   readonly values: readonly {
     readonly value: string;
     readonly stackSection: TenantStackTargetSeed["stackSection"];
+    readonly role: SdlcMaterializedProductFileRole;
+    readonly targetKind?: SdlcProductMaterializationAuthorityTarget["targetKind"];
   }[];
   readonly declaresStackSemantics: boolean;
   readonly declaresExecutionEnvironment: boolean;
@@ -1314,7 +1430,8 @@ function tenantStackBuildConfigSeedsFromValues(input: {
       sourceRef: input.sourceRef,
       stackSection: entry.stackSection,
       value: entry.value,
-      role: "build_config"
+      role: entry.role,
+      targetKind: entry.targetKind
     });
     if (seed === null) {
       reasonRefs.add(
@@ -1344,6 +1461,7 @@ function tenantStackBuildConfigSeedsFromValues(input: {
 function tenantStackAuthorityFor(
   manifest: SdlcWorkerHandoffManifest
 ): TenantStackAuthority {
+  const targetSeeds = new Map<string, TenantStackTargetSeed>();
   const buildConfigSeeds = new Map<string, TenantStackTargetSeed>();
   const sourceRefs = new Set<string>();
   const reasonRefs = new Set<string>();
@@ -1384,14 +1502,17 @@ function tenantStackAuthorityFor(
     declaresExecutionEnvironment =
       declaresExecutionEnvironment || result.declaresExecutionEnvironment;
     for (const seed of result.seeds) {
-      const prior = buildConfigSeeds.get(seed.path);
+      const prior = targetSeeds.get(seed.path);
       if (
         prior?.stackSection === "implementation" &&
         seed.stackSection === "testing"
       ) {
         continue;
       }
-      buildConfigSeeds.set(seed.path, seed);
+      targetSeeds.set(seed.path, seed);
+      if (seed.requiredRole === "build_config") {
+        buildConfigSeeds.set(seed.path, seed);
+      }
     }
   }
   if (sourceRefs.size > 0 && !declaresStackSemantics) {
@@ -1405,14 +1526,18 @@ function tenantStackAuthorityFor(
   ) {
     reasonRefs.add("tenant_stack_execution_environment_missing");
   }
-  const orderedBuildConfigSeeds = Object.freeze(
-    [...buildConfigSeeds.values()].sort((left, right) =>
+  const orderedTargetSeeds = Object.freeze(
+    [...targetSeeds.values()].sort((left, right) =>
       left.path.localeCompare(right.path)
     )
+  );
+  const orderedBuildConfigSeeds = Object.freeze(
+    orderedTargetSeeds.filter((seed) => seed.requiredRole === "build_config")
   );
   const orderedSourceRefs = Object.freeze([...sourceRefs].sort());
   const orderedReasonRefs = Object.freeze([...reasonRefs].sort());
   return Object.freeze({
+    targetSeeds: orderedTargetSeeds,
     buildConfigSeeds: orderedBuildConfigSeeds,
     sourceRefs: orderedSourceRefs,
     reasonRefs: orderedReasonRefs,
@@ -1439,7 +1564,7 @@ function tenantStackAuthorityTargetsFor(
   readonly reasonRefs: readonly string[];
 } {
   const authority = tenantStackAuthorityFor(manifest);
-  if (authority.buildConfigSeeds.length === 0) {
+  if (authority.targetSeeds.length === 0) {
     return Object.freeze({
       targets: Object.freeze([]),
       sourceRefs: authority.sourceRefs,
@@ -1447,7 +1572,7 @@ function tenantStackAuthorityTargetsFor(
     });
   }
   return Object.freeze({
-    targets: tenantStackTargetContractsFromSeeds({ manifest, seeds: authority.buildConfigSeeds }),
+    targets: tenantStackTargetContractsFromSeeds({ manifest, seeds: authority.targetSeeds }),
     sourceRefs: authority.sourceRefs,
     reasonRefs: authority.reasonRefs
   });
@@ -1507,6 +1632,28 @@ function tenantStackBuildConfigTargetCoversRelativePath(input: {
       relativePath.startsWith(`${targetRelative}/`)
     );
   });
+}
+
+export function tenantStackDeclaredMaterializedRoleForRelativePath(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly relativePath: string;
+}): SdlcMaterializedProductFileRole | null {
+  const relativePath = input.relativePath.replace(/\\/gu, "/").toLowerCase();
+  const target = tenantStackAuthorityFor(input.manifest).targetSeeds.find((seed) => {
+    if (!tenantStackTargetAppliesToCurrentMaterialization({ manifest: input.manifest, target: seed })) {
+      return false;
+    }
+    const targetRelative = targetRelativeToSelectedOutputRoot({
+      targetPath: seed.path,
+      selectedOutputRoot:
+        input.manifest.productMaterialization.selectedOutputRoot
+    }).toLowerCase();
+    return seed.targetKind === "file"
+      ? relativePath === targetRelative
+      : relativePath === targetRelative ||
+          relativePath.startsWith(`${targetRelative}/`);
+  });
+  return target?.requiredRole ?? null;
 }
 
 function tenantStackTargetAppliesToCurrentMaterialization(input: {
@@ -1627,20 +1774,24 @@ function designSourceTargetSeedFromComponentRelativePath(input: {
     selectedOutputRoot
   });
   const lowerRelative = relativeToOutputRoot.toLowerCase();
+  const declaredRole = tenantStackDeclaredMaterializedRoleForRelativePath({
+    manifest: input.manifest,
+    relativePath: relativeToOutputRoot
+  });
   if (
     lowerRelative.length === 0 ||
     lowerRelative === ".ai-workspace" ||
     lowerRelative.startsWith(".ai-workspace/") ||
     lowerRelative.includes("/.ai-workspace/") ||
-    lowerRelative === "test" ||
-    lowerRelative.startsWith("test/") ||
-    lowerRelative.includes("/test/") ||
-    lowerRelative.includes(".test.") ||
-    lowerRelative.includes(".spec.")
+    declaredRole === "test"
   ) {
     return null;
   }
+  if (declaredRole !== null && declaredRole !== "source") {
+    return null;
+  }
   const looksLikeSourceFile =
+    declaredRole === "source" ||
     lowerRelative.includes(".") ||
     lowerRelative.startsWith("src/") ||
     lowerRelative.startsWith("lib/") ||
@@ -1917,6 +2068,23 @@ function mergeAuthorityTargets(
   );
 }
 
+function tenantStackTargetCanDeclareProductMaterialization(
+  target: SdlcProductMaterializationAuthorityTarget
+): boolean {
+  return !(target.requiredRole === "test" && target.targetKind === "directory");
+}
+
+function tenantStackTargetsCanExtendCurrentMaterialization(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly currentDesignTargets: readonly SdlcProductMaterializationAuthorityTarget[];
+}): boolean {
+  return !(
+    input.manifest.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE &&
+    input.manifest.targetAssetType === "component_code_surface" &&
+    input.currentDesignTargets.length > 0
+  );
+}
+
 export function reconcileSdlcProductMaterializationAuthority(
   manifest: SdlcWorkerHandoffManifest
 ): SdlcProductMaterializationAuthorityReconciliation {
@@ -1953,6 +2121,13 @@ export function reconcileSdlcProductMaterializationAuthority(
     manifest,
     targets: tenantStackTargets
   });
+  const currentTenantStackMaterializationTargets =
+    tenantStackTargetsCanExtendCurrentMaterialization({
+      manifest,
+      currentDesignTargets
+    })
+      ? currentTenantStackTargets.filter(tenantStackTargetCanDeclareProductMaterialization)
+      : Object.freeze([] as const);
   const currentRequirementTargets = targetsForCurrentMaterializationEdge({
     manifest,
     targets: requirementTargets
@@ -1978,7 +2153,7 @@ export function reconcileSdlcProductMaterializationAuthority(
         : currentProductTargets;
   const declaredProductTargetContracts = mergeAuthorityTargets(
     baseDeclaredProductTargetContracts,
-    currentTenantStackTargets
+    currentTenantStackMaterializationTargets
   );
   const declaredProductFileTargets = uniqueSorted(
     declaredProductTargetContracts.map((target) => target.path)

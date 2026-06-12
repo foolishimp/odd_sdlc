@@ -132,6 +132,7 @@ export interface SdlcWorkerTransportContract {
   readonly args: readonly string[];
   readonly model: string | null;
   readonly effort: "low" | "medium" | "high" | "xhigh" | "max" | null;
+  readonly codexSandboxMode: "read-only" | "workspace-write" | "danger-full-access";
   readonly workerId: string;
   readonly backendId: string;
 }
@@ -1461,6 +1462,26 @@ export const SDLC_REVIEW_GRADE_FAILURE_CLASSES = Object.freeze([
 export type SdlcReviewGradeFailureClass =
   (typeof SDLC_REVIEW_GRADE_FAILURE_CLASSES)[number];
 
+export const SDLC_REPAIR_SURFACE_TRIAGE_DISPOSITIONS = Object.freeze([
+  "current_edge_repair",
+  "upstream_reentry",
+  "downstream_deferred",
+  "external_blocked"
+] as const);
+
+export type SdlcRepairSurfaceTriageDisposition =
+  (typeof SDLC_REPAIR_SURFACE_TRIAGE_DISPOSITIONS)[number];
+
+export interface SdlcRepairSurfaceTriageCarrier {
+  readonly kind: "sdlc_repair_surface_triage";
+  readonly disposition: SdlcRepairSurfaceTriageDisposition;
+  readonly repairGraphFunctionRef: string | null;
+  readonly repairGraphVectorRef: string | null;
+  readonly repairAssetRef: string | null;
+  readonly evidenceRefs: readonly string[];
+  readonly rationale: string;
+}
+
 export interface SdlcWorkerObligationAssessment {
   readonly kind: "sdlc_worker_obligation_assessment";
   readonly obligationId: string;
@@ -1473,6 +1494,7 @@ export interface SdlcWorkerObligationAssessment {
   readonly semanticEvidenceRefs?: readonly string[] | undefined;
   readonly acceptedAuthorityRefs?: readonly string[] | undefined;
   readonly fulfillmentBinding?: GtlContractFulfillmentBinding | null | undefined;
+  readonly repairSurfaceTriage?: SdlcRepairSurfaceTriageCarrier | null | undefined;
 }
 
 export type SdlcRequirementFunctionFulfillmentBinding =
@@ -1487,6 +1509,7 @@ export interface SdlcReviewGradeObligationFinding {
   readonly evidenceRefs: readonly string[];
   readonly acceptedAuthorityRefs: readonly string[];
   readonly fulfillmentBinding: GtlContractFulfillmentBinding | null;
+  readonly repairSurfaceTriage?: SdlcRepairSurfaceTriageCarrier | null | undefined;
   readonly rationale: string;
 }
 

@@ -86,7 +86,7 @@ function edgeAuthorityCompressionPromptLines(): readonly string[] {
 }
 
 const ABG_ITERATION_OUTCOME_FOLD_REF =
-  "package:@abiogenesis/typescript-tenant@4.0.0-rc.15#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows";
+  "package:@abiogenesis/typescript-tenant@4.0.0-rc.16#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows";
 
 interface EvaluatePromptLineGroups {
   readonly preAuthorityLines: readonly string[];
@@ -227,7 +227,8 @@ function compactObligationPromptLines(
     `- edgeName: ${manifest.edgeName}`,
     `- targetAssetType: ${manifest.targetAssetType}`,
     `- obligationCount: ${obligationRefs.length}`,
-    `- obligationRefs: ${listForPrompt(obligationRefs)}`
+    `- obligationRefs: ${listForPrompt(obligationRefs)}`,
+    "- Review coverage law: reviewedObligationIds and findings must cover every obligationRef above. Do not drop structural obligations such as module:* when requirement rows are fulfilled."
   ]);
 }
 
@@ -408,7 +409,7 @@ function compactReviewGradePromptLineGroups(input: {
       `- edgeName: ${JSON.stringify(input.manifest.edgeName)}`,
       `- targetAssetType: ${JSON.stringify(input.manifest.targetAssetType)}`,
       "- status: \"passed\" or \"blocked\"",
-      "- reviewedObligationIds: admitted obligation ids from worker_result_report obligation assessments or invocation package inline obligations only.",
+      "- reviewedObligationIds: every admitted obligation id from worker_result_report obligation assessments or invocation package inline obligations. It must include every obligationRef in the admitted edge packet above.",
       "- findings[]: one finding per reviewed obligation id.",
       "- evidenceRefs: refs for assessment, generated assets, accepted authority, and review evidence.",
       "- summary: one compact sentence.",
@@ -422,7 +423,16 @@ function compactReviewGradePromptLineGroups(input: {
       "- requiredAction: null when fulfilled, otherwise the next concrete work item",
       "- evidenceRefs and acceptedAuthorityRefs: non-empty arrays",
       "- fulfillmentBinding: null except every fulfilled component_code_surface finding must include it",
+      "- repairSurfaceTriage: null when fulfilled; otherwise a sdlc_repair_surface_triage object classifying the lawful repair surface as current_edge_repair, upstream_reentry, downstream_deferred, or external_blocked",
+      "- repairSurfaceTriage for upstream_reentry must name repairGraphFunctionRef, repairGraphVectorRef, and repairAssetRef; other dispositions may set those refs to null.",
       "- rationale: compact reason. No extra finding keys.",
+      "",
+      "repairSurfaceTriage shape for non-fulfilled findings:",
+      "- kind: \"sdlc_repair_surface_triage\"",
+      "- disposition: current_edge_repair, upstream_reentry, downstream_deferred, or external_blocked",
+      "- repairGraphFunctionRef, repairGraphVectorRef, repairAssetRef: non-null only when the lawful repair surface is an upstream graph/vector/asset re-entry",
+      "- evidenceRefs: non-empty refs proving this triage",
+      "- rationale: compact reason for this repair-surface classification",
       "",
       "fulfillmentBinding shape for fulfilled component_code_surface findings:",
       "- kind: \"gtl_contract_fulfillment_binding\"",
@@ -431,9 +441,11 @@ function compactReviewGradePromptLineGroups(input: {
       "",
       "Review rules:",
       "- File existence, tags, digests, or smoke output are evidence, not proof by themselves.",
+      "- SDLC depth is scenario/build-test driven: UAT/scenario authority and build/test observations are primary behavior proof; obligation mapping, carrier rows, lineage tags, and worker fulfilled counts are trace evidence only.",
       "- Mark trace_missing when a generated product file has no lineage in the asset, selected target carrier, worker report, or product materialization manifest.",
       "- Mark semantic_not_realized when behavior is absent, stubbed, placeholder, disconnected from the public boundary, or contradicts tenant stack authority.",
       "- On component_code_surface, mark semantic_not_realized when source-role files are only row-count arithmetic, print-only runners, requirement-comment shells, or other scaffolds that do not implement the admitted module responsibility through a public behavior boundary.",
+      "- For behavior-bearing component_code_surface findings, do not pass fulfillment from component_depth_register rows, manifests, or worker obligation assessments unless the finding is bound to a public source boundary and scenario/build-test/evaluator evidence. If source behavior is absent use semantic_not_realized; if only later test/runtime proof is missing after source behavior is otherwise present, use wrong_stage.",
       "- Mark boundary_collapsed when generated source collapses accepted components back into a coarse facade.",
       "- Mark wrong_stage for lawful downstream carryover only. Test execution or runtime proof absent on component_code_surface is wrong_stage when source/build_config obligations are otherwise fulfilled and no test/execution product target is declared on this edge.",
       "- On component_code_surface, inspect every role=source materialized file and declared build/config support before deciding executable or public-boundary evidence is absent.",
@@ -1014,8 +1026,17 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     "- evidenceRefs: generated asset refs and diagnostic refs used for this judgment",
     "- acceptedAuthorityRefs: non-empty requirement/design/depth/test/target-carrier authority refs used for this judgment",
     "- fulfillmentBinding: null unless this finding is a fulfilled component_code_surface finding. On component_code_surface, every fulfilled finding must provide it, including target_asset, source_asset, module, source_set, inline, aggregate, and requirement rows.",
+    "- repairSurfaceTriage: null when fulfilled; otherwise a sdlc_repair_surface_triage object classifying the lawful repair surface as current_edge_repair, upstream_reentry, downstream_deferred, or external_blocked.",
+    "- repairSurfaceTriage for upstream_reentry must name repairGraphFunctionRef, repairGraphVectorRef, and repairAssetRef; other dispositions may set those refs to null.",
     "- rationale: compact reason for the judgment",
     "- No other finding keys are allowed. Do not add helper booleans, carryover flags, scores, sourceAssetCarryover, sourceAssetStatus, confidence, or notes fields.",
+    "",
+    "repairSurfaceTriage shape for non-fulfilled findings:",
+    "- kind: \"sdlc_repair_surface_triage\"",
+    "- disposition: current_edge_repair, upstream_reentry, downstream_deferred, or external_blocked",
+    "- repairGraphFunctionRef, repairGraphVectorRef, repairAssetRef: non-null only when the lawful repair surface is an upstream graph/vector/asset re-entry",
+    "- evidenceRefs: non-empty refs proving this triage",
+    "- rationale: compact reason for this repair-surface classification",
     "",
     "fulfillmentBinding shape when required:",
     "- kind: \"gtl_contract_fulfillment_binding\"",
@@ -1037,6 +1058,7 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     "",
     "Review rules:",
     "- A requirement tag, file path, schema-valid report, or passing smoke output is evidence, not proof by itself.",
+    "- SDLC depth is scenario/build-test driven: UAT/scenario authority and build/test observations are primary behavior proof; obligation mapping, carrier rows, lineage tags, and worker fulfilled counts are trace evidence only.",
     "- Every finding must include at least one acceptedAuthorityRef. Do not emit an empty acceptedAuthorityRefs array for target_asset, source_set, inline, or aggregate findings.",
     "- For target_asset findings, use the construction brief targetCarrierProjection target carrier refs plus the accepted authority files that governed the generated asset.",
     "- Before marking missing public-boundary fulfillment, compare the admitted tenant/worksite authority to all generated source-role files and declared run/build entrypoints. A review helper that only recognizes one implementation language is evaluator failure, not product evidence.",
@@ -1053,6 +1075,7 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     "- Requirement lineage is transformer-owned semantic evidence, not a postflight closure shortcut. Inspect worker_result_report.materializedFiles, product_materialization_manifest.files, selected target-carrier materializedFiles, and native file tags/comments where the file format permits them.",
     "- Mark trace_missing when a generated product file is used as fulfillment evidence but carries no lineage in the asset itself, selected target carrier, worker report, or materialization manifest. Do not pass by file existence, digest, or test success alone.",
     "- For every component_code_surface fulfilled finding, bind finding.obligationId plus product requirement when available -> design/depth obligation -> component/product target -> function/API/route/CLI/entrypoint -> evidence in fulfillmentBinding.",
+    "- For behavior-bearing component_code_surface findings, do not pass fulfillment from component_depth_register rows, manifests, or worker obligation assessments unless the finding is bound to a public source boundary and scenario/build-test/evaluator evidence. If source behavior is absent use semantic_not_realized; if only later test/runtime proof is missing after source behavior is otherwise present, use wrong_stage.",
     "- For component_code_surface source_asset, module, target_asset, source_set, inline, or aggregate findings, use the carried product requirement id as requirementRef and productRequirementRef when one is declared for the scope; use the exact obligationId only when no narrower product requirement exists. Still bind the finding to the concrete generated entrypoint/public behavior and evidence.",
     "- A fulfilled component_code_surface finding with fulfillmentBinding:null is invalid and will be retried, even when the obligation is module-level or source-asset-level carryover.",
     "- If tenant stack ambiguity was present, verify that the generated artifact or evidence contains a compact stack reconciliation decision before passing stack-dependent product materialization.",
@@ -1071,9 +1094,9 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     "- For component_test_surface, compare generated tests to accepted testcase/test-design authority and source responsibilities.",
     "- For every other target asset type, compare the generated asset to incoming obligations, accepted upstream authority, target carrier expectations, stage boundary, and evidence overlap.",
     "- If all reviewed obligations are fulfilled, status must be passed and every finding failureClass/requiredAction must be null.",
-    "- If any reviewed obligation is partial, blocked, or unassessed, status must be blocked and every non-fulfilled finding must include failureClass and requiredAction.",
+    "- If any reviewed obligation is partial, blocked, or unassessed, status must be blocked and every non-fulfilled finding must include failureClass, requiredAction, and repairSurfaceTriage.",
     "- Before final response, re-open the assessment JSON with bounded Read and self-check it. Verify the top-level key set is exactly kind, assessmentVersion, graphFunctionName, edgeName, targetAssetType, status, reviewedObligationIds, findings, evidenceRefs, summary.",
-    "- Verify every finding key set is exactly kind, obligationId, fulfillmentStatus, failureClass, requiredAction, evidenceRefs, acceptedAuthorityRefs, fulfillmentBinding, rationale.",
+    "- Verify every finding key set is exactly kind, obligationId, fulfillmentStatus, failureClass, requiredAction, evidenceRefs, acceptedAuthorityRefs, fulfillmentBinding, repairSurfaceTriage, rationale.",
     "- Verify every finding.obligationId is present in reviewedObligationIds and every reviewedObligationId came from an admitted obligation-id field, not from an authority/evidence ref string.",
     "- Rewrite until it is valid whole-file JSON with no Markdown fences, comments, trailing prose, or extra keys.",
     "- Final response must be one line: reviewStatus=<passed|blocked> reviewed=<n> blocked=<n>."

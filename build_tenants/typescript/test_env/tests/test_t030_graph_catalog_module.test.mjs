@@ -26,6 +26,7 @@ import {
   BOOTSTRAP_RELEASE_FUNCTION_CATALOG,
   BOOTSTRAP_REQUIREMENTS_EXECUTIVE_STEPS,
   OPERATIONAL_FUNCTION_CATALOG,
+  OPTIMISING_FUNCTION_CATALOG,
   LITE_FUNCTION_CATALOG,
   SDLC_REUSABLE_GRAPH_FUNCTION_CATALOG,
   SOLUTION_ARCHITECTURE_EXECUTIVE_STEPS,
@@ -122,7 +123,8 @@ test("T-030 publishes machine-readable function and executive catalogs", () => {
   assert.equal(catalog.kind, "sdlc_graph_function_catalog");
   assert.equal(
     catalog.functions.length,
-    BOOTSTRAP_RELEASE_FUNCTION_CATALOG.length +
+    OPTIMISING_FUNCTION_CATALOG.length +
+      BOOTSTRAP_RELEASE_FUNCTION_CATALOG.length +
       LITE_FUNCTION_CATALOG.length +
       OPERATIONAL_FUNCTION_CATALOG.length +
       TRIAGE_FUNCTION_CATALOG.length

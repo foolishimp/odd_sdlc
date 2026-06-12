@@ -3,17 +3,17 @@
 // Investigates: B-068
 
 export const ENTERPRISE_CORE_COMPONENTS = Object.freeze([
-  "TypeResolver",
-  "TopologicalCompiler",
-  "MorphismExecutor",
-  "SynthesisEngine",
-  "RunManifestManager",
-  "ArtifactVersionStore",
-  "AssuranceValidator",
-  "AccountingVerifier",
-  "AdjointCompiler",
-  "FidelityVerificationService",
-  "CdmeEngine"
+  "ProbeParser",
+  "ProbePlanner",
+  "ProbeRunner",
+  "ProbeSynthesizer",
+  "ProbeRunLedger",
+  "ProbeArtifactLedger",
+  "ProbeAssuranceCheck",
+  "ProbeAccountingCheck",
+  "ProbeReversePlanner",
+  "ProbeInvariantCheck",
+  "ProbeCompositionCore"
 ] as const);
 
 export type EnterpriseCoreComponent =
@@ -29,80 +29,80 @@ export interface EnterpriseCoreCapabilityInventoryEntry {
 
 export const ENTERPRISE_CORE_CAPABILITY_INVENTORY = Object.freeze([
   {
-    capabilityId: "cdme_type_resolution",
+    capabilityId: "b068_parse_probe",
     requirementRefs: Object.freeze(["REQ-TYP"]),
-    sourceComponent: "TypeResolver",
-    behavioralTestTarget: "TypeResolver",
+    sourceComponent: "ProbeParser",
+    behavioralTestTarget: "ProbeParser",
     evidenceContract: "validated type unification and rejection behavior"
   },
   {
-    capabilityId: "cdme_topological_compilation",
+    capabilityId: "b068_plan_probe",
     requirementRefs: Object.freeze(["REQ-LDM", "REQ-TRV"]),
-    sourceComponent: "TopologicalCompiler",
-    behavioralTestTarget: "TopologicalCompiler",
-    evidenceContract: "compiled graph path with cardinality and policy checks"
+    sourceComponent: "ProbePlanner",
+    behavioralTestTarget: "ProbePlanner",
+    evidenceContract: "probe graph path with cardinality and policy checks"
   },
   {
-    capabilityId: "cdme_morphism_execution",
+    capabilityId: "b068_run_probe",
     requirementRefs: Object.freeze(["REQ-TRV", "REQ-INT"]),
-    sourceComponent: "MorphismExecutor",
-    behavioralTestTarget: "MorphismExecutor",
-    evidenceContract: "runtime traversal over compiled morphism path"
+    sourceComponent: "ProbeRunner",
+    behavioralTestTarget: "ProbeRunner",
+    evidenceContract: "probe runtime traversal"
   },
   {
-    capabilityId: "cdme_synthesis",
+    capabilityId: "b068_synthesize_probe",
     requirementRefs: Object.freeze(["REQ-INT"]),
-    sourceComponent: "SynthesisEngine",
-    behavioralTestTarget: "SynthesisEngine",
-    evidenceContract: "synthesis of missing or identity morphisms"
+    sourceComponent: "ProbeSynthesizer",
+    behavioralTestTarget: "ProbeSynthesizer",
+    evidenceContract: "synthesis of missing or identity probe links"
   },
   {
-    capabilityId: "cdme_run_manifest",
+    capabilityId: "b068_run_ledger_probe",
     requirementRefs: Object.freeze(["REQ-TRV", "REQ-LIN"]),
-    sourceComponent: "RunManifestManager",
-    behavioralTestTarget: "RunManifestManager",
+    sourceComponent: "ProbeRunLedger",
+    behavioralTestTarget: "ProbeRunLedger",
     evidenceContract: "immutable run identity and manifest lifecycle"
   },
   {
-    capabilityId: "cdme_artifact_versioning",
+    capabilityId: "b068_artifact_ledger_probe",
     requirementRefs: Object.freeze(["REQ-LIN"]),
-    sourceComponent: "ArtifactVersionStore",
-    behavioralTestTarget: "ArtifactVersionStore",
+    sourceComponent: "ProbeArtifactLedger",
+    behavioralTestTarget: "ProbeArtifactLedger",
     evidenceContract: "artifact version pinning for replay and lineage"
   },
   {
-    capabilityId: "cdme_assurance",
+    capabilityId: "b068_assurance_probe",
     requirementRefs: Object.freeze(["REQ-ASSURANCE"]),
-    sourceComponent: "AssuranceValidator",
-    behavioralTestTarget: "AssuranceValidator",
+    sourceComponent: "ProbeAssuranceCheck",
+    behavioralTestTarget: "ProbeAssuranceCheck",
     evidenceContract: "structural assurance gate over generated mappings"
   },
   {
-    capabilityId: "cdme_accounting",
+    capabilityId: "b068_accounting_probe",
     requirementRefs: Object.freeze(["REQ-ACC"]),
-    sourceComponent: "AccountingVerifier",
-    behavioralTestTarget: "AccountingVerifier",
+    sourceComponent: "ProbeAccountingCheck",
+    behavioralTestTarget: "ProbeAccountingCheck",
     evidenceContract: "balanced ledger verification before run completion"
   },
   {
-    capabilityId: "cdme_adjoint",
+    capabilityId: "b068_reverse_plan_probe",
     requirementRefs: Object.freeze(["REQ-ADJ"]),
-    sourceComponent: "AdjointCompiler",
-    behavioralTestTarget: "AdjointCompiler",
-    evidenceContract: "adjoint strategy compilation and validation"
+    sourceComponent: "ProbeReversePlanner",
+    behavioralTestTarget: "ProbeReversePlanner",
+    evidenceContract: "reverse-plan compilation and validation"
   },
   {
-    capabilityId: "cdme_fidelity",
+    capabilityId: "b068_invariant_probe",
     requirementRefs: Object.freeze(["REQ-FID"]),
-    sourceComponent: "FidelityVerificationService",
-    behavioralTestTarget: "FidelityVerificationService",
-    evidenceContract: "fidelity invariant verification with tolerance handling"
+    sourceComponent: "ProbeInvariantCheck",
+    behavioralTestTarget: "ProbeInvariantCheck",
+    evidenceContract: "probe invariant verification"
   },
   {
-    capabilityId: "cdme_engine",
+    capabilityId: "b068_composition_probe",
     requirementRefs: Object.freeze(["REQ-ENG"]),
-    sourceComponent: "CdmeEngine",
-    behavioralTestTarget: "CdmeEngine",
+    sourceComponent: "ProbeCompositionCore",
+    behavioralTestTarget: "ProbeCompositionCore",
     evidenceContract: "engine-level composition across compiler and executor"
   }
 ] satisfies readonly EnterpriseCoreCapabilityInventoryEntry[]);

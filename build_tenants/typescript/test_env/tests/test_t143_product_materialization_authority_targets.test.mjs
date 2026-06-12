@@ -93,10 +93,18 @@ function workspaceWithProductAuthority() {
     ].join("\n"),
     "utf8"
   );
-  writeTenantTechStackSpec(root, "build_tenants/scala_spark", [
-    "build.sbt",
-    "project/"
-  ]);
+  writeTenantTechStackSpec(
+    root,
+    "build_tenants/scala_spark",
+    ["build.sbt", "project/"],
+    {
+      sourceRoots: [
+        "cdme-compiler/src",
+        "cdme-assurance/src",
+        "cdme-executor/src"
+      ]
+    }
+  );
   return root;
 }
 
@@ -205,10 +213,18 @@ function workspaceWithModuleTargetProductAuthority() {
     ].join("\n"),
     "utf8"
   );
-  writeTenantTechStackSpec(root, "build_tenants/scala_spark", [
-    "build.sbt",
-    "project/"
-  ]);
+  writeTenantTechStackSpec(
+    root,
+    "build_tenants/scala_spark",
+    ["build.sbt", "project/"],
+    {
+      sourceRoots: [
+        "cdme-compiler/src",
+        "cdme-assurance/src",
+        "cdme-executor/src"
+      ]
+    }
+  );
   return root;
 }
 
@@ -393,7 +409,12 @@ function writeJsonExpectedFiles(workspaceRoot, expectedFiles) {
   );
 }
 
-function writeTenantTechStackSpec(workspaceRoot, tenantRoot, buildConfigTargets) {
+function writeTenantTechStackSpec(
+  workspaceRoot,
+  tenantRoot,
+  buildConfigTargets,
+  options = {}
+) {
   const stackSpecFile = path.join(workspaceRoot, tenantRoot, "spec/TECH_STACK.json");
   mkdirSync(path.dirname(stackSpecFile), { recursive: true });
   writeFileSync(
@@ -402,6 +423,9 @@ function writeTenantTechStackSpec(workspaceRoot, tenantRoot, buildConfigTargets)
       {
         kind: "sdlc_tenant_technology_stack_description",
         buildConfigTargets,
+        ...(options.sourceRoots === undefined
+          ? {}
+          : { moduleLayout: { sourceRoots: options.sourceRoots } }),
         executionEnvironment: {
           hostCachePolicy: "prohibited",
           workspaceLocalDirectories: [
@@ -916,21 +940,21 @@ test("T-172 combined tenant stack keeps implementation role when testing shares 
   );
 });
 
-test("T-143 derives product targets from conformed module structure", () => {
+test("T-143 derives module source targets from tenant stack module layout", () => {
   const manifest = materializationManifest(
     workspaceWithModuleTargetProductAuthority()
   );
   const reconciliation = reconcileSdlcProductMaterializationAuthority(manifest);
 
   assert.equal(reconciliation.status, "passed");
-  assert.deepEqual(reconciliation.productAuthorityTargets, [
-    "build_tenants/scala_spark/cdme-assurance/src",
-    "build_tenants/scala_spark/cdme-compiler/src",
-    "build_tenants/scala_spark/cdme-executor/src"
-  ]);
+  assert.deepEqual(reconciliation.productAuthorityTargets, []);
   assert.deepEqual(reconciliation.tenantStackAuthorityTargets, [
     "build_tenants/scala_spark/build.sbt",
-    "build_tenants/scala_spark/project"
+    "build_tenants/scala_spark/cdme-assurance/src",
+    "build_tenants/scala_spark/cdme-compiler/src",
+    "build_tenants/scala_spark/cdme-executor/src",
+    "build_tenants/scala_spark/project",
+    "build_tenants/scala_spark/src/test"
   ]);
   assert.deepEqual(declaredProductFileTargets(manifest), [
     "build_tenants/scala_spark/build.sbt",
@@ -940,10 +964,16 @@ test("T-143 derives product targets from conformed module structure", () => {
     "build_tenants/scala_spark/project"
   ]);
   assert.equal(
-    reconciliation.productAuthorityTargetContracts.find(
+    reconciliation.tenantStackAuthorityTargetContracts.find(
       (target) => target.path === "build_tenants/scala_spark/cdme-compiler/src"
     )?.targetKind,
     "directory"
+  );
+  assert.equal(
+    reconciliation.tenantStackAuthorityTargetContracts.find(
+      (target) => target.path === "build_tenants/scala_spark/src/test"
+    )?.requiredRole,
+    "test"
   );
 });
 
@@ -1123,11 +1153,10 @@ test("T-143 steel-thread materialization scopes product targets to included modu
     "cdme-compiler"
   ]);
   assert.equal(reconciliation.status, "passed");
-  assert.deepEqual(reconciliation.productAuthorityTargets, [
-    "build_tenants/scala_spark/cdme-compiler/src"
-  ]);
+  assert.deepEqual(reconciliation.productAuthorityTargets, []);
   assert.deepEqual(reconciliation.tenantStackAuthorityTargets, [
     "build_tenants/scala_spark/build.sbt",
+    "build_tenants/scala_spark/cdme-compiler/src",
     "build_tenants/scala_spark/project"
   ]);
   assert.deepEqual(reconciliation.declaredProductFileTargets, [
@@ -1238,6 +1267,37 @@ test("T-143 build-only files do not satisfy component source materialization", (
     ["build_config:build.sbt", "build_config:project/build.properties"]
   );
   assert.equal(materialized.some((file) => file.role === "source"), false);
+});
+
+test("T-143 build execution byproducts under declared config directories are not product truth", () => {
+  const workspace = workspaceWithoutProductTargets();
+  writeTenantTechStackSpec(workspace, "build_tenants/scala_spark", [
+    "build.sbt",
+    "project/"
+  ]);
+  const manifest = materializationManifest(workspace, FG_MATERIALIZE_DECLARED_PRODUCT_ASSET);
+  const before = snapshotProductMaterializationRoot(manifest.productMaterialization);
+  const buildFile = path.join(workspace, "build_tenants/scala_spark/build.sbt");
+  const buildProperties = path.join(
+    workspace,
+    "build_tenants/scala_spark/project/build.properties"
+  );
+  const sbtTargetOutput = path.join(
+    workspace,
+    "build_tenants/scala_spark/project/target/config-classes/generated.class"
+  );
+  mkdirSync(path.dirname(buildProperties), { recursive: true });
+  mkdirSync(path.dirname(sbtTargetOutput), { recursive: true });
+  writeFileSync(buildFile, "ThisBuild / scalaVersion := \"2.13.12\"\n", "utf8");
+  writeFileSync(buildProperties, "sbt.version=1.10.7\n", "utf8");
+  writeFileSync(sbtTargetOutput, "compiled bytecode placeholder\n", "utf8");
+
+  const materialized = observeProductMaterializationDelta({ manifest, before });
+
+  assert.deepEqual(
+    materialized.map((file) => `${file.role}:${file.relativePath}`).sort(),
+    ["build_config:build.sbt", "build_config:project/build.properties"]
+  );
 });
 
 test("T-143 non-materialization surface edge ignores pre-existing tenant build config", () => {

@@ -219,6 +219,9 @@ test("B-070 process://codex argv shape is preserved (regression guard)", () => {
   assert.ok(args.includes("--ignore-user-config"));
   assert.ok(args.includes("--skip-git-repo-check"));
   assert.ok(args.includes("--ephemeral"));
+  assert.ok(args.includes("--sandbox"));
+  const sandboxIndex = args.indexOf("--sandbox");
+  assert.equal(args[sandboxIndex + 1], "workspace-write");
   assert.ok(args.includes("features.memories=false"));
   assert.ok(args.includes("memories.use_memories=false"));
   assert.ok(args.includes("memories.generate_memories=false"));
@@ -364,6 +367,41 @@ test("B-070 process://codex?model=...&effort=... lowers Codex reasoning effort c
       promptPath: fx.promptPath
     }),
     "CODEX-GPT55-PROMPT\n"
+  );
+});
+
+test("B-070 process://codex?sandbox=... lowers explicit Codex sandbox mode", () => {
+  const fx = makeFixture("CODEX-FULL-BUILD-PROMPT\n");
+  const transport = admitWorkerTransport(
+    "process://codex?model=gpt-5.5&effort=high&sandbox=danger-full-access"
+  );
+  assert.equal(transport.agentKey, "codex");
+  assert.equal(transport.codexSandboxMode, "danger-full-access");
+
+  const args = argsForWorker({
+    transport,
+    manifestPath: fx.manifestPath,
+    manifest: fakeManifest(fx.workspaceRoot),
+    promptPath: fx.promptPath,
+    outputLastMessagePath: fx.outputLastMessagePath
+  });
+
+  const sandboxIndex = args.indexOf("--sandbox");
+  assert.notEqual(sandboxIndex, -1);
+  assert.equal(args[sandboxIndex + 1], "danger-full-access");
+  assert.equal(
+    stdinForWorker({
+      transport,
+      promptPath: fx.promptPath
+    }),
+    "CODEX-FULL-BUILD-PROMPT\n"
+  );
+});
+
+test("B-070 process://codex?sandbox=... rejects unsupported sandbox mode", () => {
+  assert.throws(
+    () => admitWorkerTransport("process://codex?sandbox=networked-build"),
+    /codexSandboxMode/u
   );
 });
 

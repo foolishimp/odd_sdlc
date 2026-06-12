@@ -141,6 +141,8 @@ export const DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_REF =
 export const DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_PATH =
   "config/evaluator-helper-contracts/design_depth_draft_fragment_update.md" as const;
 
+const DESIGN_DEPTH_REGISTER_VERSION = "ts-design-depth-v1" as const;
+
 function stableJson(input: unknown): string {
   if (Array.isArray(input)) {
     return `[${input.map((entry) => stableJson(entry)).join(",")}]`;
@@ -775,7 +777,7 @@ export function admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity(inpu
 function emptyDesignDepthRegister(targetAssetType: string): Record<string, unknown> {
   return {
     kind: "sdlc_design_depth_register",
-    registerVersion: "ts-design-depth-v1",
+    registerVersion: DESIGN_DEPTH_REGISTER_VERSION,
     targetAssetType,
     stackProfileRows: [],
     implementationModuleRows: [],
@@ -790,6 +792,22 @@ function emptyDesignDepthRegister(targetAssetType: string): Record<string, unkno
     fileTargetRows: [],
     designCompletenessVerdict: null
   };
+}
+
+function normalizeDesignDepthContentRegisterPayload(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null || record["kind"] !== "sdlc_design_depth_register") {
+    return input;
+  }
+  let changed = false;
+  const normalized = { ...record };
+  for (const key of ["modelVersion", "sequenceVersion", "verdictVersion"]) {
+    if (normalized[key] === DESIGN_DEPTH_REGISTER_VERSION) {
+      delete normalized[key];
+      changed = true;
+    }
+  }
+  return changed ? Object.freeze(normalized) : input;
 }
 
 function designDepthRegisterPayloadFromFragments(
@@ -866,7 +884,9 @@ export function designDepthRegisterPayloadFromEvaluateContentRegister(
     return designDepthRegisterPayloadFromFragments(register);
   }
   try {
-    return parseDesignDepthRegisterPayload(row.payload);
+    return parseDesignDepthRegisterPayload(
+      normalizeDesignDepthContentRegisterPayload(row.payload)
+    );
   } catch (error) {
     throw new TypeError(
       `evaluate_content_register_design_depth_payload_invalid:${error instanceof Error ? error.message : "unknown"}`

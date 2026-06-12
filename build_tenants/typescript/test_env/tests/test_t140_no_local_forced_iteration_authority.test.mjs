@@ -808,6 +808,84 @@ test("T-188 runtime gap merge restores newer real same-edge gap after stale retr
   assert.equal(retryContext.priorGapDossiers[0].reasons[0].reason, reason);
 });
 
+test("T-199 runtime gap merge restores same-run assurance retry gap dossier", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t199-same-run-gap-"));
+  const runsRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs"
+  );
+  const retryRun = path.join(runsRoot, "20260612T001131540Z_pid17256");
+  mkdirSync(retryRun, { recursive: true });
+  const gapDossierRef = pathToFileURL(path.join(retryRun, "gap_dossier.json"))
+    .href;
+  const reason =
+    "review_grade_edge_fulfillment_blocked:target_asset:component_code_surface:semantic_not_realized:Materialize the missing declared source boundary.";
+  const gapDossier = {
+    kind: "sdlc_postflight_gap_dossier",
+    status: "open",
+    graphFunctionName: "lite_design_module_implementation",
+    edgeName: "derive_lite_component_code_surface",
+    vectorIndex: 1,
+    targetAssetType: "component_code_surface",
+    reasons: [
+      {
+        kind: "sdlc_postflight_gap_reason",
+        reason,
+        reasonClass: "assurance",
+        blockingReason: sdlcBlockingReasonFromLegacy({ reason })
+      }
+    ],
+    evidenceRefs: [
+      pathToFileURL(
+        path.join(retryRun, "review_grade_edge_fulfillment_assessment.json")
+      ).href
+    ],
+    priorManifestId: pathToFileURL(path.join(retryRun, "handoff_manifest.json"))
+      .href,
+    currentGapDossierRef: gapDossierRef,
+    retryEligible: true,
+    nextLawfulActions: ["retry_same_edge"]
+  };
+  writeFileSync(
+    path.join(retryRun, "gap_dossier.json"),
+    JSON.stringify(gapDossier),
+    "utf8"
+  );
+
+  const retryContext = mergeSdlcWorkerRetryContextWithRuntimeGapRegister({
+    workspaceRoot: workspace,
+    vectorIndex: 1,
+    edgeName: "derive_lite_component_code_surface",
+    targetAssetType: "component_code_surface",
+    projected: {
+      kind: "sdlc_worker_retry_context",
+      retryAttemptRefs: [
+        {
+          vectorIndex: 1,
+          retryRunId: "run://odd-sdlc/public-start:retry:1",
+          retryCallId:
+            'retry-frontier-row:{"vectorIndex":1,"reasonClass":"retry_planned"}',
+          manifestId:
+            'manifest:assurance_retry:{"vectorIndex":1,"attemptIndex":1}',
+          priorAuthorityRef: pathToFileURL(
+            path.join(retryRun, "worker_result_report.json")
+          ).href,
+          attemptIndex: 1,
+          sourceProjectionRef: 'retry-frontier:{"vectorIndex":1}'
+        }
+      ],
+      priorGapDossiers: []
+    }
+  });
+
+  assert.equal(retryContext.priorGapDossiers.length, 1);
+  assert.equal(
+    retryContext.priorGapDossiers[0].currentGapDossierRef,
+    gapDossierRef
+  );
+  assert.equal(retryContext.priorGapDossiers[0].reasons[0].reason, reason);
+});
+
 test("T-188 retry context drops stale component repair schedule pressure after current qualification passes", () => {
   const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t188-stale-repair-"));
   mkdirSync(path.join(workspace, ".ai-workspace/context"), { recursive: true });

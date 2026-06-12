@@ -10,10 +10,12 @@ import { fileURLToPath } from "node:url";
 
 import {
   ENTERPRISE_CORE_COMPONENTS,
-  evaluateEnterpriseCoreInventory,
+  evaluateEnterpriseCoreInventory
+} from "../../build/semantic/code/src/qualification/enterprise_core_inventory.js";
+import {
   renderEnterpriseCoreOutcomeIterationPostmortem,
   runEnterpriseCoreOutcomeIterationSandbox
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/qualification/enterprise_core_iteration_sandbox.js";
 import {
   assertAbgInstalledSandboxEvidence,
   provisionAbgInstalledSandbox
@@ -72,7 +74,7 @@ function writeEnterpriseCoreArchive(archive, archiveRoot) {
 test("B-068 deterministic inventory evaluator rejects shallow enterprise-core output", () => {
   const evaluation = evaluateEnterpriseCoreInventory({
     state: {
-      sourceComponents: ["TypeResolver"],
+      sourceComponents: ["ProbeParser"],
       testComponents: [],
       buildEvidence: "missing",
       testEvidence: "missing",
@@ -83,11 +85,11 @@ test("B-068 deterministic inventory evaluator rejects shallow enterprise-core ou
   assert.equal(evaluation.kind, "enterprise_core_inventory_evaluation");
   assert.equal(evaluation.status, "blocked");
   assert.deepStrictEqual(evaluation.requiredComponents, ENTERPRISE_CORE_COMPONENTS);
-  assert(evaluation.requiredCapabilityIds.includes("cdme_topological_compilation"));
-  assert(evaluation.requiredCapabilityIds.includes("cdme_fidelity"));
-  assert(evaluation.missingSourceComponents.includes("TopologicalCompiler"));
-  assert(evaluation.missingSourceComponents.includes("MorphismExecutor"));
-  assert(evaluation.missingSourceComponents.includes("FidelityVerificationService"));
+  assert(evaluation.requiredCapabilityIds.includes("b068_plan_probe"));
+  assert(evaluation.requiredCapabilityIds.includes("b068_invariant_probe"));
+  assert(evaluation.missingSourceComponents.includes("ProbePlanner"));
+  assert(evaluation.missingSourceComponents.includes("ProbeRunner"));
+  assert(evaluation.missingSourceComponents.includes("ProbeInvariantCheck"));
   assert.deepStrictEqual(evaluation.missingTestComponents, ENTERPRISE_CORE_COMPONENTS);
   assert(evaluation.blockingReasons.includes("missing_governed_build_evidence"));
   assert(evaluation.blockingReasons.includes("missing_governed_test_evidence"));
@@ -147,8 +149,8 @@ test("B-068 live plugin sandbox proves enterprise-core outcome iteration through
   );
   assert.equal(archive.finalArtifact?.buildEvidence, "governed");
   assert.equal(archive.finalArtifact?.testEvidence, "governed");
-  assert(archive.finalArtifact?.evidenceRefs.includes("build://odd-sdlc/b068/sbt-clean-assembly"));
-  assert(archive.finalArtifact?.evidenceRefs.includes("junit://odd-sdlc/b068/TEST-enterprise-core.xml"));
+  assert(archive.finalArtifact?.evidenceRefs.includes("build://odd-sdlc/b068/governed-build"));
+  assert(archive.finalArtifact?.evidenceRefs.includes("test-report://odd-sdlc/b068/enterprise-core"));
   assert.equal(archive.diagnostics.length, 0);
 
   assert(archive.actualEventSequence.includes("closure_denied"));
@@ -189,24 +191,24 @@ test("B-068 live plugin sandbox proves enterprise-core outcome iteration through
   assert.equal(firstAttempt.evaluationStatus, "blocked");
   assert.equal(firstAttempt.handoffEvidence.currentStateAttemptIndex, null);
   assert.deepStrictEqual(firstAttempt.handoffEvidence.unresolvedReasons, []);
-  assert(firstAttempt.blockingReasons.includes("missing_source_component:TopologicalCompiler"));
+  assert(firstAttempt.blockingReasons.includes("missing_source_component:ProbePlanner"));
   assert.equal(secondAttempt.evaluationStatus, "blocked");
   assert.equal(secondAttempt.handoffEvidence.currentStateAttemptIndex, 1);
   assert.deepStrictEqual(secondAttempt.handoffEvidence.currentStateSourceComponents, [
-    "TypeResolver"
+    "ProbeParser"
   ]);
   assert(secondAttempt.handoffEvidence.unresolvedReasons.includes("missing_governed_test_evidence"));
   assert(secondAttempt.blockingReasons.includes("missing_governed_test_evidence"));
-  assert(secondAttempt.sourceComponents.includes("SynthesisEngine"));
-  assert(!secondAttempt.sourceComponents.includes("FidelityVerificationService"));
+  assert(secondAttempt.sourceComponents.includes("ProbeSynthesizer"));
+  assert(!secondAttempt.sourceComponents.includes("ProbeInvariantCheck"));
   assert.deepStrictEqual(secondAttempt.testComponents, [
-    "TypeResolver",
-    "TopologicalCompiler"
+    "ProbeParser",
+    "ProbePlanner"
   ]);
   assert.equal(thirdAttempt.evaluationStatus, "accepted");
   assert.equal(thirdAttempt.handoffEvidence.currentStateAttemptIndex, 2);
-  assert(thirdAttempt.handoffEvidence.currentStateSourceComponents.includes("SynthesisEngine"));
-  assert(!thirdAttempt.handoffEvidence.currentStateSourceComponents.includes("FidelityVerificationService"));
+  assert(thirdAttempt.handoffEvidence.currentStateSourceComponents.includes("ProbeSynthesizer"));
+  assert(!thirdAttempt.handoffEvidence.currentStateSourceComponents.includes("ProbeInvariantCheck"));
   assert(thirdAttempt.handoffEvidence.unresolvedReasons.includes("missing_governed_build_evidence"));
   assert.deepStrictEqual(thirdAttempt.blockingReasons, []);
   assert.deepStrictEqual(thirdAttempt.sourceComponents, ENTERPRISE_CORE_COMPONENTS);

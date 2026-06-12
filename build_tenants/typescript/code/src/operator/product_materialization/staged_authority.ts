@@ -12,6 +12,7 @@ import type {
 } from "../plugins/evaluate/design_depth_register.js";import {
   admitTestDesignRegisterFromArtifact
 } from "../test_design_register.js";import {
+  admitSdlcDependencyTraversalSelectedMethodCarrier,
   deriveSdlcTestDependencyMapFromImplementationDependencyMap,
   deriveSdlcStagedImplementationTopologyAuthority,
   deriveSdlcStagedTestTopologyAuthority,
@@ -111,6 +112,18 @@ function stagedAuditCarrier(
   });
 }
 
+function stagedParallelTraversalSelectedMethodCarrier(
+  evidenceRefs: readonly string[]
+) {
+  return admitSdlcDependencyTraversalSelectedMethodCarrier({
+    selectedMethod: "parallel",
+    evidenceRefs: Object.freeze([
+      "selection-policy://odd-sdlc/staged-topology/parallel",
+      ...evidenceRefs
+    ])
+  });
+}
+
 export function deriveSdlcStagedConstructionAuditCarriers(
   manifest: SdlcWorkerHandoffManifest,
   fpEvaluatorAdmissionEvidenceRefs: readonly string[] = Object.freeze([])
@@ -143,6 +156,12 @@ export function deriveSdlcStagedConstructionAuditCarriers(
         selectSdlcDependencyMapTraversal({
           selectionRef: "selection://odd-sdlc/component-code/staged-topology",
           dependencyMap: authority.dependencyMap,
+          selectedMethodCarrier: stagedParallelTraversalSelectedMethodCarrier(
+            Object.freeze([
+              "surface://implementation-decomposition-summary",
+              "surface://module-dependency-map"
+            ])
+          ),
           policy: "parallel_when_partitioned",
           basisRefs: Object.freeze([
             "surface://implementation-decomposition-summary",
@@ -173,6 +192,12 @@ export function deriveSdlcStagedConstructionAuditCarriers(
         selectSdlcDependencyMapTraversal({
           selectionRef: "selection://odd-sdlc/component-test/staged-topology",
           dependencyMap: authority.dependencyMap,
+          selectedMethodCarrier: stagedParallelTraversalSelectedMethodCarrier(
+            Object.freeze([
+              "surface://test-decomposition-summary",
+              "surface://test-dependency-map"
+            ])
+          ),
           policy: "parallel_when_partitioned",
           basisRefs: Object.freeze([
             "surface://test-decomposition-summary",
@@ -198,6 +223,13 @@ export function deriveSdlcStagedConstructionAuditCarriers(
             selectionRef:
               "selection://odd-sdlc/component-test/implementation-derived-topology",
             dependencyMap: derivedTestDependencyMap,
+            selectedMethodCarrier: stagedParallelTraversalSelectedMethodCarrier(
+              Object.freeze([
+                implementationDependencyMap.mapRef,
+                "surface://module-dependency-map",
+                "surface://test-dependency-map"
+              ])
+            ),
             policy: "parallel_when_partitioned",
             basisRefs: Object.freeze([
               implementationDependencyMap.mapRef,

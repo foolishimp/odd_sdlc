@@ -3,8 +3,8 @@ id: T-197
 title: Reconcile product boundary and remove authority leakage
 type: chore
 ticket_category: implementation_migration
-status: active
-proof_status: pending
+status: completed
+proof_status: passed
 goal: preserve odd_sdlc as the software-domain meaning layer over GTL/ABG without rival runtime, GTL, orchestration, or governed-target identity encoded as framework law
 build_tenant: typescript
 owner: odd_sdlc
@@ -20,7 +20,8 @@ re_entry_point: design
 priority: high
 triaged_at: 2026-06-09
 created_at: 2026-06-09
-updated_at: 2026-06-10
+updated_at: 2026-06-11
+completed_at: 2026-06-11
 activated_at: 2026-06-09
 governance_scope: STDO Method
 migration_strategy: inside_out_hard_break
@@ -42,6 +43,7 @@ source_documents:
   - /Users/jim/src/apps/specification_methodology/specification/standards/TICKET_METHOD.md
   - .ai-workspace/comments/grok/20260609T022918Z_GAP_sdlc-product-requirement-code-reconciliation.md
   - .ai-workspace/comments/claude/20260609T025417Z_GAP_framework-code-out-of-scope-reconciliation.md
+  - .ai-workspace/comments/codex/20260611T121928Z_CLOSURE_T-197-product-boundary-reconciliation.md
 related_tickets:
   - .ai-workspace/tickets/completed/T-184-partition-handoff-into-compute-stage-boundary-modules.md
   - .ai-workspace/tickets/completed/T-195-close-t194-proof-and-release-hygiene.md
@@ -159,9 +161,9 @@ non_closure_conditions:
 First missing layer: design.
 
 Two independent reconciliation passes on 2026-06-09 answered **different
-questions under the same prompt**. This ticket merges them into one governed
-active cleanup surface with a unified audit ledger, verification status, and
-wave sequencing.
+questions under the same prompt**. This ticket merged them into one governed
+cleanup surface with a unified audit ledger, verification status, and wave
+sequencing.
 
 | field | value |
 | --- | --- |
@@ -179,19 +181,19 @@ must not claim runtime-carriage closure without the T-197 design lock.
 
 ## Supersession Hygiene - 2026-06-09
 
-T-197 is now the sole active cleanup authority for the T-184/T-195 residual
-cluster.
+T-197 became the sole cleanup authority for the T-184/T-195 residual cluster
+and is now completed.
 
 - T-184 is completed as the compute-stage handoff partition slice. Its remaining
   generated-asset production proof, data-mapper live breadth proof, and
-  design-method owner-partition residuals are transferred into this ticket's
-  A/B/H ledger rows instead of keeping T-184 open as a second active authority
+  design-method owner-partition residuals were transferred into this ticket's
+  A/B/H ledger rows instead of keeping T-184 open as a second authority
   surface.
 - T-195 is completed as T-194 release/proof hygiene. T-194's pending commit
   evidence is resolved to checkpoint commit `6af364e`; the broader in-product
   `typecheckGtlProgram(...)` hook is not T-195 scope and remains P0/B1 here.
-- The GAP comments remain commentary inputs. Their terminal owner is this active
-  ticket, not a backlog ticket or either completed predecessor.
+- The GAP comments remain commentary inputs. Their terminal owner is this
+  completed ticket, not a backlog ticket or either completed predecessor.
 
 ### Dual-Axis Model
 
@@ -288,10 +290,9 @@ This is the operative plan for executing T-197 after the Grok/Claude reviews.
 | 6 | W-040 P-series residuals: P1/P3 stay here; P2 is closed by completed T-198 | proof cleanup | terminal P rows or explicit successor |
 | 7 | W-600 closure | closure | all ledger rows terminal; deterministic + installed proof green |
 
-Critical path status: Phase 0, Phase 1 design lock, A4/A1/A5, B1, B2/B3,
-H1/H2/H5/H7, A2 helper retirement, rc.7 live proof, and the rc.14 data-mapper
-breadth live proof are done. Remaining closure work is W-040 P1/P3 plus the
-still-open C/D/H rows in the work ledger.
+Critical path status: Phase 0, Phase 1 design lock, A1-A5, B1-B4b, C1a-C3,
+D1-D6, E1-E6, H1-H12, P1-P3, rc.7 live proof, the rc.14 data-mapper breadth
+live proof, and W-600 commentary closure are done. No ledger row remains open.
 
 Phase 0 dispositions recorded on 2026-06-09:
 
@@ -309,9 +310,9 @@ Phase 0 dispositions recorded on 2026-06-09:
   installed SDLC UX loop; if a run needs layered convergence, control must pass
   to ABG and remain there until ABG exits. A5 is done as an explicit SDLC
   read-model / ABG terminal-transition split.
-- H3 is probe-only in current reachability and is downgraded from live/default
-  gate severity; remediation is containment or relocation of the B-068 fixture
-  surface.
+- H3/H4 are probe-only in current reachability and are contained as B-068
+  proof fixtures. They are not exported through `qualification/index.ts` or the
+  package root, and the sandbox test imports the fixture modules directly.
 
 ## Constitutional Ownership (Vertical Frame)
 
@@ -416,8 +417,8 @@ continuation transition refs gate installed convergence and traversal truth.
 
 | id | code surface | owner | verdict | verification | disposition | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| C1a | `operator/transport.ts` worker spawn, executor profiles, session trajectory | odd_service long-term | debt REQ-ODDSVC-002/005 | reconciled — lawful incubation now; constitutional carve-out later | thin adapter; link B-004; no session registry growth in SDLC core | open |
-| C1b | `transport.ts` L147–172 `claudeArgs` hard-coded CLI flag grammar | worker capability | low refactor | **verified** per claude — worker backend lawful; only flag grammar avoidable | declared worker capability asset through existing `transport.args` contract (claude R5) | open |
+| C1a | `operator/transport.ts` worker spawn, executor profiles, session trajectory | odd_service long-term | debt REQ-ODDSVC-002/005 | **done 2026-06-11** — transport remains a thin admitted worker backend; B-004 remains linked for future odd_service promotion; `test:t197` guards against session/worker registry or server growth in `transport.ts` | thin adapter; link B-004; no session registry growth in SDLC core | done |
+| C1b | `transport.ts` L147–172 `claudeArgs` hard-coded CLI flag grammar | worker capability | low refactor | **done 2026-06-11** — Claude default argv lowered through `SDLC_WORKER_CAPABILITY_ARG_PROFILES` and `workerCapabilityArgsForTransport(...)`; explicit `transport.args` still bypasses the default profile; `test_b070`, `test_t171`, `test:t197` passed | declared worker capability argv profile plus existing `transport.args` override contract | done |
 | C2 | `install/instruction_files.ts` UX docs for local `--until converged --worker process://...` | ABG command shell / odd_service UX | fixed for installed instructions | **done 2026-06-11** — installed instructions no longer advertise SDLC-local layered convergence; they name `odd-sdlc-ts start --until blocked` for the SDLC shell and `genesis-ts start --until converged` for ABG-owned layered execution | keep docs aligned with Product command/control handoff; no service state in core | done |
 | C3 | no odd_service HTTP/MCP server | — | pass | grep | keep absent | done |
 
@@ -431,12 +432,12 @@ lawful worker-backend realization (claude rejected list).
 
 | id | code surface | axis | verdict | verification | disposition | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| D1 | `live_fp_parallel_materialization_frontier.ts` L192–204 `classifySdlcLiveParallelModuleLane` (`src/`, `index.tsx` regex) | vertical | fail REQ-085 | **verified** — path regex at L197–201 | delete; derive lanes from admitted tenant stack | open |
-| D2 | `decomposition_admission.ts` `dependencyTraversalMethod` deterministic pick | vertical | fail REQ-082 | architectural | evaluator-selected method as admitted carrier | open |
-| D3 | `start/public_start.ts` bootstrap selection | vertical | **narrowed** | **partially rejected** — `framework_smoke` / `trivial_product` paths at L376–486 lawful per claude + REQ-082 AC-3/4 | only remediate sites that pick traversal method without admitted evidence; not whole `public_start` | open |
-| D4 | `authority.ts` L1638–1639 `.test.`/`.spec.` infix exclusion | horizontal | medium | claude confirmed | use `TenantStackTargetSeed` testing-stack roles (claude R4) | open |
-| D5 | `authority.ts` L514,523 bare `/src` append | horizontal | medium | claude confirmed | declared `moduleLayout` from tenant profile (claude R4) | open |
-| D6 | `authority.ts` L221–223 `"project"` directory special-case | horizontal | low | claude confirmed | consume tenant declared directory list | open |
+| D1 | `live_fp_parallel_materialization_frontier.ts` L192–204 `classifySdlcLiveParallelModuleLane` (`src/`, `index.tsx` regex) | vertical | fail REQ-085 | **done 2026-06-11** — classifier export deleted; installed live bridge derives dev lanes from tenant-stack role authority and derives fan-in targets from dependency-map graph successors, not `src/` or `index.*` path grammar; `test:t174`, `test:t197` passed | tenant-stack role carrier plus graph-shape fan-in projection | done |
+| D2 | `decomposition_admission.ts` deterministic traversal-method pick | vertical | fail REQ-082 | **done 2026-06-11** — traversal selection now accepts `SdlcDependencyTraversalSelectedMethodCarrier`; staged authority and postflight callers pass `selectedMethodCarrier` evidence refs; the former `dependencyTraversalMethod` function is gone; `test:t172`, `test:t174`, `test:t197` passed | evaluator-selected method as admitted carrier; compatibility inference remains only when no selected-method carrier is supplied | done |
+| D3 | `start/public_start.ts` bootstrap selection | vertical | **narrowed** | **done 2026-06-11** — public-start keeps the lawful `framework_smoke` / `trivial_product` front-door and overlay selections, but it does not call dependency traversal selection; selection evidence remains capability/overlay refs; `test:t197` passed | admitted capability route; no traversal-method pick in public-start | done |
+| D4 | `authority.ts` L1638–1639 `.test.`/`.spec.` infix exclusion | horizontal | medium | **done 2026-06-11** — design-source admission consults tenant-stack test roles instead of `.test.`/`.spec.` infix strings; tenant-stack test roots/files are admitted as authority role surface while broad test directory roots are filtered out of current product materialization targets; `test:t066`, `test:t143`, `test:t197` passed | `TenantStackTargetSeed` testing roles | done |
+| D5 | `authority.ts` L514,523 bare `/src` append | horizontal | medium | **done 2026-06-11** — module names no longer synthesize `${module}/src`; module source roots are explicit `moduleLayout.sourceRoots` / `sourceRoots` tenant-stack declarations; `test:t066`, `test:t143`, `test:t197` passed | declared module layout from tenant stack | done |
+| D6 | `authority.ts` L221–223 `"project"` directory special-case | horizontal | low | **done 2026-06-11** — `"project"` name heuristic removed; build-tool directories are directories only when declared with directory syntax/role through tenant stack or other authority; `test:t066`, `test:t143`, `test:t197` passed | tenant declared directory list/syntax | done |
 
 **Rejected:** `authority.ts` L1643–1648 `src/lib/app/code` heuristic and
 `observation.ts` role inference — overridable cross-ecosystem fallback (claude).
@@ -449,16 +450,16 @@ lawful worker-backend realization (claude rejected list).
 | --- | --- | --- | --- | --- | --- | --- |
 | H1 | R1 | `mapper_requirements.md` in `source_input.ts:41`, `project_profile.ts:954-956/1039-1041`, `launch_contract.ts:225/2621/5965`, `postflight_checks.ts:2347-2364`, `result_projection.ts:1552`, `spec_method/entry.ts:289-297` | **high** (1552 load-bearing rank) | **done 2026-06-09** — code/src grep has zero `specification/mapper_requirements.md`; `deriveSdlcSourceInput(...)` no longer classifies the target-specific filename as `requirement_surface`; generic `specification/requirements/*` remains classified as requirement authority | recognition now routes through `specification/requirements/`, `specification/REQUIREMENTS.md`, and imported-source discovery; target-specific filename remains valid only as tenant data/fixture text, not framework law | done |
 | H2 | R2 | `analysis/types.ts:19-26` closed enum `hello_world`/`data_mapper`/`generic`; `profiles.ts`, `analyze.ts:358-364` name switches | medium | **done 2026-06-09** — F_D run analysis profile ids are open labels; only `generic` remains as the default built-in id, and trivial-product behavior now flows through explicit profile capability contracts instead of `profile === "hello_world"` / `data_mapper` switches. | analysis profile policy identity is open; product-shape behavior is capability-driven (`trivial_product`, `sdlc_outcome_class`, `expected_retry_floor`) | `test:t161` capability-driven profile proof; `test:t197` H2 source guard | done |
-| H3 | R3 | `qualification/enterprise_core_inventory.ts:5-108` `ENTERPRISE_CORE_COMPONENTS` + `ENTERPRISE_CORE_CAPABILITY_INVENTORY` as default gate | **medium, probe-only current reachability** | **verified probe-only** — current `code/src` usage is `qualification/enterprise_core_iteration_sandbox.ts`, a B-068 probe graph (`function_kind: "odd_outcome_iteration_probe"` at L286–288) whose evaluator calls `evaluateEnterpriseCoreInventory(...)` (L467–474); `test_env/sandbox/test_b068_*` is the only active test consumer. No public-start/operator live default gate caller found in active source grep. | contain as B-068 proof fixture or relocate to `test_env/`; do not treat as live default gate until a production caller is proven | open |
-| H4 | R3 | `qualification/enterprise_core_iteration_sandbox.ts:425-462` scripted CDME constructor sequence | medium | claude confirmed | move to non-exported `test_env/` fixture with synthetic names | open |
+| H3 | R3 | `qualification/enterprise_core_inventory.ts:5-108` `ENTERPRISE_CORE_COMPONENTS` + `ENTERPRISE_CORE_CAPABILITY_INVENTORY` as default gate | **medium, probe-only current reachability** | **done 2026-06-11** — contained as a B-068 proof fixture only: not exported by `qualification/index.ts` or root `code/src/index.ts`; code/src usage is limited to `enterprise_core_inventory.ts` and `enterprise_core_iteration_sandbox.ts`; sandbox test imports direct fixture modules; `test_b068`, `test:t197` passed | B-068 proof fixture; no production default gate export; repricing required before any live/default gate use | done |
+| H4 | R3 | `qualification/enterprise_core_iteration_sandbox.ts:425-462` scripted constructor sequence with downstream subsystem names | medium | **done 2026-06-11** — scripted fixture component names and capability ids are neutral `Probe*`/`b068_*_probe` values; stale CDME/data-mapper/morphism/fidelity words are guarded out; direct sandbox proof imports keep the fixture off public defaults; `test_b068`, `test:t197` passed | non-exported B-068 probe fixture with synthetic names | done |
 | H5 | R4 | `prompt_edge_policy.ts:226,238` `"npm test"` pressure classifier | medium | **done 2026-06-09** — current-edge downstream pressure classification no longer treats `npm test` as a pressure signal; it uses neutral target/evidence refs such as `component_test_surface`, `test-execution`, and execution evidence. Rejected `launch_contract.ts:4197` remains intentionally untouched as inert per the rejected register. | neutral SDLC pressure ids and declared execution/test surfaces are the classifier; tenant command strings are not framework law | `test:t197` H5/H7 source guard | done |
-| H6 | R4 | `repair_reentry.ts:575-578` Scala/SBT defect needles | medium | claude confirmed | tenant-declared diagnostic phrases in `TECH_STACK.*` | open |
+| H6 | R4 | `repair_reentry.ts:575-578` Scala/SBT defect needles | medium | **done 2026-06-11** — hard-coded Scala compiler phrases removed from repair-reentry diagnostic needles; excerpt selection now keys off row failure id, test/source refs, and neutral execution markers; `test:t120`, `test:t197` passed | row-declared evidence refs and neutral execution markers; tenant phrases remain data, not framework law | done |
 | H7 | R4 | `prompts.ts:1059` review prompt names `npm test` | low | **done 2026-06-09** — review-grade prompt now names declared test-execution-contract proof instead of `npm test` execution. | generic declared test-execution contract reference | `test:t187` prompt assertion; `test:t197` H5/H7 source guard | done |
-| H8 | R6 | `analyze.ts:211-290` `TEST35_CONCEPTUAL_STAGES` / `test35://stage/...` | low | claude confirmed | generic `sdlc://stage/...`; scenario id as data | open |
-| H9 | R6 | `render_markdown.ts:243-248` test35-branded headings | low | claude confirmed | neutral headings | open |
-| H10 | R7 | `project_profile.ts:153-159` `spark_scala` alias | low | claude confirmed | fix stale ref or tenant-declared identity | open |
-| H11 | R7 | `prompt_edge_policy.ts:851` `data_mapper.requirements.req_dq_001` example | low | claude confirmed | tenant-neutral placeholder; keep `CANONICAL_REQUIREMENT_REGEX` format | open |
-| H12 | — | `project_profile.ts:1014-1017` ontology heading tokens (`morphisms`, `fidelity`, `error domain`) | medium | claude confirmed | spec-method-neutral markers only | open |
+| H8 | R6 | `analyze.ts:211-290` `TEST35_CONCEPTUAL_STAGES` / `test35://stage/...` | low | **done 2026-06-11** — stage ids are now `SDLC_CONCEPTUAL_STAGES` and `sdlc://stage/...`; `test:t161`, `test:t197` passed | generic `sdlc://stage/...`; scenario id as data | done |
+| H9 | R6 | `render_markdown.ts:243-248` test35-branded headings | low | **done 2026-06-11** — markdown heading/column now say conceptual stage coverage/stage; `test:t161`, `test:t197` passed | neutral headings | done |
+| H10 | R7 | `project_profile.ts:153-159` `spark_scala` alias | low | **done 2026-06-11** — stale `spark_scala` alias removed; tenant names pass through declared identity; `test:t068`, `test:t197` passed | tenant-declared identity | done |
+| H11 | R7 | `prompt_edge_policy.ts:851` `data_mapper.requirements.req_dq_001` example | low | **done 2026-06-11** — example requirement ref is tenant-neutral while preserving canonical regex shape; `test:t197` passed | tenant-neutral placeholder; keep `CANONICAL_REQUIREMENT_REGEX` format | done |
+| H12 | — | `project_profile.ts:1014-1017` ontology heading tokens (`morphisms`, `fidelity`, `error domain`) | medium | **done 2026-06-11** — project-profile heading authority markers now stay spec-method-neutral; `test:t068`, `test:t197` passed | spec-method-neutral markers only | done |
 
 ---
 
@@ -466,12 +467,12 @@ lawful worker-backend realization (claude rejected list).
 
 | id | code surface | assessment | disposition | status |
 | --- | --- | --- | --- | --- |
-| E1 | `edge_projection.ts` `runInstalledOperatorShardCommand` | lawful REQ-077 AC-4 if graph-bound | verify bind-chain stage | open |
+| E1 | `edge_projection.ts` `runInstalledOperatorShardCommand` | **done 2026-06-11** — shard command execution is bound to `manifest.productMaterialization.executionShards` or admitted test-execution preparation rows; the runner receives `shard.command` and `shard.workingDirectory`, not framework command grammar; `test:t197` passed | graph/manifest-bound execution evidence stage | done |
 | E2 | `assurance_gate.ts` empty ledgers | aligned post T-184 | keep stub | done |
-| E3 | `closure_state_machine.ts` string-ref heuristics | weak vs REQ-086 | typed carrier inputs | open |
-| E4 | `feature_dependency_dag.ts` topological order | lawful if projection-only | audit callers | open |
+| E3 | `closure_state_machine.ts` string-ref heuristics | **done 2026-06-11** — added `SdlcClosureResidualPressureCarrier`; installed consequence passes typed residual-pressure carriers into closure transition and synthetic gap dossier construction; opaque residual-pressure behavior test proves routing comes from the typed carrier; fallback string classification remains compatibility-only when no carrier is supplied; `test:t188`, `test:t197` passed | typed carrier inputs | done |
+| E4 | `feature_dependency_dag.ts` topological order | **done 2026-06-11** — `topologicalOrder` is private to `feature_dependency_dag.ts` and carrier shape; ABG frontier compilation consumes DAG projection/declarations with parent branch refs and live frontier records `graphTruthSource: "sdlc_feature_dependency_dag"`; no external caller uses topological order as scheduler truth; `test:t174`, `test:t197` passed | lawful projection; ABG frontier owns scheduling | done |
 | E5 | `rc_qualification.ts`, non-exported sandbox paths | lawful self-qualification / fixtures | keep; claude rejected re-flag | done |
-| E6 | nonlocal product gap routing from review-grade / consequence fold | data_mapper live 20260610T231659499Z proved ABG control was lawful, but component-code review kept same-edge retrying when F_D found product semantic gaps whose lawful repair surface may be upstream or outside the current traversal | **missing primitive** — add typed triage and forced re-entry routing: F_D must be able to classify a gap as `current_edge_repair`, `upstream_reentry`, `downstream_deferred`, or `external_blocked`; when it selects `upstream_reentry`, the result must name the lawful repair graph/vector/asset and ABG must receive a yield/gap_stop basis for that re-entry instead of another current-edge retry | open |
+| E6 | nonlocal product gap routing from review-grade / consequence fold | **done 2026-06-11** — review-grade findings may carry `SdlcRepairSurfaceTriageCarrier` values with `current_edge_repair`, `upstream_reentry`, `downstream_deferred`, or `external_blocked` disposition; upstream re-entry rows name the lawful repair graph function, vector, and asset refs; installed consequence builds typed residual-pressure carriers and derives `nonlocal_repair_surface_admitted_upstream_reentry` yield basis for ABG handoff instead of same-edge retry; downstream-deferred rows are excluded from selected same-edge residual pressure; `test:t188`, `test:t197` passed | typed repair-surface triage plus ABG-owned yield/re-entry basis | done |
 
 #### E6 Non-Convergence Interpretation
 
@@ -490,11 +491,12 @@ must remain separate in later implementation work.
    therefore `blocked/gap_stop` after same-edge attempts, not continued
    convergence through an upstream repair path.
 
-Required future behavior: product incompleteness remains an `F_D` finding, but
-`F_D` consequence must be able to say whether the gap is same-edge repairable,
+Implemented behavior: product incompleteness remains an `F_D` finding, but
+`F_D` consequence can now say whether the gap is same-edge repairable,
 upstream-reentry repairable, downstream-deferred, or externally blocked. When
-the gap is upstream-reentry repairable, ABG must own the re-entry/yield route;
-SDLC must not recreate that route as a local installed loop.
+the gap is upstream-reentry repairable, SDLC emits a typed yield basis naming
+the repair graph/vector/asset refs and hands that basis to ABG; SDLC does not
+recreate the route as a local installed loop.
 
 ---
 
@@ -505,9 +507,9 @@ the supersession hygiene close.
 
 | id | source | transferred pressure | disposition | proof required | status |
 | --- | --- | --- | --- | --- | --- |
-| P1 | T-184 H-060 generated-asset production-path closure | generated-asset closure must require selected `evaluate.C` evidence and selected composition identity in all production paths, not only constructors | prove production closure cannot bypass selected F_P review through legacy writers, deterministic postflight, workspace file presence, or raw worker reports | source negative test plus generated-asset production-path proof | open |
+| P1 | T-184 H-060 generated-asset production-path closure | generated-asset closure must require selected `evaluate.C` evidence and selected composition identity in all production paths, not only constructors | **done 2026-06-11** — worker reports are admitted only with same-archive `fp_evaluate_result.json` as `authoritativeStageResultRef`; postflight rereads the sibling handoff/report pair; review-grade assessment remains required on generated-asset paths; requirement closure keeps `selectedBy: "abg_selected_edge"` and generated-asset contract satisfaction; `test:t197` passed | source negative guard plus generated-asset production-path proof | done |
 | P2 | T-184 H-140 data-mapper clean live gate | data-mapper breadth proof must close or block lawfully with PTY/process finalization and graph-owned execution evidence | closed by completed T-198 after B1/H1/A-row boundary cleanup and ABI 4.0.0-rc.14 consumption | data-mapper live archive `build_tenants/typescript/test_env/test_runs/full_external_data_mapper_sandbox/20260610T202608490Z_pid46762`; terminal reason `abg_reported_converged`; final `sdlc_worker_execution_evidence`; `npm run test:semantic` 969/969 | done |
-| P3 | T-184 H-240 stale proof fixture hygiene | semantic tests must not keep deleted handoff/fenced-carrier/legacy writer surfaces alive | keep focused proof green and sweep semantic fixtures when they preserve deleted surfaces | semantic proof plus source grep for old imports/fenced alias acceptance | partial |
+| P3 | T-184 H-240 stale proof fixture hygiene | semantic tests must not keep deleted handoff/fenced-carrier/legacy writer surfaces alive | **done 2026-06-11** — component-depth admission now accepts whole-file JSON or exact selected target-carrier envelopes only; Markdown-fenced component-depth carriers fail closed; transform prompt policy requires whole-file JSON `component_depth_register`; stale admits-fenced tests were converted to rejection guards; `test_t113`, `test_t171`, `test_t066`, `test:t197` passed | semantic proof plus source grep for old imports/fenced alias acceptance | done |
 
 ---
 
@@ -539,13 +541,13 @@ Full list: claude GAP § "Rejected / Lawful-On-Inspection" (17 items).
 | REQ-F-RUNTIME-001 ABG owns runtime facts | production runtime-event authorship flows through ABG/ABI routes; only B-068 proof-fixture constructors remain excluded by IACS | **pass for A1/A4 production authorship** | A1 done; A4 done |
 | REQ-F-RUNTIME-002 no shadow runtime | convergence loop + closure/consequence chain | **pass** — A5 installed-status leak fixed; first-class transition/ref consumption is done through ABI 4.0.0-rc.7; A2 product path no longer runs a local layered loop, and the legacy helper/export plus loop carrier are removed | A5 done; A2 product path and helper retirement done |
 | REQ-F-RUNTIME-005 ABG owns frontier | SDLC compiles DAG/payload candidates and calls ABG evented saga frontier with literal authority/control carrier admission | **pass** | A3 done |
-| REQ-F-ODDSDLC-011 AC-3 tenant stack not generic law | H1 target filename fixed; `/src` append and path regex rows remain | partial | H1 done; D1, D5 open |
-| REQ-F-ODDSDLC-017 AC-2 declared validator evidence | B4b review-grade command disjuncts removed; H5/H7 prompt-pressure npm grammar removed; remaining tenant command grammar is H6 repair-reentry and other H/D rows | partial | B4b, H5, H7 done; H6 open |
-| REQ-F-ODDSDLC-032 domain identity | H2 named analysis profile enum removed; CDME components as default gate remains probe-only H3 scope | partial | H2 done; H3 open |
+| REQ-F-ODDSDLC-011 AC-3 tenant stack not generic law | H1 target filename fixed; D1 path classifier deleted; D4-D6 target identity now flows through tenant-stack role/layout declarations instead of path/name defaults | **pass for known D/H rows** | H1, D1, D4-D6 done |
+| REQ-F-ODDSDLC-017 AC-2 declared validator evidence | B4b review-grade command disjuncts removed; H5/H7 prompt-pressure npm grammar removed; H6 repair-reentry diagnostic phrases removed | **pass for known R4 rows** | B4b, H5, H6, H7 done |
+| REQ-F-ODDSDLC-032 domain identity | H2 named analysis profile enum removed; H3/H4 enterprise-core fixture is contained as B-068-only proof code and no longer exposes CDME/default-gate vocabulary through public defaults | **pass for known H rows** | H2, H3, H4 done |
 | REQ-F-ODDSDLC-046 AC-4 imported authority | H1 target filename no longer bypasses imported-sources; generic requirement surfaces remain | **pass** | H1 done |
-| REQ-F-ODDSDLC-082 evaluator-selected depth | deterministic method pick | fail | D2; D3 narrowed |
+| REQ-F-ODDSDLC-082 evaluator-selected depth | traversal-method selection now consumes admitted selected-method carriers in staged authority/postflight paths; public-start narrowed route uses capability/overlay evidence and no dependency-method pick | **pass** | D2, D3 done |
 | REQ-F-ODDSDLC-063..068 edge assurance | matrix + kernels | pass | — |
-| REQ-F-ODDSDLC-077 execution evidence | graph-bound lite live | pass (stage debt) | E1 |
+| REQ-F-ODDSDLC-077 execution evidence | graph-bound lite live; installed shard command execution is bound to manifest/admitted test-execution shards | **pass** | E1 done |
 | REQ-F-ODDSVC-002 transport | embedded; lawful now, debt long-term | debt | C1a |
 | REQ-F-ODDSDLC-051/052/053 worker transport | codex/claude routing | pass | rejected list |
 
@@ -614,16 +616,17 @@ pin the current T-164 three-edge/residual-pressure proof before A5 edits
 
 ### Wave 4 — Ecosystem + traversal hygiene (vertical)
 
-1. D1–D3 (narrowed), D4–D6
+1. D1–D6 done 2026-06-11
 
 ### Wave 5 — Target-identity hygiene (horizontal; claude R1–R7)
 
 1. **H1 / R1** — eliminate `mapper_requirements.md` from framework law (highest horizontal priority)
-2. **H3 / R3** — current reachability is probe-only; contain or relocate as a
-   B-068 fixture, and keep production default gates free of CDME names
+2. **H3/H4 / R3** — done 2026-06-11; B-068 enterprise-core inventory and
+   scripted iteration remain direct-import proof fixtures with neutral probe
+   names and no public default export
 3. **H2 / R2** — done 2026-06-09; analysis profile space is open and capability-driven
-4. **H5/H7 / R4** — done 2026-06-09; H6 remains for repair-reentry diagnostic needles
-5. **H8–H11 / R6–R7** — low-priority de-branding and alias cleanup
+4. **H5/H6/H7 / R4** — done; repair-reentry diagnostic needles no longer encode Scala/SBT phrases
+5. **H8–H12 / R6–R7** — done 2026-06-11; de-branding, alias cleanup, and heading-token cleanup complete
 
 **Change class:** `realization_refactor` — generic mechanisms already exist.
 
@@ -633,8 +636,7 @@ pin the current T-164 three-edge/residual-pressure proof before A5 edits
 
 1. **B1** — unwired ABG conformance gate (direct payoff of T-152/T-153)
 2. **H1** — `mapper_requirements.md` lineage/ingress recurrence (highest horizontal)
-3. **H6, D1, D4–D5** — remaining horizontal + ecosystem hygiene
-4. **D2–D3, C1a–C1b, H3–H12, P1/P3** — design-locked, probe-only, proof-residual, or low-severity
+3. **No open remediation rows remain** — P3, E6, and W-600 closed on 2026-06-11
 
 ---
 
@@ -684,7 +686,7 @@ addendum `T-197 Owner Partition And Decommission Register`.
 | W-010 | Publish IACS (dual-axis) | `ODD_SDLC_TYPESCRIPT_STAGED_COMPUTE_BOUNDARY.md` § T-197 IACS; `test:t197` design guard | done |
 | W-020 | Publish structural carrier diagram | `ODD_SDLC_TYPESCRIPT_STAGED_COMPUTE_BOUNDARY.md` § Structural Carrier Diagram; `test:t197` design guard | done |
 | W-030 | Publish reference-to-target for all ledger rows | `ODD_SDLC_TYPESCRIPT_STAGED_COMPUTE_BOUNDARY.md` § Reference-To-Target Derivation plus Decommission Register; `test:t197` design guard | done |
-| W-040 | Close transferred T-184 P1-P3 proof residuals | P1/P3 terminal here; P2 closed by completed T-198 data-mapper live breadth proof | open |
+| W-040 | Close transferred T-184 P1-P3 proof residuals | **done 2026-06-11** — P1 done by selected evaluate.C/generated-asset production-path guard; P2 closed by completed T-198 data-mapper live breadth proof; P3 done by whole-file JSON component-depth admission and fenced-carrier rejection proof; `test_t113`, `test_t171`, `test_t066`, `test:t197` passed | done |
 | W-050 | **Wave 0: B1 product GTL gate** | `test:t194` 2/2; `test:t197` 18/18; `test:t059` 10/10 installed-package proof; `build:semantic` runs `preflight:gtl` over the live production inventory and rejects missing target-carrier rows | done |
 | W-100 | Wave 1 design lock (A-rows) | A1-A5 statuses moved to `design_locked`; target owner dispositions are in staged-compute design addendum | done |
 | W-105 | Wave 1 pre-realization gate | staged-compute design § W-105 Construct-Site Sufficiency Inventory; ABG T-154 filed and completed for explicit resume cursor, graph-span reentry, and traversal transition-ref consumer routes; existing ABG runner routes identified for deterministic conformance F_D advance and F_D audit outcomes; construct-site source guard classifies every `construct*Event(...)` call under `code/src`, including excluded B-068 proof-fixture sites; `npm run test:t164` passed 22/22 edge-contract + 1/1 Rust-service sandbox on 2026-06-09 | done |
@@ -692,11 +694,11 @@ addendum `T-197 Owner Partition And Decommission Register`.
 | W-115 | A2 command/control hard break | Product command/control handoff law; `spec_method/entry.ts` no longer imports/calls `executeInstalledOperatorStartWithReentry(...)`; installed instructions route layered convergence to ABG command binding; `test:t197` A2 guard | done |
 | W-116 | Retire or rehome legacy local re-entry helper | deleted `executeInstalledOperatorStartWithReentry(...)`, removed loop carrier/type exports, removed `installedReentry` runtime-policy controls, migrated direct tests to one-boundary `executeInstalledOperatorStart(...)`, and extended `test:t197` guard | done |
 | W-200 | Wave 2 B2-B3 plus B4b residual | **done 2026-06-10** — B4b command-string OR-clauses removed from review-grade routing; B2 component-depth register is proven as a SDLC target-carrier read model over GTL contract refs; B3 prompt assets are proven as ABI `AssetSurface`/`Node` rows plus SDLC prompt policy, with no local `AssetSurface` law | done |
-| W-300 | Wave 3 C1a/C1b | B-004 link; capability asset | open |
-| W-400 | Wave 4 D-rows | source tests | open |
-| W-500 | Wave 5 H-rows (R1–R7) | H1 done by `test:t197` H1 grep/classifier proof; H2 done by `test:t161` capability-driven analysis profile proof and `test:t197` source guard; H5/H7 done by neutral prompt-pressure policy and review-prompt source guards; remaining H3/H4/H6/H8-H12 open | in_progress |
-| W-510 | Register nonlocal repair-surface yield rule | E6 added from data_mapper live archive `build_tenants/typescript/test_env/test_runs/full_external_data_mapper_sandbox/20260610T231659499Z_pid95502`; context clarified that immediate non-convergence was product semantic incompleteness while the broader ABG/GTL gap is missing typed upstream re-entry/yield routing; no runtime change in this slice | done |
-| W-600 | Closure post; refresh both GAP comments | all rows terminal | open |
+| W-300 | Wave 3 C1a/C1b | **done 2026-06-11** — B-004 linked for future odd_service promotion; transport guarded as thin backend with no session/worker registry growth; Claude argv grammar extracted into declared worker capability argv profile; `test_b070`, `test_t171`, `test:t197` passed | done |
+| W-400 | Wave 4 D-rows | **done 2026-06-11** — D1 and D4-D6 done by tenant-stack role/layout authority cleanup plus `test:t066`, `test:t143`, `test:t174`, `test:t197`; D2/D3 done by selected-method carrier admission plus public-start evidence-route guard; `test:t172`, `test:t174`, `test:t197` passed | done |
+| W-500 | Wave 5 H-rows (R1–R7) | **done 2026-06-11** — H1 done by `test:t197` H1 grep/classifier proof; H2 done by `test:t161` capability-driven analysis profile proof and `test:t197` source guard; H3/H4 contained as direct-import B-068 probe fixtures with neutral names and no public default export; H5/H7 done by neutral prompt-pressure policy and review-prompt source guards; H6 done by neutral repair-reentry evidence needles; H8-H12 done by neutral stage/alias/example/heading cleanup; `test_b068`, `test:t197` passed | done |
+| W-510 | Register nonlocal repair-surface yield rule | **done 2026-06-11** — E6 primitive implemented after data_mapper live archive `build_tenants/typescript/test_env/test_runs/full_external_data_mapper_sandbox/20260610T231659499Z_pid95502`; component product incompleteness remains an F_D finding, while nonlocal repair-surface rows now produce typed upstream re-entry/yield basis for ABG instead of default same-edge retry; `test:t188`, `test:t197` passed | done |
+| W-600 | Closure post; refresh both GAP comments | **done 2026-06-11** — closure post `.ai-workspace/comments/codex/20260611T121928Z_CLOSURE_T-197-product-boundary-reconciliation.md` published; grok and claude origin GAP posts refreshed with terminal ledger state; deterministic focused proof and semantic build passed | done |
 
 ---
 

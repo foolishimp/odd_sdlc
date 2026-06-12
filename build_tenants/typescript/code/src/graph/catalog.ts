@@ -65,6 +65,8 @@ export const FG_PREPARE_TEST_EXECUTION_SURFACE =
   "prepare_test_execution_surface" as const;
 export const FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE =
   "derive_test_execution_result_surface" as const;
+export const FG_BOOTSTRAP_SDLC_ENTRY =
+  "Fg_bootstrap_sdlc_entry" as const;
 
 export const BOOTSTRAP_REQUIREMENTS_EXECUTIVE_STEPS = Object.freeze([
   "derive_intent_surface",
@@ -95,6 +97,17 @@ export const FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE_STEPS = Object.freeze([
   FG_PREPARE_TEST_EXECUTION_SURFACE,
   FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
 ] as const);
+
+export const OPTIMISING_FUNCTION_CATALOG = Object.freeze([
+  entry({
+    name: FG_BOOTSTRAP_SDLC_ENTRY,
+    intent: "Admit type.unstructured workspace/source pressure into a typed SDLC entry node, proportionality report, or explicit generic F_P fallback before public start dispatch.",
+    inputs: ["type.unstructured"],
+    outputs: ["sdlc_bootstrap_traversal_outcome"],
+    workCategoryGovernanceCategory: "requirements_build",
+    graphTrackPublication: "overlay_only"
+  })
+]);
 
 function entry(input: {
   readonly name: string;
@@ -477,6 +490,7 @@ export const LITE_FUNCTION_CATALOG = Object.freeze([
 ]);
 
 export const SDLC_FUNCTION_CATALOG = Object.freeze([
+  ...OPTIMISING_FUNCTION_CATALOG,
   ...BOOTSTRAP_RELEASE_FUNCTION_CATALOG,
   ...LITE_FUNCTION_CATALOG,
   ...OPERATIONAL_FUNCTION_CATALOG,

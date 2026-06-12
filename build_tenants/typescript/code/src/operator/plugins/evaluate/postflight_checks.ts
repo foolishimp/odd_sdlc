@@ -40,6 +40,7 @@ import {
   admitImplementationDesignRegisterForManifest,
   admitImplementationDesignRegisterForRuntimeEvaluation
 } from "../evaluate/design_depth_register.js";import {
+  admitSdlcDependencyTraversalSelectedMethodCarrier,
   deriveSdlcStagedImplementationTopologyAuthority,
   deriveSdlcStagedTestTopologyAuthority,
   selectSdlcDependencyMapTraversal
@@ -1695,6 +1696,18 @@ function stagedSurfaceEvidenceRefs(input: {
   );
 }
 
+function stagedParallelTraversalSelectedMethodCarrier(
+  evidenceRefs: readonly string[]
+) {
+  return admitSdlcDependencyTraversalSelectedMethodCarrier({
+    selectedMethod: "parallel",
+    evidenceRefs: Object.freeze([
+      "selection-policy://odd-sdlc/staged-topology/parallel",
+      ...evidenceRefs
+    ])
+  });
+}
+
 
 
 function manifestCapabilityValue(
@@ -2011,6 +2024,13 @@ export function evaluateStagedConstructionAuthority(input: {
     const traversal = selectSdlcDependencyMapTraversal({
       selectionRef: "selection://odd-sdlc/component-code/staged-topology",
       dependencyMap: authority.dependencyMap,
+      selectedMethodCarrier: stagedParallelTraversalSelectedMethodCarrier(
+        Object.freeze([
+          ...evidenceRefs,
+          "surface://implementation-decomposition-summary",
+          "surface://module-dependency-map"
+        ])
+      ),
       policy: "parallel_when_partitioned",
       basisRefs: evidenceRefs
     });
@@ -2074,6 +2094,13 @@ export function evaluateStagedConstructionAuthority(input: {
     const traversal = selectSdlcDependencyMapTraversal({
       selectionRef: "selection://odd-sdlc/component-test/staged-topology",
       dependencyMap: authority.dependencyMap,
+      selectedMethodCarrier: stagedParallelTraversalSelectedMethodCarrier(
+        Object.freeze([
+          ...evidenceRefs,
+          "surface://test-decomposition-summary",
+          "surface://test-dependency-map"
+        ])
+      ),
       policy: "parallel_when_partitioned",
       basisRefs: evidenceRefs
     });

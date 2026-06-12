@@ -4,7 +4,7 @@ title: Define optimising overlay for landscape-conditioned F_D specialization
 type: feature
 ticket_category: implementation_migration
 status: active
-proof_status: phased_implementation_bootstrap_preimplementation_review_gate_active
+proof_status: p1_bootstrap_prestart_contract_implemented_p2_p3_pending
 goal: implement-phased-optimising-overlays-that-specialize-generic-sdlc-work-without-rival-runtime-truth
 build_tenant: typescript
 owner: odd_sdlc
@@ -26,7 +26,7 @@ re_entry_point: design
 priority: high
 triaged_at: 2026-05-14
 created_at: 2026-05-14
-updated_at: 2026-06-07
+updated_at: 2026-06-11
 governance_scope: STDO Method
 source_ticket: .ai-workspace/tickets/backlog/T-162-first-class-ticket-workflow-for-governed-change.md
 source_documents:
@@ -834,11 +834,36 @@ surfaces, and closure conditions.
 | id | phase | task | closure proof | status |
 | --- | --- | --- | --- | --- |
 | P1-000 | Bootstrap entry design | Document proposed graph changes, graph functions, revised behavior, and conformance matrix. | ticket names current graph, target graph, catalog deltas, implementation moves, behavior changes, and conformance authorities | complete |
-| P1-001 | Pre-implementation review gate | Present file-level implementation slices before code begins and confirm each slice specializes the base typed traversal contract. | review pack covers carriers, graph publication, public-start consumption, projections, tests, non-changes, and base traversal checklist | pending |
-| P1-010 | Bootstrap entry traversal | Define `SdlcBootstrapTraversalOutcome`, `TypedSdlcEntryNode`, `SdlcBootstrapEntryNonAdmission`, `SdlcBootstrapProportionalityReport`, and admission rules. | carriers reject missing selected/fallback refs, contradictory landscape facts, non-admitted applicability envelopes, and inadmissible rejected-entry fallbacks | pending |
-| P1-020 | Bootstrap entry traversal | Wire public start to consume the admitted traversal outcome when selecting the initial overlay/graph function or fallback. | tests prove selected overlay binding carries outcome, entry/report or non-admission refs, and stale replay fails closed | pending |
-| P1-030 | Bootstrap/proportionality | Prove minimum lawful path selection. | hello-world-class workspace selects the smoke minimum; domain-product workspace falls back to generic baseline | pending |
-| P1-040 | Bootstrap/proportionality | Preserve generic F_P fallback by admitted non-admission. | tests prove missing or contradictory facts route to generic execution overlay through `SdlcBootstrapEntryNonAdmission` or report-level optimization non-admission refs | pending |
+| P1-001 | Pre-implementation review gate | Present file-level implementation slices before code begins and confirm each slice specializes the base typed traversal contract. | review pack covers carriers, graph publication, public-start consumption, projections, tests, non-changes, and base traversal checklist | complete |
+| P1-010 | Bootstrap entry traversal | Define `SdlcBootstrapTraversalOutcome`, `TypedSdlcEntryNode`, `SdlcBootstrapEntryNonAdmission`, `SdlcBootstrapProportionalityReport`, and admission rules. | `test_t165_optimising_overlay` admits traversal outcome, optimized overlay binding, optimized edge specialization, and rejects mixed entry/non-admission outcomes | complete |
+| P1-020 | Bootstrap entry traversal | Wire public start to consume the admitted traversal outcome when selecting the initial overlay/graph function or fallback. | public-start optimization now carries `SdlcBootstrapPreStartExecutionContract`, selected outcome refs, entry/report or non-admission refs, fallback refs, and replay identity refs | complete |
+| P1-030 | Bootstrap/proportionality | Prove minimum lawful path selection. | hello-world-class workspace selects the smoke minimum through the optimized bootstrap outcome | complete |
+| P1-040 | Bootstrap/proportionality | Preserve generic F_P fallback by admitted non-admission. | domain-product workspace falls back to generic execution overlay through explicit non-admission reason refs and admitted pre-start contract | complete |
 | P2-010 | Single-node smoke | Add optimized single iterative smoke node for design/build/test. | T-132-class live run uses bootstrap/proportionality + one transform F_P + one eval F_P | pending |
 | P2-020 | Single-node smoke | Preserve deep proof at closure. | target carrier, review/eval, gain, closure, and replay artifacts remain admitted and traceable | pending |
 | P3-010 | General specialization | Generalize optimizing overlay candidates beyond smoke products. | at least one deterministic specialization admits and at least one non-admissible case falls back to generic F_P | pending |
+
+## Implementation Evidence 2026-06-11
+
+P1 is implemented for the TypeScript tenant:
+
+- `graph/catalog.ts` publishes `Fg_bootstrap_sdlc_entry`.
+- `graph/optimising_overlay.ts` defines and admits the bootstrap outcome,
+  entry node, entry non-admission, proportionality report, pre-start execution
+  contract, optimized overlay binding, and optimized edge specialization.
+- `start/public_start.ts` carries the bootstrap optimization bundle into the
+  execution contract for both optimized smoke and generic fallback paths.
+- `projection/query_domain.ts` exposes the optimising overlay as a read-only
+  projection.
+
+Validation:
+
+```bash
+npm run build:semantic
+node --test test_env/tests/test_t165_optimising_overlay.test.mjs
+```
+
+Remaining scope is P2/P3 only. This ticket stays active until the single-node
+smoke path and general deterministic specialization phases are either
+implemented here or split into successor tickets with this ticket repriced to
+P1 closure.

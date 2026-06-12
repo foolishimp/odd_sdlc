@@ -199,7 +199,7 @@ release-cut evidence for a new ABG-pinned release candidate.
 The TypeScript package dependency for ABIogenesis is release-pinned:
 
 ```text
-@abiogenesis/typescript-tenant -> file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.0.0-rc.15/abiogenesis-typescript-tenant-4.0.0-rc.15.tgz
+@abiogenesis/typescript-tenant -> file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.0.0-rc.16/abiogenesis-typescript-tenant-4.0.0-rc.16.tgz
 ```
 
 ## Design Module Review

@@ -17,6 +17,7 @@ import {
   admitSdlcEdgeEvidence,
   REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE,
   admitReviewGradeEdgeFulfillmentAssessmentFromArtifact,
+  buildPostTransformWorkerResultReport,
   constructSdlcGtlModule,
   constructSdlcProductGraphContractCatalog,
   constructSdlcTargetCarrierRegistry,
@@ -36,6 +37,7 @@ import {
   reviewGradeFindingsAreDownstreamStagePressure,
   reviewGradeReadOnlyInputMutationReasons,
   snapshotReviewGradeReadOnlyInputFiles,
+  snapshotProductMaterializationRoot,
   SDLC_EDGE_GAIN_CLOSURE_CONTRACTS,
   SDLC_OPERATOR_RUN_ARTIFACT_CATALOG,
   SDLC_PRODUCT_GRAPH_EDGE_POLICY_ROWS,
@@ -255,14 +257,16 @@ function shallowImplementationDesignRegister(manifest) {
   };
 }
 
-function componentCodeDepthTargetCarrier(manifest) {
-  const requirementIds = manifest.traversalObligationContext.obligations
-    .filter(
-      (obligation) =>
-        obligation.obligationKind === "requirement" ||
-        obligation.obligationId.startsWith("requirement:")
-    )
-    .map((obligation) => obligation.obligationId);
+function componentCodeDepthTargetCarrier(manifest, scopedRequirementIds = null) {
+  const requirementIds =
+    scopedRequirementIds ??
+    manifest.traversalObligationContext.obligations
+      .filter(
+        (obligation) =>
+          obligation.obligationKind === "requirement" ||
+          obligation.obligationId.startsWith("requirement:")
+      )
+      .map((obligation) => obligation.obligationId);
   const designRef = "asset-type://implementation_design_surface";
   return {
     kind: sdlcTargetCarrierOutputKind("component_code_surface"),
@@ -313,21 +317,69 @@ function componentCodeDepthTargetCarrier(manifest) {
   };
 }
 
-function writeComponentCodeDepthTargetCarrier(manifest) {
+function writeComponentCodeDepthTargetCarrier(manifest, scopedRequirementIds = null) {
   mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
   writeFileSync(
     manifest.outputFile,
-    [
-      "# Component code surface",
-      "",
-      "```json component_depth_register",
-      JSON.stringify(componentCodeDepthTargetCarrier(manifest), null, 2),
-      "```",
-      ""
-    ].join("\n"),
+    `${JSON.stringify(
+      componentCodeDepthTargetCarrier(manifest, scopedRequirementIds),
+      null,
+      2
+    )}\n`,
     "utf8"
   );
 }
+
+test("T-199 lite component-code projection carries out-of-scope requirements downstream", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_lite_component_code_surface",
+      "t199-lite-code-scope-carry"
+    );
+    const requirements = manifest.traversalObligationContext.obligations.filter(
+      (obligation) => obligation.obligationId.startsWith("requirement:")
+    );
+    assert(requirements.length >= 2);
+    const inScopeRequirementId = requirements[0].obligationId;
+    const outOfScopeRequirementId = requirements[1].obligationId;
+    const before = snapshotProductMaterializationRoot(
+      manifest.productMaterialization
+    );
+    writeComponentCodeDepthTargetCarrier(manifest, [inScopeRequirementId]);
+    const sourcePath = path.join(
+      manifest.productMaterialization.tenantRoot,
+      "src/app.js"
+    );
+    mkdirSync(path.dirname(sourcePath), { recursive: true });
+    writeFileSync(
+      sourcePath,
+      [
+        `// ${inScopeRequirementId}`,
+        "export function run() {",
+        "  return 'ok';",
+        "}"
+      ].join("\n") + "\n",
+      "utf8"
+    );
+
+    const report = buildPostTransformWorkerResultReport({ manifest, before });
+    const byId = new Map(
+      report.obligationAssessments.map((assessment) => [
+        assessment.obligationId,
+        assessment
+      ])
+    );
+    assert.equal(byId.get(inScopeRequirementId)?.fulfillmentStatus, "fulfilled");
+    assert.equal(byId.get(outOfScopeRequirementId)?.fulfillmentStatus, "partial");
+    assert.deepEqual(byId.get(outOfScopeRequirementId)?.blockingReasons, [
+      `requirement_carried_for_downstream_closure:${outOfScopeRequirementId.replace(/^requirement:/u, "")}`
+    ]);
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
 
 test("T-183 ticket absorbs review-grade fulfillment into the one edge ledger surface", () => {
   const ticket = readRepoFile(
@@ -1074,6 +1126,60 @@ test("T-150 derives review-grade fulfillment bindings from admitted GTL target c
   }
 });
 
+test("T-182 synthesizes missing fulfilled module review from component-depth child coverage", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_code_surface",
+      "t182-module-coverage-synthesis"
+    );
+    writeComponentCodeDepthTargetCarrier(manifest);
+
+    const base = reviewGradeAssessment(manifest);
+    const moduleObligationId = "module:app-core";
+    assert.equal(base.reviewedObligationIds.includes(moduleObligationId), true);
+    const omittedModule = {
+      ...base,
+      reviewedObligationIds: base.reviewedObligationIds.filter(
+        (obligationId) => obligationId !== moduleObligationId
+      ),
+      findings: base.findings.filter(
+        (finding) => finding.obligationId !== moduleObligationId
+      )
+    };
+    const outputFile = writeAssessment(manifest, omittedModule);
+    const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest,
+      outputFile
+    });
+
+    assert.equal(
+      admission.status,
+      "admitted",
+      admission.blockingReasons.join("\n")
+    );
+    assert.equal(
+      admission.assessment.reviewedObligationIds.includes(moduleObligationId),
+      true
+    );
+    assert.equal(
+      admission.assessment.reviewedObligationIds.length,
+      base.reviewedObligationIds.length
+    );
+    const moduleFinding = admission.assessment.findings.find(
+      (finding) => finding.obligationId === moduleObligationId
+    );
+    assert.ok(moduleFinding);
+    assert.equal(moduleFinding.fulfillmentStatus, "fulfilled");
+    assert.equal(moduleFinding.fulfillmentBinding.kind, "gtl_contract_fulfillment_binding");
+    assert.equal(moduleFinding.fulfillmentBinding.componentRef, "app");
+    assert.equal(moduleFinding.fulfillmentBinding.productTargetRef, "workspace://src/app.js");
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
 test("T-150 canonicalizes prompt-shaped review-grade bindings through admitted GTL target carrier truth", () => {
   const workspaceRoot = makeWorkspace();
   try {
@@ -1108,7 +1214,10 @@ test("T-150 canonicalizes prompt-shaped review-grade bindings through admitted G
             ? finding.obligationId
             : null,
           componentRef: "prompt-owned-component",
-          productTargetRef: "build_tenants/hello_world_javascript/src/hello.js",
+          productTargetRef:
+            finding.obligationId === "source_asset:implementation_design_surface"
+              ? null
+              : "build_tenants/hello_world_javascript/src/hello.js",
           outputSurfaceRef: "workspace://prompt-owned.md",
           functionOrEntrypointRef: finding.obligationId.startsWith("requirement:")
             ? "prompt-owned-entrypoint"
@@ -1129,6 +1238,29 @@ test("T-150 canonicalizes prompt-shaped review-grade bindings through admitted G
     );
     assert.equal(admission.blockingReasons.length, 0);
     for (const finding of admission.assessment.findings) {
+      if (finding.obligationId === "source_asset:implementation_design_surface") {
+        assert.equal(
+          finding.fulfillmentBinding.requirementRef,
+          "source_asset:implementation_design_surface"
+        );
+        assert.equal(
+          finding.fulfillmentBinding.productRequirementRef,
+          "source_asset:implementation_design_surface"
+        );
+        assert.equal(
+          finding.fulfillmentBinding.componentRef,
+          "source_asset:implementation_design_surface"
+        );
+        assert.equal(
+          finding.fulfillmentBinding.productTargetRef,
+          "authority://odd-sdlc/t182/accepted-implementation-depth"
+        );
+        assert.equal(
+          finding.fulfillmentBinding.functionOrEntrypointRef,
+          "authority://odd-sdlc/t182/accepted-implementation-depth#source-asset"
+        );
+        continue;
+      }
       assert.equal(
         declaredRequirementRefs.has(finding.fulfillmentBinding.requirementRef),
         true
@@ -2213,6 +2345,22 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
     assert.match(
       promptSource,
       /Allowed execution byproducts may remain only as byproducts/u
+    );
+    assert.match(
+      promptSource,
+      /SDLC depth is scenario\/build-test driven: UAT\/scenario authority and build\/test observations are primary behavior proof/u
+    );
+    assert.match(
+      promptSource,
+      /obligation mapping, carrier rows, lineage tags, and worker fulfilled counts are trace evidence only/u
+    );
+    assert.match(
+      promptSource,
+      /do not pass fulfillment from component_depth_register rows, manifests, or worker obligation assessments/u
+    );
+    assert.match(
+      promptSource,
+      /If source behavior is absent use semantic_not_realized; if only later test\/runtime proof is missing after source behavior is otherwise present, use wrong_stage/u
     );
 
     const installedOperatorSource = readRepoFile(

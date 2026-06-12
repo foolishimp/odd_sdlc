@@ -139,7 +139,7 @@ export type EnterpriseCoreOutcomeIterationEvent =
 export interface EnterpriseCoreOutcomeIterationArchive {
   readonly kind: "odd_sdlc_enterprise_core_outcome_iteration_sandbox_archive";
   readonly ticketId: "B-068";
-  readonly scenarioId: "data_mapper_enterprise_core_minimal";
+  readonly scenarioId: "b068_enterprise_core_minimal";
   readonly outcomeCriteria: "outcome_iteration";
   readonly successMode: EnterpriseCoreSandboxSuccessMode;
   readonly laneVerdict: EnterpriseCoreSandboxLaneVerdict;
@@ -323,7 +323,7 @@ export function constructEnterpriseCoreOutcomeBasis(): ExecutionBasis {
     startIntent: admitStartIntent({
       scope: {
         kind: "workspace",
-        workspaceRoot: "/workspace/data_mapper_enterprise_core_minimal",
+        workspaceRoot: "/workspace/b068_enterprise_core_minimal",
         moduleName: "odd_sdlc_enterprise_core_outcome_iteration"
       },
       target: {
@@ -405,7 +405,7 @@ export function constructScriptedEnterpriseCoreConstructorPlugin():
         }
         return artifact({
           attemptIndex: input.attemptIndex,
-          sourceComponents: ["TypeResolver"],
+          sourceComponents: ["ProbeParser"],
           testComponents: [],
           buildEvidence: "missing",
           testEvidence: "missing"
@@ -416,7 +416,7 @@ export function constructScriptedEnterpriseCoreConstructorPlugin():
           input.currentState === null ||
           input.currentState.attemptIndex !== 1 ||
           !input.unresolvedReasons.includes(
-            "missing_source_component:TopologicalCompiler"
+            "missing_source_component:ProbePlanner"
           ) ||
           !input.unresolvedReasons.includes("missing_governed_test_evidence")
         ) {
@@ -428,12 +428,12 @@ export function constructScriptedEnterpriseCoreConstructorPlugin():
           attemptIndex: input.attemptIndex,
           sourceComponents: Object.freeze([
             ...input.currentState.sourceComponents,
-            "TopologicalCompiler",
-            "MorphismExecutor",
-            "SynthesisEngine",
-            "RunManifestManager"
+            "ProbePlanner",
+            "ProbeRunner",
+            "ProbeSynthesizer",
+            "ProbeRunLedger"
           ]),
-          testComponents: ["TypeResolver", "TopologicalCompiler"],
+          testComponents: ["ProbeParser", "ProbePlanner"],
           buildEvidence: "missing",
           testEvidence: "missing"
         });
@@ -442,7 +442,7 @@ export function constructScriptedEnterpriseCoreConstructorPlugin():
         input.currentState === null ||
         input.currentState.attemptIndex !== 2 ||
         !input.unresolvedReasons.includes(
-          "missing_behavioral_test:MorphismExecutor"
+          "missing_behavioral_test:ProbeRunner"
         ) ||
         !input.unresolvedReasons.includes("missing_governed_build_evidence") ||
         !input.unresolvedReasons.includes("missing_governed_test_evidence")
@@ -712,7 +712,7 @@ export function runEnterpriseCoreOutcomeIterationSandbox(input: {
   return Object.freeze({
     kind: "odd_sdlc_enterprise_core_outcome_iteration_sandbox_archive",
     ticketId: "B-068",
-    scenarioId: "data_mapper_enterprise_core_minimal",
+    scenarioId: "b068_enterprise_core_minimal",
     outcomeCriteria: "outcome_iteration",
     successMode,
     laneVerdict,

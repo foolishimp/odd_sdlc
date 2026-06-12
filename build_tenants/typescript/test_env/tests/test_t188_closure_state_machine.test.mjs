@@ -12,6 +12,7 @@ import {
   SDLC_BLOCKING_REASON_REENTRY_POINTS,
   constructOddSdlcAbiogenesisExecutionBasis,
   deriveSdlcClosureStateTransition,
+  makeSdlcClosureResidualPressureCarrier,
   makeSdlcBlockingReason,
   sdlcClosureStateBucketForLawfulReentryPoint,
   syntheticGapDossierFromClosureRefs
@@ -424,6 +425,135 @@ test("T-188 admitted yield progress outranks ABG terminal retry fallback", () =>
   assert.equal(
     transition.yieldResumeBasis?.admittedProgressRefs[0],
     "workspace://src/hello.js"
+  );
+});
+
+test("T-197 typed residual pressure carrier routes opaque closure refs", () => {
+  const pressureRef = "pressure://odd-sdlc/t197/opaque-residual/a1";
+  const carrier = makeSdlcClosureResidualPressureCarrier({
+    pressureRef,
+    lawfulReentryPoint: "repair_worker_output",
+    message: "Opaque residual pressure requires repair.",
+    detail: "opaque repair pressure",
+    evidenceRefs: ["evidence://odd-sdlc/t197/opaque-residual"]
+  });
+  const transition = transitionFor({
+    residualPressureRefs: [pressureRef],
+    residualPressureCarriers: [carrier]
+  });
+
+  assert.equal(transition.disposition, "repair");
+  assert.equal(transition.explanationCode, "residual_repair");
+  assert(transition.repairReasonRefs.includes(pressureRef));
+
+  const dossier = syntheticGapDossierFromClosureRefs({
+    manifest: {
+      archiveRoot: "/tmp/t197-typed-residual-pressure",
+      edgeName: "derive_component_code_surface",
+      graphFunctionName: "derive_component_code_surface",
+      targetAssetType: "component_code_surface",
+      vectorIndex: 0
+    },
+    decisionRef: "closure-decision://odd-sdlc/t197/typed-residual-pressure",
+    reasonRefs: [pressureRef],
+    sourceProjectionRef: "source-projection://odd-sdlc/t197/typed-residual-pressure",
+    residualPressureCarriers: [carrier]
+  });
+
+  assert.notEqual(dossier, null);
+  assert.equal(dossier.reasons.length, 1);
+  assert.equal(dossier.reasons[0].reason, "opaque repair pressure");
+  assert.equal(
+    dossier.reasons[0].blockingReason.lawfulReentryPoint,
+    "repair_worker_output"
+  );
+  assert.equal(
+    dossier.reasons[0].blockingReason.detail,
+    "opaque repair pressure"
+  );
+});
+
+test("T-197 upstream repair-surface triage yields through ABG handoff", () => {
+  const pressureRef = "pressure://odd-sdlc/t197/upstream-repair-surface/a1";
+  const repairGraphFunctionRef =
+    "graph-function://odd-sdlc/repair/upstream-authority";
+  const repairGraphVectorRef =
+    "graph-vector://odd-sdlc/repair/upstream-authority/0";
+  const repairAssetRef =
+    "asset://odd-sdlc/repair/upstream-authority/design-surface";
+  const carrier = makeSdlcClosureResidualPressureCarrier({
+    pressureRef,
+    lawfulReentryPoint: "escalate_to_fp",
+    message: "Opaque review-grade pressure names upstream repair.",
+    detail: "review grade upstream re-entry",
+    evidenceRefs: ["evidence://odd-sdlc/t197/upstream-review-grade"],
+    repairSurfaceTriage: {
+      kind: "sdlc_repair_surface_triage",
+      disposition: "upstream_reentry",
+      repairGraphFunctionRef,
+      repairGraphVectorRef,
+      repairAssetRef,
+      evidenceRefs: [
+        "evidence://odd-sdlc/t197/upstream-review-grade",
+        repairGraphFunctionRef,
+        repairGraphVectorRef,
+        repairAssetRef
+      ],
+      rationale: "The current edge cannot repair the upstream design gap."
+    }
+  });
+  const transition = transitionFor({
+    residualPressureRefs: [pressureRef],
+    residualPressureCarriers: [carrier],
+    yieldResumeBasis: {
+      yieldKind: "nonlocal_repair_surface_admitted_upstream_reentry",
+      resumeBasisRef:
+        "resume-basis://odd-sdlc/t197/upstream-repair-surface",
+      currentEdgeRef: "edge://odd-sdlc/t197/current",
+      admittedProgressRefs: [
+        pressureRef,
+        repairGraphFunctionRef,
+        repairGraphVectorRef,
+        repairAssetRef
+      ],
+      livenessProjectionRef: null,
+      resumePolicyRef:
+        "resume-policy://odd-sdlc/nonlocal-repair-surface/upstream-reentry"
+    },
+    edgeAssuranceDisposition: "retry"
+  });
+
+  assert.equal(transition.disposition, "yield");
+  assert.equal(transition.explanationCode, "yield_progress");
+  assert.equal(transition.abgIterationOutcomeProjection.outcome.kind, "suspend");
+  assert.equal(transition.abgIterationOutcomeProjection.outcome.reason, "handoff");
+  assert.deepStrictEqual(transition.retryReasonRefs, []);
+  assert(transition.reenterReasonRefs.includes(pressureRef));
+  assert(transition.evidenceRefs.includes(repairGraphVectorRef));
+
+  const dossier = syntheticGapDossierFromClosureRefs({
+    manifest: {
+      archiveRoot: "/tmp/t197-upstream-repair-surface",
+      edgeName: "derive_component_code_surface",
+      graphFunctionName: "derive_component_code_surface",
+      targetAssetType: "component_code_surface",
+      vectorIndex: 0
+    },
+    decisionRef: "closure-decision://odd-sdlc/t197/upstream-repair-surface",
+    reasonRefs: [pressureRef],
+    sourceProjectionRef: "source-projection://odd-sdlc/t197/upstream-repair-surface",
+    residualPressureCarriers: [carrier]
+  });
+
+  assert.notEqual(dossier, null);
+  assert.equal(
+    dossier.reasons[0].blockingReason.lawfulReentryPoint,
+    "escalate_to_fp"
+  );
+  assert.equal(dossier.nextLawfulActions[0], "escalate_to_fp");
+  assert.match(
+    dossier.reasons[0].blockingReason.detail,
+    /review grade upstream re-entry/u
   );
 });
 

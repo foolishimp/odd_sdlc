@@ -83,6 +83,7 @@ export const t132HelloWorldJsScenario = Object.freeze({
 
 export function t132HelloWorldJsLiveScenario({
   worker,
+  maxAdvances = 8,
   startUntil = "converged"
 }) {
   if (typeof worker !== "string" || worker.length === 0) {
@@ -141,8 +142,10 @@ export function t132HelloWorldJsLiveScenario({
     liveWorker: worker,
     startTarget: "next",
     startUntil,
-    maxAdvances: 1,
+    maxAdvances,
+    continueOnEdgeConverge: true,
     stopAfterGraphClose: true,
-    stopAfterWorkspaceFilesExist: false
+    stopAfterWorkspaceFilesExist: false,
+    stopAfterRequiredHandoffEdges: true
   });
 }

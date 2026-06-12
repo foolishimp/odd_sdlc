@@ -3,6 +3,16 @@ export type OddSdlcDefaultTraversalStrategy =
   | "steel_thread"
   | "targeted_repair";
 
+export type OddSdlcTraversalSameEdgeUntil =
+  | "foldback_closed"
+  | "retry_budget_exhausted";
+
+export interface OddSdlcTraversalContinuationConfig {
+  readonly sameEdgeUntil: OddSdlcTraversalSameEdgeUntil;
+  readonly maxAttemptsWithoutNewSignal: number;
+  readonly maxTotalAttempts: number;
+}
+
 export interface OddSdlcTraversalStrategyPlanConfig {
   readonly kind: "sdlc_traversal_strategy_plan";
   readonly planVersion: "ts-strategy-plan-v1";
@@ -10,6 +20,9 @@ export interface OddSdlcTraversalStrategyPlanConfig {
   readonly defaultStrategy: OddSdlcDefaultTraversalStrategy;
   readonly edgeStrategies: Readonly<Record<string, OddSdlcDefaultTraversalStrategy>>;
   readonly edgeScopeRefs?: Readonly<Record<string, readonly string[]>>;
+  readonly edgeContinuationConfigs?: Readonly<
+    Record<string, OddSdlcTraversalContinuationConfig>
+  >;
 }
 
 export const ODD_SDLC_TRAVERSAL_STRATEGY_PROFILE_VALUES = Object.freeze([
@@ -98,6 +111,22 @@ const STEEL_THREAD_AFTER_REQUIREMENTS_EDGE_NAMES = Object.freeze([
   "release_surface"
 ] as const);
 
+const DEEP_FULL_BREADTH_CONTINUATION_CONFIG =
+  Object.freeze({
+    sameEdgeUntil: "foldback_closed" as const,
+    maxAttemptsWithoutNewSignal: 8,
+    maxTotalAttempts: 64
+  }) satisfies OddSdlcTraversalContinuationConfig;
+
+const ODD_SDLC_DEFAULT_TRAVERSAL_CONTINUATION_CONFIGS: Readonly<
+  Record<string, OddSdlcTraversalContinuationConfig>
+> = Object.freeze({
+  derive_component_code_surface: DEEP_FULL_BREADTH_CONTINUATION_CONFIG,
+  derive_lite_component_code_surface: DEEP_FULL_BREADTH_CONTINUATION_CONFIG,
+  Fg_materialize_declared_product_asset:
+    DEEP_FULL_BREADTH_CONTINUATION_CONFIG
+});
+
 function steelThreadAfterRequirementsStrategies(): Readonly<
   Record<string, OddSdlcDefaultTraversalStrategy>
 > {
@@ -132,7 +161,8 @@ export const ODD_SDLC_DEFAULT_TRAVERSAL_STRATEGY_PLAN = Object.freeze({
   edgeStrategies: ODD_SDLC_DEFAULT_TRAVERSAL_EDGE_STRATEGIES,
   edgeScopeRefs: deriveDefaultEdgeScopeRefs({
     edgeStrategies: ODD_SDLC_DEFAULT_TRAVERSAL_EDGE_STRATEGIES
-  })
+  }),
+  edgeContinuationConfigs: ODD_SDLC_DEFAULT_TRAVERSAL_CONTINUATION_CONFIGS
 }) satisfies OddSdlcTraversalStrategyPlanConfig;
 
 const ODD_SDLC_STEEL_THREAD_AFTER_REQUIREMENTS_EDGE_STRATEGIES =
@@ -148,7 +178,8 @@ export const ODD_SDLC_STEEL_THREAD_AFTER_REQUIREMENTS_TRAVERSAL_STRATEGY_PLAN =
     edgeStrategies: ODD_SDLC_STEEL_THREAD_AFTER_REQUIREMENTS_EDGE_STRATEGIES,
     edgeScopeRefs: deriveDefaultEdgeScopeRefs({
       edgeStrategies: ODD_SDLC_STEEL_THREAD_AFTER_REQUIREMENTS_EDGE_STRATEGIES
-    })
+    }),
+    edgeContinuationConfigs: ODD_SDLC_DEFAULT_TRAVERSAL_CONTINUATION_CONFIGS
   }) satisfies OddSdlcTraversalStrategyPlanConfig;
 
 export function resolveOddSdlcTraversalStrategyPlan(
@@ -197,4 +228,15 @@ export function defaultSdlcTraversalScopeRefsForName(
   return Object.freeze([
     `schedule://odd_sdlc/${name}/primary`
   ]);
+}
+
+export function defaultSdlcTraversalContinuationConfigForName(
+  name: string,
+  plan: OddSdlcTraversalStrategyPlanConfig = activeOddSdlcTraversalStrategyPlan()
+): OddSdlcTraversalContinuationConfig | null {
+  const config = plan.edgeContinuationConfigs?.[name];
+  if (config === undefined) {
+    return null;
+  }
+  return Object.freeze({ ...config });
 }

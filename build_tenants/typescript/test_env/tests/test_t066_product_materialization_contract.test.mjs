@@ -3787,6 +3787,10 @@ test("T-172 tenant stack spec owns build-config targets without ecosystem handof
       (target) =>
         target.path === "build_tenants/fake_service/TopLevelTestHarness.fake"
     );
+  const testingRootTarget =
+    invocationPackage.outputContract.declaredProductTargetContracts.find(
+      (target) => target.path === "build_tenants/fake_service/test"
+    );
   const tenantStackAuthorityTargets =
     invocationPackage.productMaterializationAuthority
       .tenantStackAuthorityTargetContracts;
@@ -3800,15 +3804,21 @@ test("T-172 tenant stack spec owns build-config targets without ecosystem handof
   const testingStackAuthorityTarget = tenantStackAuthorityTargets.find(
     (target) => target.path === "build_tenants/fake_service/TestHarness.fake"
   );
+  const testingRootAuthorityTarget = tenantStackAuthorityTargets.find(
+    (target) => target.path === "build_tenants/fake_service/test"
+  );
   assert.notEqual(stackTarget, undefined);
   assert.equal(testingStackTarget, undefined);
   assert.equal(topLevelTestingStackTarget, undefined);
+  assert.equal(testingRootTarget, undefined);
   assert.notEqual(stackAuthorityTarget, undefined);
   assert.notEqual(topLevelTestingStackAuthorityTarget, undefined);
   assert.notEqual(testingStackAuthorityTarget, undefined);
+  assert.notEqual(testingRootAuthorityTarget, undefined);
   assert.equal(stackTarget.requiredRole, "build_config");
   assert.equal(testingStackAuthorityTarget.requiredRole, "build_config");
   assert.equal(topLevelTestingStackAuthorityTarget.requiredRole, "build_config");
+  assert.equal(testingRootAuthorityTarget.requiredRole, "test");
   assert.ok(stackAuthorityTarget.sourceRef.endsWith("/TECH_STACK.json"));
   assert.ok(
     topLevelTestingStackAuthorityTarget.sourceRef.endsWith("/TECH_STACK.json")
@@ -3821,7 +3831,8 @@ test("T-172 tenant stack spec owns build-config targets without ecosystem handof
     [
       "build_tenants/fake_service/Stackfile.fake",
       "build_tenants/fake_service/TestHarness.fake",
-      "build_tenants/fake_service/TopLevelTestHarness.fake"
+      "build_tenants/fake_service/TopLevelTestHarness.fake",
+      "build_tenants/fake_service/test"
     ].sort()
   );
   assert.ok(
@@ -8105,10 +8116,14 @@ test("T-159 component-depth prompts pin the top-level register envelope on first
     const invocationPackage = JSON.parse(
       readFileSync(handoffFiles.invocationPackagePath, "utf8")
     );
+    const defaultEnvelopePrefix =
+      promptCase.registerKind === "component_depth_register"
+        ? `Emit a whole-file JSON ${promptCase.registerKind} selected target-carrier envelope with `
+        : `Emit a fenced \`json ${promptCase.registerKind}\` selected target-carrier envelope with `;
     const envelopePattern =
       promptCase.envelopePattern ??
       new RegExp(
-        `Emit a fenced \`json ${promptCase.registerKind}\` selected target-carrier envelope with ` +
+        defaultEnvelopePrefix +
           String.raw`[\s\S]*` +
           `\`targetAssetType:"${promptCase.targetAssetType}"\`` +
           String.raw`[\s\S]*` +

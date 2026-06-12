@@ -23,7 +23,7 @@ updated_at: 2026-06-11
 completed_at: 2026-06-11
 governance_scope: STDO Method
 source_documents:
-  - .ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md
+  - .ai-workspace/tickets/completed/T-197-reconcile-product-boundary-and-remove-authority-leakage.md
   - .ai-workspace/tickets/completed/T-184-partition-handoff-into-compute-stage-boundary-modules.md
   - specification/PRODUCT.md
   - specification/requirements/14-odd-sdlc-installed-product-contract.md
@@ -33,7 +33,7 @@ source_documents:
   - /Users/jim/src/apps/specification_methodology/specification/standards/SPEC_METHOD.md
   - /Users/jim/src/apps/specification_methodology/specification/standards/TICKET_METHOD.md
 related_tickets:
-  - .ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md
+  - .ai-workspace/tickets/completed/T-197-reconcile-product-boundary-and-remove-authority-leakage.md
   - .ai-workspace/tickets/completed/T-184-partition-handoff-into-compute-stage-boundary-modules.md
 affected_boundary:
   - build_tenants/typescript/test_env/live/

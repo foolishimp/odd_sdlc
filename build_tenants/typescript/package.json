@@ -126,6 +126,7 @@
     "test:t164:rust-service-live": "npm run test:scenario:t164-rust-hello-service-live",
     "test:t164:data-mapper-full-capability-live": "npm run build:semantic && npm run guard:data-mapper-boundary && ODD_SDLC_TS_T164_DATA_MAPPER_FULL_CAPABILITY_LIVE=1 node --test test_env/live/test_t164_data_mapper_full_capability_live.test.mjs",
     "test:t164:data-mapper-full-capability-live:resume": "npm run build:semantic && npm run guard:data-mapper-boundary && node test_env/live/resume_t164_data_mapper_full_capability_live.mjs",
+    "test:t165": "npm run build:semantic && node --test test_env/tests/test_t165_optimising_overlay.test.mjs",
     "test:t168": "npm run build:semantic && node --test test_env/tests/test_t168_design_consumer_test_pipeline.test.mjs",
     "test:t169": "npm run build:semantic && node --test test_env/tests/test_t169_target_carrier_contracts.test.mjs",
     "test:t171:hello-world-lifecycle-live": "npm run test:scenario:t132-hello-world-js-live",
@@ -163,6 +164,8 @@
     "test:t188:data-mapper-lite-lifecycle-live": "npm run build:semantic && npm run guard:data-mapper-boundary && node test_env/live/run_t188_data_mapper_lite_lifecycle.mjs",
     "test:t194": "npm run build:semantic && node --test test_env/tests/test_t194_gtl_program_conformance.test.mjs",
     "test:t197": "npm run build:semantic && node --test test_env/tests/test_t197_product_gtl_gate.test.mjs",
+    "test:t199": "npm run build:semantic && node --test test_env/tests/test_t199_data_mapper_code_depth_resume.test.mjs",
+    "test:t199:data-mapper-code-depth-resume-live": "npm run build:semantic && npm run guard:data-mapper-boundary && node test_env/live/run_t199_data_mapper_code_depth_resume.mjs",
     "live:data-mapper-sandbox": "npm run build:semantic && npm run guard:data-mapper-boundary && node test_env/live/run_full_external_data_mapper_sandbox.mjs",
     "live:data-mapper-steel-thread-sandbox": "ODD_SDLC_TS_DATA_MAPPER_LANE_NAME=data_mapper_steel_thread_sandbox ODD_SDLC_TS_TRAVERSAL_STRATEGY_PROFILE=steel_thread_after_requirements npm run live:data-mapper-sandbox",
     "test:scenario-sandbox": "npm run build:semantic && node --test test_env/sandbox/test_scenario_sandbox.test.mjs",
@@ -188,6 +191,6 @@
     "typescript": "6.0.3"
   },
   "dependencies": {
-    "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.0.0-rc.15/abiogenesis-typescript-tenant-4.0.0-rc.15.tgz"
+    "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.0.0-rc.17/abiogenesis-typescript-tenant-4.0.0-rc.17.tgz"
   }
 }

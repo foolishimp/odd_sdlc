@@ -27,6 +27,7 @@ import {
 import type {
   SdlcPostflightGapDossier,
   SdlcPostflightGapReason,
+  SdlcRepairSurfaceTriageCarrier,
   SdlcWorkerHandoffManifest
 } from "./carriers.js";
 import type {
@@ -84,10 +85,52 @@ export interface SdlcClosureStateTransition {
   readonly explanationCode: SdlcClosureStateTransitionExplanation;
 }
 
+export interface SdlcClosureResidualPressureCarrier {
+  readonly kind: "sdlc_closure_residual_pressure";
+  readonly pressureRef: string;
+  readonly lawfulReentryPoint: SdlcBlockingReasonLawfulReentryPoint;
+  readonly reasonClass: SdlcBlockingReason["reasonClass"];
+  readonly message: string;
+  readonly detail: string;
+  readonly evidenceRefs: readonly string[];
+  readonly repairSurfaceTriage: SdlcRepairSurfaceTriageCarrier | null;
+}
+
 export interface SdlcClosureAbgRuntimeTransitionContext {
   readonly basis: ExecutionBasis;
   readonly runtimeProjection: RuntimeAggregateProjection;
   readonly vectorIndex: number;
+}
+
+export function makeSdlcClosureResidualPressureCarrier(input: {
+  readonly pressureRef: string;
+  readonly lawfulReentryPoint: SdlcBlockingReasonLawfulReentryPoint;
+  readonly reasonClass?: SdlcBlockingReason["reasonClass"] | undefined;
+  readonly message?: string | undefined;
+  readonly detail?: string | undefined;
+  readonly evidenceRefs?: readonly string[] | undefined;
+  readonly repairSurfaceTriage?: SdlcRepairSurfaceTriageCarrier | null | undefined;
+}): SdlcClosureResidualPressureCarrier {
+  const pressureRef = input.pressureRef.trim();
+  if (pressureRef.length === 0) {
+    throw new TypeError("sdlc_closure_residual_pressure.pressureRef is required");
+  }
+  return Object.freeze({
+    kind: "sdlc_closure_residual_pressure" as const,
+    pressureRef,
+    lawfulReentryPoint: input.lawfulReentryPoint,
+    reasonClass: input.reasonClass ?? "assurance",
+    message:
+      input.message ??
+      "Closure residual pressure requires typed re-entry routing.",
+    detail: input.detail ?? pressureRef,
+    evidenceRefs: uniqueSorted([
+      pressureRef,
+      ...(input.evidenceRefs ?? []),
+      ...(input.repairSurfaceTriage?.evidenceRefs ?? [])
+    ]),
+    repairSurfaceTriage: input.repairSurfaceTriage ?? null
+  });
 }
 
 export function sdlcClosureStateBucketForLawfulReentryPoint(
@@ -188,6 +231,26 @@ function refsForBucket(input: {
         : []
     )
   );
+}
+
+function residualPressureCarrierRefsForBucket(input: {
+  readonly residualPressureCarriers: readonly SdlcClosureResidualPressureCarrier[];
+  readonly bucket: SdlcClosureStateMachineBucket;
+}): readonly string[] {
+  return uniqueSorted(
+    input.residualPressureCarriers.flatMap((carrier) =>
+      sdlcClosureStateBucketForLawfulReentryPoint(carrier.lawfulReentryPoint) ===
+      input.bucket
+        ? carrier.evidenceRefs
+        : []
+    )
+  );
+}
+
+function residualPressureCarrierByRef(
+  carriers: readonly SdlcClosureResidualPressureCarrier[]
+): ReadonlyMap<string, SdlcClosureResidualPressureCarrier> {
+  return new Map(carriers.map((carrier) => [carrier.pressureRef, carrier]));
 }
 
 function transitionPolicy(
@@ -509,12 +572,21 @@ export function deriveSdlcClosureStateTransition(input: {
   readonly runRef: string;
   readonly blockingReasonCarriers: readonly SdlcBlockingReason[];
   readonly residualPressureRefs: readonly string[];
+  readonly residualPressureCarriers?:
+    | readonly SdlcClosureResidualPressureCarrier[]
+    | undefined;
   readonly abgTerminalRetryRefs: readonly string[];
   readonly structuralBlockReasonRefs: readonly string[];
   readonly postActionBlockReasonRefs: readonly string[];
   readonly yieldResumeBasis: Omit<SdlcYieldResumeBasis, "kind"> | null;
   readonly edgeAssuranceDisposition: SdlcEdgeClosureDisposition | null;
 }): SdlcClosureStateTransition {
+  const residualPressureCarriers =
+    input.residualPressureCarriers ?? Object.freeze([]);
+  const fallbackResidualPressureRefs =
+    residualPressureCarriers.length === 0
+      ? input.residualPressureRefs
+      : Object.freeze([]);
   const typedBlockReasonRefs = uniqueSorted([
     ...refsForBucket({
       runRef: input.runRef,
@@ -525,19 +597,30 @@ export function deriveSdlcClosureStateTransition(input: {
     ...input.structuralBlockReasonRefs,
     ...input.postActionBlockReasonRefs
   ]);
-  const residualTriageReasonRefs = input.residualPressureRefs.filter(
+  const residualTriageReasonRefs = fallbackResidualPressureRefs.filter(
     sdlcClosurePressureRefRequiresTriage
   );
+  const residualTypedBlockReasonRefs = residualPressureCarrierRefsForBucket({
+    residualPressureCarriers,
+    bucket: "block"
+  });
   const blockReasonRefs = uniqueSorted([
     ...typedBlockReasonRefs,
+    ...residualTypedBlockReasonRefs,
     ...residualTriageReasonRefs
   ]);
-  const repriceReasonRefs = refsForBucket({
-    runRef: input.runRef,
-    scope: "state",
-    blockingReasonCarriers: input.blockingReasonCarriers,
-    bucket: "reprice"
-  });
+  const repriceReasonRefs = uniqueSorted([
+    ...refsForBucket({
+      runRef: input.runRef,
+      scope: "state",
+      blockingReasonCarriers: input.blockingReasonCarriers,
+      bucket: "reprice"
+    }),
+    ...residualPressureCarrierRefsForBucket({
+      residualPressureCarriers,
+      bucket: "reprice"
+    })
+  ]);
 
   const typedRepairReasonRefs = refsForBucket({
     runRef: input.runRef,
@@ -545,25 +628,41 @@ export function deriveSdlcClosureStateTransition(input: {
     blockingReasonCarriers: input.blockingReasonCarriers,
     bucket: "repair"
   });
-  const residualRepairReasonRefs = input.residualPressureRefs.filter(
+  const residualRepairReasonRefs = fallbackResidualPressureRefs.filter(
     sdlcClosurePressureRefRequiresRepair
   );
   const repairReasonRefs = uniqueSorted([
     ...typedRepairReasonRefs,
+    ...residualPressureCarrierRefsForBucket({
+      residualPressureCarriers,
+      bucket: "repair"
+    }),
     ...residualRepairReasonRefs
   ]);
-  const reenterReasonRefs = refsForBucket({
-    runRef: input.runRef,
-    scope: "state",
-    blockingReasonCarriers: input.blockingReasonCarriers,
-    bucket: "re-enter"
-  });
-  const retryReasonRefs = refsForBucket({
-    runRef: input.runRef,
-    scope: "state",
-    blockingReasonCarriers: input.blockingReasonCarriers,
-    bucket: "retry"
-  });
+  const reenterReasonRefs = uniqueSorted([
+    ...refsForBucket({
+      runRef: input.runRef,
+      scope: "state",
+      blockingReasonCarriers: input.blockingReasonCarriers,
+      bucket: "re-enter"
+    }),
+    ...residualPressureCarrierRefsForBucket({
+      residualPressureCarriers,
+      bucket: "re-enter"
+    })
+  ]);
+  const retryReasonRefs = uniqueSorted([
+    ...refsForBucket({
+      runRef: input.runRef,
+      scope: "state",
+      blockingReasonCarriers: input.blockingReasonCarriers,
+      bucket: "retry"
+    }),
+    ...residualPressureCarrierRefsForBucket({
+      residualPressureCarriers,
+      bucket: "retry"
+    })
+  ]);
   const hasRedispatchReasonRefs =
     repairReasonRefs.length > 0 ||
     reenterReasonRefs.length > 0 ||
@@ -690,6 +789,10 @@ export function deriveSdlcClosureStateTransition(input: {
       disposition: "yield",
       explanationCode: "yield_progress",
       retryReasonRefs,
+      repairReasonRefs,
+      reenterReasonRefs,
+      repriceReasonRefs,
+      blockReasonRefs,
       yieldResumeBasis: input.yieldResumeBasis
     });
   }
@@ -736,7 +839,7 @@ export function deriveSdlcClosureStateTransition(input: {
       ...blockReasonRefs,
       ...(input.edgeAssuranceDisposition === "block" ? edgeAssuranceRef : []),
       ...(blockReasonRefs.length === 0 && input.edgeAssuranceDisposition !== "block"
-        ? input.residualPressureRefs
+        ? fallbackResidualPressureRefs
         : [])
     ])
   });
@@ -750,6 +853,9 @@ export function syntheticGapDossierFromClosureRefs(input: {
   readonly decisionRef: string;
   readonly reasonRefs: readonly string[];
   readonly sourceProjectionRef: string;
+  readonly residualPressureCarriers?:
+    | readonly SdlcClosureResidualPressureCarrier[]
+    | undefined;
   readonly blockingReasonCarriers?: readonly SdlcBlockingReason[];
   readonly runRef?: string;
   readonly scope?: string;
@@ -778,6 +884,9 @@ export function syntheticGapDossierFromClosureRefs(input: {
           blockingReasonCarriers: input.blockingReasonCarriers
         })
       : new Map<string, SdlcBlockingReason>();
+  const residualCarrierRefMap = residualPressureCarrierByRef(
+    input.residualPressureCarriers ?? Object.freeze([])
+  );
   const carrierReasons = input.reasonRefs.flatMap((reasonRef) => {
     const carrier = carrierRefMap.get(reasonRef);
     if (carrier === undefined) {
@@ -792,12 +901,38 @@ export function syntheticGapDossierFromClosureRefs(input: {
       })
     ];
   });
+  const residualCarrierReasons = input.reasonRefs.flatMap((reasonRef) => {
+    const carrier = residualCarrierRefMap.get(reasonRef);
+    if (carrier === undefined) {
+      return [];
+    }
+    return [
+      Object.freeze({
+        kind: "sdlc_postflight_gap_reason" as const,
+        reason: carrier.detail,
+        reasonClass: carrier.reasonClass,
+        blockingReason: makeSdlcBlockingReason({
+          code: "edge_closure_residual_pressure",
+          reasonClass: carrier.reasonClass,
+          lawfulReentryPoint: carrier.lawfulReentryPoint,
+          message: carrier.message,
+          detail: carrier.detail,
+          evidenceRefs: uniqueSorted([
+            input.decisionRef,
+            input.sourceProjectionRef,
+            ...carrier.evidenceRefs
+          ])
+        })
+      })
+    ];
+  });
   const fallbackReasonRefs =
-    carrierRefMap.size === 0
+    carrierRefMap.size === 0 && residualCarrierRefMap.size === 0
       ? input.reasonRefs
       : input.reasonRefs.filter(
           (reasonRef) =>
             !carrierRefMap.has(reasonRef) &&
+            !residualCarrierRefMap.has(reasonRef) &&
             (sdlcClosurePressureRefRequiresTriage(reasonRef) ||
               sdlcClosurePressureRefRequiresRepair(reasonRef))
         );
@@ -819,7 +954,11 @@ export function syntheticGapDossierFromClosureRefs(input: {
       });
     }
   );
-  const reasons = Object.freeze([...carrierReasons, ...fallbackReasons]);
+  const reasons = Object.freeze([
+    ...carrierReasons,
+    ...residualCarrierReasons,
+    ...fallbackReasons
+  ]);
   const blockingReasons = reasons.map((reason) => reason.blockingReason);
   const retryEligible = sdlcPostflightGapRetryEligible(blockingReasons);
   return Object.freeze({

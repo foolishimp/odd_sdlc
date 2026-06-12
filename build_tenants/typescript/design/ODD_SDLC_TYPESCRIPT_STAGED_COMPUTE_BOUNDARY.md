@@ -87,8 +87,9 @@ path is non-closure evidence, not proof.
 ## T-197 Owner Partition And Decommission Register
 
 Status: ratified design lock for T-197 W-010, W-020, W-030, and Wave 1
-A-row ownership. This section authorizes bounded refactoring work only. It does
-not by itself close any implementation row.
+A-row ownership; terminal ledger refresh recorded on 2026-06-11. This section
+authorizes bounded refactoring work only. It does not by itself close any
+implementation row without the ticket proof ledger.
 
 T-197 consolidates two defect axes:
 
@@ -119,6 +120,7 @@ The irreducible architectural carrier set for this reconciliation boundary is:
 | `AbgSelectedComposition` | selected `abg.fn_composition` identity and regime binding | ABG authoritative | plugin input, selected composition helpers, runtime archives | SDLC derives selected composition from edge names, paths, or graph-function names |
 | `SdlcTransformCandidate` | transform.C product candidate/evidence refs | SDLC plugin candidate, ABG admitted | `operator/plugins/transform/*`, worker result carriers | transform writes ledgers, emits events, closes, or selects continuation |
 | `SdlcEvaluationFinding` | evaluate.C finding refs and semantic review candidates | SDLC plugin candidate, ABG admitted | `operator/plugins/evaluate/*`, review-grade and design-depth artifacts | evaluation writes final ledgers, closes, transitions, or replays |
+| `SdlcRepairSurfaceTriage` | evaluate.C repair-surface classification over non-fulfilled findings | SDLC plugin candidate over admitted review evidence; ABG owns yield/re-entry execution | `operator/review_grade_edge_fulfillment.ts`, `operator/closure_state_machine.ts`, `operator/installed_operator.ts` | nonlocal product gaps default to same-edge retry or omit repair graph/vector/asset refs |
 | `SdlcConsequenceCandidate` | product consequence candidate/read model: gain, residual pressure, edge ledger, closure decision, next-action projection | SDLC downstream candidate until ABG admission/fold/transition | `operator/traversal_consequence.ts`, consequence plugin, analyzer projections | consequence candidate is treated as final ABG fold, transition, or continuation truth |
 | `AbgRuntimeTruth` | events, frames, payload ledgers, assurance fold, transition, continuation, replay | ABG authoritative | ABG runtime package, SDLC ABG append sink, replay readers | SDLC constructs runtime lifecycle events before emit or reconstructs replay truth |
 | `SdlcImportedAuthority` | imported-source ledger, source input, requirement authority, tenant stack, execution contract | tenant authority authoritative, SDLC admits/read-models | `workspace/*`, `spec_method/entry.ts`, tenant stack specs | framework code names target files, ecosystems, or scenario brands as generic law |
@@ -298,63 +300,65 @@ target filename, ecosystem command, scenario brand, or downstream product name
 | row | current source / reference | target owner API or carrier | target site | proof lane |
 | --- | --- | --- | --- | --- |
 | B1 | `test_t194` proved ABG gate only in tests | ABG `typecheckGtlProgram(...)` and `admitGtlProgramConformanceInput(...)` | product `gtl_conformance/*`, start, spec-method, release, build preflight | `test:t194`, `test:t197`, `test:t059` |
-| A1 | `replayEventsWithGraphContinuationCursor` formerly synthesized vector lifecycle events | ABG continuation and replay projection | W-110 slice D consumes ABI 4.0.0-rc.15 `applyExplicitGraphVectorResumeCursor(...)`; SDLC no longer constructs vector lifecycle cursor events | source negative test plus installed continuation replay |
-| A2 | `executeInstalledOperatorStartWithReentry` owns multi-attempt loop | installed UX over admitted ABG turns | ratified after A5 transition-ref consumption: loop may only call the installed-start boundary, derive retry context from admitted traversal consequence read models, refresh replay through the caller state callback, and archive loop attempts; no local runtime authoring, ABG runner shortcut, or transition-ref substitution | single-turn/until-converged ownership test plus T-197 source guard |
+| A1 | `replayEventsWithGraphContinuationCursor` formerly synthesized vector lifecycle events | ABG continuation and replay projection | W-110 slice D consumes ABI 4.0.0-rc.16 `applyExplicitGraphVectorResumeCursor(...)`; SDLC no longer constructs vector lifecycle cursor events | source negative test plus installed continuation replay |
+| A2 | `executeInstalledOperatorStartWithReentry` formerly owned a multi-attempt loop | ABG command/control loop with SDLC as one-boundary domain shell | hard break after A5 transition-ref consumption: SDLC resolves domain target, worker transport, and replay basis, then calls one `executeInstalledOperatorStart(...)` boundary. Layered convergence, retry/yield policy, replay refresh, and terminal exit remain inside ABG command binding/control-loop surfaces. | single-boundary start guard plus T-197 source guard rejecting the retired helper, loop carrier, and runtime-policy controls |
 | A3 | SDLC compiles DAG and calls `runEventedNativeSagaFrontier` inline | ABG frontier runtime with SDLC as thin caller | ratified in W-110 slice B: SDLC owns `sdlc_feature_dependency_dag` and branch payload candidates; ABG owns frontier execution, branch policy, leases, payload admission events, fan-in projection events, and replay-visible emitted events | `test:t197` A3 guard; `test:t174` authority/control admission negatives; live path audit |
-| A4 | SDLC callers formerly constructed runtime events before `appendOddSdlcRuntimeEvents` | ABG/system event constructors and `emit()` | W-110 slice D consumes ABI 4.0.0-rc.15 cursor and graph-span/reentry authorship routes; `appendOddSdlcRuntimeEvents` remains sink only; production construct sites are gone | construct-site inventory test |
-| A5 | `traversal_consequence.ts` builds gain, ledger, close, next-action chain | SDLC consequence candidate/read model; ABG terminal and runtime continuation transition truth | W-110 slices C/E/G ratify the split: SDLC consequence carriers remain product read models over admitted evidence, only ABG `terminalKind: "converged"` may produce installed convergence, ABG `gap_stop` remains blocked even when the SDLC consequence candidate closes, and `GtlConsequenceProjectionRef.traversalTransitionRef` consumes ABI 4.0.0-rc.15 runtime continuation transition projection refs. | three-edge chain admission-boundary test; `test:t197` A5 terminal gate and transition-ref guard |
+| A4 | SDLC callers formerly constructed runtime events before `appendOddSdlcRuntimeEvents` | ABG/system event constructors and `emit()` | W-110 slice D consumes ABI 4.0.0-rc.16 cursor and graph-span/reentry authorship routes; `appendOddSdlcRuntimeEvents` remains sink only; production construct sites are gone | construct-site inventory test |
+| A5 | `traversal_consequence.ts` builds gain, ledger, close, next-action chain | SDLC consequence candidate/read model; ABG terminal and runtime continuation transition truth | W-110 slices C/E/G ratify the split: SDLC consequence carriers remain product read models over admitted evidence, only ABG `terminalKind: "converged"` may produce installed convergence, ABG `gap_stop` remains blocked even when the SDLC consequence candidate closes, and `GtlConsequenceProjectionRef.traversalTransitionRef` consumes ABI 4.0.0-rc.16 runtime continuation transition projection refs. | three-edge chain admission-boundary test; `test:t197` A5 terminal gate and transition-ref guard |
 | B2 | `component_depth_register.ts` local protocol enums | GTL target-carrier and declaration read model | reframe local rows as projections over GTL declarations | T-153/T-197 conformance test |
 | B3 | `prompt_assets.ts` prompt registers and clause schema | GTL AssetSurface plus SDLC overlay policy | retain SDLC policy only where GTL owns structure | prompt asset conformance tests |
 | B4a | review-grade binding constructor/admitter | ABG GTL contract-fulfillment binding API | keep imported ABI constructors/admitters | `test:t194`, review-grade binding tests |
 | B4b | review-grade command string OR clauses | typed failure class and tenant execution contract | remove redundant command-string checks | review-grade negative test |
-| C1a | worker spawn and session trajectory in `transport.ts` | future odd_service adapter; current admitted worker transport | keep thin adapter; no SDLC session registry growth | transport tests |
-| C1b | hard-coded worker backend flag grammar | declared worker capability asset | move flag grammar to admitted capability/transport args | transport argument tests |
+| C1a | worker spawn and session trajectory in `transport.ts` | future odd_service adapter; current admitted worker transport | thin backend retained; no SDLC session/worker registry or server growth; B-004 owns future odd_service promotion | transport tests |
+| C1b | hard-coded worker backend flag grammar | declared worker capability argv profile plus transport args override | Claude default argv lowers through `SDLC_WORKER_CAPABILITY_ARG_PROFILES`; explicit `transport.args` bypass remains | transport argument tests |
 | C2 | install docs for converged worker UX | documentation over current public API | keep as UX docs only | install instruction tests |
 | C3 | no odd_service server | absence is target state | keep absent until separate product ticket | source grep |
-| D1 | live module lane regex over paths | tenant stack target seeds | derive lanes from admitted tenant stack | frontier lane negative test |
-| D2 | deterministic dependency traversal method pick | evaluator-selected admitted carrier | make method selected evidence, not local pick | decomposition admission test |
-| D3 | public-start bootstrap selection | admitted capability route | only remediate non-evidence method picks | narrowed public-start tests |
-| D4 | `.test.` / `.spec.` infix exclusion | tenant testing-stack roles | route through tenant stack target seeds | authority target tests |
-| D5 | bare `/src` append | declared module layout | consume tenant profile/module layout | authority target tests |
-| D6 | `"project"` directory special-case | tenant declared directory list | consume declared directory list | authority target tests |
+| D1 | live module lane regex over paths | tenant stack target seeds plus dependency-map graph successors | classifier deleted; dev lanes derive from tenant-stack source roles and fan-in target refs derive from graph successors | frontier lane negative test |
+| D2 | deterministic dependency traversal method pick | evaluator-selected admitted carrier | selected method lowers through `SdlcDependencyTraversalSelectedMethodCarrier` in staged authority/postflight paths | decomposition admission test |
+| D3 | public-start bootstrap selection | admitted capability route | public-start keeps capability/overlay evidence refs and does not pick dependency traversal methods | narrowed public-start tests |
+| D4 | `.test.` / `.spec.` infix exclusion | tenant testing-stack roles | design-source admission routes through tenant-stack test roles; test directory roots remain authority role surface, not broad product materialization targets | authority target tests |
+| D5 | bare `/src` append | declared module layout | module names no longer synthesize source roots; consume explicit `moduleLayout.sourceRoots` / `sourceRoots` declarations | authority target tests |
+| D6 | `"project"` directory special-case | tenant declared directory list | directory status comes from declared directory syntax/role, not the name `project` | authority target tests |
 | H1 | `mapper_requirements.md` special cases | generic imported-source and requirement surfaces | removed from framework law; target file is tenant data only | `test:t197`, data-mapper sandbox |
 | H2 | closed analysis profile enum | admitted profile id and capability flags | open profile id; use `truthyCapability` | analyze-run profile tests |
-| H3 | enterprise-core inventory as default-looking gate | B-068 proof fixture only | contain/relocate outside production defaults | qualification reachability test |
-| H4 | scripted CDME constructor sequence | proof fixture | move to non-exported test fixture | sandbox proof test |
+| H3 | enterprise-core inventory as default-looking gate | B-068 proof fixture only | contained outside production defaults; no qualification/root export and sandbox imports direct fixture module | qualification reachability test |
+| H4 | scripted constructor sequence with downstream subsystem names | proof fixture | neutral `Probe*` / `b068_*_probe` script names in direct-import fixture | sandbox proof test |
 | H5 | `npm test` pressure classifier | neutral test-execution contract role | use role IDs and tenant contract | prompt edge policy test |
-| H6 | Scala/SBT diagnostic needles | tenant-declared diagnostic phrases | read from tenant stack | repair reentry test |
+| H6 | Scala/SBT diagnostic needles | row-owned evidence refs and neutral execution markers | hard-coded compiler phrases removed; tenant-specific diagnostics remain evidence data | repair reentry test |
 | H7 | review prompt names `npm test` | generic role=test language | neutral prompt text | prompt text guard |
-| H8 | `TEST35_CONCEPTUAL_STAGES` / `test35://` refs | neutral stage refs with scenario id as data | rename read-model refs | analyzer render tests |
-| H9 | test35-branded headings | neutral headings | rename renderer output | markdown render test |
-| H10 | `spark_scala` alias | tenant-declared identity | remove stale alias or make declared | project profile test |
-| H11 | data-mapper requirement example | tenant-neutral placeholder | keep only canonical requirement syntax | prompt policy test |
-| H12 | ontology-specific heading tokens | spec-method-neutral markers | remove target ontology tokens from classifier | project profile test |
-| E1 | graph-bound shard command | lawful if graph-bound | verify bind-chain stage only | bind-chain audit |
+| H8 | `TEST35_CONCEPTUAL_STAGES` / `test35://` refs | neutral stage refs with scenario id as data | renamed to `SDLC_CONCEPTUAL_STAGES` and `sdlc://stage/...` | analyzer render tests |
+| H9 | test35-branded headings | neutral headings | renderer output renamed to conceptual stage coverage | markdown render test |
+| H10 | `spark_scala` alias | tenant-declared identity | stale alias removed | project profile test |
+| H11 | data-mapper requirement example | tenant-neutral placeholder | example now uses tenant-neutral canonical requirement syntax | prompt policy test |
+| H12 | ontology-specific heading tokens | spec-method-neutral markers | target ontology tokens removed from project-profile heading classifier | project profile test |
+| E1 | graph-bound shard command | lawful graph/manifest-bound execution stage | shard command comes from manifest/admitted test-execution rows, not framework grammar | bind-chain audit |
 | E2 | empty assurance stub | aligned post T-184 | keep | no action |
-| E3 | string-ref closure heuristics | typed carrier inputs | replace heuristics with typed inputs | closure state tests |
-| E4 | feature DAG topological order | lawful projection if callers stay read-only | audit callers | DAG caller tests |
+| E3 | string-ref closure heuristics | typed residual-pressure carrier inputs | closure transition and synthetic gap dossiers consume `SdlcClosureResidualPressureCarrier`; string fallback is compatibility-only | closure state tests |
+| E4 | feature DAG topological order | lawful projection if callers stay read-only | private DAG projection only; ABG frontier owns branch scheduling | DAG caller tests |
 | E5 | self-qualification fixture paths | lawful fixture | keep | no action |
-| P1 | generated-asset production-path closure | selected evaluate.C review-grade evidence | prove no legacy writer/postflight/raw report bypass | generated-asset negative test |
+| E6 | nonlocal product gap routing from review-grade / consequence fold | typed repair-surface triage plus ABG-owned yield/re-entry basis | review-grade findings may carry `SdlcRepairSurfaceTriageCarrier`; upstream re-entry names repair graph function/vector/asset refs and yields `nonlocal_repair_surface_admitted_upstream_reentry`; downstream-deferred rows do not become same-edge retry pressure | closure state and T-197 tests |
+| P1 | generated-asset production-path closure | selected evaluate.C review-grade evidence | worker reports require same-archive `fp_evaluate_result.json`; generated-asset closure remains selected ABG edge + review-grade contract proof | generated-asset negative test |
 | P2 | data-mapper breadth live proof | T-198 successor | out of T-197 closure law | successor ticket |
-| P3 | stale proof fixture hygiene | semantic fixture sweep | delete/guard deleted handoff and alias fixtures | semantic grep and focused tests |
+| P3 | stale proof fixture hygiene | semantic fixture sweep | component-depth admission requires whole-file JSON or exact selected target-carrier envelopes; fenced component-depth candidates fail closed; prompt policy requires whole-file JSON `component_depth_register` | semantic grep and focused tests |
 
 ### Decommission Register
 
 | id | decommission target | action | ABG route / dependency | prerequisite | proof |
 | --- | --- | --- | --- | --- | --- |
-| A1 | synthetic cursor event rows | done: SDLC construction deleted; ABI 4.0.0-rc.15 `applyExplicitGraphVectorResumeCursor(...)` consumed | ABG explicit resume cursor route | ABI 4.0.0-rc.15 installed and pinned | source negative test |
-| A4 | `constructVector*`, `constructGraphSpan*`, `constructFdAuthority*` before append | done for production runtime authorship: F_D audit rows are projection-only; cursor and graph-span/reentry rows consume ABI routes | ABG/system routes plus `emit()` sink | construct-site inventory complete and ABI 4.0.0-rc.15 installed | construct-site test |
+| A1 | synthetic cursor event rows | done: SDLC construction deleted; ABI 4.0.0-rc.16 `applyExplicitGraphVectorResumeCursor(...)` consumed | ABG explicit resume cursor route | ABI 4.0.0-rc.16 installed and pinned | source negative test |
+| A4 | `constructVector*`, `constructGraphSpan*`, `constructFdAuthority*` before append | done for production runtime authorship: F_D audit rows are projection-only; cursor and graph-span/reentry rows consume ABI routes | ABG/system routes plus `emit()` sink | construct-site inventory complete and ABI 4.0.0-rc.16 installed | construct-site test |
 | A3 | local live frontier ownership ambiguity | ratified as thin caller; no ABG entry move required | `runEventedNativeSagaFrontier` owns frontier execution; `SdlcLiveFpParallelMaterializationFrontier` admits only `abg_evented_saga_frontier` and `abg_branch_execution_policy` authority/control values | A3 disposition test | live frontier audit |
-| A5 | mixed closure candidate/fold/transition chain | done: SDLC candidates/read models are separated from ABG terminal and runtime transition truth; installed status leak fixed in W-110 slice C; consequence transition refs consume ABI 4.0.0-rc.15 runtime continuation transition projections in W-110 slice E | existing ABG fold/transition/projection helpers, measured against pinned T-164 baseline | T-164 three-edge proof preserved; no `gap_stop` convergence promotion; no local next-action projection substituted for traversal transition ref; SDLC consequence carriers remain domain read models | three-edge chain test |
-| A2 | installed multi-attempt loop authority ambiguity | done: installed UX over admitted starts | loop remains an operator-facing retry/reentry shell over one admitted installed-start attempt at a time; it may not construct runtime events, append runtime facts, call ABG runner routes directly, or substitute transition refs | A5 transition-ref consumption complete in ABI 4.0.0-rc.15 | until-converged ownership test and T-197 source guard |
+| A5 | mixed closure candidate/fold/transition chain | done: SDLC candidates/read models are separated from ABG terminal and runtime transition truth; installed status leak fixed in W-110 slice C; consequence transition refs consume ABI 4.0.0-rc.16 runtime continuation transition projections in W-110 slice E | existing ABG fold/transition/projection helpers, measured against pinned T-164 baseline | T-164 three-edge proof preserved; no `gap_stop` convergence promotion; no local next-action projection substituted for traversal transition ref; SDLC consequence carriers remain domain read models | three-edge chain test |
+| A2 | installed multi-attempt loop authority ambiguity | done: SDLC-local loop deleted | layered convergence moves to ABG command binding/control-loop surfaces; SDLC retains only a domain shell over one admitted `executeInstalledOperatorStart(...)` boundary and must not refresh replay or decide continuation locally | A5 transition-ref consumption complete in ABI 4.0.0-rc.16 | single-boundary start test and T-197 source guard |
 | B2 | local component-depth contract protocol law | reframe as GTL read model | ABG `typecheckGtlProgram(...)` feature coverage plus GTL target-carrier law | T-153 coverage row present | conformance test |
 | B3 | prompt structural schema duplication | retain only SDLC overlay policy | GTL AssetSurface constructor/admitter and ABG program conformance row | GTL AssetSurface row present | prompt asset tests |
 | B4b | command-string OR clauses | delete | ABG-admitted review-grade binding plus typed failure class | typed failure class covers route | review-grade tests |
-| C1a/C1b | session/flag grammar in SDLC core | keep thin transport now; move capability grammar to declared asset | none for runtime authorship; B-004 owns future odd_service promotion | no odd_service registry in SDLC | transport tests |
-| D1-D6 | ecosystem/path defaults | replace with tenant stack and admitted evidence | no ABG dependency; tenant stack/source carriers own evidence | tenant profile/source carrier available | authority tests |
+| C1a/C1b | session/flag grammar in SDLC core | done: thin transport retained; capability argv grammar declared in transport profile | none for runtime authorship; B-004 owns future odd_service promotion | no odd_service registry in SDLC | transport tests |
+| D1-D6 | ecosystem/path defaults | done: D1 and D4-D6 replaced with tenant stack/admitted evidence; D2-D3 consume selected-method/capability evidence | no ABG dependency for D1/D4-D6; tenant stack/source carriers own evidence | tenant profile/source carrier available | authority tests |
 | H1 | target-specific requirement filename recognition | done; keep removed | no ABG dependency; generic imported-source route proven | generic imported-source route proven | T-197 H1 test |
-| H2-H12 | target names, scenario brands, ecosystem phrases | replace with neutral ids or tenant-declared data | no ABG dependency unless row feeds runtime truth | row-specific source identified | row-specific grep/tests |
-| P1/P3 | stale proof bypasses | prove selected review path and remove stale fixture imports | ABG admission/evaluate.C path for generated-asset proof | B1/H1 stable | semantic proof |
+| H2-H12 | target names, scenario brands, ecosystem phrases | done: H2 and H5-H12 use neutral ids or tenant-declared data; H3/H4 are contained B-068 proof fixtures with no public default export | no ABG dependency unless row feeds runtime truth | row-specific source identified | row-specific grep/tests |
+| E6 | same-edge retry for nonlocal product gaps | done: typed repair-surface triage routes `upstream_reentry` through ABG handoff basis instead of default same-edge retry; downstream-deferred rows are excluded from same-edge pressure | ABG yield/re-entry execution over named graph/vector/asset basis | review-grade finding carries repair-surface triage | closure/review-grade tests |
+| P1/P3 | stale proof bypasses | done: P1 selected evaluate.C/generated-asset production path guard; P3 whole-file JSON component-depth admission and fenced-carrier rejection | ABG admission/evaluate.C path for generated-asset proof; GTL target-carrier law for component-depth rows | B1/H1 stable | semantic proof |
 
 No decommission target may be replaced with a shim, alias, or fallback path
 that preserves the same authority under a new name. Deletion-first means the
@@ -371,11 +375,11 @@ Baseline before A5 edits: `npm run test:t164` passed on 2026-06-09 with
 
 | family | current SDLC construct site | runtime facts assembled | ABG/GTL sufficiency disposition | Wave 1 action |
 | --- | --- | --- | --- | --- |
-| explicit graph-vector resume cursor | prior `installed_operator.ts` `replayEventsWithGraphContinuationCursor` constructed events at L1816-L1830; appended through `replayCursor.cursorEvents` on direct target paths | `vector_traversal_planned`, `vector_evaluated`, `vector_closed` for earlier vectors that were not actually replay-closed | **consumed in W-110 slice D**: ABI 4.0.0-rc.15 publishes `applyExplicitGraphVectorResumeCursor(...)`; SDLC submits basis/replay/target intent and receives ABG-authored cursor events plus replay projection | Keep source guard rejecting local vector lifecycle constructors in `installed_operator.ts`; preserve append sink only. |
+| explicit graph-vector resume cursor | prior `installed_operator.ts` `replayEventsWithGraphContinuationCursor` constructed events at L1816-L1830; appended through `replayCursor.cursorEvents` on direct target paths | `vector_traversal_planned`, `vector_evaluated`, `vector_closed` for earlier vectors that were not actually replay-closed | **consumed in W-110 slice D**: ABI 4.0.0-rc.16 publishes `applyExplicitGraphVectorResumeCursor(...)`; SDLC submits basis/replay/target intent and receives ABG-authored cursor events plus replay projection | Keep source guard rejecting local vector lifecycle constructors in `installed_operator.ts`; preserve append sink only. |
 | deterministic conform-project F_D advance | `appendFdConformanceRuntimeEvents` constructed iteration/lifecycle events before append | iteration decision events, `vector_evaluated`, `vector_closed` for `FG_CONFORM_PROJECT` | **existing route consumed in W-110 slice A**: SDLC now calls ABG `runEngineIterateAsync(...)` in `first_traversal` mode with an F_D evaluator outcome over `conform_project_report.json`; ABG emits F_D authority, payload, vector evaluation, and vector close facts | Keep the source guard rejecting `runtimeEventsForIterationDecision` in this path; preserve T-087/T-096/T-151 induction sequence with ABG-owned event kinds. |
 | front-door traversal-hop audit | `writeFrontDoorTraversalSelectionAudit` returned `constructFdAuthorityOutcomeAdmittedEvent` and pushed it into runner `emitted` | `fd_authority_outcome_admitted` over public-start/decomposition selection | **projection-only after W-110 slice A**: front-door selection remains archived as `sdlc_frontdoor_*` system artifacts and no longer authors runtime F_D truth | Keep T-173/T-197 negative source guard rejecting local F_D event construction for traversal selection. |
 | traversal-hop postflight audit | traversal selection audit returned `constructFdAuthorityOutcomeAdmittedEvent` | `fd_authority_outcome_admitted` over hop selection/postflight evidence | **projection-only after W-110 slice A**: traversal-hop selection remains archived as `sdlc_traversal_hop_selection.json`; ABG runtime truth is not emitted from this diagnostic projection | Keep T-173/T-197 negative source guard rejecting local F_D event construction for traversal selection. |
-| repair graph-span reentry | prior `repairReentryGraphSpanRuntimeEvents` constructed schedule/assessment/foldback events plus plan/apply locally | `graph_span_evaluation_scheduled`, `graph_span_assessed`, `graph_span_foldback_evaluated`, `graph_reentry_planned`, `graph_reentry_applied` | **consumed in W-110 slice D**: ABI 4.0.0-rc.15 publishes `applyGraphSpanReentryRoute(...)`; SDLC submits admitted product assessment candidates and ABG returns authored graph-span/reentry events in runner ordering law | Keep source guard rejecting local graph-span and graph-reentry constructors in `installed_operator.ts`; SDLC may only submit product assessment candidates. |
+| repair graph-span reentry | prior `repairReentryGraphSpanRuntimeEvents` constructed schedule/assessment/foldback events plus plan/apply locally | `graph_span_evaluation_scheduled`, `graph_span_assessed`, `graph_span_foldback_evaluated`, `graph_reentry_planned`, `graph_reentry_applied` | **consumed in W-110 slice D**: ABI 4.0.0-rc.16 publishes `applyGraphSpanReentryRoute(...)`; SDLC submits admitted product assessment candidates and ABG returns authored graph-span/reentry events in runner ordering law | Keep source guard rejecting local graph-span and graph-reentry constructors in `installed_operator.ts`; SDLC may only submit product assessment candidates. |
 | post-action graph-span reentry | prior `postActionReentryGraphSpanRuntimeEvents` constructed schedule/assessment/foldback events plus plan/apply locally | same graph-span and graph-reentry runtime fact family as repair reentry | **consumed in W-110 slice D**: same ABI `applyGraphSpanReentryRoute(...)` route as repair reentry; W-110 slice E binds consequence transition refs to ABI runtime continuation projection refs | Preserve T-164 residual-pressure baseline; keep SDLC consequence carriers as read models without reintroducing local transition-ref substitutes. |
 
 Construct-site exhaustiveness is enforced by
@@ -383,16 +387,17 @@ Construct-site exhaustiveness is enforced by
 under `build_tenants/typescript/code/src`. Current classified product-runtime
 sites are empty. W-110 slice D removed direct production `construct*Event(...)`
 calls from `installed_operator.ts`; cursor and graph-span/reentry authorship now
-flows through ABI 4.0.0-rc.15 routes.
+flows through ABI 4.0.0-rc.16 routes.
 
 Current excluded proof-fixture sites are:
 
 - `qualification/enterprise_core_iteration_sandbox.ts` B-068 enterprise-core
   iteration probe: `constructVectorEvaluatedEvent`,
   `constructVectorClosedEvent`, and `constructRetryProgressRecordedEvent`.
-  These are `SdlcProofFixture` sites, not product-runtime authority; H3 was
-  verified probe-only in T-197 Phase 0. If this file becomes a live default
-  gate, the exclusion must be removed and repriced before closure.
+  These are `SdlcProofFixture` sites, not product-runtime authority; H3/H4 are
+  contained as B-068 direct-import proof fixtures with no qualification/root
+  export. If this file becomes a live default gate, the exclusion must be
+  removed and repriced before closure.
 
 ## Canonical Prompt-Source Carrier
 

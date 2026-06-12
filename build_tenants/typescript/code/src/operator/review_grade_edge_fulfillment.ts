@@ -17,7 +17,9 @@ import {
 } from "../shared/validation.js";
 import { uniqueLocaleSorted as uniqueSorted } from "../shared/collections.js";
 import {
+  SDLC_REPAIR_SURFACE_TRIAGE_DISPOSITIONS,
   SDLC_REVIEW_GRADE_FAILURE_CLASSES,
+  type SdlcRepairSurfaceTriageCarrier,
   type SdlcReviewGradeEdgeFulfillmentAdmission,
   type SdlcReviewGradeEdgeFulfillmentAssessment,
   type SdlcReviewGradeDimensionObservation,
@@ -308,6 +310,64 @@ export function reviewGradeEdgeFulfillmentOpenPressureRefs(input: {
   );
 }
 
+export interface SdlcReviewGradeRepairSurfaceTriageRow {
+  readonly kind: "sdlc_review_grade_repair_surface_triage_row";
+  readonly pressureRef: string;
+  readonly obligationId: string;
+  readonly triage: SdlcRepairSurfaceTriageCarrier;
+}
+
+function defaultRepairSurfaceTriageForFinding(input: {
+  readonly finding: SdlcReviewGradeObligationFinding;
+  readonly targetAssetType?: string | undefined;
+}): SdlcRepairSurfaceTriageCarrier {
+  const downstreamDeferred = reviewGradeFindingIsDownstreamStagePressure({
+    finding: input.finding,
+    targetAssetType: input.targetAssetType
+  });
+  return Object.freeze({
+    kind: "sdlc_repair_surface_triage" as const,
+    disposition: downstreamDeferred
+      ? "downstream_deferred"
+      : "current_edge_repair",
+    repairGraphFunctionRef: null,
+    repairGraphVectorRef: null,
+    repairAssetRef: null,
+    evidenceRefs: uniqueSorted([
+      ...input.finding.evidenceRefs,
+      ...input.finding.acceptedAuthorityRefs
+    ]),
+    rationale: downstreamDeferred
+      ? "Finding names a lawful downstream stage, so current edge closure defers this pressure."
+      : "Finding remains current-edge repair pressure until F_D admits a nonlocal repair surface."
+  });
+}
+
+export function reviewGradeEdgeFulfillmentRepairSurfaceTriageRows(input: {
+  readonly runRef: string;
+  readonly targetAssetType?: string | undefined;
+  readonly assessment: SdlcReviewGradeEdgeFulfillmentAssessment;
+}): readonly SdlcReviewGradeRepairSurfaceTriageRow[] {
+  return Object.freeze(
+    input.assessment.findings
+      .filter((finding) => finding.fulfillmentStatus !== "fulfilled")
+      .map((finding) =>
+        Object.freeze({
+          kind: "sdlc_review_grade_repair_surface_triage_row" as const,
+          pressureRef:
+            `pressure://odd-sdlc/review-grade/${input.runRef}/${encodeURIComponent(finding.obligationId)}`,
+          obligationId: finding.obligationId,
+          triage:
+            finding.repairSurfaceTriage ??
+            defaultRepairSurfaceTriageForFinding({
+              finding,
+              targetAssetType: input.targetAssetType
+            })
+        })
+      )
+  );
+}
+
 export function reviewGradeEdgeFulfillmentAssessmentPressureRefs(input: {
   readonly runRef: string;
   readonly targetAssetType?: string | undefined;
@@ -316,21 +376,18 @@ export function reviewGradeEdgeFulfillmentAssessmentPressureRefs(input: {
   const openFindings = input.assessment.findings.filter(
     (finding) => finding.fulfillmentStatus !== "fulfilled"
   );
-  if (
-    reviewGradeFindingsAreDownstreamStagePressure(openFindings, {
-      targetAssetType: input.targetAssetType
-    })
-  ) {
+  const triageRows = reviewGradeEdgeFulfillmentRepairSurfaceTriageRows(input);
+  const currentEdgePressureRows = triageRows.filter(
+    (row) => row.triage.disposition !== "downstream_deferred"
+  );
+  if (openFindings.length > 0 && currentEdgePressureRows.length === 0) {
     return Object.freeze([]);
   }
   if (openFindings.length === 0 && input.assessment.status === "passed") {
     return Object.freeze([]);
   }
   const openPressureRefs = uniqueSorted(
-    openFindings.map(
-      (finding) =>
-        `pressure://odd-sdlc/review-grade/${input.runRef}/${encodeURIComponent(finding.obligationId)}`
-    )
+    currentEdgePressureRows.map((row) => row.pressureRef)
   );
   return openPressureRefs.length > 0
     ? openPressureRefs
@@ -357,6 +414,68 @@ function parseNullableRequiredAction(
     return null;
   }
   return parseNonEmptyString(input, label);
+}
+
+function parseNullableRepairSurfaceTriage(
+  input: unknown,
+  label: string
+): SdlcRepairSurfaceTriageCarrier | null {
+  if (input === undefined || input === null) {
+    return null;
+  }
+  const record = parseClosedRecord(input, label, [
+    "kind",
+    "disposition",
+    "repairGraphFunctionRef",
+    "repairGraphVectorRef",
+    "repairAssetRef",
+    "evidenceRefs",
+    "rationale"
+  ]);
+  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
+  if (kind !== "sdlc_repair_surface_triage") {
+    throw new TypeError(`${label}.kind: unexpected repair-surface triage kind`);
+  }
+  const disposition = parseEnumValue(
+    record["disposition"],
+    `${label}.disposition`,
+    SDLC_REPAIR_SURFACE_TRIAGE_DISPOSITIONS
+  );
+  const repairGraphFunctionRef = parseNullableRequiredAction(
+    record["repairGraphFunctionRef"],
+    `${label}.repairGraphFunctionRef`
+  );
+  const repairGraphVectorRef = parseNullableRequiredAction(
+    record["repairGraphVectorRef"],
+    `${label}.repairGraphVectorRef`
+  );
+  const repairAssetRef = parseNullableRequiredAction(
+    record["repairAssetRef"],
+    `${label}.repairAssetRef`
+  );
+  const evidenceRefs = parseStringList(record["evidenceRefs"], `${label}.evidenceRefs`);
+  if (evidenceRefs.length === 0) {
+    throw new TypeError(`${label}.evidenceRefs: expected non-empty array`);
+  }
+  if (
+    disposition === "upstream_reentry" &&
+    (repairGraphFunctionRef === null ||
+      repairGraphVectorRef === null ||
+      repairAssetRef === null)
+  ) {
+    throw new TypeError(
+      `${label}: upstream_reentry requires repairGraphFunctionRef, repairGraphVectorRef, and repairAssetRef`
+    );
+  }
+  return Object.freeze({
+    kind: "sdlc_repair_surface_triage" as const,
+    disposition,
+    repairGraphFunctionRef,
+    repairGraphVectorRef,
+    repairAssetRef,
+    evidenceRefs,
+    rationale: parseNonEmptyString(record["rationale"], `${label}.rationale`)
+  });
 }
 
 function parseFulfillmentBinding(
@@ -553,6 +672,7 @@ function parseReviewFinding(
     "evidenceRefs",
     "acceptedAuthorityRefs",
     "fulfillmentBinding",
+    "repairSurfaceTriage",
     "rationale"
   ]);
   const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
@@ -582,6 +702,10 @@ function parseReviewFinding(
       record["fulfillmentBinding"],
       `${label}.fulfillmentBinding`,
       { obligationId }
+    ),
+    repairSurfaceTriage: parseNullableRepairSurfaceTriage(
+      record["repairSurfaceTriage"],
+      `${label}.repairSurfaceTriage`
     ),
     rationale: parseNonEmptyString(record["rationale"], `${label}.rationale`)
   });
@@ -864,6 +988,36 @@ function deriveFulfillmentBindingForFinding(input: {
   readonly finding: SdlcReviewGradeObligationFinding;
   readonly declaredRequirementRefs: readonly string[];
 }): GtlContractFulfillmentBinding | null {
+  const outputSurfaceRef = workspaceRefForPath({
+    workspaceRoot: input.manifest.workspaceRoot,
+    absolutePath: input.manifest.outputFile
+  });
+  if (input.finding.obligationId.startsWith("source_asset:")) {
+    const sourceRef =
+      input.finding.acceptedAuthorityRefs[0] ??
+      input.finding.evidenceRefs.find((ref) => ref !== outputSurfaceRef) ??
+      input.finding.evidenceRefs[0] ??
+      outputSurfaceRef;
+    const binding = constructGtlContractFulfillmentBinding({
+      obligationRef: input.finding.obligationId,
+      requirementRef: input.finding.obligationId,
+      productRequirementRef: input.finding.obligationId,
+      designObligationRef: sourceRef,
+      componentRef: input.finding.obligationId,
+      productTargetRef: sourceRef,
+      outputSurfaceRef,
+      functionOrEntrypointRef: `${sourceRef}#source-asset`,
+      realizationEvidenceRefs: uniqueSorted([sourceRef, outputSurfaceRef]),
+      testOrExecutionEvidenceRefs: input.finding.evidenceRefs,
+      evaluatorFindingRef: `evaluation-finding://odd-sdlc/review-grade/${encodeURIComponent(input.finding.obligationId)}`,
+      authorityRefs:
+        input.finding.acceptedAuthorityRefs.length > 0
+          ? input.finding.acceptedAuthorityRefs
+          : Object.freeze([sourceRef]),
+      evidenceRefs: input.finding.evidenceRefs
+    });
+    return admitGtlContractFulfillmentBinding(binding);
+  }
   const requirementRefForRowSelection = input.finding.obligationId.startsWith(
     "requirement:"
   )
@@ -890,10 +1044,6 @@ function deriveFulfillmentBindingForFinding(input: {
   if (requirementRef === null || designObligationRef === null) {
     return null;
   }
-  const outputSurfaceRef = workspaceRefForPath({
-    workspaceRoot: input.manifest.workspaceRoot,
-    absolutePath: input.manifest.outputFile
-  });
   const productTargetRef = productTargetRefForRow({
     manifest: input.manifest,
     row
@@ -916,6 +1066,234 @@ function deriveFulfillmentBindingForFinding(input: {
   return admitGtlContractFulfillmentBinding(gtlBinding);
 }
 
+function normalizeModuleNameForReview(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, "-")
+    .replace(/^-+|-+$/gu, "");
+}
+
+function moduleNameMatchesObligation(input: {
+  readonly rowModuleName: string;
+  readonly obligationModuleName: string;
+}): boolean {
+  return (
+    input.rowModuleName === input.obligationModuleName ||
+    normalizeModuleNameForReview(input.rowModuleName) ===
+      normalizeModuleNameForReview(input.obligationModuleName)
+  );
+}
+
+function componentRowsForModuleObligation(input: {
+  readonly register: SdlcComponentDepthRegister;
+  readonly obligationId: string;
+}): readonly (SdlcComponentRealizationRow | SdlcComponentTopologyRow)[] {
+  if (!input.obligationId.startsWith("module:")) {
+    return Object.freeze([]);
+  }
+  const moduleName = input.obligationId.slice("module:".length);
+  return Object.freeze(
+    componentRowsForBinding(input.register).filter((row) =>
+      moduleNameMatchesObligation({
+        rowModuleName: row.moduleName,
+        obligationModuleName: moduleName
+      })
+    )
+  );
+}
+
+function declaredRequirementRefsForModuleRows(input: {
+  readonly rows: readonly (SdlcComponentRealizationRow | SdlcComponentTopologyRow)[];
+  readonly declaredRequirementRefs: readonly string[];
+}): readonly string[] {
+  return uniqueSorted(
+    input.rows
+      .flatMap(rowRequirementRefs)
+      .flatMap((rowRef) => {
+        const declared = input.declaredRequirementRefs.find((candidate) =>
+          requirementRefMatches(candidate, rowRef)
+        );
+        return declared === undefined ? [] : [declared];
+      })
+  );
+}
+
+function findingIsFulfilled(
+  finding: SdlcReviewGradeObligationFinding | undefined
+): boolean {
+  return finding?.fulfillmentStatus === "fulfilled";
+}
+
+function structuralReviewPrerequisitesFulfilled(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly findingsById: ReadonlyMap<string, SdlcReviewGradeObligationFinding>;
+}): boolean {
+  return input.manifest.traversalObligationContext.obligations
+    .filter(
+      (obligation) =>
+        obligation.obligationId.startsWith("target_asset:") ||
+        obligation.obligationId.startsWith("source_asset:")
+    )
+    .every((obligation) =>
+      findingIsFulfilled(input.findingsById.get(obligation.obligationId))
+    );
+}
+
+function synthesizeFulfilledModuleReviewFinding(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly register: SdlcComponentDepthRegister;
+  readonly obligationId: string;
+  readonly declaredRequirementRefs: readonly string[];
+  readonly findingsById: ReadonlyMap<string, SdlcReviewGradeObligationFinding>;
+}): SdlcReviewGradeObligationFinding | null {
+  const rows = componentRowsForModuleObligation({
+    register: input.register,
+    obligationId: input.obligationId
+  });
+  if (rows.length === 0) {
+    return null;
+  }
+  const moduleRequirementRefs = declaredRequirementRefsForModuleRows({
+    rows,
+    declaredRequirementRefs: input.declaredRequirementRefs
+  });
+  if (
+    moduleRequirementRefs.length === 0 ||
+    moduleRequirementRefs.some(
+      (requirementRef) => !findingIsFulfilled(input.findingsById.get(requirementRef))
+    ) ||
+    !structuralReviewPrerequisitesFulfilled({
+      manifest: input.manifest,
+      findingsById: input.findingsById
+    })
+  ) {
+    return null;
+  }
+  const outputSurfaceRef = workspaceRefForPath({
+    workspaceRoot: input.manifest.workspaceRoot,
+    absolutePath: input.manifest.outputFile
+  });
+  const rowProductTargets = uniqueSorted(
+    rows.map((row) =>
+      productTargetRefForRow({
+        manifest: input.manifest,
+        row
+      })
+    )
+  );
+  const requirementFindings = moduleRequirementRefs.flatMap((requirementRef) => {
+    const finding = input.findingsById.get(requirementRef);
+    return finding === undefined ? [] : [finding];
+  });
+  const evidenceRefs = uniqueSorted([
+    outputSurfaceRef,
+    ...rowProductTargets,
+    ...requirementFindings.flatMap((finding) => finding.evidenceRefs)
+  ]);
+  const acceptedAuthorityRefs = uniqueSorted([
+    ...rows.flatMap((row) => row.sourceAssetRefs),
+    ...requirementFindings.flatMap((finding) => finding.acceptedAuthorityRefs)
+  ]);
+  const findingWithoutBinding: SdlcReviewGradeObligationFinding = Object.freeze({
+    kind: "sdlc_review_grade_obligation_finding" as const,
+    obligationId: input.obligationId,
+    fulfillmentStatus: "fulfilled" as const,
+    failureClass: null,
+    requiredAction: null,
+    evidenceRefs,
+    acceptedAuthorityRefs:
+      acceptedAuthorityRefs.length > 0
+        ? acceptedAuthorityRefs
+        : Object.freeze([`module://${input.obligationId.slice("module:".length)}`]),
+    fulfillmentBinding: null,
+    repairSurfaceTriage: null,
+    rationale:
+      "Deterministic module coverage fold: all admitted requirement findings owned by this module are fulfilled and the component-depth carrier binds the module to materialized product targets."
+  });
+  const fulfillmentBinding = deriveFulfillmentBindingForFinding({
+    manifest: input.manifest,
+    register: input.register,
+    finding: findingWithoutBinding,
+    declaredRequirementRefs: input.declaredRequirementRefs
+  });
+  return fulfillmentBinding === null
+    ? null
+    : Object.freeze({
+        ...findingWithoutBinding,
+        fulfillmentBinding
+      });
+}
+
+function canonicalizeReviewAssessmentModuleCoverage(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly register: SdlcComponentDepthRegister;
+  readonly assessment: SdlcReviewGradeEdgeFulfillmentAssessment;
+  readonly declaredRequirementRefs: readonly string[];
+}): SdlcReviewGradeEdgeFulfillmentAssessment {
+  const reviewed = new Set(input.assessment.reviewedObligationIds);
+  const findingsById = new Map(
+    input.assessment.findings.map((finding) => [finding.obligationId, finding])
+  );
+  const synthesizedFindings = input.manifest.traversalObligationContext.obligations
+    .filter(
+      (obligation) =>
+        obligation.obligationId.startsWith("module:") &&
+        !reviewed.has(obligation.obligationId)
+    )
+    .flatMap((obligation) => {
+      const finding = synthesizeFulfilledModuleReviewFinding({
+        manifest: input.manifest,
+        register: input.register,
+        obligationId: obligation.obligationId,
+        declaredRequirementRefs: input.declaredRequirementRefs,
+        findingsById
+      });
+      if (finding !== null) {
+        findingsById.set(finding.obligationId, finding);
+      }
+      return finding === null ? [] : [finding];
+    });
+  if (synthesizedFindings.length === 0) {
+    return input.assessment;
+  }
+  const reviewedObligationIds = Object.freeze([
+    ...input.assessment.reviewedObligationIds,
+    ...synthesizedFindings.map((finding) => finding.obligationId)
+  ]);
+  const findings = Object.freeze([
+    ...input.assessment.findings,
+    ...synthesizedFindings
+  ]);
+  const fulfilledCount = findings.filter(
+    (finding) => finding.fulfillmentStatus === "fulfilled"
+  ).length;
+  const obligationCoverageFold =
+    input.assessment.obligationCoverageFold === null
+      ? null
+      : Object.freeze({
+          ...input.assessment.obligationCoverageFold,
+          coveredCount: fulfilledCount,
+          totalCount: reviewedObligationIds.length,
+          status:
+            fulfilledCount === reviewedObligationIds.length
+              ? "covered"
+              : input.assessment.obligationCoverageFold.status,
+          rationale:
+            `${input.assessment.obligationCoverageFold.rationale} Deterministic module coverage synthesis added ${synthesizedFindings.length} fulfilled module finding(s).`
+        });
+  return Object.freeze({
+    ...input.assessment,
+    reviewedObligationIds,
+    findings,
+    obligationCoverageFold,
+    evidenceRefs: uniqueSorted([
+      ...input.assessment.evidenceRefs,
+      ...synthesizedFindings.flatMap((finding) => finding.evidenceRefs)
+    ])
+  });
+}
+
 function canonicalizeReviewAssessmentFulfillmentBindings(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly assessment: SdlcReviewGradeEdgeFulfillmentAssessment;
@@ -936,9 +1314,9 @@ function canonicalizeReviewAssessmentFulfillmentBindings(input: {
       (obligation) =>
         obligation.obligationKind === "requirement" ||
         obligation.obligationId.startsWith("requirement:")
-    )
-    .map((obligation) => obligation.obligationId);
-  return Object.freeze({
+      )
+      .map((obligation) => obligation.obligationId);
+  const boundAssessment = Object.freeze({
     ...input.assessment,
     findings: Object.freeze(
       input.assessment.findings.map((finding) => {
@@ -959,6 +1337,12 @@ function canonicalizeReviewAssessmentFulfillmentBindings(input: {
             });
       })
     )
+  });
+  return canonicalizeReviewAssessmentModuleCoverage({
+    manifest: input.manifest,
+    register,
+    assessment: boundAssessment,
+    declaredRequirementRefs
   });
 }
 

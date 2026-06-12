@@ -43,8 +43,17 @@ export type SdlcDependencyTraversalSelectionPolicy =
 export interface SdlcDependencyTraversalSelectionInput {
   readonly selectionRef: string;
   readonly dependencyMap: SdlcModuleDependencyMap | SdlcTestDependencyMap;
+  readonly selectedMethodCarrier?:
+    | SdlcDependencyTraversalSelectedMethodCarrier
+    | undefined;
   readonly policy?: SdlcDependencyTraversalSelectionPolicy | undefined;
   readonly basisRefs?: readonly string[] | undefined;
+}
+
+export interface SdlcDependencyTraversalSelectedMethodCarrier {
+  readonly kind: "sdlc_dependency_traversal_selected_method";
+  readonly selectedMethod: SdlcDependencyTraversalMethod;
+  readonly evidenceRefs: readonly string[];
 }
 
 export interface SdlcStagedImplementationTopologyAuthority {
@@ -246,7 +255,24 @@ function parallelGroupRefs(
     : dependencyMap.parallelShardRefs;
 }
 
-function dependencyTraversalMethod(input: {
+export function admitSdlcDependencyTraversalSelectedMethodCarrier(input: {
+  readonly selectedMethod: SdlcDependencyTraversalMethod;
+  readonly evidenceRefs: readonly string[];
+}): SdlcDependencyTraversalSelectedMethodCarrier {
+  const evidenceRefs = uniqueSorted(input.evidenceRefs);
+  if (evidenceRefs.length === 0) {
+    throw new TypeError(
+      "sdlc_dependency_traversal_selected_method requires evidence refs"
+    );
+  }
+  return Object.freeze({
+    kind: "sdlc_dependency_traversal_selected_method" as const,
+    selectedMethod: input.selectedMethod,
+    evidenceRefs
+  });
+}
+
+function inferredDependencyTraversalMethod(input: {
   readonly dependencyMap: SdlcModuleDependencyMap | SdlcTestDependencyMap;
   readonly policy: SdlcDependencyTraversalSelectionPolicy;
 }): SdlcDependencyTraversalMethod {
@@ -267,6 +293,31 @@ function dependencyTraversalMethod(input: {
     return "parallel";
   }
   return "serial";
+}
+
+function invalidSelectedTraversalMethodReasons(input: {
+  readonly dependencyMap: SdlcModuleDependencyMap | SdlcTestDependencyMap;
+  readonly selectedMethod: SdlcDependencyTraversalMethod;
+}): readonly string[] {
+  const parallelRefs = parallelGroupRefs(input.dependencyMap);
+  return uniqueSorted([
+    ...(input.selectedMethod !== "blocked" &&
+    input.dependencyMap.cycleRefs.length > 0
+      ? input.dependencyMap.cycleRefs.map(
+          (cycleRef) => `dependency_cycle:${cycleRef}`
+        )
+      : []),
+    ...(input.selectedMethod === "parallel" && parallelRefs.length === 0
+      ? ["selected_parallel_without_parallel_groups"]
+      : []),
+    ...(input.selectedMethod === "steel_thread" &&
+    input.dependencyMap.steelThreadCandidateNodeIds.length === 0
+      ? ["selected_steel_thread_without_candidates"]
+      : []),
+    ...(input.selectedMethod === "serial" && input.dependencyMap.nodes.length === 0
+      ? ["selected_serial_without_nodes"]
+      : [])
+  ]);
 }
 
 function selectedNodeIds(input: {
@@ -816,11 +867,23 @@ export function selectSdlcDependencyMapTraversal(
   input: SdlcDependencyTraversalSelectionInput
 ): SdlcDependencyTraversalSelection {
   const policy = input.policy ?? "steel_thread_first";
-  const selectedMethod = dependencyTraversalMethod({
+  const carrier = input.selectedMethodCarrier;
+  const requestedMethod =
+    carrier?.selectedMethod ??
+    inferredDependencyTraversalMethod({
+      dependencyMap: input.dependencyMap,
+      policy
+    });
+  const invalidSelectionReasons = invalidSelectedTraversalMethodReasons({
     dependencyMap: input.dependencyMap,
-    policy
+    selectedMethod: requestedMethod
   });
+  const selectedMethod =
+    invalidSelectionReasons.length > 0 ? "blocked" : requestedMethod;
   const parallelRefs = parallelGroupRefs(input.dependencyMap);
+  const cycleBlockingReasons = input.dependencyMap.cycleRefs.map(
+    (cycleRef) => `dependency_cycle:${cycleRef}`
+  );
   return Object.freeze({
     kind: "sdlc_dependency_traversal_selection" as const,
     selectionRef: input.selectionRef,
@@ -835,15 +898,12 @@ export function selectSdlcDependencyMapTraversal(
       selectedMethod === "parallel" ? uniqueSorted(parallelRefs) : Object.freeze([]),
     blockingReasons:
       selectedMethod === "blocked"
-        ? uniqueSorted(
-            input.dependencyMap.cycleRefs.map(
-              (cycleRef) => `dependency_cycle:${cycleRef}`
-            )
-          )
+        ? uniqueSorted([...cycleBlockingReasons, ...invalidSelectionReasons])
         : Object.freeze([]),
     basisRefs: uniqueSorted([
       input.dependencyMap.mapRef,
       input.dependencyMap.summaryRef,
+      ...(carrier?.evidenceRefs ?? []),
       ...(input.basisRefs ?? [])
     ])
   });

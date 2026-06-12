@@ -31,16 +31,20 @@ import {
 } from "../projection/index.js";
 import {
   constructSdlcOverlayBinding,
+  constructSdlcBootstrapPublicStartOptimization,
   constructSdlcTraversalOverlayCatalog,
+  FG_BOOTSTRAP_SDLC_ENTRY,
   FG_CONFORM_PROJECT,
 	  publicSdlcOverlayStartTargets,
 	  resolveSdlcTraversalOverlay,
+  SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
 	  SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
 	  SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
 	  sdlcGraphFunctionBoundaryRef,
 	  sdlcPublishedActionRef,
 	  sdlcTraversalOverlayForGraphFunction,
   type SdlcOverlayBinding,
+  type SdlcBootstrapPublicStartOptimization,
   type SdlcTraversalOverlay,
   type SdlcTraversalOverlayRef
 } from "../graph/index.js";
@@ -130,6 +134,7 @@ export interface SdlcExecutionContract {
   readonly constructionIntent: SdlcConstructionIntent;
   readonly traversalDecompositionSummary: SdlcDecompositionSummary | null;
   readonly traversalHopSelection: SdlcTraversalHopSelection | null;
+  readonly bootstrapOptimization: SdlcBootstrapPublicStartOptimization;
 }
 
 export type SdlcPublicStartOutcome =
@@ -292,6 +297,7 @@ interface PublicStartEvaluation {
   readonly constructionIntent: SdlcConstructionIntent | null;
   readonly traversalDecompositionSummary: SdlcDecompositionSummary | null;
   readonly traversalHopSelection: SdlcTraversalHopSelection | null;
+  readonly bootstrapOptimization: SdlcBootstrapPublicStartOptimization | null;
 }
 
 function statSafe(target: string) {
@@ -485,6 +491,71 @@ function overlayTraversalSelection(input: {
     ])
   });
   return Object.freeze({ summary, selection });
+}
+
+function publicStartBootstrapOptimization(input: {
+  readonly request: SdlcPublicStartRequest;
+  readonly module: Module;
+  readonly profile: SdlcConformProjectProfile;
+  readonly selectedOverlay: SdlcTraversalOverlay;
+  readonly selectedCandidate: PublicStartActionCandidate;
+  readonly selectedTraversal: {
+    readonly summary: SdlcDecompositionSummary;
+    readonly selection: SdlcTraversalHopSelection;
+  } | null;
+  readonly sourceRef: string;
+}): SdlcBootstrapPublicStartOptimization {
+  const outcomeClass = traversalOutcomeClassForPublicStart(input.profile);
+  const fallbackCandidate = candidateForGraphFunction({
+    module: input.module,
+    graphFunctionName: "derive_intent_surface",
+    sourceRef: input.sourceRef
+  });
+  const optimizationAdmitted =
+    input.selectedTraversal !== null && outcomeClass !== "domain_product";
+  const nonAdmissionReasonRefs = optimizationAdmitted
+    ? Object.freeze([] as const)
+    : Object.freeze([
+        outcomeClass === "domain_product"
+          ? "optimization-non-admission://odd-sdlc/bootstrap-entry/domain-product"
+          : "optimization-non-admission://odd-sdlc/bootstrap-entry/no-admitted-hop-selection"
+      ]);
+  return constructSdlcBootstrapPublicStartOptimization({
+    workspaceIdentityRef: workspaceIdentityRefFor(input.request),
+    projectSlug: input.profile.projectSlug,
+    selectedOutputRoot: input.profile.selectedOutputRoot,
+    outcomeClass,
+    selectedChildOverlayRef: input.selectedOverlay.overlayRef,
+    selectedGraphFunctionRef: input.selectedCandidate.graphFunctionRef,
+    selectedStartTargetRef: input.selectedCandidate.graphFunctionName,
+    fallbackOverlayRef: SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
+    fallbackGraphFunctionRef:
+      fallbackCandidate?.graphFunctionRef ?? input.selectedCandidate.graphFunctionRef,
+    optimizationAdmitted,
+    landscapeFactRefs: Object.freeze([
+      `landscape://odd-sdlc/project/${encodeURIComponent(input.profile.projectSlug)}`,
+      `landscape://odd-sdlc/active-tenant/${encodeURIComponent(input.profile.activeTenant)}`,
+      `landscape://odd-sdlc/outcome-class/${encodeURIComponent(outcomeClass)}`,
+      `graph-function://odd-sdlc/${FG_BOOTSTRAP_SDLC_ENTRY}`
+    ]),
+    capabilityRefs: Object.freeze(
+      input.profile.capabilityContracts.map(
+        (contract) =>
+          `capability://odd-sdlc/${encodeURIComponent(contract.name)}/${encodeURIComponent(contract.value)}`
+      )
+    ),
+    sourceRefs: Object.freeze([
+      publicStartIntentRef(input.request),
+      publicStartProductModelRef(input.request)
+    ]),
+    applicabilityEnvelopeRefs: optimizationAdmitted
+      ? Object.freeze([
+          `applicability://odd-sdlc/bootstrap-entry/${encodeURIComponent(outcomeClass)}`,
+          input.selectedOverlay.overlayRef
+        ])
+      : Object.freeze([]),
+    nonAdmissionReasonRefs
+  });
 }
 
 function workspaceRootsForMaterialObservation(
@@ -802,7 +873,8 @@ function evaluateInitialPublicStartAction(input: {
         nextActionProjection: null,
         constructionIntent: null,
         traversalDecompositionSummary: null,
-        traversalHopSelection: null
+        traversalHopSelection: null,
+        bootstrapOptimization: null
       });
     }
     candidates = Object.freeze(candidate === null ? [] : [candidate]);
@@ -820,7 +892,8 @@ function evaluateInitialPublicStartAction(input: {
         nextActionProjection: null,
         constructionIntent: null,
         traversalDecompositionSummary: null,
-        traversalHopSelection: null
+        traversalHopSelection: null,
+        bootstrapOptimization: null
       });
 	    }
 	    if (selectedTraversal === null) {
@@ -889,7 +962,8 @@ function evaluateInitialPublicStartAction(input: {
       nextActionProjection: null,
       constructionIntent: null,
       traversalDecompositionSummary: null,
-      traversalHopSelection: null
+      traversalHopSelection: null,
+      bootstrapOptimization: null
     });
   }
   const targetOutcomeRefs = Object.freeze(
@@ -1013,7 +1087,8 @@ function evaluateInitialPublicStartAction(input: {
       nextActionProjection: null,
       constructionIntent: null,
       traversalDecompositionSummary: null,
-      traversalHopSelection: null
+      traversalHopSelection: null,
+      bootstrapOptimization: null
     });
   }
   const selectedActionRef =
@@ -1042,7 +1117,8 @@ function evaluateInitialPublicStartAction(input: {
       nextActionProjection: null,
       constructionIntent: null,
       traversalDecompositionSummary: null,
-      traversalHopSelection: null
+      traversalHopSelection: null,
+      bootstrapOptimization: null
     });
   }
   const selectedGraphVectorRef = input.request.replayNextGraphVectorRef ?? null;
@@ -1101,7 +1177,8 @@ function evaluateInitialPublicStartAction(input: {
       nextActionProjection: null,
       constructionIntent: null,
       traversalDecompositionSummary: null,
-      traversalHopSelection: null
+      traversalHopSelection: null,
+      bootstrapOptimization: null
     });
   }
   const replayClosureDecision =
@@ -1180,6 +1257,15 @@ function evaluateInitialPublicStartAction(input: {
       nextActionProjection.nextActionProjectionRef
     ])
   });
+  const bootstrapOptimization = publicStartBootstrapOptimization({
+    request: input.request,
+    module: input.module,
+    profile: input.conformedProject,
+    selectedOverlay,
+    selectedCandidate,
+    selectedTraversal,
+    sourceRef
+  });
   return Object.freeze({
     targetGraphFunction: selectedCandidate.graphFunctionName,
     blockingReason,
@@ -1187,7 +1273,8 @@ function evaluateInitialPublicStartAction(input: {
     nextActionProjection,
     constructionIntent,
     traversalDecompositionSummary: selectedTraversal?.summary ?? null,
-    traversalHopSelection: selectedTraversal?.selection ?? null
+    traversalHopSelection: selectedTraversal?.selection ?? null,
+    bootstrapOptimization
   });
 }
 
@@ -1202,6 +1289,7 @@ function constructExecutionContract(input: {
   readonly constructionIntent: SdlcConstructionIntent;
   readonly traversalDecompositionSummary: SdlcDecompositionSummary | null;
   readonly traversalHopSelection: SdlcTraversalHopSelection | null;
+  readonly bootstrapOptimization: SdlcBootstrapPublicStartOptimization;
 }): SdlcExecutionContract {
   const requestedOutputs =
     input.request.outputWorkspaceRoot === undefined ||
@@ -1270,7 +1358,8 @@ function constructExecutionContract(input: {
     nextActionProjection: input.nextActionProjection,
     constructionIntent: input.constructionIntent,
     traversalDecompositionSummary: input.traversalDecompositionSummary,
-    traversalHopSelection: input.traversalHopSelection
+    traversalHopSelection: input.traversalHopSelection,
+    bootstrapOptimization: input.bootstrapOptimization
   });
 }
 
@@ -1310,7 +1399,8 @@ export function publicStartOnce(input: {
     targetResolution.targetGraphFunction === null ||
     targetResolution.overlayBinding === null ||
     targetResolution.nextActionProjection === null ||
-    targetResolution.constructionIntent === null
+    targetResolution.constructionIntent === null ||
+    targetResolution.bootstrapOptimization === null
   ) {
     return Object.freeze({
       kind: "sdlc_public_start_blocked",
@@ -1354,7 +1444,8 @@ export function publicStartOnce(input: {
     nextActionProjection: targetResolution.nextActionProjection,
     constructionIntent: targetResolution.constructionIntent,
     traversalDecompositionSummary: targetResolution.traversalDecompositionSummary,
-    traversalHopSelection: targetResolution.traversalHopSelection
+    traversalHopSelection: targetResolution.traversalHopSelection,
+    bootstrapOptimization: targetResolution.bootstrapOptimization
   });
   if (
     input.request.defaultRegime === "F_P" &&

@@ -19,7 +19,7 @@
 - created_at: 2026-05-26
 - updated_at: 2026-06-09
 - completed_at: 2026-06-09
-- superseded_by: .ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md
+- superseded_by: .ai-workspace/tickets/completed/T-197-reconcile-product-boundary-and-remove-authority-leakage.md
 - migration_strategy: deletion_first_no_bridge
 - target_truth: ABG/system owns runtime events, payload admission, payload ledgers, assurance fold, traversal transition, continuation, correction, and replay truth; odd_sdlc owns SDLC edge meaning and product read-model interpretation; every plugin helper lives under its owning compute-stage module
 - superseded_truth: `operator/handoff.ts` as a shared utility bag for prompt generation, product topology, materialization observation, evaluator/register support, postflight diagnostics, replay, installed-operator-owned artifacts, and archive writes
@@ -42,7 +42,7 @@ This close does not claim that every authority-cleanup residual in the wider
 SDLC graph is solved. The remaining generated-asset production-path proof,
 data-mapper live breadth proof, ABG/GTL owner-partition reconciliation, and
 target-identity leakage rows are transferred to
-`.ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md`.
+`.ai-workspace/tickets/completed/T-197-reconcile-product-boundary-and-remove-authority-leakage.md`.
 T-197 is the single active surface for that cleanup cluster.
 
 ## Intake

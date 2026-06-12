@@ -2,7 +2,7 @@
 
 Author: codex
 Date: 2026-06-09T06:13:30Z
-Ticket: `.ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md`
+Ticket: `.ai-workspace/tickets/completed/T-197-reconcile-product-boundary-and-remove-authority-leakage.md`
 
 ## Summary
 

@@ -151,11 +151,7 @@ function normalizedScalar(value: string): string {
 }
 
 function canonicalTenantName(value: string): string {
-  const normalized = value.trim();
-  if (normalized === "spark_scala") {
-    return "scala_spark";
-  }
-  return normalized;
+  return value.trim();
 }
 
 function nonEmpty(value: string | undefined, fallback = ""): string {
@@ -1013,7 +1009,7 @@ function ontologyAnchorLines(input: {
       const authoritative =
         /^INT-\d+/u.test(title) ||
         /^REQ-[A-Z0-9-]+/u.test(title) ||
-        /\b(?:requirements?|architecture|ontology|axioms?|morphisms?|execution|error domain|fidelity)\b/iu.test(title);
+        /\b(?:requirements?|architecture|execution)\b/iu.test(title);
       if (authoritative) {
         anchors.push(`- \`${relativePath}\` -> ${title}`);
       }

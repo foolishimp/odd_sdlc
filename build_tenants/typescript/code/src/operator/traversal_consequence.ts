@@ -27,6 +27,7 @@ export type SdlcYieldKind =
   | "awaiting_external_execution_evidence"
   | "awaiting_fh_input"
   | "partial_product_evidence_admitted_current_edge_should_resume"
+  | "nonlocal_repair_surface_admitted_upstream_reentry"
   | "operator_requested_bounded_stop";
 
 export type SdlcNextActionBasisKind =

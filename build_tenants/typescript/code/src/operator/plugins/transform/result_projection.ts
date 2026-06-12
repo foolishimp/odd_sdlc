@@ -16,10 +16,13 @@ import {
   constructFpTransformResult,
   type FpTransformResult
 } from "@abiogenesis/typescript-tenant";import {
-  FG_CONFORM_PROJECT_AUTHORITY
+  FG_CONFORM_PROJECT_AUTHORITY,
+  FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
 } from "../../../graph/index.js";import {
   writeSdlcSystemArtifact
 } from "../../system_artifacts.js";import {
+  admitComponentDepthRegisterFromArtifact
+} from "../../component_depth_register.js";import {
   parseArray,
   parseClosedRecord,
   parseBoolean,
@@ -1856,12 +1859,22 @@ function materializedFileRequirementLineage(input: {
 function requirementObligationBelongsToDownstreamSurface(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly obligation: SdlcTraversalObligation;
+  readonly canonicalByObligationId: ReadonlyMap<string, string>;
+  readonly liteComponentCodeScopeRequirementIds: ReadonlySet<string> | null;
 }): boolean {
   if (
     input.manifest.targetAssetType !== "component_code_surface" ||
     input.obligation.obligationKind !== "requirement"
   ) {
     return false;
+  }
+  if (input.liteComponentCodeScopeRequirementIds !== null) {
+    const canonicalRequirementId =
+      input.canonicalByObligationId.get(input.obligation.obligationId) ??
+      input.obligation.obligationId;
+    if (!input.liteComponentCodeScopeRequirementIds.has(canonicalRequirementId)) {
+      return true;
+    }
   }
   const requirementText = [
     input.obligation.summary,
@@ -1881,6 +1894,36 @@ function requirementObligationBelongsToDownstreamSurface(input: {
       lower.includes("test-design-surface")
     );
   });
+}
+
+
+function liteComponentCodeScopeRequirementIds(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly canonicalByObligationId: ReadonlyMap<string, string>;
+}): ReadonlySet<string> | null {
+  if (
+    input.manifest.edgeName !== FG_DERIVE_LITE_COMPONENT_CODE_SURFACE ||
+    input.manifest.targetAssetType !== "component_code_surface"
+  ) {
+    return null;
+  }
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: input.manifest.targetAssetType,
+    outputFile: input.manifest.outputFile
+  });
+  if (admission.status !== "admitted" || admission.register === null) {
+    return null;
+  }
+  const ids = new Set<string>();
+  for (const row of [
+    ...admission.register.componentTopologyRows,
+    ...admission.register.componentRealizationRows
+  ]) {
+    for (const requirementId of row.requirementIds) {
+      ids.add(input.canonicalByObligationId.get(requirementId) ?? requirementId);
+    }
+  }
+  return ids.size === 0 ? null : ids;
 }
 
 
@@ -1951,6 +1994,10 @@ function postTransformObligationAssessments(input: {
   const canonicalByObligationId = canonicalRequirementLineageMap(input.manifest);
   const equivalentIdsByCanonical =
     equivalentRequirementLineageIdsByCanonical(input.manifest);
+  const liteScopeRequirementIds = liteComponentCodeScopeRequirementIds({
+    manifest: input.manifest,
+    canonicalByObligationId
+  });
   const assessments = input.manifest.traversalObligationContext.obligations.map((obligation) => {
       const requirementId = requirementIdForObligation(obligation.obligationId);
     if (requirementId !== null) {
@@ -1980,7 +2027,9 @@ function postTransformObligationAssessments(input: {
           !observed &&
           requirementObligationBelongsToDownstreamSurface({
             manifest: input.manifest,
-            obligation
+            obligation,
+            canonicalByObligationId,
+            liteComponentCodeScopeRequirementIds: liteScopeRequirementIds
           });
         const fulfillmentStatus =
           observed && recordsRequirementSurfaceOnly

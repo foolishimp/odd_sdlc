@@ -585,8 +585,6 @@ function diagnosticNeedlesForRepairRow(
     ...row.testRefs.map((ref) => path.basename(ref)),
     ...row.sourceRefs.map((ref) => path.basename(ref)),
     "[error]",
-    "type mismatch",
-    "Cannot prove",
     "test_compile_failed",
     "blockerDetail"
   ]).filter((needle) => needle.length > 0);

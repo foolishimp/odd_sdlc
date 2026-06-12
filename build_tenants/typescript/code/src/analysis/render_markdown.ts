@@ -240,17 +240,17 @@ function renderConceptualStageCoverage(
   coverage: readonly SdlcFdRunAnalysisConceptualStageCoverage[]
 ): string {
   if (coverage.length === 0) {
-    return "## Test35 Conceptual Stage Coverage\n\nnone";
+    return "## Conceptual Stage Coverage\n\nnone";
   }
   const lines: string[] = [
-    "## Test35 Conceptual Stage Coverage",
+    "## Conceptual Stage Coverage",
     "",
-    "| test35 stage | expected edge | expected target | mapped edge | mapped target | class | runs |",
+    "| conceptual stage | expected edge | expected target | mapped edge | mapped target | class | runs |",
     "| - | - | - | - | - | - | - |"
   ];
   for (const row of coverage) {
     lines.push(
-      `| ${row.test35StageRef} | ${row.expectedEdgeName} | ${row.expectedTargetAssetType} | ${row.mappedEdgeName ?? "-"} | ${row.mappedTargetAssetType ?? "-"} | ${row.stageClass} | ${row.operatorRunRefs.length} |`
+      `| ${row.conceptualStageRef} | ${row.expectedEdgeName} | ${row.expectedTargetAssetType} | ${row.mappedEdgeName ?? "-"} | ${row.mappedTargetAssetType ?? "-"} | ${row.stageClass} | ${row.operatorRunRefs.length} |`
     );
   }
   return lines.join("\n");

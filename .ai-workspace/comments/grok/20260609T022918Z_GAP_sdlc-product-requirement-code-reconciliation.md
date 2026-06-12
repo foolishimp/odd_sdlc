@@ -11,9 +11,28 @@
   - `specification/requirements/16-edge-gain-closure-contract.md`
   - `specification/requirements/18-typed-construction-algebra.md`
   - `build_tenants/typescript/code/src/`
-**Status**: Open (merged into active T-197)
-**Active ticket**: `.ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md`
+**Status**: Closed by T-197 terminal refresh (2026-06-11)
+**Completed ticket**: `.ai-workspace/tickets/completed/T-197-reconcile-product-boundary-and-remove-authority-leakage.md`
 **Peer post (horizontal axis)**: `.ai-workspace/comments/claude/20260609T025417Z_GAP_framework-code-out-of-scope-reconciliation.md`
+
+## T-197 Terminal Refresh - 2026-06-11
+
+This GAP post remains commentary. Its actionable rows were merged into T-197
+and are terminal as of the T-197 closure post:
+`.ai-workspace/comments/codex/20260611T121928Z_CLOSURE_T-197-product-boundary-reconciliation.md`.
+
+Terminal ledger state: A1-A5, B1-B4b, C1a-C3, D1-D6, E1-E6, H1-H12,
+P1-P3, and W-000-W-600 are done or explicitly closed by successor proof.
+E6 is no longer only a missing primitive: review-grade findings can now carry
+typed repair-surface triage, and upstream re-entry rows yield an ABG handoff
+basis instead of default same-edge retry. P3 is closed by whole-file JSON
+component-depth admission and fenced-carrier rejection proof.
+
+Proof refreshed on 2026-06-11: `npm run build:semantic`, `npm run test:t197`,
+`node --test test_env/tests/test_t188_closure_state_machine.test.mjs`,
+`node --test test_env/tests/test_t113_component_depth_register_admission.test.mjs`,
+`node --test test_env/tests/test_t171_component_depth_target_carrier_envelope.test.mjs`,
+and `node --test test_env/tests/test_t066_product_materialization_contract.test.mjs`.
 
 ## Summary
 
@@ -171,7 +190,7 @@ residual remains open as T-197 B4b.
 
 ## Ticket / Re-Entry Guidance
 
-Consolidated active ticket: **T-197** (`.ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md`).
+Consolidated ticket: **T-197** (`.ai-workspace/tickets/completed/T-197-reconcile-product-boundary-and-remove-authority-leakage.md`).
 
 | Wave | Smallest lawful re-entry | Ticket |
 | --- | --- | --- |

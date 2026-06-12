@@ -113,6 +113,7 @@ test("T-188 data_mapper live scripts run the boundary guard before live executio
     "test:t164:data-mapper-full-capability-live:resume",
     "test:t171:data-mapper-lifecycle-live",
     "test:t188:data-mapper-lite-lifecycle-live",
+    "test:t199:data-mapper-code-depth-resume-live",
     "live:data-mapper-sandbox"
   ];
   assert.equal(
@@ -134,7 +135,7 @@ test("T-188 data_mapper live harness worker binding comes from runtime policy", 
   );
   assert.equal(
     runtimePolicy.liveHarness.dataMapperWorkerTransport,
-    "process://codex?model=gpt-5.5&effort=high"
+    "process://codex?model=gpt-5.5&effort=high&sandbox=danger-full-access"
   );
 
   const runnerSource = readFileSync(
@@ -149,12 +150,19 @@ test("T-188 data_mapper live harness worker binding comes from runtime policy", 
     runnerSource,
     /process:\/\/claude\?model=sonnet&effort=xhigh/u
   );
+  assert.match(
+    runnerSource,
+    /ODD_SDLC_TS_DATA_MAPPER_WORKER_INACTIVITY_TIMEOUT_MS/u
+  );
+  assert.match(runnerSource, /ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS/u);
+  assert.match(runnerSource, /ODD_SDLC_TEST_ONLY_MINIMUM_OPERATOR_TIMEOUT_MS/u);
 
   for (const relativePath of [
     "test_env/live/run_full_external_data_mapper_sandbox.mjs",
     "test_env/live/test_t109_live_installed_data_mapper_pty.test.mjs",
     "test_env/live/test_t164_data_mapper_full_capability_live.test.mjs",
-    "test_env/live/resume_t164_data_mapper_full_capability_live.mjs"
+    "test_env/live/resume_t164_data_mapper_full_capability_live.mjs",
+    "test_env/live/run_t199_data_mapper_code_depth_resume.mjs"
   ]) {
     const source = readFileSync(path.join(PACKAGE_ROOT, relativePath), "utf8");
     assert.match(
@@ -168,6 +176,16 @@ test("T-188 data_mapper live harness worker binding comes from runtime policy", 
       `${relativePath} must not carry a hard-coded Claude data_mapper worker fallback`
     );
   }
+  const resumeSource = readFileSync(
+    path.join(PACKAGE_ROOT, "test_env/live/run_t199_data_mapper_code_depth_resume.mjs"),
+    "utf8"
+  );
+  assert.match(
+    resumeSource,
+    /ODD_SDLC_TS_DATA_MAPPER_WORKER_INACTIVITY_TIMEOUT_MS/u
+  );
+  assert.match(resumeSource, /ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS/u);
+  assert.match(resumeSource, /ODD_SDLC_TEST_ONLY_MINIMUM_OPERATOR_TIMEOUT_MS/u);
 });
 
 test("T-188 explicit graph-function resume is not hijacked by overlay replay", () => {

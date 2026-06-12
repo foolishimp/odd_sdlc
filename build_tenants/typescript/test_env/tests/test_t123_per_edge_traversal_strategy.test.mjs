@@ -5,9 +5,18 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { materializeGraphFunction } from "@abiogenesis/typescript-tenant";
+import {
+  admitExecutionBasis,
+  admitResolvedPolicyIdentity,
+  admitResolvedRuntimeIdentity,
+  admitStartIntent,
+  constructAgenticBackendProgressProfile,
+  deriveTraversalModulationProfileFromGtl,
+  materializeGraphFunction
+} from "@abiogenesis/typescript-tenant";
 
 import {
+  FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
   ODD_SDLC_STEEL_THREAD_AFTER_REQUIREMENTS_TRAVERSAL_STRATEGY_PLAN,
   constructSdlcGtlModule,
@@ -208,12 +217,55 @@ function manifestFor(
 }
 
 function traversalStrategyRefForVector(vector) {
+  return traversalStrategyHookForVector(vector).ref;
+}
+
+function traversalStrategyHookForVector(vector) {
   const declaration = vector.declarations.entries.find(
     (entry) => entry.key === "abg.traversal_strategy"
   );
   assert(declaration, `${vector.name}: missing traversal strategy declaration`);
   assert.equal(declaration.value.kind, "hook_ref");
-  return declaration.value.value.ref;
+  return declaration.value.value;
+}
+
+function hookConfigValue(hook, key) {
+  const entry = hook.config.entries.find((candidate) => candidate.key === key);
+  return entry?.value;
+}
+
+function basisFor(module, handle) {
+  return admitExecutionBasis({
+    startIntent: admitStartIntent({
+      scope: {
+        kind: "workspace",
+        workspaceRoot: "/workspace/odd-sdlc-t123",
+        moduleName: module.name
+      },
+      target: {
+        kind: "graph_function",
+        handle
+      },
+      until: "converged"
+    }),
+    module,
+    runtimeIdentity: admitResolvedRuntimeIdentity({
+      workerId: "worker://odd-sdlc/t123",
+      backendId: "backend://node",
+      buildId: "build://odd-sdlc/t123",
+      resolvedRuntimeRef: "runtime://abiogenesis/typescript"
+    }),
+    resolvedPolicy: admitResolvedPolicyIdentity({
+      resolvedPolicyBundleRef: "policy://odd-sdlc/t123",
+      defaultRegime: "F_P",
+      dispatchRef: "dispatch://odd-sdlc/t123",
+      approvalSubjectRef: null
+    }),
+    runId: "run://odd-sdlc/t123",
+    workKey: "wk://odd-sdlc/t123",
+    frameId: null,
+    frameLineageId: null
+  });
 }
 
 test("T-123 fallback plan derives one strategy decision for every catalog edge", () => {
@@ -310,6 +362,122 @@ test("T-123 steel-thread-after-requirements is a GTL strategy profile", () => {
       ODD_SDLC_STEEL_THREAD_AFTER_REQUIREMENTS_TRAVERSAL_STRATEGY_PLAN
   });
   assert.equal(designDecision.selectedStrategy, "steel_thread");
+});
+
+test("T-123 deep full-breadth code edges declare a high ABG same-edge continuation budget", () => {
+  const module = constructSdlcGtlModule();
+  const liteCodeFunction = module.graphFunctions.find(
+    (graphFunction) =>
+      graphFunction.name === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+  );
+  assert(liteCodeFunction);
+  const liteCodeVector = materializeGraphFunction(liteCodeFunction).vectors[0];
+  assert(liteCodeVector);
+  const liteCodeHook = traversalStrategyHookForVector(liteCodeVector);
+  assert.equal(
+    liteCodeHook.ref,
+    `strategy://odd_sdlc/${FG_DERIVE_LITE_COMPONENT_CODE_SURFACE}/full_breadth`
+  );
+  assert.deepStrictEqual(hookConfigValue(liteCodeHook, "same_edge_until"), {
+    kind: "scalar",
+    value: "foldback_closed"
+  });
+  assert.deepStrictEqual(
+    hookConfigValue(liteCodeHook, "max_attempts_without_new_signal"),
+    {
+      kind: "scalar",
+      value: 8
+    }
+  );
+  assert.deepStrictEqual(hookConfigValue(liteCodeHook, "max_total_attempts"), {
+    kind: "scalar",
+    value: 64
+  });
+
+  const materializer = module.graphFunctions.find(
+    (graphFunction) => graphFunction.name === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  );
+  assert(materializer);
+  const materializerVector = materializeGraphFunction(materializer).vectors[0];
+  assert(materializerVector);
+  const materializerHook = traversalStrategyHookForVector(materializerVector);
+  assert.equal(
+    materializerHook.ref,
+    `strategy://odd_sdlc/${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}/full_breadth`
+  );
+  assert.deepStrictEqual(hookConfigValue(materializerHook, "max_total_attempts"), {
+    kind: "scalar",
+    value: 64
+  });
+
+  const profile = deriveTraversalModulationProfileFromGtl({
+    basis: basisFor(module, FG_DERIVE_LITE_COMPONENT_CODE_SURFACE),
+    vector: liteCodeVector,
+    graphFunction: liteCodeFunction,
+    vectorIndex: 0,
+    backendProfile: constructAgenticBackendProgressProfile({
+      backendKind: "generic_process",
+      profileRef: "backend-profile://odd-sdlc/t123/deep-code",
+      finalOutputMayBeBuffered: false,
+      progressSignalRequiredBeforeInactivityMs: 1000
+    })
+  });
+  assert.equal(profile.continuation.sameEdgeUntil, "foldback_closed");
+  assert.equal(profile.continuation.maxAttemptsWithoutNewSignal, 8);
+  assert.equal(profile.continuation.maxTotalAttempts, 64);
+});
+
+test("T-123 component-code prompt uses UAT build-test loops as depth pressure", () => {
+  const manifest = manifestFor(
+    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+    null,
+    null,
+    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+  );
+  const prompt = promptForHandoff(manifest);
+
+  assert.match(
+    prompt,
+    /SDLC code-depth rule: admitted UAT\/scenario authority plus build\/test execution is the primary repair signal/u
+  );
+  assert.match(
+    prompt,
+    /force depth by iterating between the smallest admitted UAT\/scenario probe, the declared build\/test command or execution shard, and source repair/u
+  );
+  assert.match(
+    prompt,
+    /Do not report a requirement as behavior-fulfilled merely because it is mapped to a component_depth_register row/u
+  );
+  assert.match(
+    prompt,
+    /do not publish release, component-test, or test-execution carriers from this edge; use admitted UAT\/scenario and build\/test contracts only as repair probes/u
+  );
+});
+
+test("T-123 steel-thread profile does not widen deep-code continuation budget", () => {
+  const module = constructSdlcGtlModule({
+    traversalStrategyPlan:
+      ODD_SDLC_STEEL_THREAD_AFTER_REQUIREMENTS_TRAVERSAL_STRATEGY_PLAN
+  });
+  const bootstrap = module.graphFunctions.find(
+    (graphFunction) => graphFunction.name === "bootstrap_release_self_test"
+  );
+  assert(bootstrap);
+  const graph = materializeGraphFunction(bootstrap);
+  const componentCodeVector = graph.vectors.find(
+    (vector) => vector.name === "derive_component_code_surface"
+  );
+  assert(componentCodeVector);
+  const componentCodeHook = traversalStrategyHookForVector(componentCodeVector);
+
+  assert.equal(
+    componentCodeHook.ref,
+    "strategy://odd_sdlc/derive_component_code_surface/steel_thread"
+  );
+  assert.equal(
+    hookConfigValue(componentCodeHook, "max_total_attempts"),
+    undefined
+  );
 });
 
 test("T-123 induction and requirement edges remain full-breadth", () => {

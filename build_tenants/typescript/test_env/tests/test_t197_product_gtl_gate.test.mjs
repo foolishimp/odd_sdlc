@@ -211,7 +211,7 @@ test("T-197 design ratifies owner partition assets before Wave 1 code", () => {
     "### Decommission Register",
     "### W-105 Construct-Site Sufficiency Inventory",
     "ABG route / dependency",
-    "ABI 4.0.0-rc.15",
+    "ABI 4.0.0-rc.16",
     "runtime continuation transition projection refs",
     "22/22 edge-contract tests and 1/1 Rust-service sandbox proof",
     "must-not-name-governed-target",
@@ -227,14 +227,14 @@ test("T-197 design ratifies owner partition assets before Wave 1 code", () => {
     "D1", "D2", "D3", "D4", "D5", "D6",
     "H1", "H2", "H3", "H4", "H5", "H6",
     "H7", "H8", "H9", "H10", "H11", "H12",
-    "E1", "E2", "E3", "E4", "E5",
+    "E1", "E2", "E3", "E4", "E5", "E6",
     "P1", "P2", "P3"
   ]) {
     assert.match(design, new RegExp(`\\| ${rowId} \\|`, "u"));
   }
 
   const ticket = repoFile(
-    ".ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md"
+    ".ai-workspace/tickets/completed/T-197-reconcile-product-boundary-and-remove-authority-leakage.md"
   );
   assert.match(ticket, /\| W-105 \| Wave 1 pre-realization gate \|/u);
   assert.match(ticket, /\| W-115 \| A2 command\/control hard break \|/u);
@@ -392,6 +392,10 @@ test("T-197 A5 gates installed convergence on ABG terminal convergence", () => {
   const source = repoFile(
     "build_tenants/typescript/code/src/operator/installed_operator.ts"
   );
+  const transitionRefBody = sourceFunction(
+    source,
+    "abgTraversalTransitionProjectionRef"
+  );
 
   assert.equal(
     deriveSdlcInstalledOperatorStatusFromAbgTerminal({
@@ -468,13 +472,41 @@ test("T-197 A5 gates installed convergence on ABG terminal convergence", () => {
     source,
     /closureDisposition:\s*closureDecision\.disposition/u
   );
+  const gapStopTransitionIndex = transitionRefBody.indexOf(
+    'terminalKind === "gap_stop"'
+  );
+  const yieldedTransitionIndex = transitionRefBody.indexOf(
+    'terminalKind === "yielded"'
+  );
+  const closeDispositionIndex = transitionRefBody.indexOf(
+    'input.closureDisposition === "close"'
+  );
+  assert.ok(gapStopTransitionIndex >= 0);
+  assert.ok(yieldedTransitionIndex >= 0);
+  assert.ok(closeDispositionIndex >= 0);
+  assert.ok(
+    gapStopTransitionIndex < closeDispositionIndex,
+    "ABG gap_stop must outrank SDLC close when deriving traversal transition refs"
+  );
+  assert.ok(
+    yieldedTransitionIndex < closeDispositionIndex,
+    "ABG yielded terminal must outrank SDLC close when deriving traversal transition refs"
+  );
   assert.match(
-    source,
+    transitionRefBody,
+    /terminalKind === "gap_stop"[\s\S]*?disposition:\s*"block"[\s\S]*?reason:\s*"runtime_blocked"/u
+  );
+  assert.match(
+    transitionRefBody,
     /input\.closureDisposition === "close"[\s\S]*?disposition:\s*"close"[\s\S]*?reason:\s*"edge_close"/u
   );
   assert.match(
     source,
-    /const effectiveTerminalKind\s*=[\s\S]*?closureDisposition === "close"[\s\S]*?\?\s*"converged"/u
+    /const effectiveTerminalKind\s*=\s*terminal\?\.terminalKind\s*\?\?\s*null/u
+  );
+  assert.doesNotMatch(
+    source,
+    /closureDisposition === "close"[\s\S]*?\?\s*"converged"/u
   );
   assert.match(
     source,
@@ -509,6 +541,9 @@ test("T-197 A2 keeps SDLC start as shell over one admitted ABG boundary", () => 
   const runtimePolicyConfig = repoFile(
     "build_tenants/typescript/config/operator-runtime-policy.json"
   );
+  const design = repoFile(
+    "build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_STAGED_COMPUTE_BOUNDARY.md"
+  );
   const installedStartPayload = sourceFunction(entry, "installedStartPayloadFor");
   const instructions = repoFile(
     "build_tenants/typescript/code/src/install/instruction_files.ts"
@@ -540,6 +575,11 @@ test("T-197 A2 keeps SDLC start as shell over one admitted ABG boundary", () => 
   assert.doesNotMatch(runtimePolicy, /\binstalledReentry\b/u);
   assert.doesNotMatch(runtimePolicy, /\binstalledRetryReentryAttemptLimits\b/u);
   assert.doesNotMatch(runtimePolicyConfig, /"installedReentry"/u);
+  assert.match(design, /A2 \| `executeInstalledOperatorStartWithReentry` formerly owned/u);
+  assert.match(design, /SDLC-local loop deleted/u);
+  assert.match(design, /one admitted `executeInstalledOperatorStart\(\.\.\.\)` boundary/u);
+  assert.doesNotMatch(design, /loop may only call the installed-start boundary/u);
+  assert.doesNotMatch(design, /operator-facing retry\/reentry shell/u);
   assert.match(
     instructions,
     /\$\{genesisCommand\} start --workspace \. --scope workspace --target graph_function:\$\{FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE\} --until converged/u
@@ -643,6 +683,60 @@ test("T-197 H2 keeps F_D run analysis profiles open and capability-driven", () =
   assert.match(analyzeSource, /\bprofileCapabilityContracts\b/u);
 });
 
+test("T-197 H3/H4 contain B-068 enterprise-core fixtures outside product defaults", () => {
+  const rootIndexSource = repoFile("build_tenants/typescript/code/src/index.ts");
+  const qualificationIndexSource = repoFile(
+    "build_tenants/typescript/code/src/qualification/index.ts"
+  );
+  const inventorySource = repoFile(
+    "build_tenants/typescript/code/src/qualification/enterprise_core_inventory.ts"
+  );
+  const sandboxSource = repoFile(
+    "build_tenants/typescript/code/src/qualification/enterprise_core_iteration_sandbox.ts"
+  );
+  const sandboxTestSource = repoFile(
+    "build_tenants/typescript/test_env/sandbox/test_b068_enterprise_core_outcome_iteration.test.mjs"
+  );
+  const sourceHits = repoFilesUnder("build_tenants/typescript/code/src")
+    .filter((filePath) => path.extname(filePath) === ".ts")
+    .filter((filePath) => {
+      const source = readFileSync(filePath, "utf8");
+      return /\bENTERPRISE_CORE_COMPONENTS\b|\bEnterpriseCore\b|enterprise_core_inventory|enterprise_core_iteration_sandbox/u.test(
+        source
+      );
+    })
+    .map((filePath) => path.relative(REPO_ROOT, filePath).split(path.sep).join("/"));
+
+  assert.doesNotMatch(rootIndexSource, /enterprise_core_|ENTERPRISE_CORE|EnterpriseCore/u);
+  assert.doesNotMatch(
+    qualificationIndexSource,
+    /enterprise_core_|ENTERPRISE_CORE|EnterpriseCore/u
+  );
+  assert.deepEqual(sourceHits, [
+    "build_tenants/typescript/code/src/qualification/enterprise_core_inventory.ts",
+    "build_tenants/typescript/code/src/qualification/enterprise_core_iteration_sandbox.ts"
+  ]);
+  assert.match(inventorySource, /Investigates: B-068/u);
+  assert.match(sandboxSource, /Investigates: B-068/u);
+  assert.match(
+    sandboxSource,
+    /key:\s*"function_kind"[\s\S]*?value:\s*"odd_outcome_iteration_probe"/u
+  );
+  assert.match(
+    sandboxTestSource,
+    /code\/src\/qualification\/enterprise_core_inventory\.js/u
+  );
+  assert.match(
+    sandboxTestSource,
+    /code\/src\/qualification\/enterprise_core_iteration_sandbox\.js/u
+  );
+  assert.doesNotMatch(sandboxTestSource, /code\/src\/index\.js/u);
+  assert.doesNotMatch(
+    [inventorySource, sandboxSource, sandboxTestSource].join("\n"),
+    /TypeResolver|TopologicalCompiler|MorphismExecutor|SynthesisEngine|RunManifestManager|ArtifactVersionStore|AssuranceValidator|AccountingVerifier|AdjointCompiler|FidelityVerificationService|CdmeEngine|cdme_|data_mapper_enterprise|morphism|Morphism|fidelity|Fidelity|CDME|Cdme/u
+  );
+});
+
 test("T-197 H5/H7 keep prompt pressure policy off tenant command grammar", () => {
   const promptPolicySource = repoFile(
     "build_tenants/typescript/code/src/operator/plugins/transform/prompt_edge_policy.ts"
@@ -656,4 +750,323 @@ test("T-197 H5/H7 keep prompt pressure policy off tenant command grammar", () =>
   assert.match(promptPolicySource, /text\.includes\("component_test_surface"\)/u);
   assert.match(promptPolicySource, /text\.includes\("execution evidence"\)/u);
   assert.match(reviewPromptSource, /declared test-execution-contract proof/u);
+});
+
+test("T-197 H6 keeps repair reentry diagnostics tenant-declared", () => {
+  const repairReentrySource = repoFile(
+    "build_tenants/typescript/code/src/operator/plugins/consequence/repair_reentry.ts"
+  );
+
+  assert.match(repairReentrySource, /\bfunction diagnosticNeedlesForRepairRow\b/u);
+  assert.match(repairReentrySource, /\brow\.failureId\b/u);
+  assert.match(repairReentrySource, /\brow\.testRefs\.map\b/u);
+  assert.match(repairReentrySource, /\brow\.sourceRefs\.map\b/u);
+  assert.match(repairReentrySource, /"\[error\]"/u);
+  assert.match(repairReentrySource, /"test_compile_failed"/u);
+  assert.match(repairReentrySource, /"blockerDetail"/u);
+  assert.doesNotMatch(
+    repairReentrySource,
+    /"type mismatch"|"Cannot prove"|\bsbt\b|Scala|build\.sbt/u
+  );
+});
+
+test("T-197 C1 keeps Claude argv grammar in a declared worker capability profile", () => {
+  const transportSource = repoFile(
+    "build_tenants/typescript/code/src/operator/transport.ts"
+  );
+  const argsForWorkerBody = sourceFunction(transportSource, "argsForWorker");
+
+  assert.match(transportSource, /\bSDLC_WORKER_CAPABILITY_ARG_PROFILES\b/u);
+  assert.match(transportSource, /\binterface SdlcWorkerCapabilityArgProfile\b/u);
+  assert.match(transportSource, /\bworkerCapabilityArgsForTransport\b/u);
+  assert.match(argsForWorkerBody, /\bworkerCapabilityArgsForTransport\b/u);
+  assert.doesNotMatch(transportSource, /\bfunction claudeArgs\b/u);
+  assert.doesNotMatch(
+    transportSource,
+    /\bsessionRegistry\b|\bworkerRegistry\b|\bcreateServer\b|\bodd_service\b/u
+  );
+});
+
+test("T-197 D2/D3 keep traversal method selection carrier-admitted", () => {
+  const decompositionSource = repoFile(
+    "build_tenants/typescript/code/src/operator/decomposition_admission.ts"
+  );
+  const stagedAuthoritySource = repoFile(
+    "build_tenants/typescript/code/src/operator/product_materialization/staged_authority.ts"
+  );
+  const postflightSource = repoFile(
+    "build_tenants/typescript/code/src/operator/plugins/evaluate/postflight_checks.ts"
+  );
+  const publicStartSource = repoFile(
+    "build_tenants/typescript/code/src/start/public_start.ts"
+  );
+
+  assert.match(
+    decompositionSource,
+    /\binterface SdlcDependencyTraversalSelectedMethodCarrier\b/u
+  );
+  assert.match(
+    decompositionSource,
+    /\badmitSdlcDependencyTraversalSelectedMethodCarrier\b/u
+  );
+  assert.match(decompositionSource, /\bselectedMethodCarrier\b/u);
+  assert.doesNotMatch(
+    decompositionSource,
+    /\bfunction dependencyTraversalMethod\b/u
+  );
+  assert.match(
+    stagedAuthoritySource,
+    /\badmitSdlcDependencyTraversalSelectedMethodCarrier\b/u
+  );
+  assert.match(stagedAuthoritySource, /\bselectedMethodCarrier\b/u);
+  assert.match(
+    postflightSource,
+    /\badmitSdlcDependencyTraversalSelectedMethodCarrier\b/u
+  );
+  assert.match(postflightSource, /\bselectedMethodCarrier\b/u);
+  assert.doesNotMatch(publicStartSource, /\bselectSdlcDependencyMapTraversal\b/u);
+  assert.match(publicStartSource, /\bfunction frontDoorTraversalSelection\b/u);
+  assert.match(publicStartSource, /\bfunction overlayTraversalSelection\b/u);
+  assert.match(publicStartSource, /\bevidenceRefs\b/u);
+  assert.match(publicStartSource, /capability:\/\/odd-sdlc\/trivial_product/u);
+  assert.match(publicStartSource, /overlay:\/\/odd-sdlc\/framework-smoke-min-fp/u);
+  assert.match(publicStartSource, /\binput\.overlay\.overlayRef\b/u);
+});
+
+test("T-197 D1/D4-D6 keep materialization identity carrier-declared", () => {
+  const liveFrontierSource = repoFile(
+    "build_tenants/typescript/code/src/operator/live_fp_parallel_materialization_frontier.ts"
+  );
+  const installedOperatorSource = repoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+  const authoritySource = repoFile(
+    "build_tenants/typescript/code/src/operator/product_materialization/authority.ts"
+  );
+  const liveBridge = sourceFunction(
+    installedOperatorSource,
+    "writeLiveFpParallelMaterializationFrontier"
+  );
+  const laneClassifier = sourceFunction(
+    installedOperatorSource,
+    "liveParallelModuleLaneKind"
+  );
+  const moduleTargets = sourceFunction(
+    authoritySource,
+    "targetsFromDeclaredModuleTargets"
+  );
+  const directoryDetector = sourceFunction(
+    authoritySource,
+    "declaredProductTargetLooksLikeDirectory"
+  );
+  const designSourceTarget = sourceFunction(
+    authoritySource,
+    "designSourceTargetSeedFromComponentRelativePath"
+  );
+
+  assert.doesNotMatch(liveFrontierSource, /\bclassifySdlcLiveParallelModuleLane\b/u);
+  assert.doesNotMatch(installedOperatorSource, /\bclassifySdlcLiveParallelModuleLane\b/u);
+  assert.match(laneClassifier, /\btenantStackDeclaredMaterializedRoleForRelativePath\b/u);
+  assert.match(laneClassifier, /role === "source"/u);
+  assert.doesNotMatch(laneClassifier, /\/src\/|\bindex\./u);
+  assert.match(liveBridge, /\bliveParallelFanInTargetRefs\b/u);
+  assert.doesNotMatch(liveBridge, /index\.\[cm\]\?\[jt\]sx\?|\^src\\\//u);
+  assert.doesNotMatch(moduleTargets, /\$\{input\.selectedOutputRoot\}\/\$\{moduleName\}\/src/u);
+  assert.doesNotMatch(designSourceTarget, /\.test\.|\.spec\./u);
+  assert.match(designSourceTarget, /\bdeclaredRole === "test"/u);
+  assert.doesNotMatch(directoryDetector, /lower === "project"|\/project/u);
+  assert.match(authoritySource, /\btenantStackDeclaredMaterializedRoleForRelativePath\b/u);
+  assert.match(authoritySource, /\bsourceRoots\b/u);
+  assert.match(authoritySource, /\btestRoots\b/u);
+});
+
+test("T-197 E/P residual rows stay carrier-bound", () => {
+  const edgeProjectionSource = repoFile(
+    "build_tenants/typescript/code/src/operator/plugins/consequence/edge_projection.ts"
+  );
+  const closureStateSource = repoFile(
+    "build_tenants/typescript/code/src/operator/closure_state_machine.ts"
+  );
+  const carriersSource = repoFile(
+    "build_tenants/typescript/code/src/operator/carriers.ts"
+  );
+  const installedOperatorSource = repoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+  const reviewGradeSource = repoFile(
+    "build_tenants/typescript/code/src/operator/review_grade_edge_fulfillment.ts"
+  );
+  const reviewGradePromptSource = repoFile(
+    "build_tenants/typescript/code/src/operator/plugins/evaluate/prompts.ts"
+  );
+  const featureDagSource = repoFile(
+    "build_tenants/typescript/code/src/operator/feature_dependency_dag.ts"
+  );
+  const liveFrontierSource = repoFile(
+    "build_tenants/typescript/code/src/operator/live_fp_parallel_materialization_frontier.ts"
+  );
+  const postflightSource = repoFile(
+    "build_tenants/typescript/code/src/operator/plugins/evaluate/postflight_checks.ts"
+  );
+  const resultProjectionSource = repoFile(
+    "build_tenants/typescript/code/src/operator/plugins/transform/result_projection.ts"
+  );
+  const requirementClosureSource = repoFile(
+    "build_tenants/typescript/code/src/projection/requirement_closure.ts"
+  );
+  const shardRunner = sourceFunction(
+    edgeProjectionSource,
+    "runInstalledOperatorShardCommand"
+  );
+  const shardProjection = sourceFunction(
+    edgeProjectionSource,
+    "writeTestExecutionResultProjection"
+  );
+  const executionShards = sourceFunction(
+    edgeProjectionSource,
+    "installedOperatorExecutionShards"
+  );
+  const closureTransition = sourceFunction(
+    closureStateSource,
+    "deriveSdlcClosureStateTransition"
+  );
+  const reportReader = sourceFunction(
+    postflightSource,
+    "readArchivedWorkerResultReportRecord"
+  );
+  const admittedReport = sourceFunction(
+    resultProjectionSource,
+    "admitWorkerResultReport"
+  );
+  const topologicalHits = repoFilesUnder("build_tenants/typescript/code/src")
+    .filter((filePath) => path.extname(filePath) === ".ts")
+    .filter((filePath) => readFileSync(filePath, "utf8").includes("topologicalOrder"))
+    .map((filePath) => path.relative(REPO_ROOT, filePath).split(path.sep).join("/"));
+
+  assert.match(shardProjection, /\binstalledOperatorExecutionShards\(manifest\)/u);
+  assert.match(shardProjection, /\brunInstalledOperatorShardCommand\(\{/u);
+  assert.match(shardProjection, /command:\s*shard\.command/u);
+  assert.match(shardProjection, /cwd:\s*shard\.workingDirectory/u);
+  assert.match(executionShards, /\bmanifest\.productMaterialization\.executionShards\b/u);
+  assert.match(executionShards, /\blatestAdmittedTestExecutionSurfaceRegister\b/u);
+  assert.doesNotMatch(shardRunner, /\bnpm test\b|\bsbt test\b/u);
+
+  assert.match(closureStateSource, /\binterface SdlcClosureResidualPressureCarrier\b/u);
+  assert.match(closureStateSource, /\bmakeSdlcClosureResidualPressureCarrier\b/u);
+  assert.match(carriersSource, /\bSdlcRepairSurfaceTriageCarrier\b/u);
+  assert.match(carriersSource, /\bSDLC_REPAIR_SURFACE_TRIAGE_DISPOSITIONS\b/u);
+  assert.match(carriersSource, /"upstream_reentry"/u);
+  assert.match(reviewGradeSource, /\breviewGradeEdgeFulfillmentRepairSurfaceTriageRows\b/u);
+  assert.match(reviewGradeSource, /\bparseNullableRepairSurfaceTriage\b/u);
+  assert.match(reviewGradeSource, /"downstream_deferred"/u);
+  assert.match(reviewGradePromptSource, /\brepairSurfaceTriage\b/u);
+  assert.match(reviewGradePromptSource, /current_edge_repair, upstream_reentry, downstream_deferred, or external_blocked/u);
+  assert.match(closureTransition, /\bresidualPressureCarriers\b/u);
+  assert.match(closureTransition, /\bresidualPressureCarrierRefsForBucket\b/u);
+  assert.match(closureTransition, /\breenterReasonRefs\b/u);
+  assert.match(installedOperatorSource, /\bresidualPressureCarriers:\s*closureResidualPressureCarriers/u);
+  assert.match(installedOperatorSource, /\breviewGradeResidualPressureCarriersForState\b/u);
+  assert.match(installedOperatorSource, /\bderiveSdlcUpstreamRepairSurfaceYieldResumeBasis\b/u);
+  assert.match(installedOperatorSource, /\bselectedEvaluationDefaultResidualPressureRefs\b/u);
+  assert.match(
+    installedOperatorSource,
+    /nonlocal_repair_surface_admitted_upstream_reentry/u
+  );
+
+  assert.deepEqual(topologicalHits, [
+    "build_tenants/typescript/code/src/operator/carriers.ts",
+    "build_tenants/typescript/code/src/operator/feature_dependency_dag.ts"
+  ]);
+  assert.match(featureDagSource, /\bderiveDependencyFrontierProjection\b/u);
+  assert.match(featureDagSource, /\bparentBranchRefs\b/u);
+  assert.match(liveFrontierSource, /\bgraphTruthSource:\s*"sdlc_feature_dependency_dag"/u);
+
+  assert.match(reportReader, /\bauthoritativeStageResultRef\b/u);
+  assert.match(reportReader, /\bexpectedArchivedFpEvaluateResultRef\b/u);
+  assert.match(
+    reportReader,
+    /expected same-archive fp_evaluate_result\.json/u
+  );
+  assert.match(admittedReport, /\badmitAuthoritativeStageResultRef\b/u);
+  assert.match(installedOperatorSource, /\breviewGradeEdgeFulfillmentAssessmentRequired\b/u);
+  assert.match(requirementClosureSource, /selectedBy:\s*"abg_selected_edge"/u);
+  assert.match(requirementClosureSource, /\bgeneratedAssetContractSatisfied\b/u);
+});
+
+test("T-197 P3 keeps component-depth admission off fenced bridge fixtures", () => {
+  const componentDepthSource = repoFile(
+    "build_tenants/typescript/code/src/operator/component_depth_register.ts"
+  );
+  const promptPolicySource = repoFile(
+    "build_tenants/typescript/code/src/operator/plugins/transform/prompt_edge_policy.ts"
+  );
+  const t113Source = repoFile(
+    "build_tenants/typescript/test_env/tests/test_t113_component_depth_register_admission.test.mjs"
+  );
+
+  assert.doesNotMatch(componentDepthSource, /\bmarkdownFencedJsonBlocks\b/u);
+  assert.doesNotMatch(componentDepthSource, /markdown_fence_/u);
+  assert.doesNotMatch(componentDepthSource, /component_depth_register_body/u);
+  assert.doesNotMatch(
+    componentDepthSource,
+    /\(\?:json\\s\+\)\?component_depth_register/u
+  );
+  assert.match(
+    promptPolicySource,
+    /whole-file JSON component_depth_register selected target-carrier envelope/u
+  );
+  assert.match(
+    promptPolicySource,
+    /Do not wrap the component_depth_register carrier in Markdown fences/u
+  );
+  assert.doesNotMatch(
+    promptPolicySource,
+    /fenced `json component_depth_register`/u
+  );
+  assert.match(
+    t113Source,
+    /rejects Markdown-fenced component-depth target carrier payloads/u
+  );
+  assert.match(
+    t113Source,
+    /rejects plain-fence labeled component-depth target carrier payloads/u
+  );
+  assert.doesNotMatch(
+    t113Source,
+    /admits Markdown-fenced component-depth|admits live plain-fence labeled component-depth/u
+  );
+});
+
+test("T-197 H8-H12 keep low-priority horizontal literals neutral", () => {
+  const analyzeSource = repoFile("build_tenants/typescript/code/src/analysis/analyze.ts");
+  const analysisTypesSource = repoFile(
+    "build_tenants/typescript/code/src/analysis/types.ts"
+  );
+  const renderMarkdownSource = repoFile(
+    "build_tenants/typescript/code/src/analysis/render_markdown.ts"
+  );
+  const projectProfileSource = repoFile(
+    "build_tenants/typescript/code/src/workspace/project_profile.ts"
+  );
+  const promptPolicySource = repoFile(
+    "build_tenants/typescript/code/src/operator/plugins/transform/prompt_edge_policy.ts"
+  );
+
+  assert.doesNotMatch(analyzeSource, /\bTEST35_CONCEPTUAL_STAGES\b/u);
+  assert.doesNotMatch(analyzeSource, /test35:\/\/stage/u);
+  assert.match(analyzeSource, /\bSDLC_CONCEPTUAL_STAGES\b/u);
+  assert.match(analyzeSource, /sdlc:\/\/stage\/project-conformance/u);
+  assert.doesNotMatch(analysisTypesSource, /\btest35StageRef\b/u);
+  assert.match(analysisTypesSource, /\bconceptualStageRef\b/u);
+  assert.doesNotMatch(renderMarkdownSource, /Test35 Conceptual Stage Coverage/u);
+  assert.doesNotMatch(renderMarkdownSource, /test35 stage/u);
+  assert.match(renderMarkdownSource, /Conceptual Stage Coverage/u);
+  assert.match(renderMarkdownSource, /conceptual stage/u);
+  assert.doesNotMatch(projectProfileSource, /normalized === "spark_scala"/u);
+  assert.doesNotMatch(promptPolicySource, /data_mapper\.requirements\.req_dq_001/u);
+  assert.match(promptPolicySource, /tenant\.requirements\.req_example_001/u);
+  assert.doesNotMatch(
+    projectProfileSource,
+    /morphisms\?|error domain|fidelity/u
+  );
 });

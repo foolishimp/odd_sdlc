@@ -36,6 +36,12 @@ const LANE_NAME =
   "full_external_data_mapper_sandbox";
 const DATA_MAPPER_TEMPLATE_ROOT = canonicalDataMapperFixtureRoot();
 const WORKER_TRANSPORT = RUNTIME_POLICY.liveHarnessDataMapperWorkerTransport;
+const DATA_MAPPER_WORKER_MINIMUM_OPERATOR_TIMEOUT_MS =
+  process.env["ODD_SDLC_TS_DATA_MAPPER_WORKER_MINIMUM_OPERATOR_TIMEOUT_MS"] ??
+  "60000";
+const DATA_MAPPER_WORKER_INACTIVITY_TIMEOUT_MS =
+  process.env["ODD_SDLC_TS_DATA_MAPPER_WORKER_INACTIVITY_TIMEOUT_MS"] ??
+  "900000";
 const COMMAND_TIMEOUT_MS = configuredLiveTimeoutMs(
   "ODD_SDLC_TS_DATA_MAPPER_COMMAND_TIMEOUT_MS",
   RUNTIME_POLICY.liveHarnessFullCapabilityCommandTimeoutMs
@@ -172,6 +178,101 @@ function installedAbgCommandFromInstallPayload(payload, workspace, commandName) 
   return path.join(workspace, "node_modules/.bin", commandName);
 }
 
+function copyCacheSeedIfPresent(input) {
+  if (input.source.length === 0 || !existsSync(input.source)) {
+    return null;
+  }
+  mkdirSync(dirname(input.destination), { recursive: true });
+  cpSync(input.source, input.destination, {
+    recursive: true,
+    force: true,
+    errorOnExist: false
+  });
+  return Object.freeze({
+    source: input.source,
+    destination: input.destination
+  });
+}
+
+function seedSandboxToolCache(input) {
+  const home = process.env["HOME"] ?? "";
+  const hostSbtBoot =
+    process.env["ODD_SDLC_TS_HOST_SBT_BOOT_CACHE"] ??
+    (home.length === 0 ? "" : path.join(home, ".sbt/boot"));
+  const hostCoursierV1 =
+    process.env["ODD_SDLC_TS_HOST_COURSIER_V1_CACHE"] ??
+    (home.length === 0 ? "" : path.join(home, "Library/Caches/Coursier/v1"));
+  const seeded = [
+    copyCacheSeedIfPresent({
+      source: hostSbtBoot,
+      destination: input.sbtBootDirectory
+    }),
+    copyCacheSeedIfPresent({
+      source: path.join(hostCoursierV1, "https/repo1.maven.org/maven2/org/scala-sbt"),
+      destination: path.join(input.coursierCache, "https/repo1.maven.org/maven2/org/scala-sbt")
+    }),
+    copyCacheSeedIfPresent({
+      source: path.join(hostCoursierV1, "https/repo1.maven.org/maven2/org/scala-lang"),
+      destination: path.join(input.coursierCache, "https/repo1.maven.org/maven2/org/scala-lang")
+    })
+  ].filter((entry) => entry !== null);
+  return Object.freeze(seeded);
+}
+
+function sandboxToolCache(input) {
+  const toolCacheRoot = path.join(
+    input.workspace,
+    ".ai-workspace/runtime/odd_sdlc/tool-cache"
+  );
+  const sbtBootDirectory = path.join(toolCacheRoot, "sbt-boot");
+  const sbtGlobalBase = path.join(toolCacheRoot, "sbt-global");
+  const sbtIvyHome = path.join(toolCacheRoot, "ivy2");
+  const coursierCache = path.join(toolCacheRoot, "coursier");
+  const archiveToolCacheRoot = path.join(input.archiveRoot, "tool-cache");
+  for (const dirPath of [
+    toolCacheRoot,
+    sbtBootDirectory,
+    sbtGlobalBase,
+    sbtIvyHome,
+    coursierCache
+  ]) {
+    mkdirSync(dirPath, { recursive: true });
+  }
+  const seededCacheRefs = seedSandboxToolCache({
+    sbtBootDirectory,
+    coursierCache
+  });
+  const sbtProperties = [
+    `-Dsbt.boot.directory=${sbtBootDirectory}`,
+    `-Dsbt.global.base=${sbtGlobalBase}`,
+    `-Dsbt.ivy.home=${sbtIvyHome}`,
+    `-Divy.home=${sbtIvyHome}`
+  ].join(" ");
+  return Object.freeze({
+    toolCacheRoot,
+    archiveToolCacheRoot,
+    sbtBootDirectory,
+    sbtGlobalBase,
+    sbtIvyHome,
+    coursierCache,
+    seededCacheRefs,
+    env: Object.freeze({
+      COURSIER_CACHE: coursierCache,
+      IVY_HOME: sbtIvyHome,
+      SBT_OPTS: [process.env["SBT_OPTS"] ?? "", sbtProperties].join(" ").trim()
+    })
+  });
+}
+
+function dataMapperWorkerRuntimeEnv() {
+  return Object.freeze({
+    ODD_SDLC_TEST_ONLY_MINIMUM_OPERATOR_TIMEOUT_MS:
+      DATA_MAPPER_WORKER_MINIMUM_OPERATOR_TIMEOUT_MS,
+    ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS:
+      DATA_MAPPER_WORKER_INACTIVITY_TIMEOUT_MS
+  });
+}
+
 function findProductMaterializationPackages(workspace) {
   const runsRoot = path.join(workspace, ".ai-workspace/runtime/odd_sdlc/operator-runs");
   if (!existsSync(runsRoot)) {
@@ -270,9 +371,12 @@ function main() {
   const workspace = freshWorkspace(archiveRoot);
   const sourceCli = path.join(PACKAGE_ROOT, "build/semantic/code/src/cli/main.js");
   assertExists(sourceCli, "built source odd-sdlc-ts CLI");
+  const toolCache = sandboxToolCache({ archiveRoot, workspace });
 
   const baseEnv = {
     ...process.env,
+    ...dataMapperWorkerRuntimeEnv(),
+    ...toolCache.env,
     ODD_SDLC_TS_OUTPUT: "json",
     ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE: "pty-terminal",
     ABG_TS_AGENT_EXECUTOR_PROFILE: "pty-terminal",
@@ -286,6 +390,16 @@ function main() {
     workspace,
     templateRoot: DATA_MAPPER_TEMPLATE_ROOT,
     workerTransport: WORKER_TRANSPORT,
+    workerRuntimeEnv: dataMapperWorkerRuntimeEnv(),
+    sandboxToolCache: {
+      toolCacheRoot: toolCache.toolCacheRoot,
+      archiveToolCacheRoot: toolCache.archiveToolCacheRoot,
+      sbtBootDirectory: toolCache.sbtBootDirectory,
+      sbtGlobalBase: toolCache.sbtGlobalBase,
+      sbtIvyHome: toolCache.sbtIvyHome,
+      coursierCache: toolCache.coursierCache,
+      seededCacheRefs: toolCache.seededCacheRefs
+    },
     targetGraphFunction: TARGET_GRAPH_FUNCTION,
     steps: []
   };

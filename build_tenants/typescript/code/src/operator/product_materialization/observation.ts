@@ -631,10 +631,41 @@ function normalizedRelativePath(relativePath: string): string {
 
 function isSdlcRuntimeByproductPath(relativePath: string): boolean {
   const normalized = normalizedRelativePath(relativePath).toLowerCase();
-	return (
-		normalized === ".ai-workspace/runtime" ||
-		normalized.startsWith(".ai-workspace/runtime/") ||
-		normalized.includes("/.ai-workspace/runtime/")
+  return (
+    normalized === ".ai-workspace/runtime" ||
+    normalized.startsWith(".ai-workspace/runtime/") ||
+    normalized.includes("/.ai-workspace/runtime/")
+  );
+}
+
+function isGenericBuildExecutionByproductPath(relativePath: string): boolean {
+  const normalized = normalizedRelativePath(relativePath).toLowerCase();
+  return (
+    normalized === "target" ||
+    normalized.startsWith("target/") ||
+    normalized.includes("/target/") ||
+    normalized === ".bsp" ||
+    normalized.startsWith(".bsp/") ||
+    normalized.includes("/.bsp/") ||
+    normalized === ".bloop" ||
+    normalized.startsWith(".bloop/") ||
+    normalized.includes("/.bloop/") ||
+    normalized === ".metals" ||
+    normalized.startsWith(".metals/") ||
+    normalized.includes("/.metals/")
+  );
+}
+
+function targetContractIsExactFileTarget(input: {
+  readonly target: SdlcProductMaterializationAuthorityTarget | null;
+  readonly normalizedRelativePath: string;
+}): boolean {
+  if (input.target === null || input.target.targetKind !== "file") {
+    return false;
+  }
+  return (
+    normalizedRelativePath(input.target.path).replace(/\/+$/u, "") ===
+    input.normalizedRelativePath
   );
 }
 
@@ -1169,6 +1200,19 @@ export function observeProductMaterializationDeltaWithDiagnostics(
       continue;
     }
     const normalized = normalizedRelativePath(file.relativePath);
+    const targetContract = targetContractForMaterializedFile({
+      manifest: input.manifest,
+      relativePath: normalized
+    });
+    if (
+      isGenericBuildExecutionByproductPath(normalized) &&
+      !targetContractIsExactFileTarget({
+        target: targetContract,
+        normalizedRelativePath: normalized
+      })
+    ) {
+      continue;
+    }
     const declaredProductRole =
       deps.declaredProductAuthorityRoleForObservedFile({
         manifest: input.manifest,

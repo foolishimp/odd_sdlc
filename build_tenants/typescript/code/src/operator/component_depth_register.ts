@@ -659,65 +659,8 @@ function parseJsonCandidates(input: string, label: string): readonly unknown[] {
   }
 }
 
-function markdownFencedJsonBlocks(
-  content: string
-): readonly { readonly label: string; readonly content: string }[] {
-  const blocks: { readonly label: string; readonly content: string }[] = [];
-  const lines = content.split(/\r?\n/u);
-  let open:
-    | {
-        readonly label: string;
-        readonly body: string[];
-      }
-    | null = null;
-  for (const [index, line] of lines.entries()) {
-    if (open === null) {
-      const match = /^```([^\r\n`]*)$/u.exec(line.trimEnd());
-      if (match !== null) {
-        const info = (match[1] ?? "").trim();
-        open = {
-          label: info.length === 0
-            ? `component_depth_register.markdown_fence_${index + 1}`
-            : `component_depth_register.markdown_fence_${index + 1}:${info}`,
-          body: []
-        };
-      }
-      continue;
-    }
-    if (line.trim() === "```") {
-      blocks.push(Object.freeze({
-        label: open.label,
-        content: open.body.join("\n")
-      }));
-      open = null;
-      continue;
-    }
-    open.body.push(line);
-  }
-  return Object.freeze(blocks);
-}
-
 function jsonCandidates(content: string): readonly unknown[] {
-  const candidates: unknown[] = [
-    ...parseJsonCandidates(content, "component_depth_register")
-  ];
-  for (const block of markdownFencedJsonBlocks(content)) {
-    candidates.push(...parseJsonCandidates(block.content, block.label));
-    const body = block.content.trimStart();
-    const registerLabelMatch =
-      /^(?:json\s+)?component_depth_register[^\S\r\n]*(?:\r?\n)([\s\S]*)$/u.exec(
-        body
-      );
-    if (registerLabelMatch !== null) {
-      candidates.push(
-        ...parseJsonCandidates(
-          registerLabelMatch[1] ?? "",
-          `${block.label}:component_depth_register_body`
-        )
-      );
-    }
-  }
-  return Object.freeze(candidates);
+  return parseJsonCandidates(content, "component_depth_register");
 }
 
 function requiredRowsPresent(input: {

@@ -50,6 +50,25 @@ function parseEffort(
   );
 }
 
+function parseCodexSandboxMode(
+  rawSandbox: string | null
+): "read-only" | "workspace-write" | "danger-full-access" {
+  if (rawSandbox === null || rawSandbox.trim().length === 0) {
+    return "workspace-write";
+  }
+  const sandbox = rawSandbox.trim();
+  if (
+    sandbox === "read-only" ||
+    sandbox === "workspace-write" ||
+    sandbox === "danger-full-access"
+  ) {
+    return sandbox;
+  }
+  throw new TypeError(
+    "SdlcWorkerTransportContract.codexSandboxMode: expected read-only, workspace-write, or danger-full-access"
+  );
+}
+
 function normalizedWorkerTransportUrl(rawTransport: string): string {
   const trimmed = rawTransport.trim();
   const alias = /^(claude|codex|gemini|node)(\?.*)?$/u.exec(trimmed);
@@ -91,6 +110,9 @@ export function admitWorkerTransport(
   const model =
     rawModel === null || rawModel.trim().length === 0 ? null : rawModel.trim();
   const effort = parseEffort(parsed.searchParams.get("effort"));
+  const codexSandboxMode = parseCodexSandboxMode(
+    parsed.searchParams.get("sandbox")
+  );
   const agentKey = transportAgentKey(command);
   return Object.freeze({
     kind: "sdlc_worker_transport_contract",
@@ -101,6 +123,7 @@ export function admitWorkerTransport(
     args,
     model,
     effort,
+    codexSandboxMode,
     workerId: `worker://odd-sdlc/${agentKey}`,
     backendId: `backend://process/${agentKey}`
   });
@@ -112,6 +135,7 @@ function codexArgs(input: {
   readonly outputLastMessagePath: string;
   readonly model: string | null;
   readonly effort: "low" | "medium" | "high" | "xhigh" | "max" | null;
+  readonly sandboxMode: "read-only" | "workspace-write" | "danger-full-access";
 }): readonly string[] {
   const modelArgs =
     input.model === null ? Object.freeze([]) : Object.freeze(["--model", input.model]);
@@ -135,7 +159,7 @@ function codexArgs(input: {
     "--skip-git-repo-check",
     "--ephemeral",
     "--sandbox",
-    "workspace-write",
+    input.sandboxMode,
     "--cd",
     input.workspaceRoot,
     "--output-last-message",
@@ -144,30 +168,61 @@ function codexArgs(input: {
   ]);
 }
 
-function claudeArgs(input: {
-  readonly model: string | null;
-  readonly effort: "low" | "medium" | "high" | "xhigh" | "max" | null;
-}): readonly string[] {
+interface SdlcWorkerCapabilityArgProfile {
+  readonly agentKey: "claude";
+  readonly stdinPromptMode: "prompt_stdin";
+  readonly parser: "claude-stream-json";
+  readonly headArgs: readonly string[];
+  readonly modelFlag: string;
+  readonly effortFlag: string;
+  readonly fixedArgs: readonly string[];
+}
+
+const SDLC_WORKER_CAPABILITY_ARG_PROFILES = Object.freeze({
+  claude: Object.freeze({
+    agentKey: "claude" as const,
+    stdinPromptMode: "prompt_stdin" as const,
+    parser: "claude-stream-json" as const,
+    headArgs: Object.freeze(["-p"]),
+    modelFlag: "--model",
+    effortFlag: "--effort",
+    fixedArgs: Object.freeze([
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--disable-slash-commands",
+      "--no-session-persistence",
+      "--strict-mcp-config",
+      "--mcp-config",
+      "{\"mcpServers\":{}}",
+      "--setting-sources",
+      "project,local",
+      "--permission-mode",
+      "bypassPermissions"
+    ])
+  } satisfies SdlcWorkerCapabilityArgProfile)
+});
+
+function workerCapabilityArgsForTransport(input: {
+  readonly transport: SdlcWorkerTransportContract;
+}): readonly string[] | null {
+  if (input.transport.agentKey !== "claude") {
+    return null;
+  }
+  const profile = SDLC_WORKER_CAPABILITY_ARG_PROFILES.claude;
   const modelArgs =
-    input.model === null ? Object.freeze([]) : Object.freeze(["--model", input.model]);
+    input.transport.model === null
+      ? Object.freeze([])
+      : Object.freeze([profile.modelFlag, input.transport.model]);
   const effortArgs =
-    input.effort === null ? Object.freeze([]) : Object.freeze(["--effort", input.effort]);
+    input.transport.effort === null
+      ? Object.freeze([])
+      : Object.freeze([profile.effortFlag, input.transport.effort]);
   return Object.freeze([
-    "-p",
+    ...profile.headArgs,
     ...modelArgs,
     ...effortArgs,
-    "--output-format",
-    "stream-json",
-    "--verbose",
-    "--disable-slash-commands",
-    "--no-session-persistence",
-    "--strict-mcp-config",
-    "--mcp-config",
-    "{\"mcpServers\":{}}",
-    "--setting-sources",
-    "project,local",
-    "--permission-mode",
-    "bypassPermissions"
+    ...profile.fixedArgs
   ]);
 }
 
@@ -185,14 +240,17 @@ export function argsForWorker(input: {
         promptPath: input.promptPath,
         outputLastMessagePath: input.outputLastMessagePath,
         model: input.transport.model,
-        effort: input.transport.effort
+        effort: input.transport.effort,
+        sandboxMode: input.transport.codexSandboxMode
       });
     }
     if (input.transport.agentKey === "claude") {
-      return claudeArgs({
-        model: input.transport.model,
-        effort: input.transport.effort
+      const capabilityArgs = workerCapabilityArgsForTransport({
+        transport: input.transport
       });
+      if (capabilityArgs !== null) {
+        return capabilityArgs;
+      }
     }
   }
   return Object.freeze([...input.transport.args, input.manifestPath]);

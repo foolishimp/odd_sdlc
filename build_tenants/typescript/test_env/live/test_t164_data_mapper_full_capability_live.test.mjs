@@ -226,6 +226,20 @@ test("T-164 full-capability proof derives required graph edges from current cata
   );
 });
 
+test("T-164 full data_mapper live runner keeps SBT caches inside sandbox workspace", () => {
+  const runner = readFileSync(
+    path.join(dirname(fileURLToPath(import.meta.url)), "run_full_external_data_mapper_sandbox.mjs"),
+    "utf8"
+  );
+  assert.match(runner, /sandboxToolCache/u);
+  assert.match(runner, /\.ai-workspace\/runtime\/odd_sdlc\/tool-cache/u);
+  assert.match(runner, /COURSIER_CACHE/u);
+  assert.match(runner, /-Dsbt\.boot\.directory=/u);
+  assert.match(runner, /-Dsbt\.global\.base=/u);
+  assert.match(runner, /-Dsbt\.ivy\.home=/u);
+  assert.match(runner, /SBT_OPTS/u);
+});
+
 test("T-164 composite design proofs preserve split-edge capability without stale graph edges", () => {
   const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t164-graph-proof-"));
   try {

@@ -211,81 +211,81 @@ function aggregateProductFileCount(
   return seen.size;
 }
 
-const TEST35_CONCEPTUAL_STAGES = Object.freeze([
+const SDLC_CONCEPTUAL_STAGES = Object.freeze([
   Object.freeze({
-    test35StageRef: "test35://stage/project-conformance",
+    conceptualStageRef: "sdlc://stage/project-conformance",
     expectedEdgeName: "Fg_conform_project_authority",
     expectedTargetAssetType: "project_bootstrap_surface",
     stageClass: "constructive" as const
   }),
   Object.freeze({
-    test35StageRef: "test35://stage/feature-decomposition",
+    conceptualStageRef: "sdlc://stage/feature-decomposition",
     expectedEdgeName: "derive_feature_decomp_surface",
     expectedTargetAssetType: "feature_decomp_surface",
     stageClass: "constructive" as const
   }),
   Object.freeze({
-    test35StageRef: "test35://stage/scenario-uat-pressure",
+    conceptualStageRef: "sdlc://stage/scenario-uat-pressure",
     expectedEdgeName: "derive_scenario_surface",
     expectedTargetAssetType: "scenario_surface",
     stageClass: "constructive" as const
   }),
   Object.freeze({
-    test35StageRef: "test35://stage/uat-testcases",
+    conceptualStageRef: "sdlc://stage/uat-testcases",
     expectedEdgeName: "derive_uat_testcases_surface",
     expectedTargetAssetType: "uat_testcases_surface",
     stageClass: "constructive" as const
   }),
   Object.freeze({
-    test35StageRef: "test35://stage/implementation-design",
+    conceptualStageRef: "sdlc://stage/implementation-design",
     expectedEdgeName: "derive_implementation_design_surface",
     expectedTargetAssetType: "implementation_design_surface",
     stageClass: "constructive" as const
   }),
   Object.freeze({
-    test35StageRef: "test35://stage/component-code",
+    conceptualStageRef: "sdlc://stage/component-code",
     expectedEdgeName: "derive_component_code_surface",
     expectedTargetAssetType: "component_code_surface",
     stageClass: "constructive" as const
   }),
   Object.freeze({
-    test35StageRef: "test35://stage/test-design",
+    conceptualStageRef: "sdlc://stage/test-design",
     expectedEdgeName: "derive_test_design_surface",
     expectedTargetAssetType: "test_design_surface",
     stageClass: "constructive" as const
   }),
   Object.freeze({
-    test35StageRef: "test35://stage/component-test",
+    conceptualStageRef: "sdlc://stage/component-test",
     expectedEdgeName: "derive_component_test_surface",
     expectedTargetAssetType: "component_test_surface",
     stageClass: "constructive" as const
   }),
   Object.freeze({
-    test35StageRef: "test35://stage/test-execution-prep",
+    conceptualStageRef: "sdlc://stage/test-execution-prep",
     expectedEdgeName: "prepare_test_execution_surface",
     expectedTargetAssetType: "test_execution_surface",
     stageClass: "constructive" as const
   }),
   Object.freeze({
-    test35StageRef: "test35://stage/test-execution-result",
+    conceptualStageRef: "sdlc://stage/test-execution-result",
     expectedEdgeName: "derive_test_execution_result_surface",
     expectedTargetAssetType: "test_execution_result_surface",
     stageClass: "constructive" as const
   }),
   Object.freeze({
-    test35StageRef: "test35://stage/test-run-archive",
+    conceptualStageRef: "sdlc://stage/test-run-archive",
     expectedEdgeName: "derive_test_run_archive_surface",
     expectedTargetAssetType: "test_run_archive_surface",
     stageClass: "constructive" as const
   }),
   Object.freeze({
-    test35StageRef: "test35://stage/code-rollup",
+    conceptualStageRef: "sdlc://stage/code-rollup",
     expectedEdgeName: "derive_code_surface",
     expectedTargetAssetType: "code_surface",
     stageClass: "rollup" as const
   }),
   Object.freeze({
-    test35StageRef: "test35://stage/release-preparation",
+    conceptualStageRef: "sdlc://stage/release-preparation",
     expectedEdgeName: "prepare_release_surface",
     expectedTargetAssetType: "release_surface",
     stageClass: "rollup" as const
@@ -311,7 +311,7 @@ function deriveConceptualStageCoverage(
 ): readonly SdlcFdRunAnalysisConceptualStageCoverage[] {
   const rows: SdlcFdRunAnalysisConceptualStageCoverage[] = [];
   const mappedAttemptRefs = new Set<string>();
-  for (const stage of TEST35_CONCEPTUAL_STAGES) {
+  for (const stage of SDLC_CONCEPTUAL_STAGES) {
     const matches = attempts.filter((attempt) => attemptMatchesStage(attempt, stage));
     for (const match of matches) {
       mappedAttemptRefs.add(match.operatorRunRef);
@@ -319,7 +319,7 @@ function deriveConceptualStageCoverage(
     const first = matches[0] ?? null;
     rows.push(Object.freeze({
       kind: "sdlc_fd_run_analysis_conceptual_stage_coverage" as const,
-      test35StageRef: stage.test35StageRef,
+      conceptualStageRef: stage.conceptualStageRef,
       expectedEdgeName: stage.expectedEdgeName,
       expectedTargetAssetType: stage.expectedTargetAssetType,
       mappedEdgeName: first?.graphVectorRef ?? first?.graphFunctionName ?? null,
@@ -334,7 +334,7 @@ function deriveConceptualStageCoverage(
     }
     rows.push(Object.freeze({
       kind: "sdlc_fd_run_analysis_conceptual_stage_coverage" as const,
-      test35StageRef: "test35://stage/unmapped-runtime-edge",
+      conceptualStageRef: "sdlc://stage/unmapped-runtime-edge",
       expectedEdgeName: "unmapped",
       expectedTargetAssetType: "unmapped",
       mappedEdgeName: attempt.graphVectorRef ?? attempt.graphFunctionName,

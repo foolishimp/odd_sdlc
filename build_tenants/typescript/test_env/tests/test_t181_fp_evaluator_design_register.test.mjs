@@ -552,6 +552,150 @@ function writeDesignDepthFpEvaluatorContentRegister({ manifest, registerPath }) 
   return contentRegisterRef;
 }
 
+test("T-181 design-depth content register normalizes root version aliases during projection", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForImplementationDesign(
+      workspaceRoot,
+      "t181-root-version-alias-normalization"
+    );
+    mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+    writeFileSync(
+      manifest.outputFile,
+      implementationDesignAdr("alias-component"),
+      "utf8"
+    );
+    const registerPath = designDepthFpEvaluatorRegisterPath(manifest);
+    const contentRegisterPath = designDepthFpEvaluatorContentRegisterPath({
+      archiveRoot: manifest.archiveRoot
+    });
+    const composition = selectedComposition();
+    const evidenceRef = pathToFileURL(manifest.outputFile).href;
+    const axisVerdict = (axis) => ({
+      kind: "sdlc_design_completeness_axis_verdict",
+      axis,
+      status: "satisfied",
+      reasons: [],
+      evidenceRefs: [evidenceRef]
+    });
+    const register = implementationDesignRegister("alias-component", evidenceRef);
+    register.aggregateDomainModelRows = [
+      {
+        kind: "sdlc_aggregate_domain_model_row",
+        modelRef: "model://t181/alias-component"
+      }
+    ];
+    register.aggregateDomainModel = {
+      kind: "sdlc_aggregate_domain_model",
+      modelVersion: "ts-design-depth-v1",
+      entities: [],
+      operations: [],
+      crossModuleReferences: [],
+      evidenceRefs: [evidenceRef]
+    };
+    register.sunnyDaySequenceRows = [
+      {
+        kind: "sdlc_sunny_day_sequence_row",
+        sequenceRef: "sequence://t181/alias-component"
+      }
+    ];
+    register.aggregateSunnyDaySequence = {
+      kind: "sdlc_aggregate_sunny_day_sequence",
+      sequenceVersion: "ts-design-depth-v1",
+      steps: [],
+      evidenceRefs: [evidenceRef]
+    };
+    register.designCompletenessVerdict = {
+      kind: "sdlc_design_completeness_verdict",
+      verdictVersion: "ts-design-depth-v1",
+      entity: axisVerdict("entity"),
+      attribute: axisVerdict("attribute"),
+      flow: axisVerdict("flow")
+    };
+    mkdirSync(path.dirname(contentRegisterPath), { recursive: true });
+    writeFileSync(
+      contentRegisterPath,
+      `${JSON.stringify(
+        {
+          kind: "sdlc_evaluate_content_register",
+          registerVersion: "ts-evaluate-content-register-v1",
+          stage: "evaluate.C",
+          ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+          ruleRole: "semantic_judgment",
+          computeMeans: "F_P",
+          authorityFunction: "synthesize_model",
+          selectedCompositionRef: composition.compositionRef,
+          selectedCompositionDigest: composition.compositionDigest,
+          selectedCompositionSelectionRef: composition.compositionSelectionRef,
+          selectedRegimeBindingRef: composition.selectedRegimeBindingRef,
+          compositionContributionRef: composition.selectedRegimeBindingRef,
+          sourceBasisRefs: [evidenceRef],
+          candidateArtifactRefs: [evidenceRef],
+          evidenceRefs: [evidenceRef],
+          contentRows: [
+            {
+              kind: "sdlc_evaluate_content_register_row",
+              rowRef: `content-register-row://t181/${manifest.runId}/design-depth`,
+              authorityFunction: "synthesize_model",
+              carrierFamily: "ProductAssetModel",
+              contentKind: "sdlc_design_depth_register",
+              payload: {
+                ...register,
+                modelVersion: "ts-design-depth-v1",
+                sequenceVersion: "ts-design-depth-v1",
+                verdictVersion: "ts-design-depth-v1"
+              },
+              sourceBasisRefs: [evidenceRef],
+              evidenceRefs: [evidenceRef]
+            }
+          ]
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+
+    const admission = admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity({
+      registerPath: contentRegisterPath,
+      selectedIdentity: {
+        selectedCompositionRef: composition.compositionRef,
+        selectedCompositionDigest: composition.compositionDigest,
+        selectedCompositionSelectionRef: composition.compositionSelectionRef,
+        selectedRegimeBindingRef: composition.selectedRegimeBindingRef
+      },
+      ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+      authorityFunction: "synthesize_model"
+    });
+    assert.equal(admission.status, "admitted");
+
+    writeDesignDepthRegisterProjectionFromEvaluateContentRegister({
+      register: admission.register,
+      archiveRoot: manifest.archiveRoot,
+      registerPath
+    });
+    const projected = JSON.parse(readFileSync(registerPath, "utf8"));
+
+    assert.equal(Object.hasOwn(projected, "modelVersion"), false);
+    assert.equal(Object.hasOwn(projected, "sequenceVersion"), false);
+    assert.equal(Object.hasOwn(projected, "verdictVersion"), false);
+    assert.equal(
+      projected.aggregateDomainModel.modelVersion,
+      "ts-design-depth-v1"
+    );
+    assert.equal(
+      projected.aggregateSunnyDaySequence.sequenceVersion,
+      "ts-design-depth-v1"
+    );
+    assert.equal(
+      projected.designCompletenessVerdict.verdictVersion,
+      "ts-design-depth-v1"
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
 test("T-181 design-depth content register supports incremental fragment projection", () => {
   const workspaceRoot = makeWorkspace();
   try {

@@ -344,7 +344,7 @@ export interface SdlcFdRunAnalysisRetryForensic {
 
 export interface SdlcFdRunAnalysisConceptualStageCoverage {
   readonly kind: "sdlc_fd_run_analysis_conceptual_stage_coverage";
-  readonly test35StageRef: string;
+  readonly conceptualStageRef: string;
   readonly expectedEdgeName: string;
   readonly expectedTargetAssetType: string;
   readonly mappedEdgeName: string | null;

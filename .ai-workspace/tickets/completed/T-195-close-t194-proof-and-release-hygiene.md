@@ -18,7 +18,7 @@ created_at: 2026-06-08
 updated_at: 2026-06-09
 completed_at: 2026-06-09
 closing_commit: 6af364e
-successor_ticket: .ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md
+successor_ticket: .ai-workspace/tickets/completed/T-197-reconcile-product-boundary-and-remove-authority-leakage.md
 priority: high
 dependencies:
   - T-194
@@ -78,7 +78,7 @@ evidence now cites that immutable revision instead of a pending commit.
 This ticket does not own the broader in-product GTL conformance hook. The open
 PRODUCT gate requiring `typecheckGtlProgram(...)` in `code/src` build/start or
 publish preflight is transferred to
-`.ai-workspace/tickets/active/T-197-reconcile-product-boundary-and-remove-authority-leakage.md`
+`.ai-workspace/tickets/completed/T-197-reconcile-product-boundary-and-remove-authority-leakage.md`
 as P0/B1.
 
 ## STDO Triage

@@ -1067,7 +1067,7 @@ test("T-161 clean synthetic T-132 archive: 12 attempts, zero retries, hello.js w
   }
 });
 
-test("T-171 analyzer exposes prompt carrier, execution evidence, residual pressure, and test35 stage coverage", () => {
+test("T-171 analyzer exposes prompt carrier, execution evidence, residual pressure, and conceptual stage coverage", () => {
   const archiveRoot = makeTempDir("odd-sdlc-ts-t171-analysis-");
   try {
     buildSyntheticT132Archive({
@@ -1147,7 +1147,9 @@ test("T-171 analyzer exposes prompt carrier, execution evidence, residual pressu
     assert.match(markdown, /worker_construction_brief\.json/u);
     assert.match(markdown, /component_smoke/u);
     assert.match(markdown, /graph_test_execution_result/u);
-    assert.match(markdown, /## Test35 Conceptual Stage Coverage/u);
+    assert.match(markdown, /## Conceptual Stage Coverage/u);
+    assert.doesNotMatch(markdown, /Test35 Conceptual Stage Coverage/u);
+    assert.match(markdown, /sdlc:\/\/stage\/test-run-archive/u);
     assert.match(markdown, /derive_test_run_archive_surface/u);
   } finally {
     rmSync(archiveRoot, { recursive: true, force: true });

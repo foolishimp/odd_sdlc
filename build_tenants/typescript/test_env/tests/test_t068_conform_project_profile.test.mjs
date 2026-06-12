@@ -308,7 +308,7 @@ test("T-068 preserves declared tenant contracts without synthesizing sandbox com
     `
 project:
   name: analytics pipeline
-active_tenant: spark_scala
+active_tenant: scala_spark
 build_tenants:
   scala_spark:
     output_dir: build_tenants/scala_spark/

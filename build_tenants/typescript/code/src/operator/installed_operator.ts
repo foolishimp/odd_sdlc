@@ -137,6 +137,7 @@ import type {
   SdlcWorkerResultReport,
   SdlcWorkerRunResult,
   SdlcDecompositionSummary,
+  SdlcRepairSurfaceTriageCarrier,
   SdlcReviewGradeEdgeFulfillmentAssessment,
   SdlcTraversalHopSelection,
   SdlcTraversalOutcomeClass,
@@ -148,6 +149,7 @@ import {
 } from "./event_store.js";
 import {
   deriveSdlcClosureStateTransition,
+  makeSdlcClosureResidualPressureCarrier,
   sdlcClosureBlockingReasonRefsForReentry,
   syntheticGapDossierFromClosureRefs,
   syntheticGapDossiersFromClosureDecision
@@ -167,6 +169,9 @@ import {
 import {
   snapshotProductMaterializationRoot
 } from "./product_materialization/observation.js";
+import {
+  tenantStackDeclaredMaterializedRoleForRelativePath
+} from "./product_materialization/authority.js";
 import {
   writeProductMaterializationManifest
 } from "./product_materialization/manifest.js";
@@ -238,6 +243,7 @@ import {
   admitReviewGradeEdgeFulfillmentAssessmentFromArtifact,
   reviewGradeEdgeFulfillmentAssessmentPressureRefs,
   reviewGradeEdgeFulfillmentAssessmentRequired,
+  reviewGradeEdgeFulfillmentRepairSurfaceTriageRows,
   reviewGradeFindingsAreDownstreamStagePressure,
   reviewGradeReadOnlyInputMutationReasons,
   snapshotReviewGradeReadOnlyInputFiles
@@ -247,7 +253,6 @@ import {
   deriveSdlcFeatureDependencyDagFromMaps
 } from "./feature_dependency_dag.js";
 import {
-  classifySdlcLiveParallelModuleLane,
   constructSdlcLiveFpParallelMaterializationFrontier,
   deriveSdlcLiveFpParallelMaterializationBranchOverrides,
   normalizeSdlcLiveFpParallelMaterializationTarget,
@@ -313,7 +318,8 @@ import {
   sdlcBlockingReasonFromLegacy,
   summarizeBlockingReasons,
   type SdlcBlockingReason,
-  type SdlcBlockingReasonCode
+  type SdlcBlockingReasonCode,
+  type SdlcBlockingReasonLawfulReentryPoint
 } from "../shared/blocking_reason.js";
 import {
   admitComponentDepthRegisterFromArtifact,
@@ -1284,7 +1290,7 @@ function operatorRunIdsFromGapDossier(
   );
 }
 
-function retryContextHasOlderRuntimeAttemptForGap(input: {
+function retryContextReferencesRuntimeAttemptForGap(input: {
   readonly retryContext: SdlcWorkerRetryContext;
   readonly gapDossier: SdlcPostflightGapDossier;
 }): boolean {
@@ -1294,7 +1300,7 @@ function retryContextHasOlderRuntimeAttemptForGap(input: {
     return false;
   }
   return operatorRunIdsFromRetryContext(input.retryContext).some(
-    (runId) => runId < latestGapRunId
+    (runId) => runId <= latestGapRunId
   );
 }
 
@@ -1399,7 +1405,7 @@ export function mergeSdlcWorkerRetryContextWithRuntimeGapRegister(input: {
   ) {
     return projected;
   }
-  const projectedHasOlderRuntimeAttempt = retryContextHasOlderRuntimeAttemptForGap({
+  const projectedReferencesRuntimeAttempt = retryContextReferencesRuntimeAttemptForGap({
     retryContext: projected,
     gapDossier: latestGapDossier
   });
@@ -1409,7 +1415,7 @@ export function mergeSdlcWorkerRetryContextWithRuntimeGapRegister(input: {
       (!latestGapDossier.currentGapDossierRef.startsWith(
         "closure-gap-dossier://"
       ) &&
-        !projectedHasOlderRuntimeAttempt))
+        !projectedReferencesRuntimeAttempt))
   ) {
     return projected;
   }
@@ -2030,8 +2036,15 @@ function normalizedLiveMaterializationTarget(input: {
   });
 }
 
-function liveParallelModuleLaneKind(targetRef: string): "dev" | null {
-  return classifySdlcLiveParallelModuleLane(targetRef);
+function liveParallelModuleLaneKind(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly normalizedTargetRef: string;
+}): "dev" | null {
+  const role = tenantStackDeclaredMaterializedRoleForRelativePath({
+    manifest: input.manifest,
+    relativePath: input.normalizedTargetRef
+  });
+  return role === "source" ? "dev" : null;
 }
 
 function liveParallelLaneForNode(input: {
@@ -2043,7 +2056,10 @@ function liveParallelLaneForNode(input: {
       manifest: input.manifest,
       targetRef
     });
-    const laneKind = liveParallelModuleLaneKind(normalizedTargetRef);
+    const laneKind = liveParallelModuleLaneKind({
+      manifest: input.manifest,
+      normalizedTargetRef
+    });
     if (laneKind === null) {
       continue;
     }
@@ -2157,6 +2173,24 @@ function liveParallelFrontierDependencyMap(input: {
       )
     )
   });
+}
+
+function liveParallelFanInTargetRefs(input: {
+  readonly source: SdlcModuleDependencyMap;
+  readonly lanes: readonly LiveParallelMaterializationLane[];
+}): readonly string[] {
+  const laneNodeIds = new Set(input.lanes.map((lane) => lane.node.nodeId));
+  const successorNodeIds = new Set(
+    input.lanes.flatMap((lane) => lane.node.successorNodeIds)
+  );
+  return uniqueSorted(
+    input.source.nodes
+      .filter(
+        (node) =>
+          successorNodeIds.has(node.nodeId) && !laneNodeIds.has(node.nodeId)
+      )
+      .flatMap((node) => node.materializationTargetRefs)
+  );
 }
 
 function liveParallelBranchRowsFromCompilation(input: {
@@ -2288,25 +2322,17 @@ async function writeLiveFpParallelMaterializationFrontier(input: {
     source: dependencyMap,
     lanes
   });
-  const fanInNodes = dependencyMap.nodes.filter((node) =>
-    node.materializationTargetRefs.some((targetRef) =>
-      /^src\/index\.[cm]?[jt]sx?$/u.test(
-        normalizedLiveMaterializationTarget({
-          manifest: input.manifest,
-          targetRef
-        })
-      )
-    )
-  );
+  const fanInTargetRefs = liveParallelFanInTargetRefs({
+    source: dependencyMap,
+    lanes
+  });
   const dag = deriveSdlcFeatureDependencyDagFromMaps({
     dagRef: `dag://odd-sdlc/live/${manifestRefSegment(input.manifest)}/parallel-materialization`,
     graphFunctionName: input.manifest.graphFunctionName,
     moduleDependencyMap: frontierDependencyMap,
     testDependencyMap: selectedTestDependencyMap,
     traversalSelectionRef: traversal.selectionRef,
-    fanInTargetRefs: uniqueSorted(
-      fanInNodes.flatMap((node) => node.materializationTargetRefs)
-    ),
+    ...(fanInTargetRefs.length === 0 ? {} : { fanInTargetRefs }),
     evidenceRefs: Object.freeze([
       dependencyMap.mapRef,
       traversal.selectionRef,
@@ -4513,7 +4539,8 @@ function workerReportWithReviewGradeAssessment(input: {
         requiredAction,
         semanticEvidenceRefs: finding.evidenceRefs,
         acceptedAuthorityRefs: finding.acceptedAuthorityRefs,
-        fulfillmentBinding: finding.fulfillmentBinding
+        fulfillmentBinding: finding.fulfillmentBinding,
+        repairSurfaceTriage: finding.repairSurfaceTriage ?? null
       })
     ];
   });
@@ -5392,6 +5419,97 @@ function reviewGradeResidualPressureRefsForState(
     targetAssetType: state.manifest.targetAssetType,
     assessment: admission.assessment
   });
+}
+
+function lawfulReentryPointForRepairSurfaceTriage(
+  triage: SdlcRepairSurfaceTriageCarrier
+): SdlcBlockingReasonLawfulReentryPoint {
+  switch (triage.disposition) {
+    case "current_edge_repair":
+      return "same_edge_retry";
+    case "upstream_reentry":
+      return "escalate_to_fp";
+    case "downstream_deferred":
+      return "triage_gap";
+    case "external_blocked":
+      return "operator_blocked";
+  }
+}
+
+function messageForRepairSurfaceTriage(
+  triage: SdlcRepairSurfaceTriageCarrier
+): string {
+  switch (triage.disposition) {
+    case "current_edge_repair":
+      return "Review-grade residual pressure remains current-edge repair.";
+    case "upstream_reentry":
+      return "Review-grade residual pressure names an upstream repair surface.";
+    case "downstream_deferred":
+      return "Review-grade residual pressure is deferred to a downstream stage.";
+    case "external_blocked":
+      return "Review-grade residual pressure is externally blocked.";
+  }
+}
+
+function reviewGradeResidualPressureCarriersForState(
+  state: SdlcAbgOwnedFpDispatchState
+): readonly ReturnType<typeof makeSdlcClosureResidualPressureCarrier>[] {
+  if (!reviewGradeEdgeFulfillmentAssessmentRequired(state.manifest)) {
+    return Object.freeze([]);
+  }
+  const runRef = manifestRefSegment(state.manifest);
+  const assessmentPath = join(
+    state.manifest.archiveRoot,
+    REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE
+  );
+  if (!existsSync(assessmentPath)) {
+    return closureResidualPressureCarriersForRefs({
+      refs: [`pressure://odd-sdlc/review-grade/${runRef}/assessment-missing`],
+      lawfulReentryPoint: "triage_gap",
+      message: "Review-grade assessment is missing and requires triage."
+    });
+  }
+  const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+    manifest: state.manifest,
+    outputFile: assessmentPath
+  });
+  if (admission.status !== "admitted" || admission.assessment === null) {
+    return closureResidualPressureCarriersForRefs({
+      refs: admission.blockingReasons.map(
+        (reason) =>
+          `pressure://odd-sdlc/review-grade/${runRef}/${encodeURIComponent(reason)}`
+      ),
+      lawfulReentryPoint: "triage_gap",
+      message: "Review-grade assessment could not be admitted and requires triage."
+    });
+  }
+  return reviewGradeEdgeFulfillmentRepairSurfaceTriageRows({
+    runRef,
+    targetAssetType: state.manifest.targetAssetType,
+    assessment: admission.assessment
+  })
+    .filter((row) => row.triage.disposition !== "downstream_deferred")
+    .map((row) =>
+      makeSdlcClosureResidualPressureCarrier({
+        pressureRef: row.pressureRef,
+        lawfulReentryPoint: lawfulReentryPointForRepairSurfaceTriage(row.triage),
+        message: messageForRepairSurfaceTriage(row.triage),
+        detail: [
+          `review_grade_obligation=${row.obligationId}`,
+          `repairSurfaceDisposition=${row.triage.disposition}`,
+          `repairGraphFunctionRef=${row.triage.repairGraphFunctionRef ?? "none"}`,
+          `repairGraphVectorRef=${row.triage.repairGraphVectorRef ?? "none"}`,
+          `repairAssetRef=${row.triage.repairAssetRef ?? "none"}`,
+          `rationale=${row.triage.rationale}`
+        ].join(";"),
+        evidenceRefs: uniqueSorted([
+          row.pressureRef,
+          ...row.triage.evidenceRefs,
+          ...admission.evidenceRefs
+        ]),
+        repairSurfaceTriage: row.triage
+      })
+    );
 }
 
 function fpEvaluationCloseDispositionForState(
@@ -6337,6 +6455,48 @@ export function deriveSdlcProductLineageYieldResumeBasis(input: {
   });
 }
 
+function deriveSdlcUpstreamRepairSurfaceYieldResumeBasis(input: {
+  readonly runRef: string;
+  readonly edgeRef: string;
+  readonly residualPressureCarriers: readonly ReturnType<
+    typeof makeSdlcClosureResidualPressureCarrier
+  >[];
+  readonly livenessProjectionRefs: readonly string[];
+}): Omit<SdlcYieldResumeBasis, "kind"> | null {
+  const upstreamCarrier =
+    input.residualPressureCarriers.find(
+      (carrier) =>
+        carrier.repairSurfaceTriage?.disposition === "upstream_reentry"
+    ) ?? null;
+  const triage = upstreamCarrier?.repairSurfaceTriage ?? null;
+  if (
+    upstreamCarrier === null ||
+    triage === null ||
+    triage.repairGraphFunctionRef === null ||
+    triage.repairGraphVectorRef === null ||
+    triage.repairAssetRef === null
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    yieldKind: "nonlocal_repair_surface_admitted_upstream_reentry" as const,
+    resumeBasisRef:
+      `resume-basis://odd-sdlc/${input.runRef}/upstream-reentry/${encodeURIComponent(triage.repairGraphVectorRef)}`,
+    currentEdgeRef: input.edgeRef,
+    admittedProgressRefs: uniqueSorted([
+      upstreamCarrier.pressureRef,
+      triage.repairGraphFunctionRef,
+      triage.repairGraphVectorRef,
+      triage.repairAssetRef,
+      ...upstreamCarrier.evidenceRefs,
+      ...triage.evidenceRefs
+    ]),
+    livenessProjectionRef: input.livenessProjectionRefs[0] ?? null,
+    resumePolicyRef:
+      "resume-policy://odd-sdlc/nonlocal-repair-surface/upstream-reentry"
+  });
+}
+
 function postActionCandidateFor(input: {
   readonly basis: ExecutionBasis;
   readonly vectorIndex: number;
@@ -7021,6 +7181,22 @@ function testExecutionFailureResidualPressureRefsForState(
   ]);
 }
 
+function closureResidualPressureCarriersForRefs(input: {
+  readonly refs: readonly string[];
+  readonly lawfulReentryPoint: SdlcBlockingReasonLawfulReentryPoint;
+  readonly message: string;
+}): readonly ReturnType<typeof makeSdlcClosureResidualPressureCarrier>[] {
+  return uniqueSorted(input.refs).map((ref) =>
+    makeSdlcClosureResidualPressureCarrier({
+      pressureRef: ref,
+      lawfulReentryPoint: input.lawfulReentryPoint,
+      message: input.message,
+      detail: ref,
+      evidenceRefs: [ref]
+    })
+  );
+}
+
 export function edgeAssuranceEvidenceCandidatesFor(input: {
   readonly state: SdlcAbgOwnedFpDispatchState;
   readonly obligationIds: readonly string[];
@@ -7356,26 +7532,16 @@ function abgTraversalTransitionProjectionRef(input: {
   readonly closureDisposition: SdlcEdgeClosureDisposition;
   readonly terminal: SdlcAbgTerminalTransitionProjection | null;
 }): string {
-  if (input.closureDisposition === "close") {
-    return deriveRuntimeContinuationTransitionProjectionFromDisposition({
-      basis: input.basis,
-      runtimeProjection: input.runtimeProjection,
-      vectorIndex: input.currentVectorIndex,
-      disposition: "close",
-      reason: "edge_close",
-      reasonRefs: Object.freeze(["edge-closure-decision:close"])
-    }).projectionRef;
-  }
   const terminalKind = input.terminal?.terminalKind ?? null;
   const terminalReason =
     typeof input.terminal?.reason === "string" ? input.terminal.reason : null;
-  if (terminalKind === "converged" || terminalKind === "nothing_to_do") {
+  if (terminalKind === "gap_stop") {
     return deriveRuntimeContinuationTransitionProjectionFromDisposition({
       basis: input.basis,
       runtimeProjection: input.runtimeProjection,
       vectorIndex: input.currentVectorIndex,
-      disposition: "close",
-      reason: "edge_close",
+      disposition: "block",
+      reason: "runtime_blocked",
       reasonRefs: terminalReason === null ? Object.freeze([]) : [terminalReason]
     }).projectionRef;
   }
@@ -7389,13 +7555,23 @@ function abgTraversalTransitionProjectionRef(input: {
       reasonRefs: terminalReason === null ? Object.freeze([]) : [terminalReason]
     }).projectionRef;
   }
-  if (terminalKind === "gap_stop") {
+  if (input.closureDisposition === "close") {
     return deriveRuntimeContinuationTransitionProjectionFromDisposition({
       basis: input.basis,
       runtimeProjection: input.runtimeProjection,
       vectorIndex: input.currentVectorIndex,
-      disposition: "block",
-      reason: "runtime_blocked",
+      disposition: "close",
+      reason: "edge_close",
+      reasonRefs: Object.freeze(["edge-closure-decision:close"])
+    }).projectionRef;
+  }
+  if (terminalKind === "converged" || terminalKind === "nothing_to_do") {
+    return deriveRuntimeContinuationTransitionProjectionFromDisposition({
+      basis: input.basis,
+      runtimeProjection: input.runtimeProjection,
+      vectorIndex: input.currentVectorIndex,
+      disposition: "close",
+      reason: "edge_close",
       reasonRefs: terminalReason === null ? Object.freeze([]) : [terminalReason]
     }).projectionRef;
   }
@@ -7565,8 +7741,42 @@ function deriveInstalledTraversalConsequence(input: {
   const measuredEdgeResidualPressure = deriveSdlcEdgeResidualPressure(edgeGain);
   const selectedEvaluationResidualPressureRefs =
     fpEvaluationResidualPressureRefsForState(input.state);
+  const reviewGradeResidualPressureCarriers =
+    reviewGradeResidualPressureCarriersForState(input.state);
+  const reviewGradeResidualPressureCarrierRefs = new Set(
+    reviewGradeResidualPressureCarriers.map((carrier) => carrier.pressureRef)
+  );
+  const selectedEvaluationDefaultResidualPressureRefs =
+    selectedEvaluationResidualPressureRefs.filter(
+      (ref) => !reviewGradeResidualPressureCarrierRefs.has(ref)
+    );
   const testExecutionFailureResidualPressureRefs =
     testExecutionFailureResidualPressureRefsForState(input.state);
+  const closureResidualPressureRefs = uniqueSorted([
+    ...selectedEvaluationResidualPressureRefs,
+    ...testExecutionFailureResidualPressureRefs,
+    ...fulfillmentProjection.nonConvergedReasonRefs
+  ]);
+  const closureResidualPressureCarriers = Object.freeze([
+    ...reviewGradeResidualPressureCarriers,
+    ...closureResidualPressureCarriersForRefs({
+      refs: selectedEvaluationDefaultResidualPressureRefs,
+      lawfulReentryPoint: "same_edge_retry",
+      message:
+        "Selected evaluation residual pressure requires same-edge retry unless a typed upstream route is admitted."
+    }),
+    ...closureResidualPressureCarriersForRefs({
+      refs: testExecutionFailureResidualPressureRefs,
+      lawfulReentryPoint: "repair_worker_output",
+      message: "Test execution failure pressure requires repair re-entry."
+    }),
+    ...closureResidualPressureCarriersForRefs({
+      refs: fulfillmentProjection.nonConvergedReasonRefs,
+      lawfulReentryPoint: "same_edge_retry",
+      message:
+        "Fulfillment residual pressure requires same-edge retry unless a typed upstream route is admitted."
+    })
+  ]);
   const edgeResidualPressure = withAdditionalSdlcEdgeResidualPressureRefs({
     residualPressure: measuredEdgeResidualPressure,
     requiredPressureRefs: uniqueSorted([
@@ -7627,13 +7837,19 @@ function deriveInstalledTraversalConsequence(input: {
   const candidateYieldResumeBasis =
     input.state.status === "worker_report_rejected"
       ? null
-      : deriveSdlcProductLineageYieldResumeBasis({
+      : deriveSdlcUpstreamRepairSurfaceYieldResumeBasis({
           runRef,
           edgeRef: ledger.edgeRef,
-          blockingReasonCarriers: input.state.blockingReasonCarriers,
-          productEvidenceRefs: worksiteEvidence.productEvidenceRefs,
+          residualPressureCarriers: reviewGradeResidualPressureCarriers,
           livenessProjectionRefs: worksiteEvidence.livenessProjectionRefs
-        });
+        }) ??
+        deriveSdlcProductLineageYieldResumeBasis({
+            runRef,
+            edgeRef: ledger.edgeRef,
+            blockingReasonCarriers: input.state.blockingReasonCarriers,
+            productEvidenceRefs: worksiteEvidence.productEvidenceRefs,
+            livenessProjectionRefs: worksiteEvidence.livenessProjectionRefs
+          });
   const basisScopedRuntimeEvents = runtimeEventsForBasis(
     input.basis,
     Object.freeze([...input.replayEvents, ...input.emittedEvents])
@@ -7650,11 +7866,8 @@ function deriveInstalledTraversalConsequence(input: {
     },
     runRef,
     blockingReasonCarriers: input.state.blockingReasonCarriers,
-    residualPressureRefs: uniqueSorted([
-      ...selectedEvaluationResidualPressureRefs,
-      ...testExecutionFailureResidualPressureRefs,
-      ...fulfillmentProjection.nonConvergedReasonRefs
-    ]),
+    residualPressureRefs: closureResidualPressureRefs,
+    residualPressureCarriers: closureResidualPressureCarriers,
     abgTerminalRetryRefs:
       ledger.edgeConverged && edgeAssuranceCloseDecision.disposition === "close"
         ? Object.freeze([])
@@ -7692,6 +7905,7 @@ function deriveInstalledTraversalConsequence(input: {
       decisionRef: closureDecision.decisionRef,
       reasonRefs: closureDecision.reasonRefs,
       sourceProjectionRef: plannedNextActionProjectionRef,
+      residualPressureCarriers: closureResidualPressureCarriers,
       blockingReasonCarriers: input.state.blockingReasonCarriers,
       runRef,
       scope: "state"
@@ -9809,10 +10023,7 @@ function compactRuntimeEventArchivePayload(
     consequence: traversalConsequence
   });
   const closureDisposition = traversalConsequence.edgeClosureDecision.disposition;
-  const effectiveTerminalKind =
-    closureDisposition === "close"
-      ? "converged"
-      : (terminal?.terminalKind ?? null);
+  const effectiveTerminalKind = terminal?.terminalKind ?? null;
   const status = deriveSdlcInstalledOperatorStatusFromAbgTerminal({
     stateStatus: completedDispatchState.status,
     closureDisposition,
