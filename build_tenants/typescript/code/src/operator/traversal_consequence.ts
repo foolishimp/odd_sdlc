@@ -2,14 +2,19 @@
 // Implements: T-138
 
 import type {
+  ConsequenceTraversalAction,
   GtlAdmittedStateRef,
   GtlConsequenceProjectionRef
+} from "@abiogenesis/typescript-tenant";
+import {
+  constructConsequenceTraversalAction
 } from "@abiogenesis/typescript-tenant";
 import type {
   SdlcEdgeAssuranceCloseDecision,
   SdlcTargetCarrierClosureStatus
 } from "./edge_gain_closure.js";
 import type { SdlcSelectedAbgFnCompositionIdentity } from "./composition_identity.js";
+import type { SdlcTraversalStrategyDecision } from "./carriers.js";
 import { uniqueSorted } from "../shared/collections.js";
 
 export type SdlcEdgeClosureDisposition =
@@ -280,6 +285,24 @@ export interface SdlcTraversalConsequenceReplay {
   readonly consequenceProjection: GtlConsequenceProjectionRef;
 }
 
+export interface SdlcConsequenceTraversalActionBinding {
+  readonly kind: "sdlc_consequence_traversal_action_binding";
+  readonly bindingVersion: "ts-consequence-traversal-action-v1";
+  readonly bindingRef: string;
+  readonly strategyDecisionRef: string;
+  readonly consequenceProjectionRef: string;
+  readonly edgeClosureDecisionRef: string;
+  readonly nextActionProjectionRef: string;
+  readonly selectedActionRef: string;
+  readonly selectedGraphFunctionRef: string;
+  readonly selectedGraphVectorRef: string;
+  readonly reentryTargetRef: string;
+  readonly traversalAction: ConsequenceTraversalAction;
+  readonly requiredAuthorityRefs: readonly string[];
+  readonly proportionalityBasisRefs: readonly string[];
+  readonly predecessorRefs: readonly string[];
+}
+
 function requireNonEmptyString(value: string, label: string): string {
   if (value.trim().length === 0) {
     throw new TypeError(`${label} must be non-empty`);
@@ -353,6 +376,42 @@ function nonEmptyUniqueSorted(
     throw new TypeError(`${label} must contain at least one ref`);
   }
   return refs;
+}
+
+function firstNonEmpty(
+  values: readonly (string | null | undefined)[],
+  label: string
+): string {
+  const found = values.find(
+    (value): value is string =>
+      typeof value === "string" && value.trim().length > 0
+  );
+  if (found === undefined) {
+    throw new TypeError(`${label} must resolve to a non-empty ref`);
+  }
+  return found;
+}
+
+function requireAbsoluteGraphReentryTarget(ref: string): string {
+  const normalized = requireNonEmptyString(ref, "reentryTargetRef");
+  if (!/^graph-reentry-point:\/\/[^/]+\/\d+$/u.test(normalized)) {
+    throw new TypeError(
+      "reentryTargetRef must be an absolute graph-reentry-point URI with a numeric vector index"
+    );
+  }
+  return normalized;
+}
+
+function traversalStrategyDecisionRef(
+  decision: SdlcTraversalStrategyDecision
+): string {
+  return [
+    "strategy-decision://odd-sdlc",
+    encodeURIComponent(decision.edgeName),
+    encodeURIComponent(decision.targetAssetType),
+    encodeURIComponent(decision.selectedStrategy),
+    encodeURIComponent(decision.decisionSource)
+  ].join("/");
 }
 
 function requireRefsContain(input: {
@@ -1830,6 +1889,211 @@ export function replaySdlcTraversalConsequence(input: {
     nextActionProjection,
     admittedStateRef,
     consequenceProjection
+  });
+}
+
+export function constructSdlcConsequenceTraversalActionBinding(input: {
+  readonly replay: SdlcTraversalConsequenceReplay;
+  readonly traversalStrategyDecision: SdlcTraversalStrategyDecision;
+  readonly bindingRef?: string | undefined;
+  readonly actionRef?: string | undefined;
+  readonly parentObligationRef?: string | undefined;
+  readonly sourceNodeRef: string;
+  readonly targetNodeRef: string;
+  readonly graphSpanRef?: string | null | undefined;
+  readonly reentryTargetRef: string;
+  readonly targetOutcomeRef?: string | undefined;
+  readonly selectedOverlayRef?: string | null | undefined;
+  readonly selectedCandidateFamilyRef?: string | null | undefined;
+  readonly selectedRefinementBoundaryRef?: string | null | undefined;
+  readonly selectedTraversalTargetRef?: string | null | undefined;
+  readonly inputAssetRefs?: readonly string[] | undefined;
+  readonly expectedOutputAssetRefs?: readonly string[] | undefined;
+  readonly requiredAuthorityRefs?: readonly string[] | undefined;
+  readonly proportionalityBasisRefs?: readonly string[] | undefined;
+  readonly evidencePolicyRef?: string | undefined;
+  readonly foldbackPolicyRef?: string | undefined;
+}): SdlcConsequenceTraversalActionBinding {
+  const { replay, traversalStrategyDecision } = input;
+  const { edgeClosureDecision, nextActionProjection } = replay;
+  if (edgeClosureDecision.disposition !== "re-enter") {
+    throw new TypeError(
+      "SDLC consequence traversal action binding requires a re-enter closure decision"
+    );
+  }
+  if (nextActionProjection.nextActionBasisKind !== "post_reenter") {
+    throw new TypeError(
+      "SDLC consequence traversal action binding requires post_reenter next-action basis"
+    );
+  }
+  if (!nextActionProjection.choosesNextTraversal) {
+    throw new TypeError(
+      "SDLC consequence traversal action binding requires an explicit selected next traversal"
+    );
+  }
+  if (traversalStrategyDecision.selectedStrategy === "full_breadth") {
+    throw new TypeError(
+      "SDLC consequence traversal action binding requires a depth-scoped traversal strategy"
+    );
+  }
+  const decisionRef = traversalStrategyDecisionRef(traversalStrategyDecision);
+  const selectedActionRef = firstNonEmpty(
+    [nextActionProjection.selectedActionRef],
+    "selectedActionRef"
+  );
+  const selectedGraphFunctionRef = firstNonEmpty(
+    [nextActionProjection.nextGraphFunctionRef],
+    "selectedGraphFunctionRef"
+  );
+  const selectedGraphVectorRef = firstNonEmpty(
+    [nextActionProjection.nextGraphVectorRef],
+    "selectedGraphVectorRef"
+  );
+  const reentryTargetRef = requireAbsoluteGraphReentryTarget(input.reentryTargetRef);
+  const parentObligationRef =
+    input.parentObligationRef ??
+    firstNonEmpty(
+      [
+        ...edgeClosureDecision.reasonRefs,
+        ...nextActionProjection.gapPressureRefs,
+        ...nextActionProjection.edgeResidualPressureRefs
+      ],
+      "parentObligationRef"
+    );
+  const selectedTraversalTargetRef =
+    input.selectedTraversalTargetRef ?? selectedGraphVectorRef;
+  const requiredAuthorityRefs = nonEmptyUniqueSorted(
+    [
+      selectedGraphFunctionRef,
+      selectedGraphVectorRef,
+      selectedTraversalTargetRef,
+      edgeClosureDecision.decisionRef,
+      edgeClosureDecision.ledgerVersionRef,
+      nextActionProjection.nextActionProjectionRef,
+      decisionRef,
+      ...nextActionProjection.targetBindingRefs,
+      ...nextActionProjection.policyRefs,
+      ...nextActionProjection.actionCatalogRefs,
+      ...traversalStrategyDecision.basisRefs,
+      ...(input.requiredAuthorityRefs ?? [])
+    ],
+    "requiredAuthorityRefs"
+  );
+  const proportionalityBasisRefs = nonEmptyUniqueSorted(
+    [
+      traversalStrategyDecision.strategyPlanRef,
+      ...(traversalStrategyDecision.strategyDirectiveRef === null
+        ? []
+        : [traversalStrategyDecision.strategyDirectiveRef]),
+      ...traversalStrategyDecision.basisRefs,
+      ...edgeClosureDecision.reasonRefs,
+      ...nextActionProjection.gapPressureRefs,
+      ...nextActionProjection.edgeResidualPressureRefs,
+      ...(input.proportionalityBasisRefs ?? [])
+    ],
+    "proportionalityBasisRefs"
+  );
+  const actionRef =
+    input.actionRef ??
+    [
+      "action://odd-sdlc/consequence-traversal",
+      encodeURIComponent(nextActionProjection.nextActionProjectionRef)
+    ].join("/");
+  const bindingRef =
+    input.bindingRef ??
+    [
+      "binding://odd-sdlc/consequence-traversal",
+      encodeURIComponent(nextActionProjection.nextActionProjectionRef)
+    ].join("/");
+  const traversalAction = constructConsequenceTraversalAction({
+    actionRef,
+    consequenceRef: replay.consequenceProjection.consequenceRef,
+    strategyDecisionRef: decisionRef,
+    parentObligationRef,
+    actionKind: "reenter_graph_span",
+    selectedGraphFunctionRef,
+    selectedOverlayRef: input.selectedOverlayRef ?? nextActionProjection.overlayRef,
+    selectedCandidateFamilyRef: input.selectedCandidateFamilyRef ?? null,
+    selectedRefinementBoundaryRef:
+      input.selectedRefinementBoundaryRef ?? null,
+    selectedTraversalTargetRef,
+    sourceNodeRef: requireNonEmptyString(input.sourceNodeRef, "sourceNodeRef"),
+    targetNodeRef: requireNonEmptyString(input.targetNodeRef, "targetNodeRef"),
+    graphVectorRef: selectedGraphVectorRef,
+    graphSpanRef: input.graphSpanRef ?? nextActionProjection.compositionRef,
+    reentryTargetRef,
+    targetOutcomeRef:
+      input.targetOutcomeRef ?? nextActionProjection.nextActionProjectionRef,
+    inputAssetRefs: nonEmptyUniqueSorted(
+      [
+        nextActionProjection.productAssetModelRef,
+        ...replay.worksiteEvidence.productEvidenceRefs,
+        ...replay.worksiteEvidence.admittedProgressRefs,
+        ...(input.inputAssetRefs ?? [])
+      ],
+      "inputAssetRefs"
+    ),
+    expectedOutputAssetRefs: nonEmptyUniqueSorted(
+      [
+        ...nextActionProjection.targetBindingRefs,
+        ...(input.expectedOutputAssetRefs ?? [])
+      ],
+      "expectedOutputAssetRefs"
+    ),
+    requiredAuthorityRefs,
+    proportionalityBasisRefs,
+    evidencePolicyRef:
+      input.evidencePolicyRef ??
+      firstNonEmpty(
+        [
+          ...nextActionProjection.policyRefs,
+          "evidence-policy://odd-sdlc/consequence-traversal/default"
+        ],
+        "evidencePolicyRef"
+      ),
+    foldbackPolicyRef:
+      input.foldbackPolicyRef ??
+      firstNonEmpty(
+        [
+          nextActionProjection.overlayBindingRef,
+          nextActionProjection.overlayRef,
+          "foldback-policy://odd-sdlc/consequence-traversal/default"
+        ],
+        "foldbackPolicyRef"
+      )
+  });
+  return Object.freeze({
+    kind: "sdlc_consequence_traversal_action_binding" as const,
+    bindingVersion: "ts-consequence-traversal-action-v1" as const,
+    bindingRef,
+    strategyDecisionRef: decisionRef,
+    consequenceProjectionRef: replay.consequenceProjection.consequenceRef,
+    edgeClosureDecisionRef: edgeClosureDecision.decisionRef,
+    nextActionProjectionRef: nextActionProjection.nextActionProjectionRef,
+    selectedActionRef,
+    selectedGraphFunctionRef,
+    selectedGraphVectorRef,
+    reentryTargetRef,
+    traversalAction,
+    requiredAuthorityRefs,
+    proportionalityBasisRefs,
+    predecessorRefs: uniqueSorted([
+      decisionRef,
+      traversalStrategyDecision.strategyPlanRef,
+      ...traversalStrategyDecision.basisRefs,
+      replay.constructionIntent.intentRef,
+      replay.worksiteEvidence.evidenceBundleRef,
+      replay.edgeFulfillmentLedger.ledgerVersionRef,
+      edgeClosureDecision.decisionRef,
+      nextActionProjection.nextActionProjectionRef,
+      replay.consequenceProjection.consequenceRef,
+      selectedActionRef,
+      selectedGraphFunctionRef,
+      selectedGraphVectorRef,
+      reentryTargetRef,
+      ...requiredAuthorityRefs,
+      ...proportionalityBasisRefs
+    ])
   });
 }
 

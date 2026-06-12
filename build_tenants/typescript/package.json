@@ -126,7 +126,7 @@
     "test:t164:rust-service-live": "npm run test:scenario:t164-rust-hello-service-live",
     "test:t164:data-mapper-full-capability-live": "npm run build:semantic && npm run guard:data-mapper-boundary && ODD_SDLC_TS_T164_DATA_MAPPER_FULL_CAPABILITY_LIVE=1 node --test test_env/live/test_t164_data_mapper_full_capability_live.test.mjs",
     "test:t164:data-mapper-full-capability-live:resume": "npm run build:semantic && npm run guard:data-mapper-boundary && node test_env/live/resume_t164_data_mapper_full_capability_live.mjs",
-    "test:t165": "npm run build:semantic && node --test test_env/tests/test_t165_optimising_overlay.test.mjs",
+    "test:t165": "npm run build:semantic && node --test test_env/tests/test_t165_optimising_overlay.test.mjs test_env/tests/test_t165_consequence_traversal_action_bridge.test.mjs",
     "test:t168": "npm run build:semantic && node --test test_env/tests/test_t168_design_consumer_test_pipeline.test.mjs",
     "test:t169": "npm run build:semantic && node --test test_env/tests/test_t169_target_carrier_contracts.test.mjs",
     "test:t171:hello-world-lifecycle-live": "npm run test:scenario:t132-hello-world-js-live",
@@ -191,6 +191,6 @@
     "typescript": "6.0.3"
   },
   "dependencies": {
-    "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.0.0-rc.17/abiogenesis-typescript-tenant-4.0.0-rc.17.tgz"
+    "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.0.0-rc.18/abiogenesis-typescript-tenant-4.0.0-rc.18.tgz"
   }
 }

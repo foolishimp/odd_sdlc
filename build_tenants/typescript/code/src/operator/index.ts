@@ -414,6 +414,7 @@ export {
 
 export {
   assertSdlcTraversalConsequenceReplayable,
+  constructSdlcConsequenceTraversalActionBinding,
   constructSdlcConstructionIntent,
   constructSdlcEdgeFulfillmentLedger,
   constructSdlcNextActionProjection,
@@ -426,6 +427,7 @@ export {
 } from "./traversal_consequence.js";
 export type {
   SdlcConstructionIntent,
+  SdlcConsequenceTraversalActionBinding,
   SdlcEdgeClosureDecision,
   SdlcEdgeClosureDisposition,
   SdlcEdgeClosurePolicy,

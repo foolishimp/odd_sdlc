@@ -10,6 +10,9 @@ import type {
 import type {
   SdlcTraversalOverlayRef
 } from "../shared/overlay_strategy.js";
+import {
+  admitSdlcTraversalOverlayRef
+} from "../shared/overlay_strategy.js";
 
 export const SDLC_BOOTSTRAP_ENTRY_GRAPH_FUNCTION =
   "Fg_bootstrap_sdlc_entry" as const;
@@ -169,6 +172,10 @@ function uniqueStrings(values: readonly string[]): readonly string[] {
 
 function compactRefPart(value: string): string {
   return encodeURIComponent(value).replaceAll("%2F", "~");
+}
+
+function parseTraversalOverlayRef(value: unknown, label: string): SdlcTraversalOverlayRef {
+  return admitSdlcTraversalOverlayRef(parseNonEmptyString(value, label), label);
 }
 
 function profileClassFor(outcomeClass: SdlcTraversalOutcomeClass): "compact" | "broad" {
@@ -780,18 +787,18 @@ export function admitSdlcBootstrapTraversalOutcome(
       `${label}.proportionalityReportRef`
     ),
     selectedOptimisingOverlayRef: SDLC_BOOTSTRAP_OPTIMISING_OVERLAY_REF,
-    selectedChildOverlayRef: parseNonEmptyString(
+    selectedChildOverlayRef: parseTraversalOverlayRef(
       record["selectedChildOverlayRef"],
       `${label}.selectedChildOverlayRef`
-    ) as SdlcTraversalOverlayRef,
+    ),
     selectedGraphFunctionRef: parseNonEmptyString(
       record["selectedGraphFunctionRef"],
       `${label}.selectedGraphFunctionRef`
     ),
-    fallbackOverlayRef: parseNonEmptyString(
+    fallbackOverlayRef: parseTraversalOverlayRef(
       record["fallbackOverlayRef"],
       `${label}.fallbackOverlayRef`
-    ) as SdlcTraversalOverlayRef,
+    ),
     optimizationStatus: parseEnumValue(
       record["optimizationStatus"],
       `${label}.optimizationStatus`,
@@ -848,10 +855,10 @@ export function admitSdlcBootstrapPreStartExecutionContract(
       `${label}.workspaceIdentityRef`
     ),
     objectiveRef: parseNonEmptyString(record["objectiveRef"], `${label}.objectiveRef`),
-    fallbackOverlayRef: parseNonEmptyString(
+    fallbackOverlayRef: parseTraversalOverlayRef(
       record["fallbackOverlayRef"],
       `${label}.fallbackOverlayRef`
-    ) as SdlcTraversalOverlayRef,
+    ),
     fallbackGraphFunctionRef: parseNonEmptyString(
       record["fallbackGraphFunctionRef"],
       `${label}.fallbackGraphFunctionRef`
@@ -897,10 +904,10 @@ export function admitSdlcOptimizedOverlayBinding(
   ]);
   return constructSdlcOptimizedOverlayBinding({
     bindingRef: parseNonEmptyString(record["bindingRef"], `${label}.bindingRef`),
-    childOverlayRef: parseNonEmptyString(
+    childOverlayRef: parseTraversalOverlayRef(
       record["childOverlayRef"],
       `${label}.childOverlayRef`
-    ) as SdlcTraversalOverlayRef,
+    ),
     selectedGraphFunctionRef: parseNonEmptyString(
       record["selectedGraphFunctionRef"],
       `${label}.selectedGraphFunctionRef`
@@ -950,10 +957,10 @@ export function admitSdlcOptimizedEdgeSpecialization(
       record["specializationRef"],
       `${label}.specializationRef`
     ),
-    childOverlayRef: parseNonEmptyString(
+    childOverlayRef: parseTraversalOverlayRef(
       record["childOverlayRef"],
       `${label}.childOverlayRef`
-    ) as SdlcTraversalOverlayRef,
+    ),
     selectedGraphFunctionRef: parseNonEmptyString(
       record["selectedGraphFunctionRef"],
       `${label}.selectedGraphFunctionRef`

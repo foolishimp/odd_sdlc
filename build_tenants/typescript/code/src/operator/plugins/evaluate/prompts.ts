@@ -86,7 +86,7 @@ function edgeAuthorityCompressionPromptLines(): readonly string[] {
 }
 
 const ABG_ITERATION_OUTCOME_FOLD_REF =
-  "package:@abiogenesis/typescript-tenant@4.0.0-rc.16#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows";
+  "package:@abiogenesis/typescript-tenant@4.0.0-rc.18#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows";
 
 interface EvaluatePromptLineGroups {
   readonly preAuthorityLines: readonly string[];

@@ -30,8 +30,8 @@ for the TypeScript line.
 
 The ABIogenesis TypeScript tenant is substrate evidence consumed through
 explicit release snapshots. The current TypeScript line consumes
-`@abiogenesis/typescript-tenant@4.0.0-rc.16` from the immutable
-`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.0.0-rc.16/`
+`@abiogenesis/typescript-tenant@4.0.0-rc.18` from the immutable
+`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.0.0-rc.18/`
 release snapshot.
 That cut proves GTL/ABG carriers, graph-function iteration, traversal probes,
 evented saga-frontier execution, no-compute-basis failure taxonomy,
@@ -54,7 +54,7 @@ SDLC prompt authority policy remains product overlay data. It also proves
 segment-scoped evaluation redispatch metadata, so downstream SDLC evaluation
 can preserve segment, dimension-cell, fold, and relation scope across ABG-owned
 redispatch instead of collapsing deep evaluation coverage back to edge-granular
-fallbacks. It also carries the clean ABG 4.0.0-rc.16 consolidation of the
+fallbacks. It also carries the clean ABG 4.0.0-rc.18 consolidation of the
 defaults/lever registry, temporal runtime-scope consolidation, iteration
 state-action algebra, prompt asset interface, and contract-fulfillment binding
 API that `odd_sdlc.TS` consumes. It also carries the ABG-owned

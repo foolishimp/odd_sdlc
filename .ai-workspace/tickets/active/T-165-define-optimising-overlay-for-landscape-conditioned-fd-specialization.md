@@ -4,7 +4,7 @@ title: Define optimising overlay for landscape-conditioned F_D specialization
 type: feature
 ticket_category: implementation_migration
 status: active
-proof_status: p1_bootstrap_prestart_contract_implemented_p2_p3_pending
+proof_status: p1_bootstrap_prestart_contract_implemented_p2_bridge_consumption_implemented_p2_p3_depth_pending
 goal: implement-phased-optimising-overlays-that-specialize-generic-sdlc-work-without-rival-runtime-truth
 build_tenant: typescript
 owner: odd_sdlc
@@ -67,6 +67,8 @@ affected_boundary:
   - build_tenants/typescript/code/src/workspace/project_profile.ts
   - build_tenants/typescript/code/src/workspace/bootstrap_lineage.ts
   - build_tenants/typescript/code/src/operator/traversal_consequence.ts
+  - build_tenants/typescript/package.json
+  - build_tenants/typescript/package-lock.json
   - build_tenants/typescript/test_env/tests/
 excluded_boundary:
   - ABG graph-call, frame, event, continuation, projection, replay, or traversal authority
@@ -839,6 +841,7 @@ surfaces, and closure conditions.
 | P1-020 | Bootstrap entry traversal | Wire public start to consume the admitted traversal outcome when selecting the initial overlay/graph function or fallback. | public-start optimization now carries `SdlcBootstrapPreStartExecutionContract`, selected outcome refs, entry/report or non-admission refs, fallback refs, and replay identity refs | complete |
 | P1-030 | Bootstrap/proportionality | Prove minimum lawful path selection. | hello-world-class workspace selects the smoke minimum through the optimized bootstrap outcome | complete |
 | P1-040 | Bootstrap/proportionality | Preserve generic F_P fallback by admitted non-admission. | domain-product workspace falls back to generic execution overlay through explicit non-admission reason refs and admitted pre-start contract | complete |
+| P2-005 | Consequence bridge consumption | Bind SDLC replayed consequence rows and `SdlcTraversalStrategyDecision` to ABG `ConsequenceTraversalAction`, then prove ABG runner consumes the action. | `test_t165_consequence_traversal_action_bridge.test.mjs` constructs `SdlcConsequenceTraversalActionBinding`, returns it through ABI `ConsequenceProjectionOutcome.traversalAction`, and observes ABG `graph_reentry_applied` plus construction events | complete |
 | P2-010 | Single-node smoke | Add optimized single iterative smoke node for design/build/test. | T-132-class live run uses bootstrap/proportionality + one transform F_P + one eval F_P | pending |
 | P2-020 | Single-node smoke | Preserve deep proof at closure. | target carrier, review/eval, gain, closure, and replay artifacts remain admitted and traceable | pending |
 | P3-010 | General specialization | Generalize optimizing overlay candidates beyond smoke products. | at least one deterministic specialization admits and at least one non-admissible case falls back to generic F_P | pending |
@@ -1106,8 +1109,31 @@ ABG follow-through status, 2026-06-12:
   `build_tenants/abiogenesis/typescript/test_env/tests/test_t152_consequence_traversal_action_bridge.test.mjs`.
 - This proves the substrate handoff: consequence selection -> admission ->
   construction action/intent -> graph re-entry execution -> replay-visible child
-  provenance. It does not by itself wire the SDLC optimizer/data-mapper lane to
-  consume the bridge; that remains P2/P3 SDLC work below.
+  provenance.
+
+SDLC follow-through status, 2026-06-12:
+
+- `odd_sdlc` now consumes ABIogenesis TypeScript tenant `4.0.0-rc.18`, whose
+  package snapshot includes the ABG `ConsequenceTraversalAction` export and
+  runner consumption path.
+- `operator/traversal_consequence.ts` now publishes
+  `constructSdlcConsequenceTraversalActionBinding(...)`, which binds a replayed
+  SDLC consequence chain plus `SdlcTraversalStrategyDecision` to the ABG
+  `ConsequenceTraversalAction` carrier without creating an SDLC-owned runtime
+  loop.
+- The bridge requires a `re-enter` closure decision, a selected next traversal,
+  a depth-scoped traversal strategy, and an absolute
+  `graph-reentry-point://.../<vectorIndex>` target. Relative cursor moves such
+  as `-2` are rejected; the upstream evaluator/consequence lane must name the
+  admitted graph-vector reentry target.
+- The focused SDLC regression is
+  `build_tenants/typescript/test_env/tests/test_t165_consequence_traversal_action_bridge.test.mjs`.
+  It proves SDLC consequence rows -> `SdlcConsequenceTraversalActionBinding` ->
+  ABI `ConsequenceProjectionOutcome.traversalAction` -> ABG runner construction
+  intent -> replay-visible `graph_reentry_applied`.
+- Remaining P2/P3 scope is still open for the actual depth graph function,
+  decomposition trace register, downstream design/build/test consumption, and
+  data-mapper focused non-convergence proof.
 
 `simple_then_depth` is the important operating mode for feature work. The
 system may first attempt the normal edge. If the edge leaves residual feature
@@ -1174,19 +1200,21 @@ Acceptance additions for P2/P3:
 - Introduce or ratify `SdlcTraversalStrategyDecision` so consequence can admit
   `simple_traversal`, `depth_traversal`, `simple_then_depth`,
   `depth_then_simple`, or `non_admit` by proportionality.
-- Introduce or ratify `SdlcConsequenceTraversalAction`, or bind directly to the
-  ABG `ConsequenceTraversalAction`/construction-intent bridge, so a consequence
-  decision can become an executable ABG graph-function invocation, graph-span
-  re-entry, or child-frame traversal without an SDLC-owned runtime loop.
+- [x] Introduce or ratify `SdlcConsequenceTraversalAction`, or bind directly to
+  the ABG `ConsequenceTraversalAction`/construction-intent bridge, so a
+  consequence decision can become an executable ABG graph-function invocation,
+  graph-span re-entry, or child-frame traversal without an SDLC-owned runtime
+  loop. Implemented as `SdlcConsequenceTraversalActionBinding`.
 - Introduce or ratify `Fg_decompose_depth_between_nodes` as a graph function
   over existing graph nodes, not as an SDLC-owned loop.
 - Persist downstream-deferred review rows into that register instead of leaving
   them as advisory review text.
-- Add a focused SDLC bridge test where `operator/traversal_consequence.ts`
+- [x] Add a focused SDLC bridge test where `operator/traversal_consequence.ts`
   observes residual feature-depth pressure, emits or binds to the ABG
   consequence traversal action, ABG applies graph cursor/re-entry or child
   graph-function invocation, and the emitted child event/provenance refs fold
-  back to parent consolidation.
+  back to parent consolidation. Implemented by
+  `test_t165_consequence_traversal_action_bridge.test.mjs`.
 - Make downstream design, build, and test edges consume the register and block
   parent closure on untraced or unclosed child rows.
 - Reject feature-depth closure when requirement-bound test rows, source test
