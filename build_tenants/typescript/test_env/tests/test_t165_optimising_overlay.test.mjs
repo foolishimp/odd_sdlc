@@ -23,6 +23,7 @@ import {
   publicStartOnce,
   SDLC_BOOTSTRAP_OPTIMISING_OVERLAY_REF,
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
+  SDLC_DEEP_SDLC_TRAVERSAL_OVERLAY_REF,
   SDLC_EDGE_GAIN_CLOSURE_CONTRACTS,
   SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF
 } from "../../build/semantic/code/src/index.js";
@@ -232,6 +233,8 @@ test("T-165 query-domain exposes optimising overlay as read-only projection", ()
   assert.equal(overlay.ownsClosureAuthority, false);
   assert.equal(overlay.queryDomainReadModelOnly, true);
   assert(overlay.childOverlayRefs.includes(SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF));
+  assert(overlay.childOverlayRefs.includes(SDLC_DEEP_SDLC_TRAVERSAL_OVERLAY_REF));
+  assert.equal(overlay.genericFallbackOverlayRef, SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF);
   assertSdlcOptimisingOverlayReadModelOnly(overlay);
 });
 

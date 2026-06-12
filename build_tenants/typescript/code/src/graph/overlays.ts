@@ -34,6 +34,7 @@ import {
   sdlcTraversalOverlayRefForStrategy,
   SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF,
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
+  SDLC_DEEP_SDLC_TRAVERSAL_OVERLAY_REF,
   SDLC_DEFAULT_TRAVERSAL_OVERLAY_REF,
   SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
   SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
@@ -56,6 +57,7 @@ export type SdlcOverlayReentryDisposition = "retry" | "repair" | "re-enter";
 export {
   SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF,
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
+  SDLC_DEEP_SDLC_TRAVERSAL_OVERLAY_REF,
   SDLC_DEFAULT_TRAVERSAL_OVERLAY_REF,
   SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
   SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
@@ -178,6 +180,7 @@ export interface SdlcTraversalOverlay {
   readonly requiredLedgersByEdge: readonly SdlcOverlayLedgerRequirement[];
   readonly reentryRoutes: readonly SdlcOverlayReentryRoute[];
   readonly predecessorOverlayRefs: readonly SdlcTraversalOverlayRef[];
+  readonly annotations: readonly SdlcTraversalOverlayAnnotation[];
 }
 
 export interface SdlcTraversalOverlayCatalog {
@@ -265,6 +268,28 @@ interface OverlayDefinition {
   }[];
   readonly predecessorOverlayRefs?: readonly SdlcTraversalOverlayRef[];
   readonly nextEligibleOverlayRefs?: readonly SdlcTraversalOverlayRef[];
+  readonly annotations?: readonly SdlcTraversalOverlayAnnotationDefinition[];
+}
+
+export interface SdlcTraversalOverlayAnnotation {
+  readonly kind: "sdlc_traversal_overlay_annotation";
+  readonly annotationRef: string;
+  readonly annotationKind:
+    | "baseline_full_sdlc_traversal"
+    | "deep_sdlc_traversal_candidate";
+  readonly parentOverlayRef: SdlcTraversalOverlayRef | null;
+  readonly depthTraversalEligible: boolean;
+  readonly decompositionTraceRequired: boolean;
+  readonly abgRuntimeAuthorityOnly: true;
+  readonly proofRefs: readonly string[];
+}
+
+interface SdlcTraversalOverlayAnnotationDefinition {
+  readonly annotationKind: SdlcTraversalOverlayAnnotation["annotationKind"];
+  readonly parentOverlayRef?: SdlcTraversalOverlayRef | null;
+  readonly depthTraversalEligible: boolean;
+  readonly decompositionTraceRequired: boolean;
+  readonly proofRefs: readonly string[];
 }
 
 function graphFunctionByName(module: Module): ReadonlyMap<string, GraphFunction> {
@@ -385,6 +410,65 @@ function overlayDefinitions(): readonly OverlayDefinition[] {
         "release_operational_cycle"
       ]),
       lawfulStopDispositions: Object.freeze(["product_converged", "blocked"]),
+      annotations: Object.freeze([
+        {
+          annotationKind: "baseline_full_sdlc_traversal",
+          parentOverlayRef: null,
+          depthTraversalEligible: false,
+          decompositionTraceRequired: false,
+          proofRefs: Object.freeze([
+            "proof://odd-sdlc/current-full-traversal/baseline"
+          ])
+        }
+      ]),
+      assetTemplates: Object.freeze([
+        {
+          assetType: "release_surface",
+          defaultPath: "release/release_surface.md",
+          producerGraphFunctionName: "bootstrap_release_self_test",
+          terminalRole: "terminal_asset"
+        },
+        {
+          assetType: "retrofit_plan_surface",
+          defaultPath: "runtime/retrofit_plan_surface.md",
+          producerGraphFunctionName: "release_operational_cycle",
+          terminalRole: "terminal_asset"
+        }
+      ])
+    },
+    {
+      overlayRef: SDLC_DEEP_SDLC_TRAVERSAL_OVERLAY_REF,
+      aliases: Object.freeze([
+        "overlay://odd-sdlc/deep-sdlc",
+        "overlay://odd-sdlc/depth-traversal"
+      ] as const),
+      name: "deep_sdlc_traversal",
+      intent: "Annotated duplicate of current full traversal for T-200 depth/decomposition work; it preserves the full SDLC graph sequence while carrying explicit depth-traversal pressure.",
+      graphFunctionNames: currentFullGraphFunctionNames,
+      publicStartTargets: Object.freeze([
+        "derive_intent_surface",
+        "bootstrap_release_self_test",
+        "release_operational_cycle"
+      ]),
+      defaultStartTarget: "derive_intent_surface",
+      terminalAssetTypes: Object.freeze(["release_surface", "retrofit_plan_surface"]),
+      terminalGraphFunctionNames: Object.freeze([
+        "bootstrap_release_self_test",
+        "release_operational_cycle"
+      ]),
+      lawfulStopDispositions: Object.freeze(["product_converged", "blocked"]),
+      annotations: Object.freeze([
+        {
+          annotationKind: "deep_sdlc_traversal_candidate",
+          parentOverlayRef: SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
+          depthTraversalEligible: true,
+          decompositionTraceRequired: true,
+          proofRefs: Object.freeze([
+            "proof://odd-sdlc/t200/depth-traversal-overlay",
+            "proof://odd-sdlc/t200/decomposition-trace-required"
+          ])
+        }
+      ]),
       assetTemplates: Object.freeze([
         {
           assetType: "release_surface",
@@ -749,6 +833,24 @@ function overlayFromDefinition(input: {
     reentryRoutes,
     predecessorOverlayRefs: Object.freeze([
       ...(input.definition.predecessorOverlayRefs ?? [])
+    ]),
+    annotations: Object.freeze([
+      ...(input.definition.annotations ?? []).map((annotation) =>
+        Object.freeze({
+          kind: "sdlc_traversal_overlay_annotation" as const,
+          annotationRef: [
+            input.definition.overlayRef,
+            "annotation",
+            annotation.annotationKind
+          ].join("/"),
+          annotationKind: annotation.annotationKind,
+          parentOverlayRef: annotation.parentOverlayRef ?? null,
+          depthTraversalEligible: annotation.depthTraversalEligible,
+          decompositionTraceRequired: annotation.decompositionTraceRequired,
+          abgRuntimeAuthorityOnly: true as const,
+          proofRefs: Object.freeze([...annotation.proofRefs])
+        })
+      )
     ])
   });
 }

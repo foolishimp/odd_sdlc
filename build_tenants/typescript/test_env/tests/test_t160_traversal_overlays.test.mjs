@@ -36,6 +36,7 @@ import {
   sdlcTraversalOverlayFailureReentryRoute,
   SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF,
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
+  SDLC_DEEP_SDLC_TRAVERSAL_OVERLAY_REF,
   SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
   SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
   SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF,
@@ -96,6 +97,7 @@ test("T-160 publishes governed traversal overlays with boundary refs", () => {
     catalog.overlays.map((overlay) => overlay.overlayRef),
     [
       SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
+      SDLC_DEEP_SDLC_TRAVERSAL_OVERLAY_REF,
       SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
       SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
       SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF,
@@ -107,6 +109,56 @@ test("T-160 publishes governed traversal overlays with boundary refs", () => {
     overlays
       .get(SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF)
       .aliases.includes("overlay://odd-sdlc/bootstrap-heavy")
+  );
+  const currentFull = overlays.get(SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF);
+  const deepSdlc = overlays.get(SDLC_DEEP_SDLC_TRAVERSAL_OVERLAY_REF);
+  assert(currentFull);
+  assert(deepSdlc);
+  assert.deepStrictEqual(
+    currentFull.annotations.map((annotation) => annotation.annotationKind),
+    ["baseline_full_sdlc_traversal"]
+  );
+  assert.equal(currentFull.annotations[0].depthTraversalEligible, false);
+  assert.equal(currentFull.annotations[0].decompositionTraceRequired, false);
+  assert.equal(deepSdlc.annotations.length, 1);
+  assert.equal(
+    deepSdlc.annotations[0].annotationKind,
+    "deep_sdlc_traversal_candidate"
+  );
+  assert.equal(
+    deepSdlc.annotations[0].parentOverlayRef,
+    SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF
+  );
+  assert.equal(deepSdlc.annotations[0].depthTraversalEligible, true);
+  assert.equal(deepSdlc.annotations[0].decompositionTraceRequired, true);
+  assert.equal(deepSdlc.annotations[0].abgRuntimeAuthorityOnly, true);
+  assert(deepSdlc.aliases.includes("overlay://odd-sdlc/deep-sdlc"));
+  assert.deepStrictEqual(deepSdlc.graphFunctionRefs, currentFull.graphFunctionRefs);
+  assert.deepStrictEqual(deepSdlc.graphVectorRefs, currentFull.graphVectorRefs);
+  assert.deepStrictEqual(deepSdlc.publicStartTargets, currentFull.publicStartTargets);
+  assert.equal(deepSdlc.defaultStartTarget, currentFull.defaultStartTarget);
+  assert.deepStrictEqual(
+    deepSdlc.termination.terminalAssetTypes,
+    currentFull.termination.terminalAssetTypes
+  );
+  assert.deepStrictEqual(
+    deepSdlc.termination.terminalGraphFunctionRefs,
+    currentFull.termination.terminalGraphFunctionRefs
+  );
+  assert.deepStrictEqual(
+    deepSdlc.termination.lawfulStopDispositions,
+    currentFull.termination.lawfulStopDispositions
+  );
+  const comparableTemplates = (overlay) =>
+    overlay.assetTemplates.map((template) => ({
+      assetType: template.assetType,
+      defaultPath: template.defaultPath,
+      producerGraphFunctionRef: template.producerGraphFunctionRef,
+      terminalRole: template.terminalRole
+    }));
+  assert.deepStrictEqual(
+    comparableTemplates(deepSdlc),
+    comparableTemplates(currentFull)
   );
   for (const overlay of catalog.overlays) {
     assert.match(overlay.graphCatalogDigestRef, /^graph-catalog-digest:\/\/odd-sdlc\//);
@@ -526,6 +578,51 @@ test("T-160 public start admits overlay binding directly for lite traversal", ()
   assert.equal(
     outcome.executionContract.nextActionProjection.overlayBindingRef,
     outcome.executionContract.overlayBindingRef
+  );
+  assert(
+    outcome.executionContract.constructionIntent.basisRefs.includes(
+      outcome.executionContract.overlayBindingRef
+    )
+  );
+});
+
+test("T-200 explicit deep overlay selection preserves current full traversal shape", () => {
+  const { module, queryDomain, conformedProject, workspaceRoot } = startContext();
+  const outcome = publicStartOnce({
+    request: admitSdlcPublicStartRequest({
+      workspaceRoot,
+      target: {
+        kind: "overlay",
+        handle: "deep-sdlc-traversal"
+      },
+      until: "blocked",
+      defaultRegime: "F_P"
+    }),
+    module,
+    queryDomain,
+    conformedProject,
+    workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
+  });
+
+  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert.equal(outcome.blockingReason, "fp_worker_unattached");
+  assert(outcome.executionContract);
+  assert.equal(
+    outcome.executionContract.targetGraphFunction,
+    "derive_intent_surface"
+  );
+  assert.equal(
+    outcome.executionContract.overlayRef,
+    SDLC_DEEP_SDLC_TRAVERSAL_OVERLAY_REF
+  );
+  assert.equal(
+    outcome.executionContract.overlayBinding.overlayRef,
+    SDLC_DEEP_SDLC_TRAVERSAL_OVERLAY_REF
+  );
+  assert(
+    outcome.executionContract.overlayBinding.remainingGraphPressureRefs.every(
+      (ref) => ref.includes("deep-sdlc-traversal")
+    )
   );
   assert(
     outcome.executionContract.constructionIntent.basisRefs.includes(

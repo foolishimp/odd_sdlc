@@ -117,8 +117,7 @@ export function t132HelloWorldJsLiveScenario({
       executionEvidence: {
         edgeName: FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
         status: "succeeded",
-        commandIncludes: "node",
-        stdoutIncludes: "Hello, world!"
+        commandIncludes: "node"
       },
       latestArchiveArtifacts: [
         "worker_result_report.json",

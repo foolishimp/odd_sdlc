@@ -54,6 +54,38 @@ conformed. The runtime law is not special. The same graph-function catalog,
 typed asset binding, F_P/F_D split, ABG traversal truth, and downstream edge
 assurance contract law still apply.
 
+## T-200 Deep Overlay Refinement
+
+Depth traversal is introduced as an additive overlay selection, not by mutating
+the existing full SDLC overlay.
+
+The baseline full traversal remains
+`overlay://odd-sdlc/current-full-traversal`. The depth lane is the sibling
+`overlay://odd-sdlc/deep-sdlc-traversal`. It deliberately duplicates the
+current full traversal graph-function list, public starts, default start,
+terminal graph functions, terminal asset templates, and lawful stop
+dispositions, then carries an explicit
+`deep_sdlc_traversal_candidate` annotation.
+
+The annotation is product policy and pressure only:
+
+- it marks the overlay as depth-traversal eligible
+- it requires a decomposition trace before depth closure may be claimed
+- it records the baseline parent overlay ref
+- it states that ABG remains the only runtime authority
+
+The optimizing overlay read model may list the deep overlay as a candidate
+child overlay. The generic fallback remains
+`overlay://odd-sdlc/current-full-traversal`. Public start may target the deep
+overlay explicitly, but the selection does not create runtime truth, closure
+truth, graph cursor movement, recursion, or event emission inside SDLC.
+
+The later T-200 depth graph function must consume this overlay annotation and
+ABG/GTL graph-function zoom surfaces. Until the decomposition trace carrier and
+child graph-function foldback are implemented, this sibling overlay is an
+admitted route marker and testable selection surface, not completion of depth
+traversal.
+
 ## Prime Law
 
 Graph functions remain the primary constructive carrier.

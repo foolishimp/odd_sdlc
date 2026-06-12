@@ -2,6 +2,8 @@ export type SdlcTraversalOverlayRef = `overlay://odd-sdlc/${string}`;
 
 export const SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF =
   "overlay://odd-sdlc/current-full-traversal" as const;
+export const SDLC_DEEP_SDLC_TRAVERSAL_OVERLAY_REF =
+  "overlay://odd-sdlc/deep-sdlc-traversal" as const;
 export const SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF =
   "overlay://odd-sdlc/framework-smoke-min-fp" as const;
 export const SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF =

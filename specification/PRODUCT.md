@@ -30,8 +30,8 @@ for the TypeScript line.
 
 The ABIogenesis TypeScript tenant is substrate evidence consumed through
 explicit release snapshots. The current TypeScript line consumes
-`@abiogenesis/typescript-tenant@4.0.0-rc.18` from the immutable
-`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.0.0-rc.18/`
+`@abiogenesis/typescript-tenant@4.0.0-rc.19` from the immutable
+`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.0.0-rc.19/`
 release snapshot.
 That cut proves GTL/ABG carriers, graph-function iteration, traversal probes,
 evented saga-frontier execution, no-compute-basis failure taxonomy,
@@ -54,7 +54,7 @@ SDLC prompt authority policy remains product overlay data. It also proves
 segment-scoped evaluation redispatch metadata, so downstream SDLC evaluation
 can preserve segment, dimension-cell, fold, and relation scope across ABG-owned
 redispatch instead of collapsing deep evaluation coverage back to edge-granular
-fallbacks. It also carries the clean ABG 4.0.0-rc.18 consolidation of the
+fallbacks. It also carries the clean ABG 4.0.0-rc.19 consolidation of the
 defaults/lever registry, temporal runtime-scope consolidation, iteration
 state-action algebra, prompt asset interface, and contract-fulfillment binding
 API that `odd_sdlc.TS` consumes. It also carries the ABG-owned
@@ -73,6 +73,9 @@ It also carries ABG-owned runtime re-entry admission from repair-surface triage
 through construction intent and graph-vector re-entry, so nonlocal repair
 pressure can target an absolute graph function/vector/re-entry point without an
 SDLC-local retry or cursor loop.
+It also carries ABG-owned GTL graph-function zoom planning and application, so
+SDLC can publish depth-eligible traversal overlays without representing zoom as
+product-local vector cursor movement or hidden consequence-plugin recursion.
 It is not
 itself `odd_sdlc.TS`, and it does not complete the SDLC product behavior.
 

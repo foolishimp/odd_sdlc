@@ -21,7 +21,7 @@ created_at: 2026-06-13
 updated_at: 2026-06-13
 activated_at: 2026-06-13
 governance_scope: STDO Method
-migration_strategy: inside_out_hard_break
+migration_strategy: inside_out_additive_sibling
 library_usage: extend
 governing_library:
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_REUSABLE_GRAPH_FUNCTION_LIBRARY.md
@@ -48,6 +48,7 @@ related_tickets:
   - .ai-workspace/tickets/backlog/T-201-prove-single-node-smoke-optimising-specialization.md
   - .ai-workspace/tickets/completed/T-197-reconcile-product-boundary-and-remove-authority-leakage.md
   - .ai-workspace/tickets/completed/T-199-data-mapper-code-depth-resume-proof.md
+  - /Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/active/T-155-define-first-class-gtl-graph-function-zoom-plan.md
 affected_boundary:
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_OPTIMISING_OVERLAY.md
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_REUSABLE_GRAPH_FUNCTION_LIBRARY.md
@@ -64,10 +65,13 @@ excluded_boundary:
 target_truth: >-
   Residual feature-depth pressure can be escalated proportionally from simple
   traversal into an admitted depth traversal over existing graph nodes. The
-  product overlay selects the domain-meaningful depth action, but ABG owns
-  execution, graph-vector re-entry, child traversal events, replay, and closure
-  foldback. Parent closure reads admitted child evidence and the decomposition
-  trace register, not consequence prose.
+  existing `overlay://odd-sdlc/current-full-traversal` remains the baseline full
+  SDLC overlay. A sibling `overlay://odd-sdlc/deep-sdlc-traversal` carries the
+  depth/decomposition annotation while preserving the same full traversal graph
+  shape. The product overlay selects the domain-meaningful depth action, but
+  ABG owns execution, graph-function zoom, graph-vector re-entry, child
+  traversal events, replay, and closure foldback. Parent closure reads admitted
+  child evidence and the decomposition trace register, not consequence prose.
 superseded_truth: >-
   Feature-depth pressure may remain downstream-deferred review text, may close
   from successful build/test commands alone, or may be forced by an SDLC-local
@@ -92,12 +96,14 @@ evaluation_criteria:
   - SDLC never executes the selected traversal locally; selected actions enter ABG through admitted construction/re-entry carriers
   - the data-mapper regression for `REQ-ENG-003` proves command-only `sbt test` evidence cannot close the feature obligation
   - live high-zoom proof records admitted strategy decision, depth traversal start/resume, child graph-function execution, child event/provenance capture, child closure fold, and parent consolidation
+  - the deep SDLC overlay is a sibling of current-full, not a mutation of it; focused tests prove it duplicates current-full graph scope and carries the decomposition annotation
 proof_surface:
   - design update for depth traversal graph function and decomposition trace register
   - focused carrier/admission tests for the register and depth outcome
   - focused consequence-to-depth traversal test using ABG runner consumption
   - data-mapper regression for REQ-ENG-003 command-only evidence rejection
   - live high-zoom proof archive
+  - focused overlay/query-domain tests for the deep sibling overlay selection surface
 non_closure_conditions:
   - downstream-deferred pressure is only summarized in comments, prompts, or review prose
   - parent closure ignores unclosed child obligation rows
@@ -166,10 +172,35 @@ obligation, owner edge, graph-function ref, closure criteria, evidence refs,
 and consolidation refs. Parent closure must be derived from child evidence, not
 from consequence prose.
 
+## Refinement - Deep Overlay Sibling, 2026-06-13
+
+Do not break or mutate the existing full SDLC overlay to introduce depth
+pressure. Publish an additive sibling overlay:
+
+```text
+overlay://odd-sdlc/current-full-traversal
+  baseline full SDLC route
+
+overlay://odd-sdlc/deep-sdlc-traversal
+  same graph-function/public-start/terminal-asset shape
+  annotation: deep_sdlc_traversal_candidate
+  parentOverlayRef: overlay://odd-sdlc/current-full-traversal
+  depthTraversalEligible: true
+  decompositionTraceRequired: true
+  abgRuntimeAuthorityOnly: true
+```
+
+The optimizing overlay may list the deep overlay as a child candidate, but the
+generic fallback remains current-full. Explicit public start may select the deep
+overlay. That selection is not a runtime loop, cursor move, or F_D authority
+breach. It is a typed route marker for later T-200 depth graph-function and
+decomposition-trace work over ABG/GTL zoom.
+
 ## Work Ledger
 
 | id | task | proof | status |
 | --- | --- | --- | --- |
+| D0 | Publish additive deep SDLC overlay sibling without mutating current-full. | `test_t160_traversal_overlays.test.mjs` proves duplicated graph scope, annotation, explicit public-start selection; `test_t165_optimising_overlay.test.mjs` proves optimizer read model lists the candidate while fallback remains current-full. | done |
 | D1 | Design depth traversal graph function and register carriers. | design surface names carriers, owners, non-closure signals, and ABG handoff | pending |
 | D2 | Implement carrier admission and projection. | focused tests reject missing parent/child/evidence/consolidation refs | pending |
 | D3 | Publish `Fg_decompose_depth_between_nodes`. | graph catalog/module/query-domain expose the function and contract | pending |
