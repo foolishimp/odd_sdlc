@@ -13,7 +13,7 @@ re_entry_point: design
 priority: high
 triaged_at: 2026-05-12
 created_at: 2026-05-12
-updated_at: 2026-05-14
+updated_at: 2026-06-13
 activated_at: 2026-05-14
 governance_scope: STDO Method
 migration_strategy: inside_out_ticket_workflow_authority
@@ -43,7 +43,7 @@ related_tickets:
   - .ai-workspace/tickets/completed/T-159-product-assets-carry-requirement-lineage.md
   - .ai-workspace/tickets/completed/T-160-first-class-traversal-overlays-for-guided-graph-passes.md
   - .ai-workspace/tickets/backlog/T-161-read-only-fd-run-analysis-linter.md
-  - .ai-workspace/tickets/backlog/T-165-define-optimising-overlay-for-landscape-conditioned-fd-specialization.md
+  - .ai-workspace/tickets/active/T-165-define-optimising-overlay-for-landscape-conditioned-fd-specialization.md
   - .ai-workspace/tickets/backlog/T-166-define-adaptable-consensus-graph-function-for-submitter-reviewer-rounds.md
   - .ai-workspace/tickets/backlog/T-167-define-review-graph-function-for-multi-reviewer-ticket-generation.md
 affected_boundary:
@@ -67,9 +67,9 @@ excluded_boundary:
   - allowing backlog tickets to execute as admitted active work without promotion/admission
   - adding a second runtime, backlog database, or non-markdown ticket truth store
   - weakening ABG ownership of event, frame, continuation, projection, or replay truth
-target_truth: Tickets under .ai-workspace/tickets are the first-class durable work authority for substantive odd_sdlc change. The installed TypeScript operator can inspect, validate, admit, start, select configured reviewers, execute, review, and close work from ticket authority while preserving comments as evidence/publication only.
+target_truth: Tickets under .ai-workspace/tickets are the first-class durable work authority for substantive odd_sdlc change. The installed TypeScript operator can inspect, validate, admit, start, select configured reviewers, execute, review, and close work from ticket authority while preserving comments as evidence/publication only. Overlay segment completion with remaining graph, requirement, asset, or next-overlay pressure is also ticket intake pressure: the workflow may emit or update a code-review/triage ticket that carries the segment-completion refs and enters through an admitted ABG start such as current-full-traversal instead of treating the completed segment as product convergence.
 superseded_truth: Substantive specification edits, code review fixes, selective implementation choices, and bug repairs may be driven directly from prompt text, chat memory, comment files, or review notes without first admitting a ticket-shaped execution contract.
-closure_law: This ticket closes only when the TypeScript tenant exposes a ticket workflow projection, validates TICKET_METHOD-required fields, admits active tickets into execution contracts, routes asset:ticket/<id> start through admitted ticket authority, selects configured reviewer profiles or review panels before review execution, records review/bug/spec-change decisions inside the ticket workflow, and proves that comments or raw prompts cannot become closure authority.
+closure_law: This ticket closes only when the TypeScript tenant exposes a ticket workflow projection, validates TICKET_METHOD-required fields, admits active tickets into execution contracts, routes asset:ticket/<id> start through admitted ticket authority, selects configured reviewer profiles or review panels before review execution, records review/bug/spec-change decisions inside the ticket workflow, projects overlay-segment remaining pressure into governed code-review/triage ticket intake, and proves that comments, raw prompts, or segment-complete artifacts cannot become closure authority.
 evaluation_criteria:
   - ticket projection reports backlog, active, completed, malformed, blocked, and stale-ticket states from markdown files
   - execution starts only from active admitted ticket authority or an explicitly admitted draft ticket contract
@@ -79,6 +79,8 @@ evaluation_criteria:
   - bug repair tickets carry first-missing-layer triage before code change
   - specification-change tickets cite the target specification surface and lawful re-entry point before edit
   - ledgers, handoffs, events, archives, and closure projections carry the ticket/execution-contract refs used for the run
+  - overlay segment completion with productConverged = false creates or references a ticket workflow row carrying remainingGraphPressureRefs, remainingRequirementPressureRefs, remainingAssetPressureRefs, nextEligibleOverlayRefs, and the source overlay-segment completion ref
+  - a final-node code-review/triage ticket can lawfully re-enter at the start of current-full-traversal through ABG public start or admitted runtime re-entry, without an SDLC-local loop or cursor selection
 non_closure_conditions:
   - an operator can still implement review feedback from a comment without accepted/rejected/deferred rulings in a ticket
   - reviewer choice is inferred from current operator identity, chat context, environment defaults, or hardcoded `claude`/`codex` branches instead of a configured reviewer profile
@@ -92,6 +94,9 @@ non_closure_conditions:
   - review decisions are recorded only in a comment and not visible from the ticket workflow projection
   - old route-ticket or raw prompt paths remain accepted as equivalent closure authority
   - implementation creates a second ticket database or mutable board that outranks `.ai-workspace/tickets/`
+  - an overlay segment with `productConverged: false` is treated as product closure without an admitted ticket/triage continuation or explicit successor-ticket ruling
+  - remaining overlay pressure refs are dropped, summarized only in prose, or copied into comments without ticket workflow admission
+  - current-full-traversal re-entry is performed by an SDLC-local loop, local cursor move, or prompt instruction instead of an admitted ABG start or construction/re-entry carrier
 ---
 
 # T-162: First-Class Ticket Workflow For Governed Change
@@ -211,11 +216,33 @@ SdlcBugTriageRow
 SdlcSelectiveImplementationRow
   accepted decision refs, excluded decision refs, implementation boundary,
   proof surface, non-closure conditions
+
+SdlcOverlaySegmentContinuationRow
+  source overlay segment completion ref, completed overlay ref,
+  terminal graph function refs, terminal asset refs, remaining graph pressure
+  refs, remaining requirement pressure refs, remaining asset pressure refs,
+  next eligible overlay refs, selected ticket intake kind, selected start or
+  re-entry target, and proof expectation
 ```
 
 These subordinate rows should not become peer carriers unless implementation
 review proves independent identity. The identity-bearing unit is still the
 ticket and its admitted execution contract.
+
+Latest capability reload:
+
+- ABG `4.0.0-rc.18` supplies admitted runtime re-entry and construction-intent
+  consumption for consequence-selected traversal actions.
+- `odd_sdlc` can now distinguish edge closure, overlay segment completion, and
+  product convergence. A lite overlay may close every edge and still emit
+  `productConverged: false` with remaining graph/requirement/asset pressure.
+- Ticket workflow must treat that state as governed continuation pressure. The
+  simple lawful path is to create or update a code-review/triage ticket whose
+  first action is an admitted start at `overlay://odd-sdlc/current-full-traversal`.
+- This is intentionally a brute-force bridge. It does not replace the future
+  depth traversal graph function from T-165; it provides the governed entrypoint
+  that lets review/triage decide whether to close, repair, split, or escalate to
+  depth traversal.
 
 Reviewer selection is part of the ticket workflow, not a separate authority
 surface. Concrete reviewers such as Claude and Codex are configured profiles
@@ -275,6 +302,13 @@ current chat agent, or accept unregistered reviewer output as governed review.
    defaults.
 10. Reviewer output is evidence until reduced into decision rows and admitted by
    the ticket workflow.
+11. Overlay segment completion is not product convergence when any remaining
+   pressure ref or next eligible overlay ref is present.
+12. Segment-completion remaining pressure enters the next work cycle through a
+   ticket workflow row or successor ticket, not through a local retry loop.
+13. A code-review/triage final node may be the brute-force continuation carrier
+   when it preserves source segment refs, remaining pressure refs, and the ABG
+   start/re-entry target.
 
 ## Operator UX
 
@@ -288,6 +322,7 @@ odd-sdlc-ts ticket-intake --workspace . --kind bug --evidence <path>
 odd-sdlc-ts ticket-admit --workspace . --ticket T-162
 odd-sdlc-ts reviewers --workspace .
 odd-sdlc-ts ticket-review --workspace . --ticket T-162 --reviewers codex,claude
+odd-sdlc-ts ticket-intake --workspace . --from-overlay-segment <path> --kind code_review_triage
 odd-sdlc-ts start --workspace . --target asset:ticket/T-162 --until blocked
 ```
 
@@ -308,6 +343,9 @@ Minimum UX contract:
   projection as a whole.
 - bugs display first-missing-layer triage before work begins.
 - spec enhancements display their target specification surfaces before edits.
+- overlay-segment continuation tickets display the source segment completion,
+  remaining pressure refs, next eligible overlay refs, and selected ABG
+  start/re-entry target before work begins.
 
 ## End-State Flow Capability
 
@@ -343,6 +381,19 @@ flowchart TD
     R -- yes --> T[Move/update ticket as completed with proof refs]
 ```
 
+Segment-completion continuation path:
+
+```mermaid
+flowchart TD
+    A[Overlay segment completion] --> B{productConverged?}
+    B -- yes --> C[Product closure candidate]
+    B -- no --> D[Create or update code-review/triage ticket]
+    D --> E[Carry remaining graph/requirement/asset pressure refs]
+    E --> F[Admit ticket execution contract]
+    F --> G[ABG start or admitted re-entry at current-full-traversal]
+    G --> H[Review decides close, repair, split, depth, or block]
+```
+
 ## Design Module Method Constraints
 
 This ticket is governed by `DESIGN_MODULE_METHOD.md`.
@@ -364,6 +415,9 @@ This ticket is governed by `DESIGN_MODULE_METHOD.md`.
   `F_H` human ruling, and `F_P` productive work. Review rulings and
   specification approvals are not silently downgraded to productive worker
   discretion.
+- Overlay continuation must stay a ticket workflow concern. ABG owns the start,
+  continuation, re-entry, event, and replay mechanics; the ticket owns the
+  SDLC meaning of the remaining pressure and the review/triage ruling.
 
 ## Implementation Checklist
 
@@ -388,12 +442,28 @@ Inside-out sequencing is required.
 - [ ] add bug triage rows with expected/actual/reproduction/evidence and first-missing-layer fields
 - [ ] enforce `realization_refactor` bug admission only when requirement and design authority are present
 - [ ] add spec-change rows with target spec surface, current truth, target truth, source docs, change class, re-entry point, and proof surface
+- [ ] add overlay segment continuation rows that bind `productConverged: false`
+  segment completion to code-review/triage ticket intake
+- [ ] carry remaining graph, requirement, asset, and next-overlay pressure refs
+  from `sdlc_overlay_segment_completion` into the ticket projection and admitted
+  execution contract
+- [ ] route final-node code-review/triage tickets through admitted ABG public
+  start or runtime re-entry at `overlay://odd-sdlc/current-full-traversal`
+  without an SDLC-local loop
+- [ ] require review/triage rulings for whether the continuation closes, repairs,
+  splits, creates a depth traversal ticket, or blocks
 - [ ] ensure comments/forensics/review posts can be referenced as evidence but cannot set ticket status
 - [ ] update compact CLI output so blocked ticket workflow states are visible to a cold session
 - [ ] add fixtures for valid active ticket, malformed ticket, backlog ticket, review-resolution ticket, spec-change ticket, and bug-repair ticket
 - [ ] add deterministic tests for projection, admission, start rejection, review selection, bug triage, and spec-change authority
 - [ ] add deterministic tests for configured `codex` and `claude` reviewer selection, unknown-reviewer rejection, unavailable-reviewer blocking, and reviewer output schema rejection
+- [ ] add deterministic tests for overlay-segment continuation ticket intake,
+  remaining-pressure preservation, and current-full-traversal start admission
 - [ ] add one scenario proof that starts from a review comment, records rulings in a ticket, implements only accepted findings, and leaves deferred findings visible
+- [ ] add one scenario proof that starts from a completed lite overlay segment
+  with `productConverged: false`, emits a code-review/triage ticket, starts the
+  ticket at current-full-traversal, and preserves the source segment refs in
+  handoff, ledger, next-action, and archive truth
 
 ## Migration Checklist
 
@@ -417,6 +487,8 @@ Old truth path:
 - raw `asset:ticket/<id>` routing without deterministic ticket validation and
   admitted execution-contract derivation;
 - manual inspection of `.ai-workspace/tickets/` as the only workflow surface.
+- treating `overlay_segment_complete` as product closure when the segment still
+  advertises remaining pressure or next eligible overlay refs.
 
 New truth path:
 
@@ -426,6 +498,8 @@ New truth path:
 - review panel binding selects configured reviewers and records reviewer
   invocation provenance;
 - start/handoff/ledger/eval/archive/closure all carry the admitted ticket basis.
+- overlay segment completion with remaining pressure emits or references a
+  ticket workflow continuation row before any full-traversal closure claim.
 
 ## Acceptance Criteria
 
@@ -471,6 +545,23 @@ New truth path:
 - AC-15: Claude, Codex, human, or service reviewer output cannot change ticket
   status, authorize implementation, or satisfy closure until admitted by the
   ticket workflow.
+- AC-16: `sdlc_overlay_segment_completion` with `productConverged: false`
+  projects as continuation pressure, not as closure, and creates or references
+  a code-review/triage ticket workflow row.
+- AC-17: the continuation row carries source segment completion ref, terminal
+  graph function refs, terminal asset refs, remaining graph/requirement/asset
+  pressure refs, next eligible overlay refs, selected start/re-entry target, and
+  proof expectation.
+- AC-18: a final-node code-review/triage ticket starts only through admitted
+  ticket authority and ABG public start or admitted runtime re-entry at
+  `overlay://odd-sdlc/current-full-traversal`; local cursor moves and prompt-only
+  loops are rejected.
+- AC-19: the continuation review must rule `close`, `repair`, `split_ticket`,
+  `depth_traversal`, `defer`, or `block` before implementation or closure can
+  proceed.
+- AC-20: product convergence cannot be claimed while a segment-derived
+  continuation ticket has unruled findings, unclosed child/depth rows, or
+  unconsumed remaining pressure refs.
 
 ## Required Proof
 
@@ -501,6 +592,15 @@ shapes:
   - bug repair rejects illegal `realization_refactor` when requirement/design
     authority is missing;
   - spec-change work rejects missing target truth or source documents.
+- `test_t162_overlay_segment_ticket_continuation.test.mjs`
+  - overlay segment completion with `productConverged: false` creates or
+    references a code-review/triage ticket workflow row;
+  - remaining pressure refs and next eligible overlay refs are preserved in the
+    ticket projection and admitted execution contract;
+  - current-full-traversal starts only through admitted ABG start/re-entry
+    authority;
+  - product convergence is rejected until the continuation ticket is ruled and
+    closed or split.
 - scenario fixture `t162_ticket_workflow_review_resolution`
   - starts from a review comment;
   - creates or updates a ticket with finding rulings;
@@ -529,6 +629,8 @@ This design matches `specification/PRODUCT.md`.
   services are selectable profiles bound into Review or Consensus rounds, not
   hardcoded sovereign evaluators.
 
-This design does not require an ABG change. ABG remains the runtime substrate.
-`odd_sdlc` needs to bind ticket authority into its domain execution contracts,
-ledgers, projections, and operator UX.
+This design does not require a new ABG capability beyond the current rc18
+substrate. ABG remains the runtime substrate and owns start, continuation,
+re-entry, event, and replay truth. `odd_sdlc` needs to bind ticket authority
+and segment-continuation pressure into its domain execution contracts, ledgers,
+projections, and operator UX.
