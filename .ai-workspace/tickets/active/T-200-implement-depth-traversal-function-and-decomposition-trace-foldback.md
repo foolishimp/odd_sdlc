@@ -1,0 +1,186 @@
+---
+id: T-200
+title: Implement depth traversal function and decomposition trace foldback
+type: feature
+ticket_category: implementation_migration
+status: active
+goal: residual-feature-depth-pressure-expands-into-admitted-child-graph-traversals
+build_tenant: typescript
+owner: odd_sdlc
+change_intent: >-
+  Implement the depth traversal path split from T-165. Residual feature-depth
+  pressure must become an admitted decomposition trace over existing graph
+  nodes, child obligations, graph-function refs, evidence refs, closure
+  criteria, and parent consolidation instead of remaining advisory review text
+  or becoming an SDLC-local recursive controller.
+change_class: design_reframe
+re_entry_point: design
+priority: high
+triaged_at: 2026-06-13
+created_at: 2026-06-13
+updated_at: 2026-06-13
+activated_at: 2026-06-13
+governance_scope: STDO Method
+migration_strategy: inside_out_hard_break
+library_usage: extend
+governing_library:
+  - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_REUSABLE_GRAPH_FUNCTION_LIBRARY.md
+  - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_OPTIMISING_OVERLAY.md
+source_ticket: .ai-workspace/tickets/completed/T-165-define-optimising-overlay-for-landscape-conditioned-fd-specialization.md
+source_documents:
+  - specification/PRODUCT.md
+  - specification/requirements/02-graph-functions.md
+  - specification/requirements/07-asset-typing-and-binding.md
+  - specification/requirements/13-odd-sdlc-typescript-tenant.md
+  - specification/requirements/16-edge-gain-closure-contract.md
+  - specification/requirements/18-typed-construction-algebra.md
+  - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_OPTIMISING_OVERLAY.md
+  - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_REUSABLE_GRAPH_FUNCTION_LIBRARY.md
+  - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_STAGED_COMPUTE_BOUNDARY.md
+  - .ai-workspace/tickets/completed/T-165-define-optimising-overlay-for-landscape-conditioned-fd-specialization.md
+  - .ai-workspace/tickets/active/T-162-first-class-ticket-workflow-for-governed-change.md
+  - /Users/jim/src/apps/specification_methodology/specification/standards/SPEC_METHOD.md
+  - /Users/jim/src/apps/specification_methodology/specification/standards/DESIGN_MODULE_METHOD.md
+  - /Users/jim/src/apps/specification_methodology/specification/standards/ODD_METHOD.md
+related_tickets:
+  - .ai-workspace/tickets/completed/T-165-define-optimising-overlay-for-landscape-conditioned-fd-specialization.md
+  - .ai-workspace/tickets/active/T-162-first-class-ticket-workflow-for-governed-change.md
+  - .ai-workspace/tickets/backlog/T-201-prove-single-node-smoke-optimising-specialization.md
+  - .ai-workspace/tickets/completed/T-197-reconcile-product-boundary-and-remove-authority-leakage.md
+  - .ai-workspace/tickets/completed/T-199-data-mapper-code-depth-resume-proof.md
+affected_boundary:
+  - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_OPTIMISING_OVERLAY.md
+  - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_REUSABLE_GRAPH_FUNCTION_LIBRARY.md
+  - build_tenants/typescript/code/src/graph/
+  - build_tenants/typescript/code/src/operator/
+  - build_tenants/typescript/code/src/projection/
+  - build_tenants/typescript/test_env/tests/
+  - build_tenants/typescript/test_env/live/
+excluded_boundary:
+  - ABG graph-call, frame, event, continuation, projection, replay, or traversal authority
+  - an SDLC-owned recursive controller, retry loop, cursor move, or event store
+  - closing parent feature-depth pressure from command success alone
+  - generated-sandbox patching as proof of product depth
+target_truth: >-
+  Residual feature-depth pressure can be escalated proportionally from simple
+  traversal into an admitted depth traversal over existing graph nodes. The
+  product overlay selects the domain-meaningful depth action, but ABG owns
+  execution, graph-vector re-entry, child traversal events, replay, and closure
+  foldback. Parent closure reads admitted child evidence and the decomposition
+  trace register, not consequence prose.
+superseded_truth: >-
+  Feature-depth pressure may remain downstream-deferred review text, may close
+  from successful build/test commands alone, or may be forced by an SDLC-local
+  recursive loop instead of admitted ABG graph traversal.
+closure_law: >-
+  This ticket closes only when the TypeScript tenant publishes and tests a
+  depth traversal graph-function path over existing graph nodes, admits a
+  decomposition trace register, persists downstream-deferred review rows into
+  that register, makes downstream design/build/test closure consume the child
+  rows, rejects parent closure when requirement-bound tests/source refs/shards
+  or admitted evidence are missing, proves the REQ-ENG-003 data-mapper
+  regression cannot converge through command-only sbt evidence, and runs a live
+  high-zoom proof showing ABG start/resume, child events, foldback, and parent
+  consolidation.
+evaluation_criteria:
+  - `Fg_decompose_depth_between_nodes` is catalog-visible as a graph function over existing graph nodes
+  - `sdlc_decomposition_trace_register` or an equivalent admitted carrier records parent/child obligations, owner edge, graph-function refs, closure criteria, evidence refs, and consolidation refs
+  - downstream-deferred review rows are persisted into the register and are not left as advisory prose
+  - design, build, and test edges consume register rows and block parent closure on untraced or open child rows
+  - feature-depth closure rejects missing requirement-bound test rows, source test refs, execution shard refs, or admitted evidence
+  - `SdlcTraversalStrategyDecision` can select simple traversal, depth traversal, simple-then-depth, depth-then-simple, or non-admit by proportionality
+  - SDLC never executes the selected traversal locally; selected actions enter ABG through admitted construction/re-entry carriers
+  - the data-mapper regression for `REQ-ENG-003` proves command-only `sbt test` evidence cannot close the feature obligation
+  - live high-zoom proof records admitted strategy decision, depth traversal start/resume, child graph-function execution, child event/provenance capture, child closure fold, and parent consolidation
+proof_surface:
+  - design update for depth traversal graph function and decomposition trace register
+  - focused carrier/admission tests for the register and depth outcome
+  - focused consequence-to-depth traversal test using ABG runner consumption
+  - data-mapper regression for REQ-ENG-003 command-only evidence rejection
+  - live high-zoom proof archive
+non_closure_conditions:
+  - downstream-deferred pressure is only summarized in comments, prompts, or review prose
+  - parent closure ignores unclosed child obligation rows
+  - command success is accepted without requirement-bound source test and admitted execution evidence
+  - SDLC performs graph cursor movement, retry, recursion, or event emission locally
+  - ABG/GTL gaps discovered by the high-zoom proof are hidden by SDLC workarounds
+---
+
+# T-200: Depth Traversal Function And Decomposition Trace Foldback
+
+## STDO Triage
+
+First missing layer: design.
+
+T-165 implemented the optimising-overlay foundation and the lawful bridge from
+SDLC consequence selection into ABI/ABG construction and graph-vector re-entry.
+It did not implement the graph function that expands residual feature-depth
+pressure into child obligations. This ticket owns that depth path.
+
+The intended motion is:
+
+```text
+simple traversal
+  -> residual feature-depth pressure
+  -> Fg_decompose_depth_between_nodes
+  -> child graph-function starts/resumes
+  -> child closure evidence
+  -> parent consolidation
+```
+
+The product may decide that depth is proportionate. It must not own the runtime
+mechanics. ABG remains the owner of graph calls, vectors, re-entry, events,
+replay, continuation, and closure fold.
+
+## Required Shape
+
+The depth traversal function is a graph function over an existing graph:
+
+```text
+Fg_decompose_depth_between_nodes(
+  sourceNodeRef,
+  targetNodeRef,
+  parentObligationRef,
+  graphCatalogDigestRef,
+  edgeContractRefs,
+  depthPolicyRef,
+  evidencePolicyRef
+) -> DepthTraversalOutcome
+```
+
+`DepthTraversalOutcome` must include:
+
+```text
+status: admitted | rejected | blocked
+depthPlanRef
+decompositionTraceRegisterRef
+childObligationRefs
+graphVectorRefs
+requiredLedgerRefs
+consolidationRef
+nonAdmissionReasonRefs
+```
+
+The decomposition trace register must bind each child obligation to the parent
+obligation, owner edge, graph-function ref, closure criteria, evidence refs,
+and consolidation refs. Parent closure must be derived from child evidence, not
+from consequence prose.
+
+## Work Ledger
+
+| id | task | proof | status |
+| --- | --- | --- | --- |
+| D1 | Design depth traversal graph function and register carriers. | design surface names carriers, owners, non-closure signals, and ABG handoff | pending |
+| D2 | Implement carrier admission and projection. | focused tests reject missing parent/child/evidence/consolidation refs | pending |
+| D3 | Publish `Fg_decompose_depth_between_nodes`. | graph catalog/module/query-domain expose the function and contract | pending |
+| D4 | Persist downstream-deferred review rows into the register. | consequence/evaluator test proves review text becomes register pressure | pending |
+| D5 | Make design/build/test closure consume child rows. | closure tests block on untraced or open children | pending |
+| D6 | Prove REQ-ENG-003 command-only rejection. | data-mapper regression fails closure from command-only `sbt test` evidence | pending |
+| D7 | Run high-zoom live proof. | archive records admitted strategy, depth traversal, child events, foldback, parent consolidation | pending |
+
+## Non-Goals
+
+- no SDLC-local recursive controller
+- no prompt-only obligation list as proof
+- no command-success-only feature closure
+- no ABG/GTL workaround in product code

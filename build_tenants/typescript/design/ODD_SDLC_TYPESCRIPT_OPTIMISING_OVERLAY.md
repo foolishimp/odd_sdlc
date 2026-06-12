@@ -2,7 +2,7 @@
 
 **Status**: Active
 **Date**: 2026-06-07
-**Owner Ticket**: `.ai-workspace/tickets/active/T-165-define-optimising-overlay-for-landscape-conditioned-fd-specialization.md`
+**Owner Ticket**: `.ai-workspace/tickets/completed/T-165-define-optimising-overlay-for-landscape-conditioned-fd-specialization.md`
 **Implements**: REQ-F-GFUNC-001, REQ-F-GFUNC-004, REQ-F-GFUNC-006, REQ-F-ASSET-001, REQ-F-ASSET-002, REQ-F-ASSET-003, REQ-F-ASSETMODEL-003, REQ-F-ASSETMODEL-004, REQ-F-ODDSDLC-074
 **Derives From**: `specification/PRODUCT.md`, `specification/requirements/02-graph-functions.md`, `specification/requirements/06-bootstrap-assets-and-recursive-edges.md`, `specification/requirements/07-asset-typing-and-binding.md`, `specification/requirements/18-typed-construction-algebra.md`, `ODD_SDLC_TYPESCRIPT_REUSABLE_GRAPH_FUNCTION_LIBRARY.md`, `ODD_SDLC_TYPESCRIPT_WORKSPACE_INGRESS_SEAMS.md`
 

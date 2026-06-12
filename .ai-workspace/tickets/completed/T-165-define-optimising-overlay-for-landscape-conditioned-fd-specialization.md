@@ -3,8 +3,8 @@ id: T-165
 title: Define optimising overlay for landscape-conditioned F_D specialization
 type: feature
 ticket_category: implementation_migration
-status: active
-proof_status: p1_bootstrap_prestart_contract_implemented_p2_bridge_consumption_implemented_p2_p3_depth_pending
+status: completed
+proof_status: closed_by_reprice_p1_bootstrap_p2_bridge_consumption_successors_t200_t201_t162
 goal: implement-phased-optimising-overlays-that-specialize-generic-sdlc-work-without-rival-runtime-truth
 build_tenant: typescript
 owner: odd_sdlc
@@ -18,17 +18,18 @@ change_intent: >-
   node carrying typed intent, product, optional requirements, project
   conformance, optional initial tenant surfaces, and a proportionality report.
   Before implementation begins, the ticket must expose the planned graph,
-  carrier, public-start, projection, and test changes for review. Later phases
-  add single-node smoke execution and broader landscape-conditioned F_D
-  specialization.
+  carrier, public-start, projection, and test changes for review. Remaining
+  single-node smoke, depth traversal, and broader landscape-conditioned F_D
+  specialization work is split to T-200/T-201.
 change_class: design_reframe
 re_entry_point: design
 priority: high
 triaged_at: 2026-05-14
 created_at: 2026-05-14
-updated_at: 2026-06-12
+updated_at: 2026-06-13
+completed_at: 2026-06-13
 governance_scope: STDO Method
-source_ticket: .ai-workspace/tickets/backlog/T-162-first-class-ticket-workflow-for-governed-change.md
+source_ticket: .ai-workspace/tickets/active/T-162-first-class-ticket-workflow-for-governed-change.md
 source_documents:
   - specification/GOALS.md
   - specification/PRODUCT.md
@@ -44,17 +45,25 @@ source_documents:
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_REUSABLE_GRAPH_FUNCTION_LIBRARY.md
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_EDGE_GAIN_CLOSURE_CONTRACT.md
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_OPTIMISING_OVERLAY.md
-  - .ai-workspace/tickets/backlog/T-162-first-class-ticket-workflow-for-governed-change.md
+  - .ai-workspace/tickets/active/T-162-first-class-ticket-workflow-for-governed-change.md
+  - .ai-workspace/tickets/active/T-200-implement-depth-traversal-function-and-decomposition-trace-foldback.md
+  - .ai-workspace/tickets/backlog/T-201-prove-single-node-smoke-optimising-specialization.md
   - .ai-workspace/tickets/completed/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md
   - .ai-workspace/tickets/completed/T-160-first-class-traversal-overlays-for-guided-graph-passes.md
   - /Users/jim/src/apps/specification_methodology/specification/standards/SPEC_METHOD.md
   - /Users/jim/src/apps/specification_methodology/specification/standards/DESIGN_MODULE_METHOD.md
   - /Users/jim/src/apps/specification_methodology/specification/standards/ODD_METHOD.md
 related_tickets:
-  - .ai-workspace/tickets/backlog/T-162-first-class-ticket-workflow-for-governed-change.md
+  - .ai-workspace/tickets/active/T-162-first-class-ticket-workflow-for-governed-change.md
+  - .ai-workspace/tickets/active/T-200-implement-depth-traversal-function-and-decomposition-trace-foldback.md
+  - .ai-workspace/tickets/backlog/T-201-prove-single-node-smoke-optimising-specialization.md
   - .ai-workspace/tickets/completed/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md
   - .ai-workspace/tickets/completed/T-160-first-class-traversal-overlays-for-guided-graph-passes.md
   - .ai-workspace/tickets/backlog/T-161-read-only-fd-run-analysis-linter.md
+successor_tickets:
+  - .ai-workspace/tickets/active/T-162-first-class-ticket-workflow-for-governed-change.md
+  - .ai-workspace/tickets/active/T-200-implement-depth-traversal-function-and-decomposition-trace-foldback.md
+  - .ai-workspace/tickets/backlog/T-201-prove-single-node-smoke-optimising-specialization.md
 affected_boundary:
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_OPTIMISING_OVERLAY.md
   - build_tenants/typescript/code/src/graph/catalog.ts
@@ -78,7 +87,7 @@ excluded_boundary:
   - creating a second graph catalog, overlay catalog, ticket database, event store, or closure authority
 target_truth: odd_sdlc can publish hierarchical and composable overlays. Bootstrap/proportionality is a graph-function traversal from type.unstructured input into an admitted bootstrap traversal outcome over a typed SDLC entry node or an admitted entry non-admission carrier, not a public-start branch. An optimising overlay is a parent overlay that observes declared landscape facts, capability assets, prior ledgers, ticket/work objective, and edge assurance contracts, then admits an optimized overlay binding or deterministic edge specialization only inside a declared applicability envelope. Existing execution overlays and graph functions still perform the SDLC work.
 superseded_truth: Optimization is handled by hardcoded public-start routing, ad hoc linter advice, local controller logic, or convenience F_D paths that bypass the generic F_P baseline without a declared overlay, applicability envelope, edge contract, and proof lane.
-closure_law: This ticket closes only when the TypeScript design and implementation define optimising overlays as composable parent overlays over existing graph overlays and graph functions, implement the bootstrap/proportionality phase as an ABG-owned type.unstructured-to-typed SDLC entry graph-function traversal with admitted outcome/non-admission carriers, declare the F_P-to-F_D specialization lifecycle, name the candidate graph-function family and environment law, and prove that no optimizer path becomes a rival runtime, hidden controller, or undeclared closure authority.
+closure_law: This ticket closes by reprice when the TypeScript design and implementation define optimising overlays as composable parent overlays over existing graph overlays and graph functions, implement the bootstrap/proportionality phase as an ABG-owned type.unstructured-to-typed SDLC entry graph-function traversal with admitted outcome/non-admission carriers, implement lawful ABG consequence-traversal bridge consumption for depth/re-entry selection, and split the remaining depth traversal, decomposition foldback, single-node smoke, and general specialization proof into successor tickets without claiming product convergence here.
 evaluation_criteria:
   - overlay hierarchy distinguishes governance overlays, optimising overlays, execution overlays, and proof/read-model overlays
   - optimising overlay output is an admitted overlay binding or edge specialization contract, not an imperative route decision
@@ -220,13 +229,13 @@ not count as closure evidence.
 - [x] producer set for the new truth is listed
 - [x] consumer set for the new truth is listed
 - [x] projection/read-model surfaces are listed
-- [ ] old truth path is removed or explicitly demoted from authority
-- [ ] mixed-state behavior is no longer accepted as closure evidence
-- [ ] tests proving mixed old/new behavior are removed or repriced
+- [x] old truth path is removed or explicitly demoted from authority for the closed P1/P2 bridge scope; residual depth/general paths are split to T-200/T-201
+- [x] mixed-state behavior is no longer accepted as closure evidence for this ticket; remaining product pressure routes to T-162/T-200/T-201
+- [x] tests proving mixed old/new behavior are removed or repriced into the successor scope
 - [x] recurring realization patterns are checked against existing library/commonization surfaces
 - [x] ticket declares library usage and names the governing library or rationale
 - [x] if the work exists in more than one build tenant, this backlog/active ticket carries only one tenant lifecycle and any sibling tenant work lives on its own suffixed ticket
-- [ ] ticket wording, product wording, and proof claims are reconciled before closure
+- [x] ticket wording, product wording, and proof claims are reconciled before closure by repricing residual P2/P3 work to T-200/T-201 and final-node workflow to T-162
 
 ## Design Claim
 
@@ -842,9 +851,9 @@ surfaces, and closure conditions.
 | P1-030 | Bootstrap/proportionality | Prove minimum lawful path selection. | hello-world-class workspace selects the smoke minimum through the optimized bootstrap outcome | complete |
 | P1-040 | Bootstrap/proportionality | Preserve generic F_P fallback by admitted non-admission. | domain-product workspace falls back to generic execution overlay through explicit non-admission reason refs and admitted pre-start contract | complete |
 | P2-005 | Consequence bridge consumption | Bind SDLC replayed consequence rows and `SdlcTraversalStrategyDecision` to ABG `ConsequenceTraversalAction`, then prove ABG runner consumes the action. | `test_t165_consequence_traversal_action_bridge.test.mjs` constructs `SdlcConsequenceTraversalActionBinding`, returns it through ABI `ConsequenceProjectionOutcome.traversalAction`, and observes ABG `graph_reentry_applied` plus construction events | complete |
-| P2-010 | Single-node smoke | Add optimized single iterative smoke node for design/build/test. | T-132-class live run uses bootstrap/proportionality + one transform F_P + one eval F_P | pending |
-| P2-020 | Single-node smoke | Preserve deep proof at closure. | target carrier, review/eval, gain, closure, and replay artifacts remain admitted and traceable | pending |
-| P3-010 | General specialization | Generalize optimizing overlay candidates beyond smoke products. | at least one deterministic specialization admits and at least one non-admissible case falls back to generic F_P | pending |
+| P2-010 | Single-node smoke | Add optimized single iterative smoke node for design/build/test. | T-132-class live run uses bootstrap/proportionality + one transform F_P + one eval F_P | split to T-201 |
+| P2-020 | Single-node smoke/depth proof | Preserve deep proof at closure. | target carrier, review/eval, gain, closure, and replay artifacts remain admitted and traceable | split to T-200/T-201 |
+| P3-010 | General specialization | Generalize optimizing overlay candidates beyond smoke products. | at least one deterministic specialization admits and at least one non-admissible case falls back to generic F_P | split to T-200/T-201 |
 
 ## Implementation Evidence 2026-06-11
 
@@ -866,10 +875,12 @@ npm run build:semantic
 node --test test_env/tests/test_t165_optimising_overlay.test.mjs
 ```
 
-Remaining scope is P2/P3 only. This ticket stays active until the single-node
-smoke path and general deterministic specialization phases are either
-implemented here or split into successor tickets with this ticket repriced to
-P1 closure.
+Remaining P2/P3 scope has now been split out. T-200 owns the depth traversal
+function, decomposition trace register, downstream closure blocking, and
+data-mapper high-zoom proof. T-201 owns the optimized single-node smoke path and
+general specialization proof. T-162 owns the final-node code-review/triage
+ticket workflow that re-enters at the start of `current-full-traversal` when an
+overlay segment completes with remaining product pressure.
 
 ## Workflow Addendum 2026-06-12: ABG-Owned Zoom-In Decomposition
 
@@ -1192,12 +1203,12 @@ function path, preserve child event/provenance refs, or fold child closure back
 into parent consolidation, the correct outcome is an ABG/GTL gap ticket or
 patch. SDLC must not compensate by adding a local recursive controller.
 
-Acceptance additions for P2/P3:
+Acceptance additions for P2/P3, repriced at close:
 
-- Introduce or ratify a `sdlc_decomposition_trace_register` equivalent for
+- [split -> T-200] Introduce or ratify a `sdlc_decomposition_trace_register` equivalent for
   parent/child requirement decomposition, owner edge, graph-function refs,
   closure criteria, evidence refs, and consolidation refs.
-- Introduce or ratify `SdlcTraversalStrategyDecision` so consequence can admit
+- [x] Introduce or ratify `SdlcTraversalStrategyDecision` so consequence can admit
   `simple_traversal`, `depth_traversal`, `simple_then_depth`,
   `depth_then_simple`, or `non_admit` by proportionality.
 - [x] Introduce or ratify `SdlcConsequenceTraversalAction`, or bind directly to
@@ -1205,9 +1216,9 @@ Acceptance additions for P2/P3:
   consequence decision can become an executable ABG graph-function invocation,
   graph-span re-entry, or child-frame traversal without an SDLC-owned runtime
   loop. Implemented as `SdlcConsequenceTraversalActionBinding`.
-- Introduce or ratify `Fg_decompose_depth_between_nodes` as a graph function
+- [split -> T-200] Introduce or ratify `Fg_decompose_depth_between_nodes` as a graph function
   over existing graph nodes, not as an SDLC-owned loop.
-- Persist downstream-deferred review rows into that register instead of leaving
+- [split -> T-200] Persist downstream-deferred review rows into that register instead of leaving
   them as advisory review text.
 - [x] Add a focused SDLC bridge test where `operator/traversal_consequence.ts`
   observes residual feature-depth pressure, emits or binds to the ABG
@@ -1215,16 +1226,16 @@ Acceptance additions for P2/P3:
   graph-function invocation, and the emitted child event/provenance refs fold
   back to parent consolidation. Implemented by
   `test_t165_consequence_traversal_action_bridge.test.mjs`.
-- Make downstream design, build, and test edges consume the register and block
+- [split -> T-200] Make downstream design, build, and test edges consume the register and block
   parent closure on untraced or unclosed child rows.
-- Reject feature-depth closure when requirement-bound test rows, source test
+- [split -> T-200] Reject feature-depth closure when requirement-bound test rows, source test
   refs, execution shard refs, or admitted evidence are absent.
-- Prove with a data-mapper focused regression that `REQ-ENG-003` cannot converge
+- [split -> T-200] Prove with a data-mapper focused regression that `REQ-ENG-003` cannot converge
   through command-only `sbt test` evidence.
-- Prove the ABG high-zoom path live: admitted strategy decision, depth traversal
+- [split -> T-200] Prove the ABG high-zoom path live: admitted strategy decision, depth traversal
   start/resume, child graph-function execution, child event/provenance capture,
   child closure fold, and parent consolidation.
-- If the high-zoom path exposes missing ABG/GTL mechanics, open or patch the
+- [split -> T-200] If the high-zoom path exposes missing ABG/GTL mechanics, open or patch the
   ABG/GTL gap rather than implementing a local SDLC traversal controller.
 
 Non-goals:
@@ -1233,3 +1244,20 @@ Non-goals:
 - no SDLC-owned ABG runtime loop
 - no generated-sandbox product patching as proof
 - no generic obligation prose masquerading as feature-depth evidence
+
+## Completion Reprice 2026-06-13
+
+T-165 is complete for the implemented optimising-overlay foundation:
+
+- P1 bootstrap/proportionality carriers, admission, public-start consumption,
+  fallback, and query-domain projection are implemented and verified.
+- P2 bridge consumption is implemented: SDLC consequence rows and
+  `SdlcTraversalStrategyDecision` bind to ABI `ConsequenceTraversalAction` and
+  enter ABG runner consumption through `ConsequenceProjectionOutcome.traversalAction`.
+- ABG remains the runtime owner for construction intent, graph-vector re-entry,
+  replay-visible events, continuation, and foldback.
+
+The ticket does not claim full product convergence or complete data-mapper
+feature-depth closure. The final-node code-review/triage workflow belongs to
+T-162. The depth traversal/decomposition/foldback line belongs to T-200. The
+optimized single-node smoke/general specialization proof belongs to T-201.

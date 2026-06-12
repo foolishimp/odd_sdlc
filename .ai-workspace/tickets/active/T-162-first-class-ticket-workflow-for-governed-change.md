@@ -43,7 +43,9 @@ related_tickets:
   - .ai-workspace/tickets/completed/T-159-product-assets-carry-requirement-lineage.md
   - .ai-workspace/tickets/completed/T-160-first-class-traversal-overlays-for-guided-graph-passes.md
   - .ai-workspace/tickets/backlog/T-161-read-only-fd-run-analysis-linter.md
-  - .ai-workspace/tickets/active/T-165-define-optimising-overlay-for-landscape-conditioned-fd-specialization.md
+  - .ai-workspace/tickets/completed/T-165-define-optimising-overlay-for-landscape-conditioned-fd-specialization.md
+  - .ai-workspace/tickets/active/T-200-implement-depth-traversal-function-and-decomposition-trace-foldback.md
+  - .ai-workspace/tickets/backlog/T-201-prove-single-node-smoke-optimising-specialization.md
   - .ai-workspace/tickets/backlog/T-166-define-adaptable-consensus-graph-function-for-submitter-reviewer-rounds.md
   - .ai-workspace/tickets/backlog/T-167-define-review-graph-function-for-multi-reviewer-ticket-generation.md
 affected_boundary:

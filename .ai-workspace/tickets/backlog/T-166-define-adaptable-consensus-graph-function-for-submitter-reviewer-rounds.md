@@ -13,7 +13,7 @@ re_entry_point: design
 priority: high
 triaged_at: 2026-05-14
 created_at: 2026-05-14
-updated_at: 2026-05-14
+updated_at: 2026-06-13
 governance_scope: STDO Method
 source_documents:
   - specification/requirements/02-graph-functions.md
@@ -25,14 +25,14 @@ source_documents:
   - build_tenants/python/test_env/tests/test_odd_sdlc_sandbox_usecase.py
   - .ai-workspace/tickets/completed/T-005-reprice-consensus-as-reusable-graph-function-plugin.md
   - .ai-workspace/tickets/active/T-162-first-class-ticket-workflow-for-governed-change.md
-  - .ai-workspace/tickets/backlog/T-165-define-optimising-overlay-for-landscape-conditioned-fd-specialization.md
+  - .ai-workspace/tickets/completed/T-165-define-optimising-overlay-for-landscape-conditioned-fd-specialization.md
   - /Users/jim/src/apps/specification_methodology/specification/standards/SPEC_METHOD.md
   - /Users/jim/src/apps/specification_methodology/specification/standards/DESIGN_MODULE_METHOD.md
   - /Users/jim/src/apps/specification_methodology/specification/standards/ODD_METHOD.md
 related_tickets:
   - .ai-workspace/tickets/completed/T-005-reprice-consensus-as-reusable-graph-function-plugin.md
   - .ai-workspace/tickets/active/T-162-first-class-ticket-workflow-for-governed-change.md
-  - .ai-workspace/tickets/backlog/T-165-define-optimising-overlay-for-landscape-conditioned-fd-specialization.md
+  - .ai-workspace/tickets/completed/T-165-define-optimising-overlay-for-landscape-conditioned-fd-specialization.md
   - .ai-workspace/tickets/backlog/T-167-define-review-graph-function-for-multi-reviewer-ticket-generation.md
   - .ai-workspace/tickets/backlog/B-004-track-odd-service-remote-client-and-consensus-scope-debt.md
 affected_boundary:

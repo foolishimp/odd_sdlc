@@ -20,7 +20,7 @@ re_entry_point: design
 priority: medium
 triaged_at: 2026-06-09
 created_at: 2026-06-09
-updated_at: 2026-06-09
+updated_at: 2026-06-13
 governance_scope: STDO Method
 source_documents:
   - specification/PRODUCT.md
@@ -30,7 +30,7 @@ source_documents:
   - specification/requirements/18-typed-construction-algebra.md
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_REUSABLE_GRAPH_FUNCTION_LIBRARY.md
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_OPTIMISING_OVERLAY.md
-  - .ai-workspace/tickets/active/T-165-define-optimising-overlay-for-landscape-conditioned-fd-specialization.md
+  - .ai-workspace/tickets/completed/T-165-define-optimising-overlay-for-landscape-conditioned-fd-specialization.md
   - .ai-workspace/tickets/completed/T-184-partition-handoff-into-compute-stage-boundary-modules.md
   - .ai-workspace/tickets/completed/T-185-agent-internal-subworkstreams-for-compute-stage-acceleration.md
   - .ai-workspace/tickets/completed/T-187-restore-fp-evaluator-prompt-boundary-and-proportionality.md
@@ -38,7 +38,7 @@ source_documents:
   - /Users/jim/src/apps/specification_methodology/specification/standards/DESIGN_MODULE_METHOD.md
   - /Users/jim/src/apps/specification_methodology/specification/standards/ODD_METHOD.md
 related_tickets:
-  - .ai-workspace/tickets/active/T-165-define-optimising-overlay-for-landscape-conditioned-fd-specialization.md
+  - .ai-workspace/tickets/completed/T-165-define-optimising-overlay-for-landscape-conditioned-fd-specialization.md
   - .ai-workspace/tickets/completed/T-184-partition-handoff-into-compute-stage-boundary-modules.md
   - .ai-workspace/tickets/completed/T-185-agent-internal-subworkstreams-for-compute-stage-acceleration.md
   - .ai-workspace/tickets/completed/T-187-restore-fp-evaluator-prompt-boundary-and-proportionality.md
