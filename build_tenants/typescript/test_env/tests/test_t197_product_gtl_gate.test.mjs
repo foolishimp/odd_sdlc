@@ -392,6 +392,9 @@ test("T-197 A5 gates installed convergence on ABG terminal convergence", () => {
   const source = repoFile(
     "build_tenants/typescript/code/src/operator/installed_operator.ts"
   );
+  const traversalConsequenceSource = repoFile(
+    "build_tenants/typescript/code/src/operator/traversal_consequence.ts"
+  );
   const transitionRefBody = sourceFunction(
     source,
     "abgTraversalTransitionProjectionRef"
@@ -515,6 +518,18 @@ test("T-197 A5 gates installed convergence on ABG terminal convergence", () => {
   assert.doesNotMatch(source, /\bclosedWithoutNextTraversal\b/u);
   assert.doesNotMatch(
     source,
+    /traversalTransitionRef:\s*nextActionProjection\.nextActionProjectionRef/u
+  );
+  assert.match(
+    traversalConsequenceSource,
+    /abgTraversalTransitionRef:\s*string/u
+  );
+  assert.match(
+    traversalConsequenceSource,
+    /const traversalTransitionRef\s*=\s*requireNonEmptyString\(\s*input\.abgTraversalTransitionRef/u
+  );
+  assert.doesNotMatch(
+    traversalConsequenceSource,
     /traversalTransitionRef:\s*nextActionProjection\.nextActionProjectionRef/u
   );
   assert.doesNotMatch(

@@ -659,8 +659,104 @@ function parseJsonCandidates(input: string, label: string): readonly unknown[] {
   }
 }
 
+function firstJsonObjectText(input: string): string | null {
+  const start = input.search(/\S/u);
+  if (start < 0 || input[start] !== "{") {
+    return null;
+  }
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < input.length; index += 1) {
+    const char = input[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+    if (char === "\"") {
+      inString = true;
+      continue;
+    }
+    if (char === "{") {
+      depth += 1;
+      continue;
+    }
+    if (char !== "}") {
+      continue;
+    }
+    depth -= 1;
+    if (depth === 0) {
+      return input.slice(start, index + 1);
+    }
+  }
+  return null;
+}
+
+function targetCarrierSectionText(content: string): string | null {
+  const heading = /^## Target Carrier\s*$/mu.exec(content);
+  if (heading === null || heading.index === undefined) {
+    return null;
+  }
+  const start = heading.index + heading[0].length;
+  const rest = content.slice(start);
+  const nextHeading = /^## /mu.exec(rest);
+  return nextHeading === null || nextHeading.index === undefined
+    ? rest
+    : rest.slice(0, nextHeading.index);
+}
+
+function targetCarrierSectionCandidates(content: string): readonly unknown[] {
+  const section = targetCarrierSectionText(content);
+  if (section === null) {
+    return Object.freeze([]);
+  }
+  const jsonText = firstJsonObjectText(section);
+  if (jsonText === null) {
+    return Object.freeze([]);
+  }
+  return parseJsonCandidates(jsonText, "component_depth_register.target_carrier");
+}
+
+function embeddedJsonObjectCandidates(content: string): readonly unknown[] {
+  let offset = 0;
+  let inCodeBlock = false;
+  for (const line of content.split("\n")) {
+    const trimmed = line.trimStart();
+    if (trimmed.startsWith("```")) {
+      inCodeBlock = !inCodeBlock;
+      offset += line.length + 1;
+      continue;
+    }
+    if (!inCodeBlock && trimmed.startsWith("{")) {
+      const objectStart = offset + line.length - trimmed.length;
+      const jsonText = firstJsonObjectText(content.slice(objectStart));
+      return jsonText === null
+        ? Object.freeze([])
+        : parseJsonCandidates(
+            jsonText,
+            "component_depth_register.embedded_target_carrier"
+          );
+    }
+    offset += line.length + 1;
+  }
+  return Object.freeze([]);
+}
+
 function jsonCandidates(content: string): readonly unknown[] {
-  return parseJsonCandidates(content, "component_depth_register");
+  const wholeFileCandidates = parseJsonCandidates(content, "component_depth_register");
+  if (wholeFileCandidates.length > 0) {
+    return wholeFileCandidates;
+  }
+  const sectionCandidates = targetCarrierSectionCandidates(content);
+  return sectionCandidates.length > 0
+    ? sectionCandidates
+    : embeddedJsonObjectCandidates(content);
 }
 
 function requiredRowsPresent(input: {

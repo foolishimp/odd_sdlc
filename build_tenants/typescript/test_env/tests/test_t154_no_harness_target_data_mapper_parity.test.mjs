@@ -475,7 +475,9 @@ function assertReplay(rows) {
     edgeFulfillmentLedgers: [rows.ledger],
     edgeClosureDecisions: [rows.decision],
     nextActionProjections: [rows.nextActionProjection],
-    finalNextActionProjectionRef: rows.nextActionProjection.nextActionProjectionRef
+    finalNextActionProjectionRef: rows.nextActionProjection.nextActionProjectionRef,
+    abgTraversalTransitionRef:
+      `abg-runtime-transition://t154/${encodeURIComponent(rows.nextActionProjection.nextActionProjectionRef)}`
   });
   assert.equal(replay.edgeClosureDecision.decisionRef, rows.decision.decisionRef);
   assert.equal(

@@ -1685,6 +1685,7 @@ export function replaySdlcTraversalConsequence(input: {
   readonly edgeClosureDecisions: readonly SdlcEdgeClosureDecision[];
   readonly nextActionProjections: readonly SdlcNextActionProjection[];
   readonly finalNextActionProjectionRef?: string;
+  readonly abgTraversalTransitionRef: string;
 }): SdlcTraversalConsequenceReplay {
   const nextActionProjection =
     input.finalNextActionProjectionRef === undefined
@@ -1835,6 +1836,10 @@ export function replaySdlcTraversalConsequence(input: {
     requiredRefs: [nextActionProjection.productAssetModelRef],
     label: constructionIntent.intentRef
   });
+  const traversalTransitionRef = requireNonEmptyString(
+    input.abgTraversalTransitionRef,
+    "abgTraversalTransitionRef"
+  );
   const admittedStateRef = Object.freeze({
     compositionRef: nextActionProjection.compositionRef,
     compositionDigest: nextActionProjection.compositionDigest,
@@ -1849,7 +1854,10 @@ export function replaySdlcTraversalConsequence(input: {
       edgeFulfillmentLedger.ledgerVersionRef,
       edgeClosureDecision.decisionRef
     ]),
-    projectionRefs: uniqueSorted([nextActionProjection.nextActionProjectionRef])
+    projectionRefs: uniqueSorted([
+      traversalTransitionRef,
+      nextActionProjection.nextActionProjectionRef
+    ])
   } satisfies GtlAdmittedStateRef);
   const consequenceProjection = Object.freeze({
     consequenceRef:
@@ -1859,10 +1867,11 @@ export function replaySdlcTraversalConsequence(input: {
     compositionSelectionRef: nextActionProjection.compositionSelectionRef,
     assuranceDecisionRef:
       edgeClosureDecision.edgeAssuranceDecisionRef ?? edgeClosureDecision.decisionRef,
-    traversalTransitionRef: nextActionProjection.nextActionProjectionRef,
+    traversalTransitionRef,
     domainReadModelRefs: uniqueSorted([
       edgeFulfillmentLedger.ledgerVersionRef,
       edgeClosureDecision.decisionRef,
+      traversalTransitionRef,
       nextActionProjection.nextActionProjectionRef
     ])
   } satisfies GtlConsequenceProjectionRef);
@@ -2104,6 +2113,7 @@ export function assertSdlcTraversalConsequenceReplayable(input: {
   readonly edgeClosureDecisions: readonly SdlcEdgeClosureDecision[];
   readonly nextActionProjections: readonly SdlcNextActionProjection[];
   readonly finalNextActionProjectionRef?: string;
+  readonly abgTraversalTransitionRef: string;
 }): SdlcTraversalConsequenceReplay {
   return replaySdlcTraversalConsequence(input);
 }

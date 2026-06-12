@@ -17,6 +17,10 @@ const PRODUCT_ASSET_MODEL_REF = "product-asset-model://t138/current";
 const GAP_PRESSURE_REFS = ["gap-pressure://t138/current"];
 const TARGET_BINDING_REFS = ["target-binding://t138/current"];
 
+function abgTraversalTransitionRef(caseId) {
+  return `abg-runtime-transition://t138/${encodeURIComponent(caseId)}`;
+}
+
 function intentBasis() {
   return {
     intentEventRefs: INTENT_EVENT_REFS,
@@ -137,7 +141,8 @@ test("T-138 replay reconstructs the full causal chain from predecessor refs", ()
     edgeFulfillmentLedgers: [rows.edgeFulfillmentLedger],
     edgeClosureDecisions: [rows.edgeClosureDecision],
     nextActionProjections: [rows.nextActionProjection],
-    finalNextActionProjectionRef: rows.nextActionProjection.nextActionProjectionRef
+    finalNextActionProjectionRef: rows.nextActionProjection.nextActionProjectionRef,
+    abgTraversalTransitionRef: abgTraversalTransitionRef("post-evidence")
   });
 
   assert.deepEqual(replay.refs, {
@@ -154,6 +159,14 @@ test("T-138 replay reconstructs the full causal chain from predecessor refs", ()
     admittedStateRef: replay.admittedStateRef.frameRef,
     consequenceProjectionRef: replay.consequenceProjection.consequenceRef
   });
+  assert.equal(
+    replay.consequenceProjection.traversalTransitionRef,
+    abgTraversalTransitionRef("post-evidence")
+  );
+  assert.notEqual(
+    replay.consequenceProjection.traversalTransitionRef,
+    rows.nextActionProjection.nextActionProjectionRef
+  );
 });
 
 test("T-138 initial next-action selection has no synthetic closure decision", () => {
@@ -183,7 +196,8 @@ test("T-138 initial next-action selection has no synthetic closure decision", ()
         edgeFulfillmentLedgers: [],
         edgeClosureDecisions: [],
         nextActionProjections: [projection],
-        finalNextActionProjectionRef: projection.nextActionProjectionRef
+        finalNextActionProjectionRef: projection.nextActionProjectionRef,
+        abgTraversalTransitionRef: abgTraversalTransitionRef("initial")
       }),
     /initial next-action projection and cannot replay an action consequence/
   );
@@ -204,7 +218,8 @@ test("T-138 broken ledger predecessor refs fail replayability", () => {
         edgeFulfillmentLedgers: [brokenLedger],
         edgeClosureDecisions: [rows.edgeClosureDecision],
         nextActionProjections: [rows.nextActionProjection],
-        finalNextActionProjectionRef: rows.nextActionProjection.nextActionProjectionRef
+        finalNextActionProjectionRef: rows.nextActionProjection.nextActionProjectionRef,
+        abgTraversalTransitionRef: abgTraversalTransitionRef("broken-ledger")
       }),
     /ledger:\/\/t138\/current-edge missing predecessor refs: target-binding:\/\/t138\/current/
   );
@@ -264,7 +279,8 @@ test("T-138 replay validates every evidence bundle referenced by the ledger", ()
         edgeFulfillmentLedgers: [ledger],
         edgeClosureDecisions: [decision],
         nextActionProjections: [projection],
-        finalNextActionProjectionRef: projection.nextActionProjectionRef
+        finalNextActionProjectionRef: projection.nextActionProjectionRef,
+        abgTraversalTransitionRef: abgTraversalTransitionRef("multi-evidence")
       }),
     /evidence:\/\/t138\/worksite-2 missing predecessor refs: invocation:\/\/t138\/graph-call-2/
   );
@@ -328,7 +344,8 @@ test("T-138 replay rejects multi-evidence ledgers that mix intents", () => {
         edgeFulfillmentLedgers: [ledger],
         edgeClosureDecisions: [decision],
         nextActionProjections: [projection],
-        finalNextActionProjectionRef: projection.nextActionProjectionRef
+        finalNextActionProjectionRef: projection.nextActionProjectionRef,
+        abgTraversalTransitionRef: abgTraversalTransitionRef("mixed-intents")
       }),
     /ledger:\/\/t138\/mixed-intents references evidence from multiple intents/
   );
@@ -349,7 +366,8 @@ test("T-138 orphan closure decision fails replayability", () => {
         edgeFulfillmentLedgers: [rows.edgeFulfillmentLedger],
         edgeClosureDecisions: [brokenDecision],
         nextActionProjections: [rows.nextActionProjection],
-        finalNextActionProjectionRef: rows.nextActionProjection.nextActionProjectionRef
+        finalNextActionProjectionRef: rows.nextActionProjection.nextActionProjectionRef,
+        abgTraversalTransitionRef: abgTraversalTransitionRef("orphan-closure")
       }),
     /closure-decision:\/\/t138\/yield missing predecessor refs/
   );
@@ -377,7 +395,8 @@ test("T-138 replay is deterministic when caller arrays are shuffled", () => {
     edgeFulfillmentLedgers: [rows.edgeFulfillmentLedger],
     edgeClosureDecisions: [rows.edgeClosureDecision],
     nextActionProjections: [rows.nextActionProjection],
-    finalNextActionProjectionRef: rows.nextActionProjection.nextActionProjectionRef
+    finalNextActionProjectionRef: rows.nextActionProjection.nextActionProjectionRef,
+    abgTraversalTransitionRef: abgTraversalTransitionRef("deterministic")
   });
   const second = assertSdlcTraversalConsequenceReplayable({
     constructionIntents: [rows.constructionIntent, unrelatedIntent],
@@ -385,7 +404,8 @@ test("T-138 replay is deterministic when caller arrays are shuffled", () => {
     edgeFulfillmentLedgers: [rows.edgeFulfillmentLedger],
     edgeClosureDecisions: [rows.edgeClosureDecision],
     nextActionProjections: [rows.nextActionProjection],
-    finalNextActionProjectionRef: rows.nextActionProjection.nextActionProjectionRef
+    finalNextActionProjectionRef: rows.nextActionProjection.nextActionProjectionRef,
+    abgTraversalTransitionRef: abgTraversalTransitionRef("deterministic")
   });
 
   assert.deepEqual(first.refs, second.refs);
@@ -407,7 +427,8 @@ test("T-138 post-action projections must cite model, gap, binding, closure, obse
         edgeFulfillmentLedgers: [rows.edgeFulfillmentLedger],
         edgeClosureDecisions: [rows.edgeClosureDecision],
         nextActionProjections: [brokenProjection],
-        finalNextActionProjectionRef: rows.nextActionProjection.nextActionProjectionRef
+        finalNextActionProjectionRef: rows.nextActionProjection.nextActionProjectionRef,
+        abgTraversalTransitionRef: abgTraversalTransitionRef("broken-projection")
       }),
     /next-action:\/\/t138\/post-evidence missing predecessor refs/
   );

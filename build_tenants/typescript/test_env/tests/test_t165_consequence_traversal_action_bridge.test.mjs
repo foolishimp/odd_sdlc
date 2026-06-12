@@ -339,7 +339,9 @@ function buildSdlcTraversalActionBinding(basis, reentryTargetRef = "graph-reentr
     edgeFulfillmentLedgers: [rows.edgeFulfillmentLedger],
     edgeClosureDecisions: [rows.edgeClosureDecision],
     nextActionProjections: [rows.nextActionProjection],
-    finalNextActionProjectionRef: rows.nextActionProjection.nextActionProjectionRef
+    finalNextActionProjectionRef: rows.nextActionProjection.nextActionProjectionRef,
+    abgTraversalTransitionRef:
+      "abg-runtime-transition://t165/reenter-requirements-to-design"
   });
   const strategyDecision = deriveSdlcTraversalStrategyDecision({
     edgeName: "derive_code_surface",

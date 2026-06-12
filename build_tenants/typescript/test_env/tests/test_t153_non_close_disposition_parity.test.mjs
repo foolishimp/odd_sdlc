@@ -254,7 +254,9 @@ function replay(rows, decision, projection) {
     edgeFulfillmentLedgers: [rows.edgeFulfillmentLedger],
     edgeClosureDecisions: [decision],
     nextActionProjections: [projection],
-    finalNextActionProjectionRef: projection.nextActionProjectionRef
+    finalNextActionProjectionRef: projection.nextActionProjectionRef,
+    abgTraversalTransitionRef:
+      `abg-runtime-transition://t153/${encodeURIComponent(projection.nextActionProjectionRef)}`
   });
 
   assert.equal(

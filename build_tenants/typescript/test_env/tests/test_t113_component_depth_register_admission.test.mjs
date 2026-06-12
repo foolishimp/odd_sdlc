@@ -83,8 +83,9 @@ function componentDepthEdgeRefForTarget(targetAssetType) {
   }
 }
 
-function componentDepthTargetCarrierFor(register) {
-  const edgeRef = componentDepthEdgeRefForTarget(register.targetAssetType);
+function componentDepthTargetCarrierFor(register, edgeRefOverride = null) {
+  const edgeRef =
+    edgeRefOverride ?? componentDepthEdgeRefForTarget(register.targetAssetType);
   return {
     kind: sdlcTargetCarrierOutputKind(register.targetAssetType),
     targetAssetType: register.targetAssetType,
@@ -140,6 +141,48 @@ function writePlainFenceLabeledCarrierArtifact(register, name = register.targetA
     "json component_depth_register",
     JSON.stringify(carrier, null, 2),
     "```",
+    ""
+  ].join("\n");
+  mkdirSync(path.dirname(outputFile), { recursive: true });
+  writeFileSync(outputFile, content, "utf8");
+  return { outputFile, content };
+}
+
+function writeTargetCarrierSectionArtifact(
+  register,
+  name = register.targetAssetType,
+  edgeRefOverride = null
+) {
+  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t113-"));
+  const outputFile = path.join(root, `${name}.md`);
+  const carrier = componentDepthTargetCarrierFor(register, edgeRefOverride);
+  const content = [
+    `# ${name}`,
+    "",
+    "## Target Carrier",
+    "",
+    JSON.stringify(carrier),
+    ""
+  ].join("\n");
+  mkdirSync(path.dirname(outputFile), { recursive: true });
+  writeFileSync(outputFile, content, "utf8");
+  return { outputFile, content };
+}
+
+function writeUnfencedEmbeddedCarrierArtifact(
+  register,
+  name = register.targetAssetType,
+  edgeRefOverride = null
+) {
+  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t113-"));
+  const outputFile = path.join(root, `${name}.md`);
+  const carrier = componentDepthTargetCarrierFor(register, edgeRefOverride);
+  const content = [
+    `# ${name}`,
+    "",
+    "The prose surface can precede the selected target carrier.",
+    "",
+    JSON.stringify(carrier, null, 2),
     ""
   ].join("\n");
   mkdirSync(path.dirname(outputFile), { recursive: true });
@@ -501,6 +544,130 @@ test("T-197 rejects plain-fence labeled component-depth target carrier payloads"
 
   assert.equal(admission.status, "rejected");
   assert.match(admission.blockingReasons.join("\n"), /component_depth_register_missing/u);
+});
+
+test("T-132 admits Markdown Target Carrier envelope with component-depth payload", () => {
+  const register = {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_code_surface",
+    componentTopologyRows: [
+      {
+        kind: "sdlc_component_topology_row",
+        componentId: "hello_program",
+        moduleName: "hello_world_javascript",
+        relativePath: "build_tenants/hello_world_javascript/src/hello.js",
+        publicBoundary: "build_tenants/hello_world_javascript/src/hello.js",
+        concernRole: "other",
+        requirementIds: [
+          "requirement:t132_hello_world_single_tenant.bootstrap.req_t132_001"
+        ],
+        sourceAssetRefs: [
+          "workspace://build_tenants/hello_world_javascript/design/adrs/ADR-002-implementation-design-surface.md"
+        ]
+      }
+    ],
+    componentRealizationRows: [
+      {
+        kind: "sdlc_component_realization_row",
+        componentId: "hello_program",
+        moduleName: "hello_world_javascript",
+        relativePath: "build_tenants/hello_world_javascript/src/hello.js",
+        publicBoundary: "build_tenants/hello_world_javascript/src/hello.js",
+        requirementIds: [
+          "requirement:t132_hello_world_single_tenant.bootstrap.req_t132_001"
+        ],
+        sourceAssetRefs: [
+          "workspace://build_tenants/hello_world_javascript/design/adrs/ADR-002-implementation-design-surface.md"
+        ]
+      }
+    ],
+    testComponentTopologyRows: [],
+    componentTestRows: [],
+    componentTestQualificationRows: [],
+    componentExecutionFailureRegister: null,
+    componentRepairSchedule: null,
+    releaseDepthParity: null
+  };
+  const { outputFile } = writeTargetCarrierSectionArtifact(
+    register,
+    "component_code_surface",
+    "derive_lite_component_code_surface"
+  );
+
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: "component_code_surface",
+    outputFile
+  });
+
+  assert.equal(admission.status, "admitted");
+  assert.equal(admission.register.componentRealizationRows.length, 1);
+  assert.equal(
+    admission.register.componentRealizationRows[0].componentId,
+    "hello_program"
+  );
+});
+
+test("T-132 admits raw unfenced target-carrier envelope embedded in Markdown", () => {
+  const register = {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_code_surface",
+    componentTopologyRows: [
+      {
+        kind: "sdlc_component_topology_row",
+        componentId: "hello_main",
+        moduleName: "hello_world_javascript",
+        relativePath: "src/hello.js",
+        publicBoundary: "direct stdout: Hello, world!",
+        concernRole: "other",
+        requirementIds: [
+          "requirement:t132_hello_world_single_tenant.bootstrap.req_t132_001"
+        ],
+        sourceAssetRefs: [
+          "workspace://build_tenants/hello_world_javascript/design/adrs/ADR-002-implementation-design-surface.md"
+        ]
+      }
+    ],
+    componentRealizationRows: [
+      {
+        kind: "sdlc_component_realization_row",
+        componentId: "hello_main",
+        moduleName: "hello_world_javascript",
+        relativePath: "src/hello.js",
+        publicBoundary: "direct stdout: Hello, world!",
+        requirementIds: [
+          "requirement:t132_hello_world_single_tenant.bootstrap.req_t132_001"
+        ],
+        sourceAssetRefs: [
+          "workspace://build_tenants/hello_world_javascript/design/adrs/ADR-002-implementation-design-surface.md"
+        ]
+      }
+    ],
+    testComponentTopologyRows: [],
+    componentTestRows: [],
+    componentTestQualificationRows: [],
+    componentExecutionFailureRegister: null,
+    componentRepairSchedule: null,
+    releaseDepthParity: null
+  };
+  const { outputFile } = writeUnfencedEmbeddedCarrierArtifact(
+    register,
+    "component_code_surface",
+    "derive_lite_component_code_surface"
+  );
+
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: "component_code_surface",
+    outputFile
+  });
+
+  assert.equal(admission.status, "admitted");
+  assert.equal(admission.register.componentTopologyRows[0].componentId, "hello_main");
+  assert.equal(
+    admission.register.componentRealizationRows[0].relativePath,
+    "src/hello.js"
+  );
 });
 
 test("T-153 rejects component-depth wrappers that are not GTL target-carrier envelopes", () => {
