@@ -1905,6 +1905,8 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(evaluatorPromptSource, /fragmentVersion, targetAssetType, section, sequence, mergeMode, value/u);
   assert.match(evaluatorPromptSource, /Self-check non-null aggregateDomainModel\.modelVersion/u);
   assert.match(evaluatorPromptSource, /aggregateDomainModel\.modelVersion/u);
+  assert.match(evaluatorPromptSource, /Self-check every moduleSchemaFragments\[\] item: exactly kind, moduleName, entities, operations, requirementIds, sourceAssetRefs/u);
+  assert.match(evaluatorPromptSource, /kind must be exactly \\"sdlc_module_schema_fragment\\"/u);
   assert.match(evaluatorPromptSource, /Self-check non-null designCompletenessVerdict keys: exactly attribute, entity, flow, kind, verdictVersion/u);
   assert.match(evaluatorPromptSource, /Self-check each designCompletenessVerdict axis object: exactly axis, evidenceRefs, kind, reasons, status/u);
   assert.match(evaluatorPromptSource, /Self-check moduleSchemaFragments\[\]\.entities\[\]\.invariants: array of strings/u);

@@ -782,6 +782,7 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
     `- Self-check fragment sections: only ${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.join(", ")}.`,
     "- Self-check final sdlc_design_depth_register payload: registerVersion exactly ts-design-depth-v1.",
     "- Self-check non-null aggregateDomainModel.modelVersion, aggregateSunnyDaySequence.sequenceVersion, and designCompletenessVerdict.verdictVersion: exactly ts-design-depth-v1.",
+    "- Self-check every moduleSchemaFragments[] item: exactly kind, moduleName, entities, operations, requirementIds, sourceAssetRefs; kind must be exactly \"sdlc_module_schema_fragment\".",
     "- Self-check every moduleStateDiagramFragments[].entityId is a non-null string and, for that module, exists in moduleSchemaFragments[].entities[].entityId.",
     "- Self-check non-null designCompletenessVerdict keys: exactly attribute, entity, flow, kind, verdictVersion.",
     "- Self-check each designCompletenessVerdict axis object: exactly axis, evidenceRefs, kind, reasons, status.",
