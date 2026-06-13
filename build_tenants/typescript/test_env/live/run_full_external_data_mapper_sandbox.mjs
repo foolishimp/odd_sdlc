@@ -49,6 +49,9 @@ const COMMAND_TIMEOUT_MS = configuredLiveTimeoutMs(
 const TARGET_GRAPH_FUNCTION =
   process.env["ODD_SDLC_TS_DATA_MAPPER_TARGET_GRAPH_FUNCTION"] ??
   FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE;
+const START_TARGET =
+  process.env["ODD_SDLC_TS_DATA_MAPPER_START_TARGET"] ??
+  `graph_function:${TARGET_GRAPH_FUNCTION}`;
 
 function archiveTimestamp() {
   return new Date().toISOString().replaceAll("-", "").replaceAll(":", "").replace(".", "");
@@ -310,7 +313,13 @@ function readDirEntries(dirPath) {
     : [];
 }
 
-function abgStartArgs(targetGraphFunction) {
+function graphFunctionFromStartTarget(startTarget) {
+  return startTarget.startsWith("graph_function:")
+    ? startTarget.slice("graph_function:".length)
+    : null;
+}
+
+function abgStartArgs(startTarget) {
   return [
     "start",
     "--workspace",
@@ -318,7 +327,7 @@ function abgStartArgs(targetGraphFunction) {
     "--scope",
     "workspace",
     "--target",
-    `graph_function:${targetGraphFunction}`,
+    startTarget,
     "--until",
     "converged"
   ];
@@ -400,6 +409,7 @@ function main() {
       coursierCache: toolCache.coursierCache,
       seededCacheRefs: toolCache.seededCacheRefs
     },
+    startTarget: START_TARGET,
     targetGraphFunction: TARGET_GRAPH_FUNCTION,
     steps: []
   };
@@ -463,7 +473,7 @@ function main() {
   const start = runCommand({
     label: "abg-start-until-converged",
     command: genesisCommand,
-    args: abgStartArgs(TARGET_GRAPH_FUNCTION),
+    args: abgStartArgs(START_TARGET),
     cwd: workspace,
     env: baseEnv,
     archiveRoot,
@@ -471,6 +481,8 @@ function main() {
   });
   summary.steps.push(summaryStepFromStart("abg-start", start));
   summary.abgStart = start;
+  summary.resolvedStartGraphFunction =
+    graphFunctionFromStartTarget(START_TARGET) ?? start.resolved_target ?? null;
   summary.productMaterializationPackages = findProductMaterializationPackages(workspace);
   summary.terminalReason = terminalReasonFromStart(start);
   writeJson(path.join(archiveRoot, "run_summary.json"), summary);

@@ -1614,6 +1614,9 @@ export interface SdlcTraversalIntentPackage {
   readonly overlayRef: string | null;
   readonly overlayBindingRef: string | null;
   readonly graphCatalogDigestRef: string | null;
+  readonly overlayAnnotationRefs: readonly string[];
+  readonly overlayZoomGraphFunctionRefs: readonly string[];
+  readonly overlayZoomTargetGraphFunctionRefs: readonly string[];
   readonly edgeAssuranceContractRef?: string;
   readonly edgeAssuranceContractDigest?: string;
   readonly targetCarrierContractRef?: string;

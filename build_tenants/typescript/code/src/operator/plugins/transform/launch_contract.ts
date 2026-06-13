@@ -3606,6 +3606,9 @@ function constructTraversalIntentPackage(input: {
   readonly overlayRef?: string | null | undefined;
   readonly overlayBindingRef?: string | null | undefined;
   readonly graphCatalogDigestRef?: string | null | undefined;
+  readonly overlayAnnotationRefs?: readonly string[] | undefined;
+  readonly overlayZoomGraphFunctionRefs?: readonly string[] | undefined;
+  readonly overlayZoomTargetGraphFunctionRefs?: readonly string[] | undefined;
   readonly edgeAssuranceContractRef: string;
   readonly edgeAssuranceContractDigest: string;
   readonly targetCarrierProjection: SdlcWorkerTargetCarrierProjection;
@@ -3629,6 +3632,15 @@ function constructTraversalIntentPackage(input: {
     overlayRef: input.overlayRef ?? null,
     overlayBindingRef: input.overlayBindingRef ?? null,
     graphCatalogDigestRef: input.graphCatalogDigestRef ?? null,
+    overlayAnnotationRefs: Object.freeze([
+      ...(input.overlayAnnotationRefs ?? [])
+    ]),
+    overlayZoomGraphFunctionRefs: Object.freeze([
+      ...(input.overlayZoomGraphFunctionRefs ?? [])
+    ]),
+    overlayZoomTargetGraphFunctionRefs: Object.freeze([
+      ...(input.overlayZoomTargetGraphFunctionRefs ?? [])
+    ]),
     edgeAssuranceContractRef: input.edgeAssuranceContractRef,
     edgeAssuranceContractDigest: input.edgeAssuranceContractDigest,
     targetCarrierContractRef:
@@ -3813,6 +3825,9 @@ export function deriveWorkerHandoffManifest(input: {
   readonly overlayRef?: string | null | undefined;
   readonly overlayBindingRef?: string | null | undefined;
   readonly graphCatalogDigestRef?: string | null | undefined;
+  readonly overlayAnnotationRefs?: readonly string[] | undefined;
+  readonly overlayZoomGraphFunctionRefs?: readonly string[] | undefined;
+  readonly overlayZoomTargetGraphFunctionRefs?: readonly string[] | undefined;
   readonly graphFunctionName: string;
   readonly edgeName: string;
   readonly vectorIndex: number;
@@ -3987,6 +4002,15 @@ export function deriveWorkerHandoffManifest(input: {
     overlayRef: input.overlayRef ?? null,
     overlayBindingRef: input.overlayBindingRef ?? null,
     graphCatalogDigestRef: input.graphCatalogDigestRef ?? null,
+    overlayAnnotationRefs: Object.freeze([
+      ...(input.overlayAnnotationRefs ?? [])
+    ]),
+    overlayZoomGraphFunctionRefs: Object.freeze([
+      ...(input.overlayZoomGraphFunctionRefs ?? [])
+    ]),
+    overlayZoomTargetGraphFunctionRefs: Object.freeze([
+      ...(input.overlayZoomTargetGraphFunctionRefs ?? [])
+    ]),
     edgeAssuranceContractRef,
     edgeAssuranceContractDigest,
     targetCarrierProjection,
@@ -4010,6 +4034,11 @@ export function deriveWorkerHandoffManifest(input: {
     overlayRef: input.overlayRef ?? null,
     overlayBindingRef: input.overlayBindingRef ?? null,
     graphCatalogDigestRef: input.graphCatalogDigestRef ?? null,
+    overlayAnnotationRefs: input.overlayAnnotationRefs ?? Object.freeze([]),
+    overlayZoomGraphFunctionRefs:
+      input.overlayZoomGraphFunctionRefs ?? Object.freeze([]),
+    overlayZoomTargetGraphFunctionRefs:
+      input.overlayZoomTargetGraphFunctionRefs ?? Object.freeze([]),
     edgeAssuranceContractRef,
     edgeAssuranceContractDigest,
     targetCarrierContractRef:

@@ -30,7 +30,9 @@ import {
   t131OddChatScenario
 } from "./scenarios/t131_odd_chat.scenario.mjs";
 import {
+  T132_HELLO_WORLD_JS_DEEP_CODE_TEST_EDGES,
   T132_HELLO_WORLD_JS_MIN_FP_EDGES,
+  t132HelloWorldJsDeepSdlcZoomLiveScenario,
   t132HelloWorldJsLiveScenario,
   t132HelloWorldJsScenario
 } from "./scenarios/t132_hello_world_js.scenario.mjs";
@@ -245,11 +247,11 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
     helloWorldRustMinimumInductionLiveScenario({ worker }).maxAdvances >= 16
   );
   const jsLive = t132HelloWorldJsLiveScenario({ worker });
-  assert.equal(jsLive.maxAdvances, 1);
+  assert.equal(jsLive.maxAdvances, 8);
   assert.deepEqual(jsLive.startTarget, "next");
   assert.deepEqual(jsLive.startUntil, "converged");
   assert.equal(Array.isArray(jsLive.startTargetSequence), false);
-  assert.equal(jsLive.continueOnEdgeConverge, undefined);
+  assert.equal(jsLive.continueOnEdgeConverge, true);
   assert.equal(jsLive.stopAfterGraphClose, true);
   assert.ok(
     jsLive.fixture.sourceFiles.includes(
@@ -260,17 +262,9 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
     ...T132_HELLO_WORLD_JS_MIN_FP_EDGES
   ]);
   assert.deepEqual(jsLive.expectations.latestArchiveArtifacts, [
-    "sdlc_decomposition_summary.json",
-    "sdlc_implementation_decomposition_summary.json",
-    "sdlc_module_dependency_map.json",
-    "sdlc_module_dependency_traversal_selection.json",
-    "sdlc_traversal_hop_selection.json",
-    "worker_result_report.json"
+    "worker_result_report.json",
+    "declared_edge_projection_artifact.json"
   ]);
-  assert.equal(
-    jsLive.expectations.latestArchiveJsonAssertions[1].equals.hopClass,
-    "single_hop"
-  );
   assert.deepEqual(jsLive.expectations.handoffEdgeSequencePrefix, [
     ...T132_HELLO_WORLD_JS_MIN_FP_EDGES
   ]);
@@ -278,6 +272,36 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
   assert.deepEqual(
     jsLive.expectations.firstHandoffOverlayRef,
     "overlay://odd-sdlc/framework-smoke-min-fp"
+  );
+  const jsZoom = t132HelloWorldJsDeepSdlcZoomLiveScenario({ worker });
+  assert.equal(
+    jsZoom.scenarioId,
+    "scenario_t200_hello_world_js_deep_sdlc_zoom_live"
+  );
+  assert.deepEqual(jsZoom.startTarget, "overlay:deep-sdlc-traversal");
+  assert.deepEqual(
+    jsZoom.expectations.firstStartOverlayRef,
+    "overlay://odd-sdlc/deep-sdlc-traversal"
+  );
+  assert.deepEqual(
+    jsZoom.expectations.firstHandoffOverlayRef,
+    "overlay://odd-sdlc/deep-sdlc-traversal"
+  );
+  assert.deepEqual(jsZoom.expectations.handoffEdgeSequencePrefix, [
+    ...T132_HELLO_WORLD_JS_DEEP_CODE_TEST_EDGES
+  ]);
+  assert.deepEqual(
+    jsZoom.expectations.latestArchiveJsonAssertions[0].equals
+      .overlayZoomGraphFunctionRefs,
+    ["Fg_decompose_depth_between_nodes"]
+  );
+  assert(
+    jsZoom.expectations.latestArchiveJsonAssertions[0].equals
+      .overlayZoomTargetGraphFunctionRefs.includes("derive_component_code_surface")
+  );
+  assert(
+    jsZoom.expectations.latestArchiveJsonAssertions[0].equals
+      .overlayZoomTargetGraphFunctionRefs.includes("derive_component_test_surface")
   );
   assert(t133HelloWorldRustLiveScenario({ worker }).maxAdvances >= 16);
   const jsLite = t160HelloWorldJsLiteLiveScenario({ worker });
@@ -1131,6 +1155,34 @@ test(
   async () => {
     const scenario = t132HelloWorldJsLiveScenario({
       worker: T132_LIVE_WORKER
+    });
+    const result = await runScenarioSandbox(scenario);
+    assertWorkspaceWasInstalled(result);
+    assertScenarioExpectations(result, scenario);
+  }
+);
+
+const T200_JS_ZOOM_LIVE_ENABLED =
+  process.env["ODD_SDLC_TS_T200_HELLO_WORLD_JS_ZOOM_SCENARIO_LIVE"] === "1";
+const T200_JS_ZOOM_LIVE_WORKER =
+  process.env["ODD_SDLC_TS_T200_HELLO_WORLD_JS_ZOOM_SCENARIO_WORKER"] ??
+  "process://claude";
+const T200_JS_ZOOM_LIVE_MAX_ADVANCES = Number.parseInt(
+  process.env["ODD_SDLC_TS_T200_HELLO_WORLD_JS_ZOOM_SCENARIO_MAX_ADVANCES"] ?? "24",
+  10
+);
+
+test(
+  "scenario sandbox: T-200 JavaScript hello-world deep SDLC zoom live build loop (opt-in)",
+  {
+    skip: T200_JS_ZOOM_LIVE_ENABLED
+      ? false
+      : "ODD_SDLC_TS_T200_HELLO_WORLD_JS_ZOOM_SCENARIO_LIVE=1 not set"
+  },
+  async () => {
+    const scenario = t132HelloWorldJsDeepSdlcZoomLiveScenario({
+      worker: T200_JS_ZOOM_LIVE_WORKER,
+      maxAdvances: T200_JS_ZOOM_LIVE_MAX_ADVANCES
     });
     const result = await runScenarioSandbox(scenario);
     assertWorkspaceWasInstalled(result);

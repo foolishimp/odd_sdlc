@@ -8611,6 +8611,11 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
         overlayRef: executionContract.overlayRef,
         overlayBindingRef: executionContract.overlayBindingRef,
         graphCatalogDigestRef: executionContract.overlayBinding.graphCatalogDigestRef,
+        overlayAnnotationRefs: executionContract.overlayBinding.annotationRefs,
+        overlayZoomGraphFunctionRefs:
+          executionContract.overlayBinding.zoomGraphFunctionRefs,
+        overlayZoomTargetGraphFunctionRefs:
+          executionContract.overlayBinding.zoomTargetGraphFunctionRefs,
         graphFunctionName: executionContract.targetGraphFunction,
         edgeName: pluginInput.edge,
         vectorIndex: pluginInput.vectorIndex,

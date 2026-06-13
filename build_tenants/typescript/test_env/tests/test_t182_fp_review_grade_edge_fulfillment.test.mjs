@@ -97,6 +97,22 @@ function makeWorkspace() {
   return root;
 }
 
+test("T-200 compact review-grade prompt forbids null fulfillment binding fields", () => {
+  const source = readRepoFile(
+    "build_tenants/typescript/code/src/operator/plugins/evaluate/prompts.ts"
+  );
+  assert.match(source, /compactReviewGradePromptLineGroups/u);
+  assert.match(source, /Do not emit JSON null inside fulfillmentBinding/u);
+  assert.match(
+    source,
+    /testOrExecutionEvidenceRefs: test, execution, or evaluator evidence refs/u
+  );
+  assert.match(
+    source,
+    /use evaluator and worker-report evidence refs instead of null/u
+  );
+});
+
 function manifestForEdge(workspaceRoot, edgeName, runId) {
   const contract = hookContractByEdgeName(edgeName);
   return deriveWorkerHandoffManifest({

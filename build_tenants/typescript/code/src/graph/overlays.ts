@@ -7,6 +7,7 @@ import { parseNonEmptyString } from "../shared/validation.js";
 import { sha256Text } from "../shared/digest.js";
 import {
   FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE,
+  FG_DECOMPOSE_DEPTH_BETWEEN_NODES,
   FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
@@ -224,6 +225,9 @@ export interface SdlcOverlayBinding {
     readonly requestedBy: "public_start" | "archive_replay" | "operator_resume";
   };
   readonly assetBindings: readonly SdlcOverlayAssetBinding[];
+  readonly annotationRefs: readonly string[];
+  readonly zoomGraphFunctionRefs: readonly string[];
+  readonly zoomTargetGraphFunctionRefs: readonly string[];
   readonly priorLedgerRefs: readonly string[];
   readonly priorEventRefs: readonly string[];
   readonly remainingGraphPressureRefs: readonly string[];
@@ -281,6 +285,8 @@ export interface SdlcTraversalOverlayAnnotation {
   readonly depthTraversalEligible: boolean;
   readonly decompositionTraceRequired: boolean;
   readonly abgRuntimeAuthorityOnly: true;
+  readonly zoomGraphFunctionRef: string | null;
+  readonly zoomTargetGraphFunctionRefs: readonly string[];
   readonly proofRefs: readonly string[];
 }
 
@@ -289,6 +295,8 @@ interface SdlcTraversalOverlayAnnotationDefinition {
   readonly parentOverlayRef?: SdlcTraversalOverlayRef | null;
   readonly depthTraversalEligible: boolean;
   readonly decompositionTraceRequired: boolean;
+  readonly zoomGraphFunctionRef?: string | null;
+  readonly zoomTargetGraphFunctionRefs?: readonly string[];
   readonly proofRefs: readonly string[];
 }
 
@@ -366,6 +374,19 @@ function uniqueNames(names: readonly string[]): readonly string[] {
   return Object.freeze(unique);
 }
 
+const DEEP_SDLC_CODE_TEST_ZOOM_TARGETS = Object.freeze([
+  "derive_component_code_surface",
+  "qualify_component_realization_surface",
+  "derive_code_surface",
+  "derive_test_design_surface",
+  "derive_component_test_surface",
+  "prepare_test_execution_surface",
+  "derive_test_execution_result_surface",
+  "qualify_component_test_execution_surface",
+  "derive_component_repair_schedule_surface",
+  "derive_test_run_archive_surface"
+] as const);
+
 function overlayDefinitions(): readonly OverlayDefinition[] {
   const currentFullGraphFunctionNames = uniqueNames([
     FG_CONFORM_PROJECT,
@@ -416,6 +437,8 @@ function overlayDefinitions(): readonly OverlayDefinition[] {
           parentOverlayRef: null,
           depthTraversalEligible: false,
           decompositionTraceRequired: false,
+          zoomGraphFunctionRef: null,
+          zoomTargetGraphFunctionRefs: Object.freeze([]),
           proofRefs: Object.freeze([
             "proof://odd-sdlc/current-full-traversal/baseline"
           ])
@@ -463,6 +486,8 @@ function overlayDefinitions(): readonly OverlayDefinition[] {
           parentOverlayRef: SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
           depthTraversalEligible: true,
           decompositionTraceRequired: true,
+          zoomGraphFunctionRef: FG_DECOMPOSE_DEPTH_BETWEEN_NODES,
+          zoomTargetGraphFunctionRefs: DEEP_SDLC_CODE_TEST_ZOOM_TARGETS,
           proofRefs: Object.freeze([
             "proof://odd-sdlc/t200/depth-traversal-overlay",
             "proof://odd-sdlc/t200/decomposition-trace-required"
@@ -848,6 +873,10 @@ function overlayFromDefinition(input: {
           depthTraversalEligible: annotation.depthTraversalEligible,
           decompositionTraceRequired: annotation.decompositionTraceRequired,
           abgRuntimeAuthorityOnly: true as const,
+          zoomGraphFunctionRef: annotation.zoomGraphFunctionRef ?? null,
+          zoomTargetGraphFunctionRefs: Object.freeze([
+            ...(annotation.zoomTargetGraphFunctionRefs ?? [])
+          ]),
           proofRefs: Object.freeze([...annotation.proofRefs])
         })
       )
@@ -1164,6 +1193,21 @@ export function constructSdlcOverlayBinding(input: {
       });
     })
   );
+  const annotationRefs = Object.freeze(
+    input.overlay.annotations.map((annotation) => annotation.annotationRef)
+  );
+  const zoomGraphFunctionRefs = uniqueOverlayBindingRefs(
+    input.overlay.annotations.flatMap((annotation) =>
+      annotation.zoomGraphFunctionRef === null
+        ? []
+        : [annotation.zoomGraphFunctionRef]
+    )
+  );
+  const zoomTargetGraphFunctionRefs = uniqueOverlayBindingRefs(
+    input.overlay.annotations.flatMap((annotation) => [
+      ...annotation.zoomTargetGraphFunctionRefs
+    ])
+  );
   return Object.freeze({
     kind: "sdlc_overlay_binding" as const,
     bindingRef: admitSdlcOverlayBindingRef(
@@ -1200,6 +1244,9 @@ export function constructSdlcOverlayBinding(input: {
       requestedBy: input.requestedBy
     }),
     assetBindings,
+    annotationRefs,
+    zoomGraphFunctionRefs,
+    zoomTargetGraphFunctionRefs,
     priorLedgerRefs,
     priorEventRefs,
     remainingGraphPressureRefs: input.overlay.termination.remainingGraphPressureRefs,
@@ -1218,6 +1265,9 @@ export function constructSdlcOverlayBinding(input: {
       input.selectedGraphFunctionRef,
       input.selectedStartTargetRef,
       ...assetBindings.map((binding) => binding.bindingRef),
+      ...annotationRefs,
+      ...zoomGraphFunctionRefs,
+      ...zoomTargetGraphFunctionRefs,
       ...priorLedgerRefs,
       ...priorEventRefs
     ])

@@ -238,6 +238,9 @@ test("T-164 full data_mapper live runner keeps SBT caches inside sandbox workspa
   assert.match(runner, /-Dsbt\.global\.base=/u);
   assert.match(runner, /-Dsbt\.ivy\.home=/u);
   assert.match(runner, /SBT_OPTS/u);
+  assert.match(runner, /ODD_SDLC_TS_DATA_MAPPER_START_TARGET/u);
+  assert.match(runner, /`graph_function:\$\{TARGET_GRAPH_FUNCTION\}`/u);
+  assert.match(runner, /args: abgStartArgs\(START_TARGET\)/u);
 });
 
 test("T-164 composite design proofs preserve split-edge capability without stale graph edges", () => {

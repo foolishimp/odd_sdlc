@@ -433,6 +433,16 @@ function assertScenarioExecutionEvidence(result, scenario, expectation) {
       `${scenario.scenarioId}: ${edgeName} execution command does not include ${expectation.commandIncludes}`
     );
   }
+  for (const field of ["testsObserved", "passedCount", "failedCount"]) {
+    if (
+      typeof expectation[field] === "number" &&
+      evidence[field] !== expectation[field]
+    ) {
+      throw new Error(
+        `${scenario.scenarioId}: ${edgeName} execution ${field} ${evidence[field]}, expected ${expectation[field]}`
+      );
+    }
+  }
   if (typeof expectation.stdoutIncludes === "string") {
     const stdoutText = (Array.isArray(evidence.shardEvidence)
       ? evidence.shardEvidence

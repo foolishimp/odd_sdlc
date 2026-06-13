@@ -17,11 +17,13 @@ import {
   constructSdlcNextActionProjection,
   constructSdlcOverlaySegmentCompletion,
   constructSdlcTraversalOverlayCatalog,
+  deriveWorkerHandoffManifest,
   deriveSdlcPostActionOverlayReentryActionInput,
   deriveSdlcEdgeClosureDecision,
   deriveSdlcWorkspaceIngressReport,
   FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE,
   FG_CONFORM_PROJECT,
+  FG_DECOMPOSE_DEPTH_BETWEEN_NODES,
   FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
@@ -29,6 +31,7 @@ import {
   FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
   FG_PREPARE_TEST_EXECUTION_SURFACE,
   FG_SOLUTION_ARCHITECTURE_EXECUTIVE,
+  hookContractByEdgeName,
   projectSdlcQueryDomain,
   projectSdlcWorkerAttachment,
   publicSdlcOverlayStartTargets,
@@ -120,6 +123,8 @@ test("T-160 publishes governed traversal overlays with boundary refs", () => {
   );
   assert.equal(currentFull.annotations[0].depthTraversalEligible, false);
   assert.equal(currentFull.annotations[0].decompositionTraceRequired, false);
+  assert.equal(currentFull.annotations[0].zoomGraphFunctionRef, null);
+  assert.deepStrictEqual(currentFull.annotations[0].zoomTargetGraphFunctionRefs, []);
   assert.equal(deepSdlc.annotations.length, 1);
   assert.equal(
     deepSdlc.annotations[0].annotationKind,
@@ -132,6 +137,22 @@ test("T-160 publishes governed traversal overlays with boundary refs", () => {
   assert.equal(deepSdlc.annotations[0].depthTraversalEligible, true);
   assert.equal(deepSdlc.annotations[0].decompositionTraceRequired, true);
   assert.equal(deepSdlc.annotations[0].abgRuntimeAuthorityOnly, true);
+  assert.equal(
+    deepSdlc.annotations[0].zoomGraphFunctionRef,
+    "Fg_decompose_depth_between_nodes"
+  );
+  assert.deepStrictEqual(deepSdlc.annotations[0].zoomTargetGraphFunctionRefs, [
+    "derive_component_code_surface",
+    "qualify_component_realization_surface",
+    "derive_code_surface",
+    "derive_test_design_surface",
+    "derive_component_test_surface",
+    "prepare_test_execution_surface",
+    "derive_test_execution_result_surface",
+    "qualify_component_test_execution_surface",
+    "derive_component_repair_schedule_surface",
+    "derive_test_run_archive_surface"
+  ]);
   assert(deepSdlc.aliases.includes("overlay://odd-sdlc/deep-sdlc"));
   assert.deepStrictEqual(deepSdlc.graphFunctionRefs, currentFull.graphFunctionRefs);
   assert.deepStrictEqual(deepSdlc.graphVectorRefs, currentFull.graphVectorRefs);
@@ -409,6 +430,55 @@ test("T-160 overlay binding distinguishes material assets from planned templates
   assert.equal(material.assetBindings[0].mode, "material");
   assert.equal(material.assetBindings[0].templateRef, null);
   assert.deepEqual(material.assetBindings[0].evidenceRefs, ["evidence://t160/material"]);
+
+  const deepOverlay = catalog.overlays.find(
+    (candidate) => candidate.overlayRef === SDLC_DEEP_SDLC_TRAVERSAL_OVERLAY_REF
+  );
+  assert(deepOverlay);
+  const deepBinding = constructSdlcOverlayBinding({
+    catalog,
+    overlay: deepOverlay,
+    workspaceRootUri: "file:///workspace/t160",
+    workspaceIdentityRef: "workspace://t160",
+    preActionWorkspaceObservationRef: "observation://t160/pre-deep",
+    preActionWorkspaceFingerprintRef: "fingerprint://t160/pre-deep",
+    selectedGraphFunctionRef: deepOverlay.graphFunctionRefs[0],
+    selectedStartTargetRef: "derive_intent_surface",
+    requestedBy: "public_start"
+  });
+  assert.deepEqual(
+    deepBinding.annotationRefs,
+    deepOverlay.annotations.map((annotation) => annotation.annotationRef)
+  );
+  assert.deepEqual(deepBinding.zoomGraphFunctionRefs, [
+    FG_DECOMPOSE_DEPTH_BETWEEN_NODES
+  ]);
+  assert(deepBinding.zoomTargetGraphFunctionRefs.includes("derive_component_code_surface"));
+  assert(deepBinding.zoomTargetGraphFunctionRefs.includes("derive_component_test_surface"));
+  assert(deepBinding.predecessorRefs.includes(FG_DECOMPOSE_DEPTH_BETWEEN_NODES));
+  assert(deepBinding.predecessorRefs.includes("derive_component_code_surface"));
+  const deepManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: mkdtempSync(path.join(tmpdir(), "odd-sdlc-t160-zoom-")),
+    overlayRef: deepBinding.overlayRef,
+    overlayBindingRef: deepBinding.bindingRef,
+    graphCatalogDigestRef: deepBinding.graphCatalogDigestRef,
+    overlayAnnotationRefs: deepBinding.annotationRefs,
+    overlayZoomGraphFunctionRefs: deepBinding.zoomGraphFunctionRefs,
+    overlayZoomTargetGraphFunctionRefs: deepBinding.zoomTargetGraphFunctionRefs,
+    graphFunctionName: "derive_component_code_surface",
+    edgeName: "derive_component_code_surface",
+    vectorIndex: 0,
+    contract: hookContractByEdgeName("derive_component_code_surface")
+  });
+  assert.deepEqual(deepManifest.overlayAnnotationRefs, deepBinding.annotationRefs);
+  assert.deepEqual(
+    deepManifest.overlayZoomGraphFunctionRefs,
+    deepBinding.zoomGraphFunctionRefs
+  );
+  assert.deepEqual(
+    deepManifest.overlayZoomTargetGraphFunctionRefs,
+    deepBinding.zoomTargetGraphFunctionRefs
+  );
 
   assert.throws(
     () =>
@@ -1240,13 +1310,18 @@ test("T-160 spec-method replay preserves overlay target identity", () => {
     new URL("../../code/src/spec_method/entry.ts", import.meta.url),
     "utf8"
   );
+  const startOutcomeBody = source.slice(
+    source.indexOf("function startOutcomeFor("),
+    source.indexOf("function selectedActionRequiresFreshTargetTraversal")
+  );
   const replayBody = source.slice(
     source.indexOf("function startOutcomeForObservedReplay"),
     source.indexOf("function replayEventsForBasis")
   );
 
+  assert.match(startOutcomeBody, /request\.target\.kind === "overlay"/);
+  assert.match(startOutcomeBody, /handle: replayNextAction\.nextGraphFunctionRef/);
   assert.match(replayBody, /input\.request\.target\.kind === "overlay"/);
-  assert.match(replayBody, /\? input\.request\.target/);
   assert.match(
     replayBody,
     /overlayRef: selectedNextGraphFunction\.overlayRef/
