@@ -735,6 +735,12 @@ Implemented and verified surfaces:
   workflow projection/admission without creating runtime authority.
 - worker handoff, traversal intent package, ledgers, closure/consequence basis,
   and next-action projection carry admitted ticket execution refs.
+- `test_env/live/test_t162_ticket_workflow_live.test.mjs` creates a live
+  workspace with an active `T-162` ticket, registered reviewer selection,
+  accepted review finding, review evidence comment, and overlay-continuation
+  ruling; it drives the built CLI through `tickets`, `ticket-admit`, and
+  `start --target asset:ticket/T-162`, proving the ticket projects, admits,
+  and routes to `route_ticket_work_item` through the installed command surface.
 
 Verification:
 
@@ -743,6 +749,8 @@ Verification:
 - `npm run test:t033` passed 8/8.
 - `npm run test:t058` passed 17/17.
 - `npm run test:semantic` passed 1023/1023.
+- `npm run test:t162:ticket-workflow-live` passed 1/1.
+- `npm run lint:test-harness` passed.
 
 Remaining before ticket closure:
 
