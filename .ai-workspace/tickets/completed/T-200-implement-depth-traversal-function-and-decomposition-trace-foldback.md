@@ -3,7 +3,7 @@ id: T-200
 title: Implement depth traversal function and decomposition trace foldback
 type: feature
 ticket_category: implementation_migration
-status: active
+status: completed
 goal: residual-feature-depth-pressure-expands-into-admitted-child-graph-traversals
 build_tenant: typescript
 owner: odd_sdlc
@@ -207,7 +207,7 @@ decomposition-trace work over ABG/GTL zoom.
 | D4 | Persist downstream-deferred review rows into the register. | `constructSdlcDecompositionTraceRegisterFromReviewGrade(...)`; `test_t200_review_decomposition_trace.test.mjs` proves downstream-deferred review pressure becomes register rows and current-edge prose is refused. | done |
 | D5 | Make design/build/test closure consume child rows. | `evaluateSdlcDecompositionTraceClosure(...)`; `test_t200_decomposition_trace_closure.test.mjs` blocks on untraced/open child rows and closes only after expected children close. | done |
 | D6 | Prove REQ-ENG-003 command-only rejection. | `test_t200_req_eng_003_command_only_closure.test.mjs` proves command-only `sbt test` evidence cannot close requirement-bound depth; source test refs, execution shard refs, and non-command admitted evidence are required. | done |
-| D7 | Run high-zoom live proof. | archive records admitted strategy, depth traversal, child events, foldback, parent consolidation | pending |
+| D7 | Run high-zoom live proof. | `test:t200:hello-world-js-zoom-live`, `test:t200:rust-detailed-live`, and `test:t200:data-mapper-detailed-live`; data-mapper archive `build_tenants/typescript/test_env/test_runs/data_mapper_deep_sdlc_detail_sandbox/20260613T104716446Z_pid4166` stopped with `terminalReason: sdlc_reported_detail_zoom_edges` after every required detail edge. | done |
 
 ## Non-Live Implementation Proof, 2026-06-13
 
@@ -237,8 +237,98 @@ Result: semantic build and GTL preflight clean; focused non-live proof pack
 `test_t169_target_carrier_contracts.test.mjs`, and
 `test_t197_product_gtl_gate.test.mjs` passes 63/63 after adding the required
 hook target policy for `sdlc_depth_traversal_outcome`. Full non-live
-`npm run test:semantic` passes 1010/1010. D7 remains open for the deferred live
-high-zoom proof.
+`npm run test:semantic` passes 1010/1010.
+
+## Live High-Zoom Proof, 2026-06-13
+
+Completed the live proof for the deep overlay/detail lane.
+
+Proofs:
+
+- `npm run test:t200:hello-world-js-zoom-live` passed. Archive:
+  `build_tenants/typescript/test_env/test_runs/scenario_t200_hello_world_js_deep_sdlc_zoom_live/20260613T051203908Z_pid33470`.
+  This proved the JS detail/zoom path is opt-in; the automatic/default JS lane
+  did not trigger the deep overlay.
+- `npm run test:t200:rust-detailed-live` passed. Archive:
+  `build_tenants/typescript/test_env/test_runs/scenario_t133_hello_world_rust_live/20260613T060148412Z_pid68135`.
+- `npm run test:t200:data-mapper-detailed-live` passed. Archive:
+  `build_tenants/typescript/test_env/test_runs/data_mapper_deep_sdlc_detail_sandbox/20260613T104716446Z_pid4166`.
+  The run used `overlay://odd-sdlc/deep-sdlc-traversal`,
+  `commandBinding: odd_sdlc_cli_overlay_start_first_traversal`, and stopped at
+  `terminalReason: sdlc_reported_detail_zoom_edges`.
+
+Data-mapper detail edges observed:
+
+```text
+derive_implementation_design_surface
+derive_component_code_surface
+derive_component_code_surface
+qualify_component_realization_surface
+derive_code_surface
+derive_test_design_surface
+derive_component_test_surface
+derive_component_test_surface
+prepare_test_execution_surface
+derive_test_execution_result_surface
+qualify_component_test_execution_surface
+derive_component_repair_schedule_surface
+derive_test_run_archive_surface
+```
+
+Live depth behavior:
+
+- `derive_component_code_surface` first blocked on review pressure
+  (`trace_missing`, `semantic_not_realized`, `wrong_stage`), then re-entered
+  and passed review-grade with 187 fulfilled findings.
+- `derive_component_test_surface` first blocked on 15 `trace_missing`
+  findings, then re-entered and passed review-grade with 198 fulfilled
+  findings.
+- Test execution preparation, execution result, component-test execution
+  qualification, repair schedule, and test-run archive edges all closed after
+  the component-test repair.
+
+Live bugs fixed during D7:
+
+- Data-mapper overlay starts now route through installed `odd-sdlc-ts`; graph
+  function starts continue to use installed `genesis-ts`.
+- The data-mapper live harness now loops through first-traversal overlay starts
+  instead of stopping after the first overlay edge.
+- `worker_invoked` plus admitted semantic `closureDisposition: close` is
+  accepted as successful first-traversal progress.
+- The harness tracks canonical plural zoom fields rather than stale singular
+  `zoomGraphFunctionRef`.
+- Design-depth evaluator prompts now disambiguate SDLC attribute cardinality
+  (`one | optional | many`) from product morphism cardinalities such as `1:1`,
+  `N:1`, `1:N`, `M:N`, `0..1`, `1..1`, and `0..*`.
+- Component-test transform prompts now require admitted requirement obligation
+  ids to appear in generated test lineage and component-test carrier rows when
+  repairing `trace_missing`.
+- Accepted review-grade `wrong_stage` carryover now writes
+  `review_grade_edge_fulfillment_rule_outcome.json` and carries that evidence
+  through edge ledger/closure predecessor refs, so downstream-stage fold-forward
+  is replay-visible instead of a silent close.
+
+Focused verification after the live fixes:
+
+```text
+npm run build:semantic
+node --test --test-name-pattern "T-160 traversal overlay catalog" test_env/tests/test_t160_traversal_overlays.test.mjs
+node --test --test-name-pattern "T-160 overlay binding distinguishes" test_env/tests/test_t160_traversal_overlays.test.mjs
+node --test --test-name-pattern "T-160 spec-method replay preserves overlay target identity" test_env/tests/test_t160_traversal_overlays.test.mjs
+node --test --test-name-pattern "scenario sandbox: hello-world live descriptors bind profile overlay scope" test_env/sandbox/test_scenario_sandbox.test.mjs
+node --test --test-name-pattern "T-200 compact review-grade prompt forbids null fulfillment binding fields" test_env/tests/test_t182_fp_review_grade_edge_fulfillment.test.mjs
+node --test --test-name-pattern "T-164 full data_mapper live runner keeps SBT caches" test_env/live/test_t164_data_mapper_full_capability_live.test.mjs
+node --test --test-name-pattern "T-151 component-test trace_missing review pressure writes retry closure" test_env/tests/test_t151_runner_evaluator_sovereignty.test.mjs
+node --test --test-name-pattern "T-151 lawful wrong_stage review carryover is closure-visible evidence" test_env/tests/test_t151_runner_evaluator_sovereignty.test.mjs
+node --test --test-name-pattern "T-192 compact evaluation prompts stay under budget" test_env/tests/test_t192_evaluation_grid_prompt_contract.test.mjs
+```
+
+All commands passed.
+
+Scope note: this closes the T-200 deep/detail traversal proof. It is not a
+claim that `overlay://odd-sdlc/current-full-traversal` or the entire generated
+data-mapper product is complete; the live harness intentionally stopped after
+the required detail zoom edges were observed.
 
 ## Non-Goals
 

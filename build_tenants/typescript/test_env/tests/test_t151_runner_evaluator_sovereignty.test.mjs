@@ -495,7 +495,7 @@ function makeUnderstructuredConformWorkspace() {
   return root;
 }
 
-function makeStart(workspaceRoot) {
+function makeStart(workspaceRoot, targetHandle = "bootstrap_release_self_test") {
   const module = constructSdlcGtlModule();
   const ingressReport = deriveSdlcWorkspaceIngressReport({
     workspaceRootUri: `file://${workspaceRoot}`,
@@ -517,7 +517,7 @@ function makeStart(workspaceRoot) {
       workspaceRoot,
       target: {
         kind: "graph_function",
-        handle: "bootstrap_release_self_test"
+        handle: targetHandle
       },
       until: "first_traversal",
       defaultRegime: "F_P"
@@ -670,6 +670,132 @@ function writeUnassessedObligationWorkerScript(workspaceRoot) {
   return workerPath;
 }
 
+function writeTraceMissingComponentTestWorkerScript(workspaceRoot) {
+  const workerPath = path.join(workspaceRoot, "t151_component_test_trace_worker.mjs");
+  writeFileSync(
+    workerPath,
+    [
+      "import { createHash } from 'node:crypto';",
+      "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
+      "import path, { dirname } from 'node:path';",
+      "import { pathToFileURL } from 'node:url';",
+      "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
+      "if (process.env.ODD_SDLC_EVALUATE_STAGE === 'review_grade_edge_fulfillment') {",
+      "  const outputRef = pathToFileURL(manifest.outputFile).href;",
+      "  const reportRef = pathToFileURL(manifest.reportFile).href;",
+      "  const reviewedObligationIds = manifest.traversalObligationContext.obligations.map((obligation) => obligation.obligationId);",
+      "  const findings = manifest.traversalObligationContext.obligations.map((obligation) => ({",
+      "    kind: 'sdlc_review_grade_obligation_finding',",
+      "    obligationId: obligation.obligationId,",
+      "    fulfillmentStatus: 'blocked',",
+      "    failureClass: 'trace_missing',",
+      "    requiredAction: 'repair component_test_surface lineage before advancing',",
+      "    evidenceRefs: [outputRef, reportRef, ...obligation.evidenceRefs.slice(0, 2)],",
+      "    acceptedAuthorityRefs: [outputRef, reportRef],",
+      "    fulfillmentBinding: null,",
+      "    rationale: 'synthetic component-test evaluator reproduces trace_missing pressure from live data_mapper depth run'",
+      "  }));",
+      "  const assessment = { kind: 'sdlc_review_grade_edge_fulfillment_assessment', assessmentVersion: 'ts-review-grade-v1', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, status: 'blocked', reviewedObligationIds, findings, evidenceRefs: [outputRef, reportRef], summary: 'synthetic review-grade trace_missing pressure for component tests' };",
+      "  writeFileSync(path.join(manifest.archiveRoot, 'review_grade_edge_fulfillment_assessment.json'), `${JSON.stringify(assessment, null, 2)}\\n`, 'utf8');",
+      "  process.exit(0);",
+      "}",
+      "const testRelative = 'src/test/scala/generated/CoreSpec.scala';",
+      "const testPath = path.join(manifest.productMaterialization.tenantRoot, testRelative);",
+      "mkdirSync(dirname(testPath), { recursive: true });",
+      "const testSource = '// requirement:REQ-T151-001\\npackage generated\\nclass CoreSpec\\n';",
+      "writeFileSync(testPath, testSource, 'utf8');",
+      "const register = {",
+      "  kind: 'sdlc_component_depth_register',",
+      "  registerVersion: 'ts-component-depth-v1',",
+      "  targetAssetType: 'component_test_surface',",
+      "  componentTopologyRows: [],",
+      "  componentRealizationRows: [],",
+      "  testComponentTopologyRows: [],",
+      "  componentTestRows: [{ kind: 'sdlc_component_test_realization_row', testClassId: 'CoreSpec', relativePath: testRelative, testcaseIds: ['UAT-T151-001'], componentIds: ['generated-core'], requirementIds: ['REQ-T151-001'], shardId: 'unit' }],",
+      "  componentTestQualificationRows: [],",
+      "  componentExecutionFailureRegister: null,",
+      "  componentRepairSchedule: null,",
+      "  releaseDepthParity: null",
+      "};",
+      "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
+      "writeFileSync(manifest.outputFile, `${JSON.stringify(register, null, 2)}\\n`, 'utf8');",
+      "const outputDigest = `sha256:${createHash('sha256').update(JSON.stringify(register), 'utf8').digest('hex')}`;",
+      "const testDigest = `sha256:${createHash('sha256').update(testSource, 'utf8').digest('hex')}`;",
+      "const outputRef = pathToFileURL(manifest.outputFile).href;",
+      "const materializedFiles = [{ kind: 'sdlc_materialized_product_file', role: 'test', relativePath: testRelative, absolutePath: testPath, digest: testDigest, byteCount: Buffer.byteLength(testSource, 'utf8') }];",
+      "const obligationAssessments = manifest.traversalObligationContext.obligations.map((obligation) => ({ kind: 'sdlc_worker_obligation_assessment', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', evidenceRefs: [outputRef, ...obligation.evidenceRefs.slice(0, 2)], blockingReasons: [] }));",
+      "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', projectionRole: 'typed_fp_stage_projection', authoritativeStageResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href, graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest: outputDigest, summary: 'generated component tests with insufficient review-grade trace bindings', unresolvedReasons: [], materializedFiles, materializationDiagnostics: [], executionEvidence: null, executionEvidenceErrors: [], obligationAssessments }, null, 2)}\\n`, 'utf8');"
+    ].join("\n"),
+    "utf8"
+  );
+  return workerPath;
+}
+
+function writeWrongStageTestDesignWorkerScript(workspaceRoot) {
+  const workerPath = path.join(workspaceRoot, "t151_test_design_wrong_stage_worker.mjs");
+  writeFileSync(
+    workerPath,
+    [
+      "import { createHash } from 'node:crypto';",
+      "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
+      "import path, { dirname } from 'node:path';",
+      "import { pathToFileURL } from 'node:url';",
+      "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
+      "const outputRef = pathToFileURL(manifest.outputFile).href;",
+      "const reportRef = pathToFileURL(manifest.reportFile).href;",
+      "if (process.env.ODD_SDLC_EVALUATE_STAGE === 'review_grade_edge_fulfillment') {",
+      "  const reviewedObligationIds = manifest.traversalObligationContext.obligations.map((obligation) => obligation.obligationId);",
+      "  const findings = manifest.traversalObligationContext.obligations.map((obligation) => obligation.obligationId.startsWith('requirement:') ? ({",
+      "    kind: 'sdlc_review_grade_obligation_finding',",
+      "    obligationId: obligation.obligationId,",
+      "    fulfillmentStatus: 'partial',",
+      "    failureClass: 'wrong_stage',",
+      "    requiredAction: 'Carry this requirement to component_test_surface downstream; test-design may only declare topology and schedule authority.',",
+      "    evidenceRefs: [outputRef, reportRef, ...obligation.evidenceRefs.slice(0, 2)],",
+      "    acceptedAuthorityRefs: [outputRef, reportRef],",
+      "    fulfillmentBinding: null,",
+      "    rationale: 'synthetic lawful downstream carryover for test-design planning surface'",
+      "  }) : ({",
+      "    kind: 'sdlc_review_grade_obligation_finding',",
+      "    obligationId: obligation.obligationId,",
+      "    fulfillmentStatus: 'fulfilled',",
+      "    failureClass: null,",
+      "    requiredAction: null,",
+      "    evidenceRefs: [outputRef, reportRef, ...obligation.evidenceRefs.slice(0, 2)],",
+      "    acceptedAuthorityRefs: [outputRef, reportRef],",
+      "    fulfillmentBinding: { kind: 'gtl_contract_fulfillment_binding', obligationRef: obligation.obligationId, requirementRef: obligation.obligationId, productRequirementRef: obligation.obligationId, designObligationRef: 'authority://t151/test-design', componentRef: null, productTargetRef: outputRef, outputSurfaceRef: outputRef, functionOrEntrypointRef: null, realizationEvidenceRefs: [outputRef], testOrExecutionEvidenceRefs: [], evaluatorFindingRef: `finding://t151/${encodeURIComponent(obligation.obligationId)}`, authorityRefs: ['authority://t151/test-design'], evidenceRefs: [outputRef, reportRef] },",
+      "    rationale: 'target/current-edge obligation fulfilled by emitted test design register'",
+      "  }));",
+      "  const assessment = { kind: 'sdlc_review_grade_edge_fulfillment_assessment', assessmentVersion: 'ts-review-grade-v1', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, status: 'blocked', reviewedObligationIds, findings, evidenceRefs: [outputRef, reportRef], summary: 'synthetic wrong_stage downstream carryover' };",
+      "  writeFileSync(path.join(manifest.archiveRoot, 'review_grade_edge_fulfillment_assessment.json'), `${JSON.stringify(assessment, null, 2)}\\n`, 'utf8');",
+      "  process.exit(0);",
+      "}",
+      "const register = {",
+      "  kind: 'sdlc_test_design_register',",
+      "  registerVersion: 'ts-test-design-v1',",
+      "  targetAssetType: 'test_design_surface',",
+      "  designConsumptionRows: [{ kind: 'sdlc_design_consumption_contract', contractRef: 'design-consumption://t151/test', sourceDesignObligationRefs: ['REQ-T151-001'], authorityBasisRefs: ['asset://implementation-design'], consumerGraphFunctionRefs: ['derive_component_test_surface'] }],",
+      "  uatTestcaseRows: [{ kind: 'sdlc_test_case_row', testCaseRef: 'TC-T151-001', caseKind: 'uat', executionLane: 'uat', sourceDesignObligationRefs: ['REQ-T151-001'], testcaseAuthorityRefs: ['REQ-T151-001'], expectedBehavior: 'core value is transformed' }],",
+      "  testcaseAuthorityRows: [{ kind: 'sdlc_test_case_row', testCaseRef: 'TC-T151-001', caseKind: 'positive', executionLane: 'integration', sourceDesignObligationRefs: ['REQ-T151-001'], testcaseAuthorityRefs: ['REQ-T151-001'], expectedBehavior: 'core value is transformed' }],",
+      "  testStackProfileRows: [{ kind: 'sdlc_test_stack_profile_row', stackRef: 'stack://t151/node-test', frameworkRef: 'framework://node-test', buildTool: 'node' }],",
+      "  testModuleRows: [{ kind: 'sdlc_test_module_row', moduleName: 'generated-tests', moduleRef: 'module://t151/generated-tests', testRoot: 'test' }],",
+      "  testComponentTopologyRows: [{ kind: 'sdlc_test_component_topology_row', testClassId: 'CoreSpec', relativePath: 'test/core.test.js', testcaseIds: ['TC-T151-001'], componentIds: ['generated-core'], requirementIds: ['REQ-T151-001'], shardId: 'unit' }],",
+      "  testDataBindings: [{ kind: 'sdlc_test_data_binding', testDataRef: 'test-data://t151/core', testCaseRef: 'TC-T151-001', inputFixtureRefs: ['fixture://t151/none'], generationPolicyRef: 'generation-policy://t151/static', expectedResultRef: 'expected://t151/core', sourceDesignObligationRefs: ['REQ-T151-001'] }],",
+      "  expectedResultBindings: [{ kind: 'sdlc_expected_result_binding', expectedResultRef: 'expected://t151/core', testCaseRef: 'TC-T151-001', assertionRefs: ['assertion://t151/core'], expectedResultSummary: 'core value is transformed', verificationPolicyRef: 'verification-policy://t151/core' }],",
+      "  uatIntegrationBindings: [{ kind: 'sdlc_uat_integration_binding', uatTestCaseRef: 'TC-T151-001', integrationTestCaseRef: 'TC-T151-001', executionLane: 'integration' }],",
+      "  testExecutionScheduleRows: [{ kind: 'sdlc_test_execution_schedule_row', scheduleRef: 'schedule://t151/core', testCaseRefs: ['TC-T151-001'], command: 'node --test test/core.test.js', frameworkRef: 'framework://node-test', shardId: 'unit' }]",
+      "};",
+      "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
+      "writeFileSync(manifest.outputFile, `${JSON.stringify(register, null, 2)}\\n`, 'utf8');",
+      "const outputDigest = `sha256:${createHash('sha256').update(JSON.stringify(register), 'utf8').digest('hex')}`;",
+      "const obligationAssessments = manifest.traversalObligationContext.obligations.map((obligation) => ({ kind: 'sdlc_worker_obligation_assessment', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', evidenceRefs: [outputRef, ...obligation.evidenceRefs.slice(0, 2)], blockingReasons: [] }));",
+      "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', projectionRole: 'typed_fp_stage_projection', authoritativeStageResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href, graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest: outputDigest, summary: 'generated synthetic test design register', unresolvedReasons: [], materializedFiles: [], materializationDiagnostics: [], executionEvidence: null, executionEvidenceErrors: [], obligationAssessments }, null, 2)}\\n`, 'utf8');"
+    ].join("\n"),
+    "utf8"
+  );
+  return workerPath;
+}
+
 test("T-151 first_traversal returns the first admitted non-close consequence", async () => {
   const workspace = makeWorkspace();
   const start = makeStart(workspace);
@@ -709,6 +835,72 @@ test("T-151 first_traversal returns the first admitted non-close consequence", a
   );
   assert.equal(
     existsSync(path.join(outcome.archiveRoot, "sdlc_next_action_projection.json")),
+    true
+  );
+});
+
+test("T-151 component-test trace_missing review pressure writes retry closure", async () => {
+  const workspace = makeWorkspace();
+  const start = makeStart(workspace, "derive_component_test_surface");
+  const workerScript = writeTraceMissingComponentTestWorkerScript(workspace);
+
+  const outcome = await executeInstalledOperatorStart({
+    workspaceRoot: workspace,
+    start,
+    workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`,
+    replayEvents: []
+  });
+
+  assert.equal(outcome.status, "blocked");
+  assert.equal(outcome.summary.currentEdge, "derive_component_test_surface");
+  assert.equal(outcome.postflight.status, "blocked");
+  assert(outcome.traversalConsequence);
+  assert.equal(outcome.traversalConsequence.edgeClosureDecision.disposition, "retry");
+  assert.equal(
+    outcome.traversalConsequence.nextActionProjection.nextGraphFunctionRef,
+    "derive_component_test_surface"
+  );
+  assert.equal(
+    existsSync(path.join(outcome.archiveRoot, "sdlc_edge_closure_decision.json")),
+    true
+  );
+  assert.equal(
+    existsSync(path.join(outcome.archiveRoot, "sdlc_next_action_projection.json")),
+    true
+  );
+});
+
+test("T-151 lawful wrong_stage review carryover is closure-visible evidence", async () => {
+  const workspace = makeWorkspace();
+  const start = makeStart(workspace, "derive_test_design_surface");
+  const workerScript = writeWrongStageTestDesignWorkerScript(workspace);
+
+  const outcome = await executeInstalledOperatorStart({
+    workspaceRoot: workspace,
+    start,
+    workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`,
+    replayEvents: []
+  });
+
+  const reviewRuleOutcomeRef = pathToFileURL(
+    path.join(outcome.archiveRoot, "review_grade_edge_fulfillment_rule_outcome.json")
+  ).href;
+
+  assert.equal(outcome.status, "worker_invoked");
+  assert.notEqual(outcome.summary.currentEdge, "derive_test_design_surface");
+  assert(outcome.traversalConsequence);
+  assert.equal(outcome.traversalConsequence.edgeClosureDecision.disposition, "close");
+  assert.equal(existsSync(path.join(outcome.archiveRoot, "review_grade_edge_fulfillment_rule_outcome.json")), true);
+  assert.equal(
+    outcome.traversalConsequence.edgeFulfillmentLedger.admissionRefs.includes(
+      reviewRuleOutcomeRef
+    ),
+    true
+  );
+  assert.equal(
+    outcome.traversalConsequence.edgeClosureDecision.predecessorRefs.includes(
+      reviewRuleOutcomeRef
+    ),
     true
   );
 });

@@ -41,6 +41,9 @@ import { admitComponentDepthRegisterFromArtifact } from "./component_depth_regis
 export const REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE =
   "review_grade_edge_fulfillment_assessment.json";
 
+export const REVIEW_GRADE_EDGE_FULFILLMENT_RULE_OUTCOME_FILE =
+  "review_grade_edge_fulfillment_rule_outcome.json";
+
 export const REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF =
   "evaluation-rule://odd-sdlc/review-grade-edge-fulfillment/fp";
 

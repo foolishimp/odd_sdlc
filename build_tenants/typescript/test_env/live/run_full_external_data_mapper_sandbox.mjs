@@ -8,6 +8,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync
 } from "node:fs";
 import path, { dirname, resolve } from "node:path";
@@ -18,6 +19,7 @@ import {
 } from "./operator_runtime_policy.mjs";
 import { canonicalDataMapperFixtureRoot } from "../fixtures/data_mapper_fixture.mjs";
 import {
+  FG_DECOMPOSE_DEPTH_BETWEEN_NODES,
   FG_CONFORM_PROJECT,
   FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE
 } from "../../build/semantic/code/src/index.js";
@@ -52,6 +54,24 @@ const TARGET_GRAPH_FUNCTION =
 const START_TARGET =
   process.env["ODD_SDLC_TS_DATA_MAPPER_START_TARGET"] ??
   `graph_function:${TARGET_GRAPH_FUNCTION}`;
+const DATA_MAPPER_MAX_ADVANCES = Number.parseInt(
+  process.env["ODD_SDLC_TS_DATA_MAPPER_MAX_ADVANCES"] ?? "80",
+  10
+);
+const DATA_MAPPER_STOP_AFTER_DETAIL_ZOOM =
+  process.env["ODD_SDLC_TS_DATA_MAPPER_STOP_AFTER_DETAIL_ZOOM"] !== "false";
+const DATA_MAPPER_DETAIL_ZOOM_EDGES = Object.freeze([
+  "derive_component_code_surface",
+  "qualify_component_realization_surface",
+  "derive_code_surface",
+  "derive_test_design_surface",
+  "derive_component_test_surface",
+  "prepare_test_execution_surface",
+  "derive_test_execution_result_surface",
+  "qualify_component_test_execution_surface",
+  "derive_component_repair_schedule_surface",
+  "derive_test_run_archive_surface"
+]);
 
 function archiveTimestamp() {
   return new Date().toISOString().replaceAll("-", "").replaceAll(":", "").replace(".", "");
@@ -313,10 +333,91 @@ function readDirEntries(dirPath) {
     : [];
 }
 
+function operatorRunRoots(workspace) {
+  const runsRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs"
+  );
+  if (!existsSync(runsRoot)) {
+    return [];
+  }
+  return readdirSync(runsRoot)
+    .map((entry) => path.join(runsRoot, entry))
+    .filter((entryPath) => {
+      try {
+        return statSync(entryPath).isDirectory();
+      } catch {
+        return false;
+      }
+    })
+    .sort();
+}
+
+function observedHandoffRecords(workspace) {
+  return operatorRunRoots(workspace)
+    .map((runRoot) => {
+      const manifestPath = path.join(runRoot, "handoff_manifest.json");
+      if (!existsSync(manifestPath)) {
+        return null;
+      }
+      const manifest = readJsonFile(manifestPath);
+      return Object.freeze({
+        runRoot,
+        edgeName: manifest.edgeName ?? null,
+        overlayRef: manifest.overlayRef ?? null,
+        overlayZoomGraphFunctionRefs: Object.freeze([
+          ...(Array.isArray(manifest.overlayZoomGraphFunctionRefs)
+            ? manifest.overlayZoomGraphFunctionRefs
+            : manifest.zoomGraphFunctionRef === undefined ||
+                manifest.zoomGraphFunctionRef === null
+              ? []
+              : [manifest.zoomGraphFunctionRef])
+        ])
+      });
+    })
+    .filter((entry) => entry !== null);
+}
+
+function observedDetailZoomEdges(workspace) {
+  return observedHandoffRecords(workspace)
+    .filter((entry) =>
+      entry.overlayZoomGraphFunctionRefs.includes(FG_DECOMPOSE_DEPTH_BETWEEN_NODES)
+    )
+    .map((entry) => entry.edgeName)
+    .filter((edgeName) => typeof edgeName === "string" && edgeName.length > 0);
+}
+
+function observedHandoffEdgesIncludeInOrder(observed, expected) {
+  let cursor = 0;
+  for (const edgeName of observed) {
+    if (edgeName === expected[cursor]) {
+      cursor += 1;
+      if (cursor === expected.length) {
+        return true;
+      }
+    }
+  }
+  return expected.length === 0;
+}
+
+function detailZoomStopSatisfied(workspace) {
+  return (
+    DATA_MAPPER_STOP_AFTER_DETAIL_ZOOM &&
+    observedHandoffEdgesIncludeInOrder(
+      observedDetailZoomEdges(workspace),
+      DATA_MAPPER_DETAIL_ZOOM_EDGES
+    )
+  );
+}
+
 function graphFunctionFromStartTarget(startTarget) {
   return startTarget.startsWith("graph_function:")
     ? startTarget.slice("graph_function:".length)
     : null;
+}
+
+function isOverlayStartTarget(startTarget) {
+  return startTarget.startsWith("overlay:");
 }
 
 function abgStartArgs(startTarget) {
@@ -333,18 +434,92 @@ function abgStartArgs(startTarget) {
   ];
 }
 
+function sdlcStartArgs(startTarget) {
+  return [
+    "start",
+    "--workspace",
+    ".",
+    "--target",
+    startTarget,
+    "--until",
+    "first_traversal",
+    "--worker",
+    WORKER_TRANSPORT
+  ];
+}
+
+function startCommandForTarget(input) {
+  return isOverlayStartTarget(input.startTarget)
+    ? input.installedCommand
+    : input.genesisCommand;
+}
+
+function startArgsForTarget(startTarget) {
+  return isOverlayStartTarget(startTarget)
+    ? sdlcStartArgs(startTarget)
+    : abgStartArgs(startTarget);
+}
+
+function startLabelForTarget(startTarget) {
+  return isOverlayStartTarget(startTarget)
+    ? "odd-sdlc-start-first-traversal"
+    : "abg-start-until-converged";
+}
+
+function unwrapStartPayload(parsed, label) {
+  if (parsed?.kind === "odd_sdlc_spec_method_result") {
+    if (parsed.status !== "ok") {
+      throw new Error(`${label} returned non-ok spec-method result: ${JSON.stringify(parsed, null, 2)}`);
+    }
+    return parsed.payload;
+  }
+  return parsed;
+}
+
 function summaryStepFromStart(phase, start) {
+  const summary = start?.summary ?? null;
   return {
     phase,
-    status: start.status ?? null,
+    status: start?.status ?? summary?.status ?? null,
     target: start.target ?? null,
     resolvedTarget: start.resolved_target ?? null,
-    edge: start.edge ?? null,
+    edge: start.edge ?? summary?.currentEdge ?? null,
     stoppedBy: start.stopped_by ?? null,
     stopClass: start.stop_class ?? null,
     liveStatus: start.live_status ?? null,
-    eventKinds: start.event_kinds ?? []
+    eventKinds: start.event_kinds ?? start.emittedRuntimeEventKinds ?? []
   };
+}
+
+function compactStartForSummary(start) {
+  const summary = start?.summary ?? null;
+  const executionContract = start?.start?.executionContract ?? null;
+  const overlaySegmentCompletion =
+    start?.traversalConsequence?.overlaySegmentCompletion ?? null;
+  return Object.freeze({
+    kind: start?.kind ?? null,
+    status: start?.status ?? summary?.status ?? null,
+    graphFunctionName:
+      summary?.graphFunctionName ?? executionContract?.targetGraphFunction ?? null,
+    currentEdge: summary?.currentEdge ?? null,
+    blockingReason: summary?.blockingReason ?? null,
+    nextLawfulAction: summary?.nextLawfulAction ?? null,
+    archiveRoot: start?.archiveRoot ?? summary?.archiveRoot ?? null,
+    overlayRef: executionContract?.overlayRef ?? overlaySegmentCompletion?.overlayRef ?? null,
+    overlayZoomGraphFunctionRefs:
+      executionContract?.overlayBinding?.zoomGraphFunctionRefs ?? [],
+    overlayZoomTargetGraphFunctionRefs:
+      executionContract?.overlayBinding?.zoomTargetGraphFunctionRefs ?? [],
+    overlaySegmentCompletion:
+      overlaySegmentCompletion === null
+        ? null
+        : Object.freeze({
+            stopDisposition: overlaySegmentCompletion.stopDisposition ?? null,
+            productConverged: overlaySegmentCompletion.productConverged ?? null,
+            remainingGraphPressureRefs:
+              overlaySegmentCompletion.remainingGraphPressureRefs ?? []
+          })
+  });
 }
 
 function isLawfulAbgGapStop(start) {
@@ -360,6 +535,21 @@ function isLawfulAbgGapStop(start) {
 }
 
 function terminalReasonFromStart(start) {
+  if (
+    start?.kind === "sdlc_installed_operator_start_cli_projection" ||
+    start?.kind === "sdlc_installed_operator_start_outcome"
+  ) {
+    const status = start.status ?? start.summary?.status ?? null;
+    if (status === "converged") {
+      return "sdlc_reported_converged";
+    }
+    if (status === "blocked") {
+      return "sdlc_reported_blocked";
+    }
+    throw new Error(
+      `SDLC start returned non-terminal status: ${JSON.stringify(start, null, 2)}`
+    );
+  }
   if (start?.status === "converged") {
     return "abg_reported_converged";
   }
@@ -369,6 +559,82 @@ function terminalReasonFromStart(start) {
   throw new Error(
     `ABG start returned non-lawful terminal: ${JSON.stringify(start, null, 2)}`
   );
+}
+
+function isSuccessfulSdlcTraversalStart(start) {
+  const status = start?.status ?? start?.summary?.status ?? null;
+  return (
+    status === "converged" ||
+    (status === "worker_invoked" &&
+      start?.summary?.admittedSemantic?.closureDisposition === "close")
+  );
+}
+
+function sdlcOverlayStartLoop(input) {
+  if (!Number.isInteger(DATA_MAPPER_MAX_ADVANCES) || DATA_MAPPER_MAX_ADVANCES < 1) {
+    throw new TypeError("ODD_SDLC_TS_DATA_MAPPER_MAX_ADVANCES must be a positive integer");
+  }
+  const starts = [];
+  let terminalStart = null;
+  let terminalReason = "sdlc_overlay_max_advances_reached";
+  let lastGraphFunctionName = null;
+  let sameGraphFunctionAfterConverge = 0;
+  for (let step = 0; step < DATA_MAPPER_MAX_ADVANCES; step += 1) {
+    const label = `${startLabelForTarget(input.startTarget)}-${String(step + 1).padStart(3, "0")}`;
+    const start = unwrapStartPayload(runCommand({
+      label,
+      command: input.installedCommand,
+      args: sdlcStartArgs(input.startTarget),
+      cwd: input.workspace,
+      env: input.env,
+      archiveRoot: input.archiveRoot,
+      acceptedStatuses: Object.freeze([0, 4])
+    }), label);
+    starts.push(compactStartForSummary(start));
+    input.summary.steps.push(summaryStepFromStart(`sdlc-overlay-start-${step + 1}`, start));
+    input.summary.sdlcOverlayStarts = starts;
+    input.summary.observedDetailZoomEdges = observedDetailZoomEdges(input.workspace);
+    writeJson(path.join(input.archiveRoot, "run_summary.json"), input.summary);
+    terminalStart = start;
+
+    if (detailZoomStopSatisfied(input.workspace)) {
+      terminalReason = "sdlc_reported_detail_zoom_edges";
+      break;
+    }
+
+    if (!isSuccessfulSdlcTraversalStart(start)) {
+      terminalReason = terminalReasonFromStart(start);
+      break;
+    }
+
+    const graphFunctionName =
+      start?.summary?.graphFunctionName ??
+      start?.start?.executionContract?.targetGraphFunction ??
+      null;
+    if (graphFunctionName !== null && graphFunctionName === lastGraphFunctionName) {
+      sameGraphFunctionAfterConverge += 1;
+      if (sameGraphFunctionAfterConverge >= 2) {
+        terminalReason = `sdlc_overlay_no_progress:${graphFunctionName}`;
+        break;
+      }
+    } else {
+      sameGraphFunctionAfterConverge = 0;
+    }
+    lastGraphFunctionName = graphFunctionName;
+  }
+  if (terminalStart === null) {
+    throw new Error("overlay start loop produced no starts");
+  }
+  if (terminalReason === "sdlc_overlay_max_advances_reached") {
+    throw new Error(
+      `overlay start loop exhausted ${DATA_MAPPER_MAX_ADVANCES} advances before terminal or detail zoom stop`
+    );
+  }
+  return Object.freeze({
+    start: terminalStart,
+    starts,
+    terminalReason
+  });
 }
 
 function main() {
@@ -394,7 +660,9 @@ function main() {
   };
   const summary = {
     kind: "odd_sdlc_full_external_data_mapper_sandbox_run",
-    commandBinding: "abg_cli_start_until_converged",
+    commandBinding: isOverlayStartTarget(START_TARGET)
+      ? "odd_sdlc_cli_overlay_start_first_traversal"
+      : "abg_cli_start_until_converged",
     archiveRoot,
     workspace,
     templateRoot: DATA_MAPPER_TEMPLATE_ROOT,
@@ -411,6 +679,9 @@ function main() {
     },
     startTarget: START_TARGET,
     targetGraphFunction: TARGET_GRAPH_FUNCTION,
+    maxAdvances: DATA_MAPPER_MAX_ADVANCES,
+    stopAfterDetailZoomEdges: DATA_MAPPER_STOP_AFTER_DETAIL_ZOOM,
+    requiredDetailZoomEdges: DATA_MAPPER_DETAIL_ZOOM_EDGES,
     steps: []
   };
   writeJson(path.join(archiveRoot, "run_summary.json"), summary);
@@ -461,7 +732,7 @@ function main() {
   const conformStart = runCommand({
     label: "abg-conform-project-until-converged",
     command: genesisCommand,
-    args: abgStartArgs(FG_CONFORM_PROJECT),
+    args: abgStartArgs(`graph_function:${FG_CONFORM_PROJECT}`),
     cwd: workspace,
     env: baseEnv,
     archiveRoot
@@ -470,21 +741,36 @@ function main() {
   summary.abgConformProject = conformStart;
   writeJson(path.join(archiveRoot, "run_summary.json"), summary);
 
-  const start = runCommand({
-    label: "abg-start-until-converged",
-    command: genesisCommand,
-    args: abgStartArgs(START_TARGET),
-    cwd: workspace,
-    env: baseEnv,
-    archiveRoot,
-    acceptedStatuses: Object.freeze([0, 4])
-  });
+  const startResult = isOverlayStartTarget(START_TARGET)
+    ? sdlcOverlayStartLoop({
+        startTarget: START_TARGET,
+        installedCommand,
+        workspace,
+        env: baseEnv,
+        archiveRoot,
+        summary
+      })
+    : Object.freeze({
+        start: unwrapStartPayload(runCommand({
+          label: startLabelForTarget(START_TARGET),
+          command: startCommandForTarget({ startTarget: START_TARGET, genesisCommand, installedCommand }),
+          args: startArgsForTarget(START_TARGET),
+          cwd: workspace,
+          env: baseEnv,
+          archiveRoot,
+          acceptedStatuses: Object.freeze([0, 4])
+        }), startLabelForTarget(START_TARGET)),
+        starts: Object.freeze([]),
+        terminalReason: null
+      });
+  const start = startResult.start;
   summary.steps.push(summaryStepFromStart("abg-start", start));
-  summary.abgStart = start;
+  summary.abgStart = compactStartForSummary(start);
   summary.resolvedStartGraphFunction =
     graphFunctionFromStartTarget(START_TARGET) ?? start.resolved_target ?? null;
   summary.productMaterializationPackages = findProductMaterializationPackages(workspace);
-  summary.terminalReason = terminalReasonFromStart(start);
+  summary.observedDetailZoomEdges = observedDetailZoomEdges(workspace);
+  summary.terminalReason = startResult.terminalReason ?? terminalReasonFromStart(start);
   writeJson(path.join(archiveRoot, "run_summary.json"), summary);
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 }

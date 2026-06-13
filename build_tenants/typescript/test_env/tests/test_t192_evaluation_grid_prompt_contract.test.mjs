@@ -230,6 +230,14 @@ test("T-192 small admitted handoffs render compact fused-grid prompts", () => {
   );
   assert.match(
     compactDesign.promptText,
+    /Attribute cardinality is SDLC schema multiplicity only/u
+  );
+  assert.match(
+    compactDesign.promptText,
+    /Do not use product-domain morphism values such as 1:1, N:1, 1:N, M:N, 0\.\.1, 1\.\.1, or 0\.\.\*/u
+  );
+  assert.match(
+    compactDesign.promptText,
     /moduleSchemaFragments\[\]\.entities\[\]: kind "sdlc_domain_entity"/u
   );
   assert.match(

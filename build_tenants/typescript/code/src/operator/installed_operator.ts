@@ -239,6 +239,7 @@ import {
 } from "./plugins/evaluate/prompts.js";
 import {
   REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE,
+  REVIEW_GRADE_EDGE_FULFILLMENT_RULE_OUTCOME_FILE,
   REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
   admitReviewGradeEdgeFulfillmentAssessmentFromArtifact,
   reviewGradeEdgeFulfillmentAssessmentPressureRefs,
@@ -4392,6 +4393,20 @@ function writeDesignDepthFpEvaluatorRuleOutcomeProof(input: {
   ).href;
 }
 
+function writeReviewGradeEdgeFulfillmentRuleOutcomeProof(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly outcome: EvaluationRuleOutcome;
+}): string {
+  writeSdlcSystemArtifact({
+    archiveRoot: input.manifest.archiveRoot,
+    relativePath: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_OUTCOME_FILE,
+    payload: input.outcome
+  });
+  return pathToFileURL(
+    join(input.manifest.archiveRoot, REVIEW_GRADE_EDGE_FULFILLMENT_RULE_OUTCOME_FILE)
+  ).href;
+}
+
 function designDepthFpEvaluatorBlockingReasonCode(
   outcome: EvaluationRuleOutcome
 ): SdlcBlockingReasonCode {
@@ -7626,6 +7641,7 @@ function deriveInstalledTraversalConsequence(input: {
   readonly engineTerminal: SdlcAbgTerminalTransitionProjection | null;
   readonly nextVectorIndex: number | null;
   readonly fpEvaluatorAdmissionEvidenceRefs?: readonly string[] | undefined;
+  readonly reviewGradeAdmissionEvidenceRefs?: readonly string[] | undefined;
 }): SdlcInstalledOperatorTraversalConsequence {
   if (input.start.executionContract === null) {
     throw new TypeError("installed traversal consequence requires execution contract");
@@ -7633,7 +7649,13 @@ function deriveInstalledTraversalConsequence(input: {
   const constructionIntent = input.start.executionContract.constructionIntent;
   const module = constructSdlcGtlModule();
   const fpEvaluateResultRefs = fpEvaluateResultRefsForState(input.state);
-  const evidenceRefs = traversalConsequenceEvidenceRefs({ state: input.state });
+  const reviewGradeAdmissionEvidenceRefs = uniqueSorted(
+    input.reviewGradeAdmissionEvidenceRefs ?? Object.freeze([])
+  );
+  const evidenceRefs = uniqueSorted([
+    ...traversalConsequenceEvidenceRefs({ state: input.state }),
+    ...reviewGradeAdmissionEvidenceRefs
+  ]);
   const runRef = manifestRefSegment(input.state.manifest);
   const selectedComposition = input.state.selectedComposition;
   const ledgerRef = `ledger://odd-sdlc/${runRef}/edge-fulfillment`;
@@ -7852,6 +7874,7 @@ function deriveInstalledTraversalConsequence(input: {
       constructionIntent.intentRef,
       worksiteEvidence.evidenceBundleRef,
       ...fpEvaluateResultRefs,
+      ...reviewGradeAdmissionEvidenceRefs,
       ...input.start.executionContract.nextActionProjection.targetBindingRefs
     ])
   });
@@ -8517,6 +8540,9 @@ interface SdlcInstalledOperatorAbgPluginSessionInternal
   readonly designDepthFpEvaluatorAdmissionEvidenceRefsForState: (
     state: SdlcAbgOwnedFpDispatchState
   ) => readonly string[];
+  readonly reviewGradeAdmissionEvidenceRefsForState: (
+    state: SdlcAbgOwnedFpDispatchState
+  ) => readonly string[];
 }
 
 function createSdlcInstalledOperatorAbgPluginSessionInternal(
@@ -8549,12 +8575,21 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
     string,
     readonly string[]
   >();
+  const reviewGradeAdmissionEvidenceByArchiveRoot = new Map<
+    string,
+    readonly string[]
+  >();
   const designDepthFpEvaluatorAdmissionEvidenceRefsForState = (
     state: SdlcAbgOwnedFpDispatchState
   ): readonly string[] =>
     designDepthFpEvaluatorAdmissionEvidenceByArchiveRoot.get(
       state.manifest.archiveRoot
     ) ?? Object.freeze([]);
+  const reviewGradeAdmissionEvidenceRefsForState = (
+    state: SdlcAbgOwnedFpDispatchState
+  ): readonly string[] =>
+    reviewGradeAdmissionEvidenceByArchiveRoot.get(state.manifest.archiveRoot) ??
+    Object.freeze([]);
   const admitDispatchConsequence = (
     state: SdlcAbgOwnedFpDispatchState,
     nextVectorIndex: number | null = null
@@ -8568,7 +8603,9 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
       engineTerminal: null,
       nextVectorIndex,
       fpEvaluatorAdmissionEvidenceRefs:
-        designDepthFpEvaluatorAdmissionEvidenceRefsForState(state)
+        designDepthFpEvaluatorAdmissionEvidenceRefsForState(state),
+      reviewGradeAdmissionEvidenceRefs:
+        reviewGradeAdmissionEvidenceRefsForState(state)
     });
     writeTraversalConsequenceArchive({
       manifest: state.manifest,
@@ -9409,6 +9446,16 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
           emitRuntimeEvent(event);
         }
       });
+      const ruleOutcomeRef = writeReviewGradeEdgeFulfillmentRuleOutcomeProof({
+        manifest: dispatchState.current.manifest,
+        outcome
+      });
+      if (outcome.status === "accepted") {
+        reviewGradeAdmissionEvidenceByArchiveRoot.set(
+          dispatchState.current.manifest.archiveRoot,
+          Object.freeze([ruleOutcomeRef])
+        );
+      }
       if (dispatchState.current !== null) {
         dispatchState.current = stateWithReviewGradePostflight(dispatchState.current);
       }
@@ -9458,7 +9505,8 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
     emitted,
     transport,
     dispatchState,
-    designDepthFpEvaluatorAdmissionEvidenceRefsForState
+    designDepthFpEvaluatorAdmissionEvidenceRefsForState,
+    reviewGradeAdmissionEvidenceRefsForState
   });
 }
 
@@ -9962,6 +10010,8 @@ function compactRuntimeEventArchivePayload(
   const transport = session.transport;
   const designDepthFpEvaluatorAdmissionEvidenceRefsForState =
     session.designDepthFpEvaluatorAdmissionEvidenceRefsForState;
+  const reviewGradeAdmissionEvidenceRefsForState =
+    session.reviewGradeAdmissionEvidenceRefsForState;
   const engineResult = await runEngineIterateAsync({
     basis,
     runtimeEvents: effectiveReplayEvents,
@@ -10029,7 +10079,9 @@ function compactRuntimeEventArchivePayload(
     engineTerminal: terminal,
     nextVectorIndex: engineResult.projection.nextVectorIndex,
     fpEvaluatorAdmissionEvidenceRefs:
-      designDepthFpEvaluatorAdmissionEvidenceRefsForState(completedDispatchState)
+      designDepthFpEvaluatorAdmissionEvidenceRefsForState(completedDispatchState),
+    reviewGradeAdmissionEvidenceRefs:
+      reviewGradeAdmissionEvidenceRefsForState(completedDispatchState)
   });
   emitted.push(
     ...postActionReentryGraphSpanRuntimeEvents({

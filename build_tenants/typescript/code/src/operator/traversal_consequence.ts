@@ -1275,6 +1275,7 @@ export function deriveSdlcEdgeClosureDecision(input: {
             edgeAssuranceCloseDecision.residualPressureRef
           ]),
       ...input.ledger.edgeResidualPressureRefs,
+      ...input.ledger.predecessorRefs,
       ...(normalizedYieldResumeBasis === null
         ? []
         : [
@@ -1327,7 +1328,8 @@ export function deriveSdlcEdgeClosureDecision(input: {
             edgeAssuranceCloseDecision.decisionRef,
             edgeAssuranceCloseDecision.residualPressureRef
           ]),
-      ...input.ledger.edgeResidualPressureRefs
+      ...input.ledger.edgeResidualPressureRefs,
+      ...input.ledger.predecessorRefs
     ])
   });
 }
