@@ -531,6 +531,34 @@ export type {
 } from "./decomposition_admission.js";
 
 export {
+  admitSdlcDecompositionTraceChildRow,
+  admitSdlcDecompositionTraceRegister,
+  admitSdlcDepthTraversalOutcome,
+  constructSdlcDecompositionTraceChildRow,
+  constructSdlcDecompositionTraceRegister,
+  constructSdlcDecompositionTraceRegisterFromReviewGrade,
+  constructSdlcDepthTraversalOutcome,
+  evaluateSdlcDecompositionTraceClosure,
+  SDLC_DECOMPOSITION_TRACE_CHILD_STATUSES,
+  SDLC_DECOMPOSITION_TRACE_CLOSURE_STATUSES,
+  SDLC_DEPTH_TRAVERSAL_OUTCOME_STATUSES
+} from "./depth_traversal.js";
+export type {
+  SdlcDecompositionTraceChildRow,
+  SdlcDecompositionTraceChildRowInput,
+  SdlcDecompositionTraceChildStatus,
+  SdlcDecompositionTraceClosure,
+  SdlcDecompositionTraceClosureInput,
+  SdlcDecompositionTraceClosureStatus,
+  SdlcDecompositionTraceRegister,
+  SdlcDecompositionTraceRegisterFromReviewInput,
+  SdlcDecompositionTraceRegisterInput,
+  SdlcDepthTraversalOutcome,
+  SdlcDepthTraversalOutcomeInput,
+  SdlcDepthTraversalOutcomeStatus
+} from "./depth_traversal.js";
+
+export {
   compileSdlcFeatureDependencyDagToAbgFrontier,
   deriveSdlcFeatureDependencyDag,
   deriveSdlcFeatureDependencyDagFromMaps

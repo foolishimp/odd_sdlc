@@ -364,8 +364,8 @@ test("T-164 published graph vector inventory is fully classified", () => {
     contracts: SDLC_EDGE_GAIN_CLOSURE_CONTRACTS
   });
 
-  assert.equal(publishedGraphVectorRefs.length, 65);
-  assert.equal(SDLC_EDGE_GAIN_CLOSURE_CONTRACTS.length, 65);
+  assert.equal(publishedGraphVectorRefs.length, 66);
+  assert.equal(SDLC_EDGE_GAIN_CLOSURE_CONTRACTS.length, 66);
   assert.deepStrictEqual(
     publishedGraphVectorRefs.filter((graphVectorRef) =>
       graphVectorRef.startsWith("Fg_ingress_project__") ||
@@ -416,11 +416,11 @@ test("T-164 published graph vector inventory is fully classified", () => {
 
   assert.deepStrictEqual(classificationCounts, {
     library_only: 9,
-    close_capable: 50,
+    close_capable: 51,
     projection_only: 6
   });
   assert.deepStrictEqual(sourcePolicyCounts, {
-    strict: 64,
+    strict: 65,
     subset_allowed: 1
   });
 });
@@ -445,7 +445,7 @@ test("T-164 query domain and gaps expose edge assurance as a read-only view", ()
     queryDomain.edgeAssurance.actionClosureEvaluationFunction,
     "evaluate_action"
   );
-  assert.equal(queryDomain.edgeAssurance.rows.length, 65);
+  assert.equal(queryDomain.edgeAssurance.rows.length, 66);
   assert.deepStrictEqual(queryDomain.edgeAssurance.diagnostics, []);
   assert.equal(intentRow.edgeAssuranceContractRef, intentContractRef);
   assert.equal(intentRow.edgeAssuranceContractDigest, intentContractDigest);

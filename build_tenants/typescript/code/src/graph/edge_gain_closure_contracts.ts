@@ -8,6 +8,7 @@
 
 import {
   FG_BOOTSTRAP_SDLC_ENTRY,
+  FG_DECOMPOSE_DEPTH_BETWEEN_NODES,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE
 } from "./catalog.js";
@@ -392,6 +393,30 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     proofLaneRefs: ["test://odd-sdlc/t165/bootstrap-entry-optimising-overlay"],
     residualPressureRefs: [
       "pressure://odd-sdlc/t165/bootstrap-entry-generic-fp-fallback"
+    ]
+  }),
+  contract({
+    edgeRef: FG_DECOMPOSE_DEPTH_BETWEEN_NODES,
+    category: "solution_formalisation",
+    closureClassification: "close_capable",
+    sourceAssetTypes: [
+      "source_node_ref",
+      "target_node_ref",
+      "parent_obligation_ref",
+      "graph_catalog_digest_ref",
+      "edge_contract_refs",
+      "depth_policy_ref",
+      "evidence_policy_ref"
+    ],
+    targetAssetType: "sdlc_depth_traversal_outcome",
+    compositionRole: "intermediate",
+    authorityBasisRefs: [
+      "authority://odd-sdlc/t200-depth-traversal",
+      "authority://odd-sdlc/decomposition-trace-register"
+    ],
+    proofLaneRefs: ["test://odd-sdlc/t200/depth-traversal-catalog"],
+    residualPressureRefs: [
+      "pressure://odd-sdlc/t200/residual-feature-depth"
     ]
   }),
   contract({

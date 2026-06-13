@@ -33,6 +33,10 @@ export const SDLC_HOOK_TARGET_POLICY = Object.freeze([
     edgeClass: "bootstrap_specification"
   }),
   policyEntry({
+    targetAssetType: "sdlc_depth_traversal_outcome",
+    edgeClass: "design"
+  }),
+  policyEntry({
     targetAssetType: "project_bootstrap_surface",
     edgeClass: "bootstrap_specification"
   }),

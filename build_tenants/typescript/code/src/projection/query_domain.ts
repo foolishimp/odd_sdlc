@@ -31,6 +31,7 @@ import {
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
   SDLC_DEEP_SDLC_TRAVERSAL_OVERLAY_REF,
   FG_BOOTSTRAP_SDLC_ENTRY,
+  FG_DECOMPOSE_DEPTH_BETWEEN_NODES,
   SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
   SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
   publicSdlcOverlayStartTargets,
@@ -1277,6 +1278,14 @@ function graphFunctionsByName(module: Module): ReadonlyMap<string, GraphFunction
   );
 }
 
+function graphFunctionByName(module: Module, name: string): GraphFunction {
+  const graphFunction = graphFunctionsByName(module).get(name);
+  if (graphFunction === undefined) {
+    throw new TypeError(`${name}: graph function is not published by module`);
+  }
+  return graphFunction;
+}
+
 function compareStringArray(input: {
   readonly label: string;
   readonly actual: readonly string[];
@@ -1428,6 +1437,9 @@ export function projectSdlcQueryDomain(input: {
       ]),
       candidateGraphFunctionRefs: Object.freeze([
         bootstrapEntryGraphFunctionRef,
+        sdlcGraphFunctionBoundaryRef(
+          graphFunctionByName(input.module, FG_DECOMPOSE_DEPTH_BETWEEN_NODES)
+        ),
         ...traversalOverlays.overlays.flatMap((overlay) =>
           overlay.termination.terminalGraphFunctionRefs
         )

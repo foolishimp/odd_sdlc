@@ -67,6 +67,8 @@ export const FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE =
   "derive_test_execution_result_surface" as const;
 export const FG_BOOTSTRAP_SDLC_ENTRY =
   "Fg_bootstrap_sdlc_entry" as const;
+export const FG_DECOMPOSE_DEPTH_BETWEEN_NODES =
+  "Fg_decompose_depth_between_nodes" as const;
 
 export const BOOTSTRAP_REQUIREMENTS_EXECUTIVE_STEPS = Object.freeze([
   "derive_intent_surface",
@@ -105,6 +107,22 @@ export const OPTIMISING_FUNCTION_CATALOG = Object.freeze([
     inputs: ["type.unstructured"],
     outputs: ["sdlc_bootstrap_traversal_outcome"],
     workCategoryGovernanceCategory: "requirements_build",
+    graphTrackPublication: "overlay_only"
+  }),
+  entry({
+    name: FG_DECOMPOSE_DEPTH_BETWEEN_NODES,
+    intent: "Decompose residual feature-depth pressure between existing graph nodes into an admitted decomposition trace register and depth traversal outcome for ABG-owned child traversal foldback.",
+    inputs: [
+      "source_node_ref",
+      "target_node_ref",
+      "parent_obligation_ref",
+      "graph_catalog_digest_ref",
+      "edge_contract_refs",
+      "depth_policy_ref",
+      "evidence_policy_ref"
+    ],
+    outputs: ["sdlc_depth_traversal_outcome"],
+    workCategoryGovernanceCategory: "design_build",
     graphTrackPublication: "overlay_only"
   })
 ]);

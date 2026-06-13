@@ -201,13 +201,44 @@ decomposition-trace work over ABG/GTL zoom.
 | id | task | proof | status |
 | --- | --- | --- | --- |
 | D0 | Publish additive deep SDLC overlay sibling without mutating current-full. | `test_t160_traversal_overlays.test.mjs` proves duplicated graph scope, annotation, explicit public-start selection; `test_t165_optimising_overlay.test.mjs` proves optimizer read model lists the candidate while fallback remains current-full. | done |
-| D1 | Design depth traversal graph function and register carriers. | design surface names carriers, owners, non-closure signals, and ABG handoff | pending |
-| D2 | Implement carrier admission and projection. | focused tests reject missing parent/child/evidence/consolidation refs | pending |
-| D3 | Publish `Fg_decompose_depth_between_nodes`. | graph catalog/module/query-domain expose the function and contract | pending |
-| D4 | Persist downstream-deferred review rows into the register. | consequence/evaluator test proves review text becomes register pressure | pending |
-| D5 | Make design/build/test closure consume child rows. | closure tests block on untraced or open children | pending |
-| D6 | Prove REQ-ENG-003 command-only rejection. | data-mapper regression fails closure from command-only `sbt test` evidence | pending |
+| D1 | Design depth traversal graph function and register carriers. | `ODD_SDLC_TYPESCRIPT_DEPTH_TRAVERSAL_FUNCTION.md`; `test_t200_depth_traversal_design.test.mjs` proves carriers, owners, ABG handoff, and non-closure signals. | done |
+| D2 | Implement carrier admission and projection. | `depth_traversal.ts`; `test_t200_depth_traversal_carriers.test.mjs` rejects missing parent/child/evidence/consolidation refs and closed-shape runtime-authority payloads. | done |
+| D3 | Publish `Fg_decompose_depth_between_nodes`. | `test_t200_depth_traversal_catalog.test.mjs` proves catalog, module, query-domain candidate, target-carrier row, edge-gain contract, semantic build, and GTL preflight. | done |
+| D4 | Persist downstream-deferred review rows into the register. | `constructSdlcDecompositionTraceRegisterFromReviewGrade(...)`; `test_t200_review_decomposition_trace.test.mjs` proves downstream-deferred review pressure becomes register rows and current-edge prose is refused. | done |
+| D5 | Make design/build/test closure consume child rows. | `evaluateSdlcDecompositionTraceClosure(...)`; `test_t200_decomposition_trace_closure.test.mjs` blocks on untraced/open child rows and closes only after expected children close. | done |
+| D6 | Prove REQ-ENG-003 command-only rejection. | `test_t200_req_eng_003_command_only_closure.test.mjs` proves command-only `sbt test` evidence cannot close requirement-bound depth; source test refs, execution shard refs, and non-command admitted evidence are required. | done |
 | D7 | Run high-zoom live proof. | archive records admitted strategy, depth traversal, child events, foldback, parent consolidation | pending |
+
+## Non-Live Implementation Proof, 2026-06-13
+
+Implemented D1-D6 without adding an SDLC-local runtime loop, cursor movement, or
+event store. The depth path is now expressed as typed graph-function
+publication, admitted decomposition trace carriers, review-pressure projection,
+and closure foldback over child rows.
+
+Verification:
+
+```text
+cd build_tenants/typescript
+npm run build:semantic
+node --test \
+  test_env/tests/test_t200_depth_traversal_design.test.mjs \
+  test_env/tests/test_t200_depth_traversal_carriers.test.mjs \
+  test_env/tests/test_t200_depth_traversal_catalog.test.mjs \
+  test_env/tests/test_t200_review_decomposition_trace.test.mjs \
+  test_env/tests/test_t200_decomposition_trace_closure.test.mjs \
+  test_env/tests/test_t200_req_eng_003_command_only_closure.test.mjs
+```
+
+Result: semantic build and GTL preflight clean; focused non-live proof pack
+11/11 passing. Affected regression set
+`test_t160_traversal_overlays.test.mjs`,
+`test_t165_optimising_overlay.test.mjs`,
+`test_t169_target_carrier_contracts.test.mjs`, and
+`test_t197_product_gtl_gate.test.mjs` passes 63/63 after adding the required
+hook target policy for `sdlc_depth_traversal_outcome`. Full non-live
+`npm run test:semantic` passes 1010/1010. D7 remains open for the deferred live
+high-zoom proof.
 
 ## Non-Goals
 
