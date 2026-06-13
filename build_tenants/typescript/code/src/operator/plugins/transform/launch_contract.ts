@@ -3603,6 +3603,9 @@ function emptyRetryContext(): SdlcWorkerRetryContext {
 }
 
 function constructTraversalIntentPackage(input: {
+  readonly ticketExecutionContract?:
+    | SdlcWorkerHandoffManifest["ticketExecutionContract"]
+    | undefined;
   readonly overlayRef?: string | null | undefined;
   readonly overlayBindingRef?: string | null | undefined;
   readonly graphCatalogDigestRef?: string | null | undefined;
@@ -3629,6 +3632,7 @@ function constructTraversalIntentPackage(input: {
   const base = Object.freeze({
     kind: "sdlc_traversal_intent_package" as const,
     packageVersion: "ts-intent-v1" as const,
+    ticketExecutionContract: input.ticketExecutionContract ?? null,
     overlayRef: input.overlayRef ?? null,
     overlayBindingRef: input.overlayBindingRef ?? null,
     graphCatalogDigestRef: input.graphCatalogDigestRef ?? null,
@@ -3720,6 +3724,12 @@ export function assertTraversalIntentPackagePressure(
     JSON.stringify(pkg.featureScope) !== JSON.stringify(manifest.featureScope)
   ) {
     throw new TypeError("traversal intent package feature scope drift");
+  }
+  if (
+    JSON.stringify(pkg.ticketExecutionContract ?? null) !==
+    JSON.stringify(manifest.ticketExecutionContract ?? null)
+  ) {
+    throw new TypeError("traversal intent package ticket context drift");
   }
   if (pkg.authorityRefs.length === 0) {
     throw new TypeError("traversal intent package missing source authority refs");
@@ -3822,6 +3832,9 @@ export function proportionalityProfileFromHopSelection(
 
 export function deriveWorkerHandoffManifest(input: {
   readonly workspaceRoot: string;
+  readonly ticketExecutionContract?:
+    | SdlcWorkerHandoffManifest["ticketExecutionContract"]
+    | undefined;
   readonly overlayRef?: string | null | undefined;
   readonly overlayBindingRef?: string | null | undefined;
   readonly graphCatalogDigestRef?: string | null | undefined;
@@ -3999,6 +4012,7 @@ export function deriveWorkerHandoffManifest(input: {
     outputAuthorityProjections
   });
   const traversalIntentPackage = constructTraversalIntentPackage({
+    ticketExecutionContract: input.ticketExecutionContract ?? null,
     overlayRef: input.overlayRef ?? null,
     overlayBindingRef: input.overlayBindingRef ?? null,
     graphCatalogDigestRef: input.graphCatalogDigestRef ?? null,
@@ -4031,6 +4045,7 @@ export function deriveWorkerHandoffManifest(input: {
   const manifest = Object.freeze({
     kind: "sdlc_worker_handoff_manifest",
     contractVersion: "ts-operator-v1",
+    ticketExecutionContract: input.ticketExecutionContract ?? null,
     overlayRef: input.overlayRef ?? null,
     overlayBindingRef: input.overlayBindingRef ?? null,
     graphCatalogDigestRef: input.graphCatalogDigestRef ?? null,

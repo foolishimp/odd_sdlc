@@ -11,6 +11,7 @@ import type {
 import {
   REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF
 } from "../review_grade_edge_fulfillment.js";
+import { SDLC_TICKET_WORKFLOW_FD_RULE_REF } from "../../tickets/index.js";
 import {
   DESIGN_DEPTH_FP_EVALUATOR_RULE_REF
 } from "./evaluate/design_depth_register.js";
@@ -19,7 +20,8 @@ import {
   designDepthFpEvaluatorRuleContract,
   fpDispatchPluginContract,
   fpEvaluatorPluginContract,
-  reviewGradeEdgeFulfillmentRuleContract
+  reviewGradeEdgeFulfillmentRuleContract,
+  ticketWorkflowFdRuleContract
 } from "./plugin_contracts.js";
 
 export interface SdlcAbgPluginSetCallbacks {
@@ -36,6 +38,9 @@ export interface SdlcAbgPluginSetCallbacks {
   readonly evaluateReviewGradeEdgeFulfillment: (
     input: EnginePluginInput
   ) => Promise<EvaluationRuleOutcome>;
+  readonly evaluateTicketWorkflow: (
+    input: EnginePluginInput
+  ) => EvaluationRuleOutcome | Promise<EvaluationRuleOutcome>;
 }
 
 export function createSdlcAbgPluginSet(
@@ -56,6 +61,14 @@ export function createSdlcAbgPluginSet(
     }),
     evaluationRules: Object.freeze([
       Object.freeze({
+        contract: ticketWorkflowFdRuleContract(),
+        ruleRef: SDLC_TICKET_WORKFLOW_FD_RULE_REF,
+        ruleRole: "semantic_judgment" as const,
+        required: true,
+        outputCarrierRefs: Object.freeze(["SdlcTicketExecutionContract"]),
+        evaluate: callbacks.evaluateTicketWorkflow
+      }),
+      Object.freeze({
         contract: designDepthFpEvaluatorRuleContract(),
         ruleRef: DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
         ruleRole: "semantic_judgment" as const,
@@ -75,6 +88,7 @@ export function createSdlcAbgPluginSet(
       })
     ]),
     requiredEvaluationRuleRefs: Object.freeze([
+      SDLC_TICKET_WORKFLOW_FD_RULE_REF,
       DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
       REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF
     ])

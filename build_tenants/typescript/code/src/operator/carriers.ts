@@ -40,6 +40,7 @@ import type {
   SdlcOverlayBinding,
   SdlcWorkCategoryGovernanceCategory
 } from "../graph/index.js";
+import type { SdlcTicketExecutionContract } from "../tickets/index.js";
 import type {
   SdlcDependencyTraversalMethod,
   SdlcFeatureDependencyDagNodeKind,
@@ -1611,6 +1612,7 @@ export interface SdlcWorkerRetryContext {
 export interface SdlcTraversalIntentPackage {
   readonly kind: "sdlc_traversal_intent_package";
   readonly packageVersion: "ts-intent-v1";
+  readonly ticketExecutionContract?: SdlcTicketExecutionContract | null;
   readonly overlayRef: string | null;
   readonly overlayBindingRef: string | null;
   readonly graphCatalogDigestRef: string | null;
@@ -2035,6 +2037,7 @@ export interface SdlcComputeProportionalityProfile {
 export interface SdlcWorkerHandoffManifest {
   readonly kind: "sdlc_worker_handoff_manifest";
   readonly contractVersion: "ts-operator-v1";
+  readonly ticketExecutionContract?: SdlcTicketExecutionContract | null;
   readonly overlayRef: string | null;
   readonly overlayBindingRef: string | null;
   readonly graphCatalogDigestRef: string | null;

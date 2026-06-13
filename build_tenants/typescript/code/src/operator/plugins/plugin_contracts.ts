@@ -4,6 +4,7 @@ import {
   constructEnginePluginContract,
   type EnginePluginContract
 } from "@abiogenesis/typescript-tenant";
+import { SDLC_TICKET_WORKFLOW_FD_RULE_REF } from "../../tickets/index.js";
 
 export function fpDispatchPluginContract(): EnginePluginContract {
   return constructEnginePluginContract({
@@ -53,6 +54,19 @@ export function reviewGradeEdgeFulfillmentRuleContract(): EnginePluginContract {
     outputCarrier: "SdlcReviewGradeEdgeFulfillmentAssessment",
     computeStageRole: "evaluate",
     computeMeans: "F_P",
+    computeStagePurpose: "candidate_evaluation"
+  });
+}
+
+export function ticketWorkflowFdRuleContract(): EnginePluginContract {
+  return constructEnginePluginContract({
+    ref: SDLC_TICKET_WORKFLOW_FD_RULE_REF,
+    pluginKind: "fd_evaluator",
+    authority: "effect_plugin",
+    inputCarrier: "EnginePluginInput",
+    outputCarrier: "SdlcTicketExecutionContractAdmission",
+    computeStageRole: "evaluate",
+    computeMeans: "F_D",
     computeStagePurpose: "candidate_evaluation"
   });
 }

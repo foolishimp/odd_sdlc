@@ -53,6 +53,7 @@ import {
   SDLC_EDGE_GAIN_CLOSURE_CATEGORY_TEMPLATES,
   SDLC_EDGE_GAIN_CLOSURE_CONTRACTS,
   SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
+  SDLC_TICKET_WORKFLOW_OVERLAY_REF,
   sdlcEdgeAssuranceContractRef,
   withAdditionalSdlcEdgeResidualPressureRefs
 } from "../../build/semantic/code/src/index.js";
@@ -524,8 +525,13 @@ test("T-164 overlay matrix covers every current overlay-selected vector", () => 
     catalog.overlays.flatMap((overlay) => overlay.graphVectorRefs)
   );
 
-  assert.equal(catalog.overlays.length, 6);
-  assert.equal(overlayVectorUnion.length, 37);
+  assert(
+    catalog.overlays.some(
+      (overlay) => overlay.overlayRef === SDLC_TICKET_WORKFLOW_OVERLAY_REF
+    )
+  );
+  assert.equal(catalog.overlays.length, 7);
+  assert.equal(overlayVectorUnion.length, 38);
 
   for (const overlay of catalog.overlays) {
     assertSdlcOverlayEdgeGainClosureContracts({

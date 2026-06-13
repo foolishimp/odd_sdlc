@@ -99,10 +99,14 @@ import {
 } from "../workspace/index.js";
 import { assertCurrentSdlcGtlProgramConformance } from "../gtl_conformance/index.js";
 import { isRecord } from "../admission/codecs.js";
+import { admitSdlcTicketExecutionContract } from "../tickets/index.js";
 
 export const ODD_SDLC_SPEC_METHOD_COMMAND_VALUES = Object.freeze([
   "catalog",
   "query-domain",
+  "tickets",
+  "reviewers",
+  "ticket-admit",
   "gaps",
   "start",
   "install",
@@ -2154,6 +2158,40 @@ function commandPayload(
         outputWorkspaceRoot: request.outputWorkspaceRoot
       })
     );
+  }
+  if (request.command === "tickets" || request.command === "reviewers") {
+    const queryDomain = queryDomainFor(
+      workspaceContext({
+        workspaceRoot: request.workspaceRoot,
+        outputWorkspaceRoot: request.outputWorkspaceRoot
+      })
+    );
+    return request.command === "tickets"
+      ? queryDomain.ticketWorkflow
+      : Object.freeze({
+          kind: "sdlc_reviewer_profile_projection" as const,
+          readOnly: true as const,
+          reviewerProfiles: queryDomain.ticketWorkflow.reviewerProfiles,
+          emittedRuntimeEventKinds: Object.freeze([] as const)
+        });
+  }
+  if (request.command === "ticket-admit") {
+    if (
+      request.target.kind !== "asset" ||
+      !request.target.handle.startsWith("ticket/")
+    ) {
+      throw new TypeError("ticket-admit requires --target asset:ticket/<id>");
+    }
+    const queryDomain = queryDomainFor(
+      workspaceContext({
+        workspaceRoot: request.workspaceRoot,
+        outputWorkspaceRoot: request.outputWorkspaceRoot
+      })
+    );
+    return admitSdlcTicketExecutionContract({
+      workflow: queryDomain.ticketWorkflow,
+      ticketId: request.target.handle.slice("ticket/".length)
+    });
   }
   if (request.command === "gaps") {
     return gapsPayload(request);

@@ -19,6 +19,7 @@ export const ODD_SDLC_TYPESCRIPT_TENANT_CAPABILITIES = Object.freeze([
   "gap_triage_route_binding",
   "operational_transition_runtime_return",
   "spec_method_installed_entrypoint",
+  "ticket_workflow_projection",
   "typescript_install_adapter",
   "installed_operator_execution",
   "assurance_ledger_composition",
@@ -57,6 +58,7 @@ export * from "./projection/index.js";
 export * from "./start/index.js";
 export * from "./hooks/index.js";
 export * from "./triage/index.js";
+export * from "./tickets/index.js";
 export * from "./operational/index.js";
 export * from "./qualification/index.js";
 export * from "./package_binding/index.js";

@@ -13,16 +13,22 @@ re_entry_point: design
 priority: high
 triaged_at: 2026-05-12
 created_at: 2026-05-12
-updated_at: 2026-06-13
+updated_at: 2026-06-14
 activated_at: 2026-05-14
 governance_scope: STDO Method
 migration_strategy: inside_out_ticket_workflow_authority
 library_usage: extend
 governing_library:
   - build_tenants/typescript/code/src/graph/catalog.ts
+  - build_tenants/typescript/code/src/graph/overlays.ts
+  - build_tenants/typescript/code/src/hooks/catalog.ts
+  - build_tenants/typescript/code/src/tickets/workflow.ts
   - build_tenants/typescript/code/src/spec_method/entry.ts
   - build_tenants/typescript/code/src/start/public_start.ts
   - build_tenants/typescript/code/src/projection/query_domain.ts
+  - build_tenants/typescript/code/src/operator/plugins/plugin_contracts.ts
+  - build_tenants/typescript/code/src/operator/plugins/plugin_set.ts
+  - build_tenants/typescript/code/src/operator/plugins/transform/launch_contract.ts
   - /Users/jim/src/apps/specification_methodology/specification/standards/TICKET_METHOD.md
 source_documents:
   - specification/GOALS.md
@@ -44,7 +50,7 @@ related_tickets:
   - .ai-workspace/tickets/completed/T-160-first-class-traversal-overlays-for-guided-graph-passes.md
   - .ai-workspace/tickets/backlog/T-161-read-only-fd-run-analysis-linter.md
   - .ai-workspace/tickets/completed/T-165-define-optimising-overlay-for-landscape-conditioned-fd-specialization.md
-  - .ai-workspace/tickets/active/T-200-implement-depth-traversal-function-and-decomposition-trace-foldback.md
+  - .ai-workspace/tickets/completed/T-200-implement-depth-traversal-function-and-decomposition-trace-foldback.md
   - .ai-workspace/tickets/backlog/T-201-prove-single-node-smoke-optimising-specialization.md
   - .ai-workspace/tickets/backlog/T-166-define-adaptable-consensus-graph-function-for-submitter-reviewer-rounds.md
   - .ai-workspace/tickets/backlog/T-167-define-review-graph-function-for-multi-reviewer-ticket-generation.md
@@ -200,6 +206,30 @@ SdlcTicketExecutionContract
   draft ticket-shaped contract
 ```
 
+Implementation shape:
+
+```text
+overlay://odd-sdlc/ticket-workflow
+  product overlay that exposes the governed ticket lane
+
+route_ticket_work_item
+  graph function used as the sole constructive ticket-workflow entry path
+
+custom F_D ticket workflow plugin rule
+  deterministic ticket projection/admission/reviewer/continuation validation
+
+custom F_P ticket route hook
+  constructive route of the admitted ticket work item
+```
+
+This is the lawful place for custom `F_D` plugins composed with `F_P`: `F_D`
+admits and validates ticket authority, reviewer rulings, and continuation
+pressure before and after the route; `F_P` constructs the ticket work-item route
+surface. Neither plugin family selects vectors, emits runtime events, closes
+the run, retries, re-enters, or becomes a second controller. The overlay and
+graph function are the typed constructive path; CLI commands and query-domain
+output are read/admission clients over that path.
+
 Subordinate rows on the ticket/workflow projection:
 
 ```text
@@ -233,8 +263,10 @@ ticket and its admitted execution contract.
 
 Latest capability reload:
 
-- ABG `4.0.0-rc.18` supplies admitted runtime re-entry and construction-intent
-  consumption for consequence-selected traversal actions.
+- ABG `4.0.0-rc.19` supplies admitted runtime re-entry, construction-intent
+  consumption for consequence-selected traversal actions, graph-function zoom
+  planning/application, same-edge assurance retry, and current GTL program
+  conformance gates consumed by this ticket workflow lane.
 - `odd_sdlc` can now distinguish edge closure, overlay segment completion, and
   product convergence. A lite overlay may close every edge and still emit
   `productConverged: false` with remaining graph/requirement/asset pressure.
@@ -420,46 +452,59 @@ This ticket is governed by `DESIGN_MODULE_METHOD.md`.
 - Overlay continuation must stay a ticket workflow concern. ABG owns the start,
   continuation, re-entry, event, and replay mechanics; the ticket owns the
   SDLC meaning of the remaining pressure and the review/triage ruling.
+- T-162 realization, 2026-06-14: durable ticket markdown projects into
+  `SdlcTicketWorkflowProjection`; active valid tickets admit into
+  `SdlcTicketExecutionContract`; `asset:ticket/<id>` selects the
+  `overlay://odd-sdlc/ticket-workflow` overlay and the `route_ticket_work_item`
+  graph function; the hook profile composes deterministic `F_D` ticket
+  authority checks, reviewer-ruling checks, and continuation-pressure checks
+  with the constructive `F_P` ticket-route step; the ABG plugin set exposes a
+  required `fd_evaluator` rule at
+  `evaluation-rule://odd-sdlc/ticket-workflow/fd`.
+- The graph function and overlay are the sole implementation path for governed
+  ticket starts. Ticket commands in `spec_method/entry.ts` expose projection and
+  admission views only; they do not route work outside graph function
+  traversal, ABG public start, or admitted runtime re-entry.
 
 ## Implementation Checklist
 
 Inside-out sequencing is required.
 
-- [ ] define ticket workflow validation over `.ai-workspace/tickets/{backlog,active,completed}` with TICKET_METHOD-required fields
-- [ ] define `SdlcTicketWorkflowProjection` as a read-only query-domain surface
-- [ ] define `SdlcTicketExecutionContract` as the admitted run-scoped contract derived from a ticket or drafted ticket-shaped contract
-- [ ] define a reviewer profile registry/projection for configured reviewers such as `codex` and `claude`
-- [ ] define `SdlcReviewPanelBinding` so each review-capable ticket can select required and optional reviewers, roles, reduction policy, and fallback policy
-- [ ] validate reviewer profiles before review or consensus execution; unknown, unavailable, or schema-incompatible reviewers must block the review act with typed reasons
-- [ ] extend graph catalog with explicit ticket workflow functions only where graph publication is needed; do not hide constructive carriers inside CLI code
-- [ ] publish ticket workflow state through `query-domain` or a dedicated command that uses the same projection authority
-- [ ] reject missing, malformed, backlog, stale, or unadmitted `asset:ticket/<id>` handles at public start
-- [ ] admit active valid tickets into execution contracts before traversal
-- [ ] carry ticket id, ticket digest, execution contract ref, and ruling refs into handoff manifests
-- [ ] carry reviewer profile ids, profile config digests, panel binding refs, and reviewer invocation refs into handoff manifests
-- [ ] carry ticket/execution-contract refs into `SdlcEdgeFulfillmentLedger`, closure decision, eval output, archive, and next-action projection
-- [ ] carry reviewer invocation refs into review decision rows, ledgers, archives, and next-action projection
-- [ ] add review decision rows with `accepted`, `rejected`, `deferred`, and `split_ticket` rulings
-- [ ] make selective implementation consume only accepted review decision rows
-- [ ] add bug triage rows with expected/actual/reproduction/evidence and first-missing-layer fields
-- [ ] enforce `realization_refactor` bug admission only when requirement and design authority are present
-- [ ] add spec-change rows with target spec surface, current truth, target truth, source docs, change class, re-entry point, and proof surface
-- [ ] add overlay segment continuation rows that bind `productConverged: false`
+- [x] define ticket workflow validation over `.ai-workspace/tickets/{backlog,active,completed}` with TICKET_METHOD-required fields
+- [x] define `SdlcTicketWorkflowProjection` as a read-only query-domain surface
+- [x] define `SdlcTicketExecutionContract` as the admitted run-scoped contract derived from a ticket or drafted ticket-shaped contract
+- [x] define a reviewer profile registry/projection for configured reviewers such as `codex` and `claude`
+- [x] define `SdlcReviewPanelBinding` so each review-capable ticket can select required and optional reviewers, roles, reduction policy, and fallback policy
+- [x] validate reviewer profiles before review or consensus execution; unknown, unavailable, or schema-incompatible reviewers must block the review act with typed reasons
+- [x] extend graph catalog with explicit ticket workflow functions only where graph publication is needed; do not hide constructive carriers inside CLI code
+- [x] publish ticket workflow state through `query-domain` or a dedicated command that uses the same projection authority
+- [x] reject missing, malformed, backlog, stale, or unadmitted `asset:ticket/<id>` handles at public start
+- [x] admit active valid tickets into execution contracts before traversal
+- [x] carry ticket id, ticket digest, execution contract ref, and ruling refs into handoff manifests
+- [x] carry reviewer profile ids, profile config digests, panel binding refs, and reviewer invocation refs into handoff manifests
+- [x] carry ticket/execution-contract refs into `SdlcEdgeFulfillmentLedger`, closure decision, eval output, archive, and next-action projection
+- [x] carry reviewer invocation refs into review decision rows, ledgers, archives, and next-action projection
+- [x] add review decision rows with `accepted`, `rejected`, `deferred`, and `split_ticket` rulings
+- [x] make selective implementation consume only accepted review decision rows
+- [x] add bug triage rows with expected/actual/reproduction/evidence and first-missing-layer fields
+- [x] enforce `realization_refactor` bug admission only when requirement and design authority are present
+- [x] add spec-change rows with target spec surface, current truth, target truth, source docs, change class, re-entry point, and proof surface
+- [x] add overlay segment continuation rows that bind `productConverged: false`
   segment completion to code-review/triage ticket intake
-- [ ] carry remaining graph, requirement, asset, and next-overlay pressure refs
+- [x] carry remaining graph, requirement, asset, and next-overlay pressure refs
   from `sdlc_overlay_segment_completion` into the ticket projection and admitted
   execution contract
 - [ ] route final-node code-review/triage tickets through admitted ABG public
   start or runtime re-entry at `overlay://odd-sdlc/current-full-traversal`
   without an SDLC-local loop
-- [ ] require review/triage rulings for whether the continuation closes, repairs,
+- [x] require review/triage rulings for whether the continuation closes, repairs,
   splits, creates a depth traversal ticket, or blocks
-- [ ] ensure comments/forensics/review posts can be referenced as evidence but cannot set ticket status
-- [ ] update compact CLI output so blocked ticket workflow states are visible to a cold session
-- [ ] add fixtures for valid active ticket, malformed ticket, backlog ticket, review-resolution ticket, spec-change ticket, and bug-repair ticket
-- [ ] add deterministic tests for projection, admission, start rejection, review selection, bug triage, and spec-change authority
+- [x] ensure comments/forensics/review posts can be referenced as evidence but cannot set ticket status
+- [x] update compact CLI output so blocked ticket workflow states are visible to a cold session
+- [x] add fixtures for valid active ticket, malformed ticket, backlog ticket, review-resolution ticket, spec-change ticket, and bug-repair ticket
+- [x] add deterministic tests for projection, admission, start rejection, review selection, bug triage, and spec-change authority
 - [ ] add deterministic tests for configured `codex` and `claude` reviewer selection, unknown-reviewer rejection, unavailable-reviewer blocking, and reviewer output schema rejection
-- [ ] add deterministic tests for overlay-segment continuation ticket intake,
+- [x] add deterministic tests for overlay-segment continuation ticket intake,
   remaining-pressure preservation, and current-full-traversal start admission
 - [ ] add one scenario proof that starts from a review comment, records rulings in a ticket, implements only accepted findings, and leaves deferred findings visible
 - [ ] add one scenario proof that starts from a completed lite overlay segment
@@ -469,17 +514,17 @@ Inside-out sequencing is required.
 
 ## Migration Checklist
 
-- [ ] old truth path is named explicitly
-- [ ] new truth path is named explicitly
-- [ ] producer set for the new truth is listed
-- [ ] consumer set for the new truth is listed
-- [ ] projection/read-model surfaces are listed
-- [ ] old truth path is removed or explicitly demoted from authority
-- [ ] mixed-state behavior is no longer accepted as closure evidence
-- [ ] tests proving mixed old/new behavior are removed or repriced
-- [ ] recurring realization patterns are checked against existing library/commonization surfaces
-- [ ] ticket declares library usage and names the governing library or rationale
-- [ ] if the work exists in more than one build tenant, this backlog/active ticket carries only one tenant lifecycle and any sibling tenant work lives on its own suffixed ticket
+- [x] old truth path is named explicitly
+- [x] new truth path is named explicitly
+- [x] producer set for the new truth is listed
+- [x] consumer set for the new truth is listed
+- [x] projection/read-model surfaces are listed
+- [x] old truth path is removed or explicitly demoted from authority
+- [x] mixed-state behavior is no longer accepted as closure evidence
+- [x] tests proving mixed old/new behavior are removed or repriced
+- [x] recurring realization patterns are checked against existing library/commonization surfaces
+- [x] ticket declares library usage and names the governing library or rationale
+- [x] if the work exists in more than one build tenant, this backlog/active ticket carries only one tenant lifecycle and any sibling tenant work lives on its own suffixed ticket
 - [ ] ticket wording, product wording, and proof claims are reconciled before closure
 
 Old truth path:
@@ -502,6 +547,35 @@ New truth path:
 - start/handoff/ledger/eval/archive/closure all carry the admitted ticket basis.
 - overlay segment completion with remaining pressure emits or references a
   ticket workflow continuation row before any full-traversal closure claim.
+
+Producer set:
+
+- `.ai-workspace/tickets/{backlog,active,completed}` markdown files;
+- `projectSdlcTicketWorkflow(...)`;
+- `admitSdlcTicketExecutionContract(...)`;
+- `asset:ticket/<id>` public-start admission;
+- `overlay://odd-sdlc/ticket-workflow` plus `route_ticket_work_item`;
+- the required ticket workflow `F_D` plugin rule and ticket route `F_P` hook.
+
+Consumer set:
+
+- query-domain ticket workflow projection;
+- `tickets`, `reviewers`, and `ticket-admit` operator commands;
+- public-start execution contract resolution;
+- worker handoff manifests and traversal intent packages;
+- installed operator ledger, closure, consequence, next-action, and archive
+  derivations.
+
+Projection/read-model surfaces:
+
+- `SdlcTicketWorkflowProjection`;
+- `SdlcTicketWorkflowRow`;
+- `SdlcTicketExecutionContract`;
+- `SdlcReviewPanelBinding`;
+- `SdlcReviewFindingDecisionRow`;
+- `SdlcBugTriageRow`;
+- `SdlcSpecChangeRow`;
+- `SdlcOverlaySegmentContinuationRow`.
 
 ## Acceptance Criteria
 
@@ -631,8 +705,53 @@ This design matches `specification/PRODUCT.md`.
   services are selectable profiles bound into Review or Consensus rounds, not
   hardcoded sovereign evaluators.
 
-This design does not require a new ABG capability beyond the current rc18
+This design does not require a new ABG capability beyond the current rc19
 substrate. ABG remains the runtime substrate and owns start, continuation,
-re-entry, event, and replay truth. `odd_sdlc` needs to bind ticket authority
-and segment-continuation pressure into its domain execution contracts, ledgers,
-projections, and operator UX.
+re-entry, zoom, event, and replay truth. `odd_sdlc` binds ticket authority and
+segment-continuation pressure into its domain overlays, graph-function route,
+plugin contracts, execution contracts, ledgers, projections, and operator UX.
+
+## Current Proof, 2026-06-14
+
+Implemented and verified surfaces:
+
+- `build_tenants/typescript/code/src/tickets/workflow.ts` projects
+  `.ai-workspace/tickets/{backlog,active,completed}` into read-only workflow
+  rows, admits active ticket execution contracts, preserves reviewer/decision
+  rows, bug/spec rows, and overlay continuation rows, and fails closed for
+  malformed, stale, inactive, unruled, or authority-incomplete tickets.
+- `overlay://odd-sdlc/ticket-workflow` publishes `route_ticket_work_item` as
+  the graph-function entry path for ticket work.
+- `hookContractByEdgeName("route_ticket_work_item")` composes deterministic
+  ticket-workflow `F_D` checks with the constructive ticket-route `F_P` hook.
+- `createSdlcAbgPluginSet(...)` includes required
+  `evaluation-rule://odd-sdlc/ticket-workflow/fd`; installed operator
+  evaluation accepts non-ticket edges as not applicable and blocks ticket-route
+  edges missing an admitted ticket execution contract.
+- public start rejects missing, malformed, backlog, completed, stale, and
+  unadmitted `asset:ticket/<id>` handles before traversal; valid active tickets
+  select the ticket workflow overlay and graph function.
+- query-domain, `tickets`, `reviewers`, and `ticket-admit` expose ticket
+  workflow projection/admission without creating runtime authority.
+- worker handoff, traversal intent package, ledgers, closure/consequence basis,
+  and next-action projection carry admitted ticket execution refs.
+
+Verification:
+
+- `npm run test:t162` passed 10/10.
+- `npm run lint:semantic` passed.
+- `npm run test:t033` passed 8/8.
+- `npm run test:t058` passed 17/17.
+- `npm run test:semantic` passed 1023/1023.
+
+Remaining before ticket closure:
+
+- deterministic unavailable-reviewer and schema-incompatible reviewer output
+  rejection cases;
+- scenario proof that starts from a review comment, records ticket rulings,
+  implements only accepted findings, and leaves deferred findings visible;
+- scenario proof that starts from a completed lite overlay segment with
+  `productConverged: false`, emits or references a code-review/triage ticket,
+  starts the continuation through admitted ABG public start or runtime re-entry
+  at `overlay://odd-sdlc/current-full-traversal`, and preserves source segment
+  refs in handoff, ledger, next-action, and archive truth.

@@ -250,6 +250,10 @@ import {
   snapshotReviewGradeReadOnlyInputFiles
 } from "./review_grade_edge_fulfillment.js";
 import {
+  SDLC_TICKET_WORKFLOW_FD_RULE_REF,
+  sdlcTicketExecutionContractRefs
+} from "../tickets/index.js";
+import {
   compileSdlcFeatureDependencyDagToAbgFrontier,
   deriveSdlcFeatureDependencyDagFromMaps
 } from "./feature_dependency_dag.js";
@@ -7647,6 +7651,9 @@ function deriveInstalledTraversalConsequence(input: {
     throw new TypeError("installed traversal consequence requires execution contract");
   }
   const constructionIntent = input.start.executionContract.constructionIntent;
+  const ticketExecutionRefs = sdlcTicketExecutionContractRefs(
+    input.start.executionContract.ticketExecutionContract
+  );
   const module = constructSdlcGtlModule();
   const fpEvaluateResultRefs = fpEvaluateResultRefsForState(input.state);
   const reviewGradeAdmissionEvidenceRefs = uniqueSorted(
@@ -7712,7 +7719,8 @@ function deriveInstalledTraversalConsequence(input: {
         : Object.freeze([runtimeLivenessProjectionRef(input.state.manifest)]),
     predecessorRefs: Object.freeze([
       constructionIntent.intentRef,
-      constructionIntent.nextActionProjectionRef
+      constructionIntent.nextActionProjectionRef,
+      ...ticketExecutionRefs
     ])
   });
   const fulfillmentProjection = edgeFulfillmentProjectionFor({
@@ -7854,6 +7862,7 @@ function deriveInstalledTraversalConsequence(input: {
     materializationRefs: workerOutputMaterializationRefs(input.state),
     livenessProjectionRefs: worksiteEvidence.livenessProjectionRefs,
     admissionRefs: Object.freeze([
+      ...ticketExecutionRefs,
       ...evidenceRefs,
       ...(targetCarrierAdmission?.status === "admitted"
         ? [targetCarrierAdmission.validationRef]
@@ -7875,6 +7884,7 @@ function deriveInstalledTraversalConsequence(input: {
       worksiteEvidence.evidenceBundleRef,
       ...fpEvaluateResultRefs,
       ...reviewGradeAdmissionEvidenceRefs,
+      ...ticketExecutionRefs,
       ...input.start.executionContract.nextActionProjection.targetBindingRefs
     ])
   });
@@ -8645,6 +8655,7 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
         });
       const manifest = deriveWorkerHandoffManifest({
         workspaceRoot: input.workspaceRoot,
+        ticketExecutionContract: executionContract.ticketExecutionContract,
         overlayRef: executionContract.overlayRef,
         overlayBindingRef: executionContract.overlayBindingRef,
         graphCatalogDigestRef: executionContract.overlayBinding.graphCatalogDigestRef,
@@ -9490,11 +9501,86 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
       }
       return outcome;
   };
+  const evaluateTicketWorkflowForInstalledOperatorState = (
+    pluginInput: EnginePluginInput
+  ): EvaluationRuleOutcome => {
+    const base = {
+      ruleRef: SDLC_TICKET_WORKFLOW_FD_RULE_REF,
+      ruleRole: "semantic_judgment" as const,
+      computeMeans: "F_D" as const,
+      selectedCompositionRef: pluginInput.selectedCompositionRef,
+      selectedCompositionDigest: pluginInput.selectedCompositionDigest,
+      selectedCompositionSelectionRef:
+        pluginInput.selectedCompositionSelectionRef,
+      selectedRegimeBindingRef: pluginInput.selectedRegimeBindingRef,
+      compositionContributionRef:
+        pluginInput.selectedRegimeBindingRef ??
+        pluginInput.selectedCompositionRef
+    };
+    if (dispatchState.current === null) {
+      return constructEvaluationRuleOutcome({
+        status: "accepted",
+        ...base,
+        evidenceRefs: Object.freeze([pluginInput.sourceProjectionRef]),
+        findingRefs: Object.freeze([
+          "finding://odd-sdlc/ticket-workflow/not-applicable/no-transform-state"
+        ]),
+        reason: "ticket workflow FD rule has no transform state for this vector"
+      });
+    }
+    const manifest = dispatchState.current.manifest;
+    if (
+      manifest.graphFunctionName !== "route_ticket_work_item" &&
+      manifest.targetAssetType !== "ticket_work_item_route_surface"
+    ) {
+      return constructEvaluationRuleOutcome({
+        status: "accepted",
+        ...base,
+        evidenceRefs: Object.freeze([pluginInput.sourceProjectionRef]),
+        findingRefs: Object.freeze([
+          `finding://odd-sdlc/${manifestRefSegment(manifest)}/ticket-workflow/not-applicable`
+        ]),
+        reason: "ticket workflow FD rule not applicable to non-ticket edge"
+      });
+    }
+    const ticketContract = manifest.ticketExecutionContract ?? null;
+    if (ticketContract === null) {
+      return constructEvaluationRuleOutcome({
+        status: "blocked",
+        ...base,
+        evidenceRefs: Object.freeze([
+          pluginInput.sourceProjectionRef,
+          pathToFileURL(join(manifest.archiveRoot, "handoff_manifest.json")).href
+        ]),
+        findingRefs: Object.freeze([
+          `finding://odd-sdlc/${manifestRefSegment(manifest)}/ticket-workflow/missing-execution-contract`
+        ]),
+        reason: "ticket workflow edge requires admitted ticket execution contract"
+      });
+    }
+    return constructEvaluationRuleOutcome({
+      status: "accepted",
+      ...base,
+      evidenceRefs: uniqueSorted([
+        pluginInput.sourceProjectionRef,
+        ticketContract.executionContractRef,
+        ticketContract.ticketUri,
+        ticketContract.ticketDigest,
+        ...ticketContract.rulingRefs,
+        ...ticketContract.overlayContinuationRefs
+      ]),
+      findingRefs: Object.freeze([
+        `finding://odd-sdlc/${manifestRefSegment(manifest)}/ticket-workflow/admitted/${ticketContract.ticketId}`
+      ]),
+      reason: "ticket workflow execution contract admitted before F_P route construction"
+    });
+  };
 
   const plugins = createSdlcAbgPluginSet({
     dispatch: dispatchThroughInstalledOperator,
     evaluateFp: evaluateFpForInstalledOperatorState,
     projectConsequence: projectConsequenceForInstalledOperatorState,
+    evaluateTicketWorkflow: evaluateTicketWorkflowForInstalledOperatorState,
     evaluateDesignDepth: evaluateDesignDepthForInstalledOperatorState,
     evaluateReviewGradeEdgeFulfillment:
       evaluateReviewGradeForInstalledOperatorState

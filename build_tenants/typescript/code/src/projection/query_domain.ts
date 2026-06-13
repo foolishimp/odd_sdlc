@@ -2,6 +2,8 @@
 // Implements: REQ-F-ODDSDLC-035
 
 import { createHash } from "node:crypto";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   constructConstructionPriorityRule,
   constructConstructionPriorityScheme,
@@ -71,6 +73,26 @@ import type {
   SdlcConformProjectReport,
   SdlcWorkspaceIngressReport
 } from "../workspace/index.js";
+import {
+  projectSdlcTicketWorkflow,
+  type SdlcTicketWorkflowProjection
+} from "../tickets/index.js";
+
+function ticketWorkflowWorkspaceRoot(workspaceRootUri: string): string {
+  try {
+    const parsed = new URL(workspaceRootUri);
+    if (parsed.protocol === "file:") {
+      return fileURLToPath(parsed);
+    }
+  } catch {
+    // Synthetic fixture roots are legal query-domain inputs but have no tickets.
+  }
+  const digest = createHash("sha256")
+    .update(workspaceRootUri)
+    .digest("hex")
+    .slice(0, 16);
+  return join("/tmp", "odd-sdlc-ticket-workflow-non-file", digest);
+}
 
 export interface SdlcGraphFunctionSurface {
   readonly name: string;
@@ -351,6 +373,7 @@ export interface SdlcQueryDomainProjection {
   readonly targetCarriers: SdlcTargetCarrierReadModel;
   readonly edgeAssurance: SdlcEdgeAssuranceReadModel;
   readonly requirementFulfillment: SdlcRequirementFulfillmentPublicProjection;
+  readonly ticketWorkflow: SdlcTicketWorkflowProjection;
   readonly currentDossierRefs: readonly string[];
   readonly projectConformance: SdlcConformProjectReport | null;
 }
@@ -1462,6 +1485,11 @@ export function projectSdlcQueryDomain(input: {
   const requirementFulfillment = projectSdlcRequirementFulfillmentForIngress(
     input.ingressReport
   );
+  const ticketWorkflow = projectSdlcTicketWorkflow({
+    workspaceRoot: ticketWorkflowWorkspaceRoot(
+      input.ingressReport.workspaceRootUri
+    )
+  });
   return Object.freeze({
     kind: "sdlc_query_domain_projection",
     contractName: "odd_sdlc.query-domain",
@@ -1498,6 +1526,7 @@ export function projectSdlcQueryDomain(input: {
     targetCarriers,
     edgeAssurance,
     requirementFulfillment,
+    ticketWorkflow,
     currentDossierRefs: Object.freeze([...(input.currentDossierRefs ?? [])]),
     projectConformance: input.projectConformance ?? null
   });

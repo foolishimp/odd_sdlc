@@ -40,6 +40,7 @@ import {
   SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
   SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
   SDLC_PROFILE_OVERLAY_STRATEGY_VALUES,
+  SDLC_TICKET_WORKFLOW_OVERLAY_REF,
   SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF,
   type SdlcTraversalOverlayRef
 } from "../shared/overlay_strategy.js";
@@ -63,6 +64,7 @@ export {
   SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
   SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
   SDLC_PROFILE_OVERLAY_STRATEGY_VALUES,
+  SDLC_TICKET_WORKFLOW_OVERLAY_REF,
   SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF,
   sdlcTraversalOverlayRefForStrategy
 } from "../shared/overlay_strategy.js";
@@ -280,7 +282,8 @@ export interface SdlcTraversalOverlayAnnotation {
   readonly annotationRef: string;
   readonly annotationKind:
     | "baseline_full_sdlc_traversal"
-    | "deep_sdlc_traversal_candidate";
+    | "deep_sdlc_traversal_candidate"
+    | "ticket_workflow_fd_fp_composition";
   readonly parentOverlayRef: SdlcTraversalOverlayRef | null;
   readonly depthTraversalEligible: boolean;
   readonly decompositionTraceRequired: boolean;
@@ -410,6 +413,43 @@ function overlayDefinitions(): readonly OverlayDefinition[] {
     FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
   ]);
   return [
+    {
+      overlayRef: SDLC_TICKET_WORKFLOW_OVERLAY_REF,
+      aliases: Object.freeze([
+        "overlay://odd-sdlc/tickets",
+        "overlay://odd-sdlc/governed-ticket-workflow"
+      ] as const),
+      name: "ticket_workflow",
+      intent: "Governed ticket workflow overlay: validate ticket authority, route the admitted work item, and return control to ABG public-start/runtime continuation.",
+      graphFunctionNames: Object.freeze(["route_ticket_work_item"]),
+      publicStartTargets: Object.freeze(["route_ticket_work_item"]),
+      defaultStartTarget: "route_ticket_work_item",
+      terminalAssetTypes: Object.freeze(["ticket_work_item_route_surface"]),
+      terminalGraphFunctionNames: Object.freeze(["route_ticket_work_item"]),
+      lawfulStopDispositions: Object.freeze(["overlay_segment_complete", "blocked"]),
+      annotations: Object.freeze([
+        {
+          annotationKind: "ticket_workflow_fd_fp_composition",
+          parentOverlayRef: SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
+          depthTraversalEligible: false,
+          decompositionTraceRequired: false,
+          zoomGraphFunctionRef: null,
+          zoomTargetGraphFunctionRefs: Object.freeze([]),
+          proofRefs: Object.freeze([
+            "proof://odd-sdlc/t162/ticket-workflow-overlay",
+            "proof://odd-sdlc/t162/fd-ticket-admission-before-fp-route"
+          ])
+        }
+      ]),
+      assetTemplates: Object.freeze([
+        {
+          assetType: "ticket_work_item_route_surface",
+          defaultPath: "design/ticket_work_item_route_surface.md",
+          producerGraphFunctionName: "route_ticket_work_item",
+          terminalRole: "terminal_asset"
+        }
+      ])
+    },
     {
       overlayRef: SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
       aliases: Object.freeze([

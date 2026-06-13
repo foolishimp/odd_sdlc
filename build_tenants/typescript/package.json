@@ -120,6 +120,7 @@
     "test:t160:hello-world-js-lite-live": "npm run test:scenario:t160-hello-world-js-lite-live",
     "test:t160:hello-world-rust-lite-live": "npm run test:scenario:t160-hello-world-rust-lite-live",
     "test:t161": "npm run build:semantic && node --test test_env/tests/test_t161_fd_run_analysis_linter.test.mjs",
+    "test:t162": "npm run build:semantic && node --test test_env/tests/test_t162_graph_overlay_plugin_composition.test.mjs test_env/tests/test_t162_ticket_workflow_projection.test.mjs test_env/tests/test_t162_ticket_execution_contract_admission.test.mjs test_env/tests/test_t162_review_decision_selective_implementation.test.mjs test_env/tests/test_t162_overlay_segment_ticket_continuation.test.mjs",
     "test:t164": "npm run test:t164:edge-contract && npm run test:t164:rust-service",
     "test:t164:edge-contract": "npm run build:semantic && node --test test_env/tests/test_t164_edge_gain_closure_contract.test.mjs",
     "test:t164:rust-service": "npm run build:semantic && node --test --test-name-pattern \"T-164 Rust hello service conformance bootstrap\" test_env/sandbox/test_scenario_sandbox.test.mjs",

@@ -43,6 +43,7 @@ import {
   SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
   SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
   SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF,
+  SDLC_TICKET_WORKFLOW_OVERLAY_REF,
   withSdlcOverlayBindingPostActionEvidence
 } from "../../build/semantic/code/src/index.js";
 
@@ -99,6 +100,7 @@ test("T-160 publishes governed traversal overlays with boundary refs", () => {
   assert.deepStrictEqual(
     catalog.overlays.map((overlay) => overlay.overlayRef),
     [
+      SDLC_TICKET_WORKFLOW_OVERLAY_REF,
       SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
       SDLC_DEEP_SDLC_TRAVERSAL_OVERLAY_REF,
       SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,

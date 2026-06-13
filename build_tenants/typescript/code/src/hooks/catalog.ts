@@ -26,13 +26,34 @@ function constructHookContract(input: {
   }
   const edgeClass = hookTargetPolicyForTarget(targetAssetType).edgeClass;
   const evaluatorPrefix = evaluatorPrefixForClass(edgeClass);
+  const ticketWorkflowTransformProfile =
+    targetAssetType === "ticket_work_item_route_surface"
+      ? Object.freeze({
+          kind: "sdlc_hook_transform_profile" as const,
+          preflightFd: Object.freeze([
+            "ticket-workflow-authority-projection-fd",
+            "ticket-execution-contract-admitted-fd",
+            "ticket-review-ruling-table-fd"
+          ]),
+          constructiveFp:
+            "fp://odd-sdlc/ticket-workflow/route-ticket-work-item",
+          capabilityFd: Object.freeze([
+            "ticket-workflow-output-contract-fd"
+          ]),
+          postflightFd: Object.freeze([
+            "ticket-work-item-route-surface-fd",
+            "ticket-continuation-pressure-preserved-fd"
+          ]),
+          fhGate: null
+        })
+      : null;
   return Object.freeze({
     kind: "sdlc_hook_contract",
     edgeName: input.edgeName,
     edgeClass,
     sourceAssetTypes: Object.freeze([...input.inputs]),
     targetAssetType,
-    transformProfile: Object.freeze({
+    transformProfile: ticketWorkflowTransformProfile ?? Object.freeze({
       kind: "sdlc_hook_transform_profile",
       preflightFd: Object.freeze([
         "core-binding-identity-provenance-fd",

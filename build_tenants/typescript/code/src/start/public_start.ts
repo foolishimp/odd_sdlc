@@ -40,6 +40,7 @@ import {
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
 	  SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
 	  SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
+  SDLC_TICKET_WORKFLOW_OVERLAY_REF,
 	  sdlcGraphFunctionBoundaryRef,
 	  sdlcPublishedActionRef,
 	  sdlcTraversalOverlayForGraphFunction,
@@ -59,6 +60,12 @@ import {
   type SdlcConstructionIntent,
   type SdlcNextActionProjection
 } from "../operator/traversal_consequence.js";
+import {
+  resolveSdlcTicketExecutionContractForAssetHandle,
+  sdlcTicketExecutionContractRefs,
+  type SdlcTicketExecutionBlockingReason,
+  type SdlcTicketExecutionContract
+} from "../tickets/index.js";
 import { deriveSdlcPreRuntimePlanningCompositionIdentity } from "../operator/composition_identity.js";
 import {
   deriveSdlcDecompositionSummary,
@@ -123,6 +130,7 @@ export interface SdlcWorkerAttachment {
 export interface SdlcExecutionContract {
   readonly kind: "sdlc_execution_contract";
   readonly targetGraphFunction: string;
+  readonly ticketExecutionContract: SdlcTicketExecutionContract | null;
   readonly overlayRef: string;
   readonly overlayBindingRef: string;
   readonly overlayBinding: SdlcOverlayBinding;
@@ -145,7 +153,8 @@ export type SdlcPublicStartOutcome =
         | "fp_worker_unattached"
         | "target_unavailable"
         | "stale_query_domain"
-        | "project_conformance_blocked";
+        | "project_conformance_blocked"
+        | SdlcTicketExecutionBlockingReason;
       readonly stopPredicate: "worker_attachment_required" | "gap_stop";
       readonly executionContract: SdlcExecutionContract | null;
       readonly emittedRuntimeEventKinds: readonly RuntimeEvent["kind"][];
@@ -291,7 +300,12 @@ interface PublicStartActionCandidate {
 
 interface PublicStartEvaluation {
   readonly targetGraphFunction: string | null;
-  readonly blockingReason: "target_unavailable" | "stale_query_domain" | null;
+  readonly blockingReason:
+    | "target_unavailable"
+    | "stale_query_domain"
+    | SdlcTicketExecutionBlockingReason
+    | null;
+  readonly ticketExecutionContract: SdlcTicketExecutionContract | null;
   readonly overlayBinding: SdlcOverlayBinding | null;
   readonly nextActionProjection: SdlcNextActionProjection | null;
   readonly constructionIntent: SdlcConstructionIntent | null;
@@ -299,6 +313,8 @@ interface PublicStartEvaluation {
   readonly traversalHopSelection: SdlcTraversalHopSelection | null;
   readonly bootstrapOptimization: SdlcBootstrapPublicStartOptimization | null;
 }
+
+const SDLC_ROUTE_TICKET_WORK_ITEM_GRAPH_FUNCTION = "route_ticket_work_item" as const;
 
 function statSafe(target: string) {
   try {
@@ -770,10 +786,11 @@ function evaluateInitialPublicStartAction(input: {
     }
     return overlayCatalog;
   };
-  let candidates: readonly PublicStartActionCandidate[];
+  let candidates: readonly PublicStartActionCandidate[] = Object.freeze([]);
   let blockingReason: "target_unavailable" | "stale_query_domain" | null = null;
   let preferredTargetOutcomeRef: string | null = null;
   let requestedOverlay: SdlcTraversalOverlay | null = null;
+  let ticketExecutionContract: SdlcTicketExecutionContract | null = null;
   let selectedTraversal = frontDoorTraversalSelection({
     request: input.request,
     profile: input.conformedProject
@@ -781,7 +798,85 @@ function evaluateInitialPublicStartAction(input: {
   const sourceRef = `${input.request.target.kind}/${input.request.target.handle}`;
   const replayNextGraphFunctionRef =
     input.request.replayNextGraphFunctionRef ?? null;
-  if (targetPolicy.resolver === "published_start_targets") {
+  if (input.request.target.kind === "asset") {
+    const ticketResolution = resolveSdlcTicketExecutionContractForAssetHandle({
+      workflow: input.queryDomain.ticketWorkflow,
+      handle: input.request.target.handle
+    });
+    if (ticketResolution.kind === "blocked") {
+      return Object.freeze({
+        targetGraphFunction: null,
+        blockingReason: ticketResolution.blockingReason,
+        ticketExecutionContract: null,
+        overlayBinding: null,
+        nextActionProjection: null,
+        constructionIntent: null,
+        traversalDecompositionSummary: null,
+        traversalHopSelection: null,
+        bootstrapOptimization: null
+      });
+    }
+    if (ticketResolution.kind === "admitted") {
+      ticketExecutionContract = ticketResolution.contract;
+      requestedOverlay = resolveSdlcTraversalOverlay({
+        catalog: getOverlayCatalog(),
+        overlayRef: SDLC_TICKET_WORKFLOW_OVERLAY_REF
+      });
+      if (requestedOverlay === null) {
+        return Object.freeze({
+          targetGraphFunction: null,
+          blockingReason: "stale_query_domain",
+          ticketExecutionContract,
+          overlayBinding: null,
+          nextActionProjection: null,
+          constructionIntent: null,
+          traversalDecompositionSummary: null,
+          traversalHopSelection: null,
+          bootstrapOptimization: null
+        });
+      }
+      const candidate = candidateForGraphFunction({
+        module: input.module,
+        graphFunctionName: SDLC_ROUTE_TICKET_WORK_ITEM_GRAPH_FUNCTION,
+        sourceRef
+      });
+      candidates = Object.freeze(candidate === null ? [] : [candidate]);
+      blockingReason = candidate === null ? "stale_query_domain" : null;
+      preferredTargetOutcomeRef = candidate?.targetOutcomeRef ?? null;
+    } else if (targetPolicy.resolver === "asset_published_action") {
+      const binding = deriveSdlcTargetObligationBinding({
+        queryDomain: input.queryDomain,
+        targetAssetType: input.request.target.handle,
+        evidenceRefs: ["public-start://odd-sdlc/target-request"]
+      });
+      candidates = Object.freeze(
+        binding.admissibleGraphFunctionNames
+          .map((name) =>
+            candidateForGraphFunction({
+              module: input.module,
+              graphFunctionName: name,
+              sourceRef
+            })
+          )
+          .filter(
+            (
+              candidate
+            ): candidate is PublicStartActionCandidate => candidate !== null
+          )
+      );
+      blockingReason =
+        binding.status === "stale_action_publication"
+          ? "stale_query_domain"
+          : binding.status === "no_published_action"
+            ? "target_unavailable"
+            : candidates.length === 0
+              ? "stale_query_domain"
+              : null;
+    } else {
+      candidates = Object.freeze([]);
+      blockingReason = "target_unavailable";
+    }
+  } else if (targetPolicy.resolver === "published_start_targets") {
     const conformanceStatus = input.queryDomain.projectConformance?.status ?? null;
     if (replayNextGraphFunctionRef !== null) {
       const candidate = candidateForGraphFunction({
@@ -869,6 +964,7 @@ function evaluateInitialPublicStartAction(input: {
       return Object.freeze({
         targetGraphFunction: input.request.target.handle,
         blockingReason: "stale_query_domain",
+        ticketExecutionContract: null,
         overlayBinding: null,
         nextActionProjection: null,
         constructionIntent: null,
@@ -888,6 +984,7 @@ function evaluateInitialPublicStartAction(input: {
 	      return Object.freeze({
         targetGraphFunction: null,
         blockingReason: "target_unavailable",
+        ticketExecutionContract: null,
         overlayBinding: null,
         nextActionProjection: null,
         constructionIntent: null,
@@ -924,40 +1021,12 @@ function evaluateInitialPublicStartAction(input: {
     candidates = Object.freeze(candidate === null ? [] : [candidate]);
     blockingReason = candidate === null ? "stale_query_domain" : null;
     preferredTargetOutcomeRef = candidate?.targetOutcomeRef ?? null;
-  } else {
-    const binding = deriveSdlcTargetObligationBinding({
-      queryDomain: input.queryDomain,
-      targetAssetType: input.request.target.handle,
-      evidenceRefs: ["public-start://odd-sdlc/target-request"]
-    });
-    candidates = Object.freeze(
-      binding.admissibleGraphFunctionNames
-        .map((name) =>
-          candidateForGraphFunction({
-            module: input.module,
-            graphFunctionName: name,
-            sourceRef
-          })
-        )
-        .filter(
-          (
-            candidate
-          ): candidate is PublicStartActionCandidate => candidate !== null
-        )
-    );
-    blockingReason =
-      binding.status === "stale_action_publication"
-        ? "stale_query_domain"
-        : binding.status === "no_published_action"
-          ? "target_unavailable"
-          : candidates.length === 0
-            ? "stale_query_domain"
-            : null;
   }
   if (candidates.length === 0) {
     return Object.freeze({
       targetGraphFunction: null,
       blockingReason: blockingReason ?? "target_unavailable",
+      ticketExecutionContract,
       overlayBinding: null,
       nextActionProjection: null,
       constructionIntent: null,
@@ -1083,6 +1152,7 @@ function evaluateInitialPublicStartAction(input: {
     return Object.freeze({
       targetGraphFunction: null,
       blockingReason: blockingReason ?? "target_unavailable",
+      ticketExecutionContract,
       overlayBinding: null,
       nextActionProjection: null,
       constructionIntent: null,
@@ -1113,6 +1183,7 @@ function evaluateInitialPublicStartAction(input: {
     return Object.freeze({
       targetGraphFunction: selectedCandidate.graphFunctionName,
       blockingReason: "stale_query_domain",
+      ticketExecutionContract,
       overlayBinding: null,
       nextActionProjection: null,
       constructionIntent: null,
@@ -1139,6 +1210,8 @@ function evaluateInitialPublicStartAction(input: {
     request: input.request,
     overlay: selectedOverlay
   });
+  const ticketExecutionRefs =
+    sdlcTicketExecutionContractRefs(ticketExecutionContract);
   const overlayBinding = constructSdlcOverlayBinding({
     catalog: getOverlayCatalog(),
     overlay: selectedOverlay,
@@ -1173,6 +1246,7 @@ function evaluateInitialPublicStartAction(input: {
     return Object.freeze({
       targetGraphFunction: selectedCandidate.graphFunctionName,
       blockingReason: "stale_query_domain",
+      ticketExecutionContract,
       overlayBinding: null,
       nextActionProjection: null,
       constructionIntent: null,
@@ -1229,7 +1303,8 @@ function evaluateInitialPublicStartAction(input: {
     observationRef: evaluator.observation.observationId,
     policyRefs: Object.freeze([
       evaluator.policyCarrierRef,
-      evaluator.priorityProjection.prioritySchemeRef
+      evaluator.priorityProjection.prioritySchemeRef,
+      ...ticketExecutionRefs
     ]),
     actionCatalogRefs: evaluator.actionCatalogRefs,
     overlayRef: overlayBinding.overlayRef,
@@ -1250,6 +1325,7 @@ function evaluateInitialPublicStartAction(input: {
     selectedActionRef,
     basisRefs: Object.freeze([
       overlayBinding.bindingRef,
+      ...ticketExecutionRefs,
       ...nextActionProjection.predecessorRefs
     ]),
     predecessorRefs: Object.freeze([
@@ -1269,6 +1345,7 @@ function evaluateInitialPublicStartAction(input: {
   return Object.freeze({
     targetGraphFunction: selectedCandidate.graphFunctionName,
     blockingReason,
+    ticketExecutionContract,
     overlayBinding,
     nextActionProjection,
     constructionIntent,
@@ -1282,6 +1359,7 @@ function constructExecutionContract(input: {
   readonly request: SdlcPublicStartRequest;
   readonly module: Module;
   readonly targetGraphFunction: string;
+  readonly ticketExecutionContract: SdlcTicketExecutionContract | null;
   readonly overlayBinding: SdlcOverlayBinding;
   readonly conformedProject: SdlcConformProjectProfile;
   readonly workerAttachment: SdlcWorkerAttachment;
@@ -1348,6 +1426,7 @@ function constructExecutionContract(input: {
   return Object.freeze({
     kind: "sdlc_execution_contract",
     targetGraphFunction: input.targetGraphFunction,
+    ticketExecutionContract: input.ticketExecutionContract,
     overlayRef: input.overlayBinding.overlayRef,
     overlayBindingRef: input.overlayBinding.bindingRef,
     overlayBinding: input.overlayBinding,
@@ -1438,6 +1517,7 @@ export function publicStartOnce(input: {
     request: input.request,
     module: input.module,
     targetGraphFunction: targetResolution.targetGraphFunction,
+    ticketExecutionContract: targetResolution.ticketExecutionContract,
     overlayBinding: targetResolution.overlayBinding,
     conformedProject: input.conformedProject,
     workerAttachment: input.workerAttachment,
