@@ -203,6 +203,8 @@ test("T-188 data_mapper release proof installs the release snapshot package", ()
   );
   assert.match(runnerSource, /release_snapshot_package/u);
   assert.match(runnerSource, /release-package-source/u);
+  assert.match(runnerSource, /function resolveRunPath/u);
+  assert.match(runnerSource, /resolve\(REPO_ROOT, value\)/u);
   assert.match(runnerSource, /packageSource\.packageSourceRoot/u);
   assert.doesNotMatch(
     runnerSource,

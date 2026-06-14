@@ -98,6 +98,17 @@ function assertExists(filePath, label) {
   }
 }
 
+function resolveRunPath(value) {
+  if (path.isAbsolute(value)) {
+    return value;
+  }
+  const cwdRelative = resolve(value);
+  if (existsSync(cwdRelative)) {
+    return cwdRelative;
+  }
+  return resolve(REPO_ROOT, value);
+}
+
 function packageSourceForRun(archiveRoot) {
   if (
     DATA_MAPPER_RELEASE_SNAPSHOT_ROOT.length > 0 &&
@@ -108,7 +119,7 @@ function packageSourceForRun(archiveRoot) {
     );
   }
   if (DATA_MAPPER_PACKAGE_SOURCE_ROOT.length > 0) {
-    const packageSourceRoot = resolve(DATA_MAPPER_PACKAGE_SOURCE_ROOT);
+    const packageSourceRoot = resolveRunPath(DATA_MAPPER_PACKAGE_SOURCE_ROOT);
     assertExists(path.join(packageSourceRoot, "package.json"), "override package.json");
     return Object.freeze({
       kind: "package_source_override",
@@ -126,7 +137,7 @@ function packageSourceForRun(archiveRoot) {
     });
   }
 
-  const releaseSnapshotRoot = resolve(DATA_MAPPER_RELEASE_SNAPSHOT_ROOT);
+  const releaseSnapshotRoot = resolveRunPath(DATA_MAPPER_RELEASE_SNAPSHOT_ROOT);
   const manifestPath = path.join(releaseSnapshotRoot, "release-snapshot-manifest.json");
   const manifest = readJsonFile(manifestPath);
   const tarballRelativePath = manifest?.tarball?.relativePath;
