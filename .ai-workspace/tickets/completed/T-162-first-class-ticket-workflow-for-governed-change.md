@@ -3,7 +3,7 @@ id: T-162
 title: First-class ticket workflow for governed specification change, review resolution, and bug repair
 type: feature
 ticket_category: implementation_migration
-status: active
+status: completed
 goal: ticket-workflow-is-the-controlled-entrypoint-for-substantive-change
 build_tenant: typescript
 owner: odd_sdlc
@@ -15,6 +15,7 @@ triaged_at: 2026-05-12
 created_at: 2026-05-12
 updated_at: 2026-06-14
 activated_at: 2026-05-14
+completed_at: 2026-06-14
 governance_scope: STDO Method
 migration_strategy: inside_out_ticket_workflow_authority
 library_usage: extend
@@ -505,7 +506,7 @@ Inside-out sequencing is required.
   `operator_summary`, `sdlc_edge_closure_decision`, residual review-grade
   findings, and `lawfulReentryPoint: triage_gap` blocking reasons into the same
   governed parent/split ticket workflow
-- [ ] route final-node code-review/triage tickets through admitted ABG public
+- [x] route final-node code-review/triage tickets through admitted ABG public
   start or runtime re-entry at `overlay://odd-sdlc/current-full-traversal`
   without an SDLC-local loop
 - [x] require review/triage rulings for whether the continuation closes, repairs,
@@ -514,7 +515,7 @@ Inside-out sequencing is required.
 - [x] update compact CLI output so blocked ticket workflow states are visible to a cold session
 - [x] add fixtures for valid active ticket, malformed ticket, backlog ticket, review-resolution ticket, spec-change ticket, and bug-repair ticket
 - [x] add deterministic tests for projection, admission, start rejection, review selection, bug triage, and spec-change authority
-- [ ] add deterministic tests for configured `codex` and `claude` reviewer selection, unknown-reviewer rejection, unavailable-reviewer blocking, and reviewer output schema rejection
+- [x] add deterministic tests for configured `codex` and `claude` reviewer selection, unknown-reviewer rejection, unavailable-reviewer blocking, and reviewer output schema rejection
 - [x] add deterministic tests for overlay-segment continuation ticket intake,
   remaining-pressure preservation, and current-full-traversal start admission
 - [x] add deterministic tests for retry-exhaustion gap-ticket intake, split
@@ -522,8 +523,8 @@ Inside-out sequencing is required.
 - [x] add deterministic tests for terminal review-grade triage-block gap-ticket
   intake, split product-gap ticket admission, and parent `asset:ticket/<id>`
   start admission
-- [ ] add one scenario proof that starts from a review comment, records rulings in a ticket, implements only accepted findings, and leaves deferred findings visible
-- [ ] add one scenario proof that starts from a completed lite overlay segment
+- [x] add one scenario proof that starts from a review comment, records rulings in a ticket, implements only accepted findings, and leaves deferred findings visible
+- [x] add one scenario proof that starts from a completed lite overlay segment
   with `productConverged: false`, emits a code-review/triage ticket, starts the
   ticket at current-full-traversal, and preserves the source segment refs in
   handoff, ledger, next-action, and archive truth
@@ -541,7 +542,7 @@ Inside-out sequencing is required.
 - [x] recurring realization patterns are checked against existing library/commonization surfaces
 - [x] ticket declares library usage and names the governing library or rationale
 - [x] if the work exists in more than one build tenant, this backlog/active ticket carries only one tenant lifecycle and any sibling tenant work lives on its own suffixed ticket
-- [ ] ticket wording, product wording, and proof claims are reconciled before closure
+- [x] ticket wording, product wording, and proof claims are reconciled before closure
 
 Old truth path:
 
@@ -750,11 +751,32 @@ Implemented and verified surfaces:
   edges missing an admitted ticket execution contract.
 - public start rejects missing, malformed, backlog, completed, stale, and
   unadmitted `asset:ticket/<id>` handles before traversal; valid active tickets
-  select the ticket workflow overlay and graph function.
+  select the ticket workflow overlay and graph function unless an admitted
+  overlay continuation row selects
+  `overlay://odd-sdlc/current-full-traversal`, in which case public start
+  selects the current-full overlay through the same admitted ticket authority.
 - query-domain, `tickets`, `reviewers`, and `ticket-admit` expose ticket
   workflow projection/admission without creating runtime authority.
 - worker handoff, traversal intent package, ledgers, closure/consequence basis,
   and next-action projection carry admitted ticket execution refs.
+- `.ai-workspace/tickets/reviewer_profiles.json` is an optional configured
+  reviewer-profile registry for the ticket workflow projection. Absent that
+  registry, the installed defaults remain `codex` and `claude`; if the registry
+  marks a selected profile unavailable or omits its output schema, admission
+  fails closed with typed diagnostics.
+- `test_t162_reviewer_profile_selection.test.mjs` proves configured `codex`
+  and `claude` reviewer selection, unknown reviewer rejection, unavailable
+  reviewer blocking, and schema-incompatible reviewer output rejection.
+- `test_t162_review_comment_ruling_scenario.test.mjs` proves review comments
+  are evidence only: ticket decision rows carry the accepted/rejected/deferred
+  and split-ticket rulings, only accepted findings are executable, and deferred
+  findings remain visible in the admitted execution contract.
+- `test_t162_overlay_segment_ticket_continuation.test.mjs` now proves the
+  final-node continuation scenario: a `productConverged: false` overlay segment
+  ticket starts `overlay://odd-sdlc/current-full-traversal` through admitted
+  public start, and the source segment, remaining-pressure, ticket, ruling, and
+  continuation refs are preserved in next-action, handoff/archive, and ledger
+  truth.
 - `ticket-intake --from-run <operator-run-archive> --kind code_review_triage`
   converts terminal builder gaps into first-class ticket workflow pressure:
   retry exhaustion and review-grade triage blocks both emit an active parent
@@ -770,7 +792,8 @@ Implemented and verified surfaces:
   accepted review finding, review evidence comment, and overlay-continuation
   ruling; it drives the built CLI through `tickets`, `ticket-admit`, and
   `start --target asset:ticket/T-162`, proving the ticket projects, admits,
-  and routes to `route_ticket_work_item` through the installed command surface.
+  and starts the selected current-full continuation through the installed
+  command surface.
 - `test:t162:terminal-gap-data-mapper-live` runs the deep data-mapper builder
   lane and the terminal-gap ticket workflow exercise. Archive:
   `build_tenants/typescript/test_env/test_runs/t162_terminal_gap_data_mapper_sandbox/20260613T233152914Z_pid17441`.
@@ -784,28 +807,31 @@ Implemented and verified surfaces:
 
 Verification:
 
-- `npm run test:t162` passed 12/12.
+- `npm run test:t162` passed 18/18.
 - `npm run lint:semantic` passed.
 - `npm run test:t033` passed 8/8.
 - `npm run test:t058` passed 17/17.
-- `npm run test:semantic` passed 1023/1023.
-- `npm run test:t162:ticket-workflow-live` passed 1/1.
+- `npm run test:semantic` passed 1031/1031.
+- `npm run test:t162:ticket-workflow-live` passed 1/1 and now proves an
+  overlay-continuation ticket selects `derive_intent_surface` on
+  `overlay://odd-sdlc/current-full-traversal` through the installed CLI.
 - `npm run lint:test-harness` passed.
 - `npm run build:semantic` passed.
 - `node --test test_env/tests/test_t162_terminal_gap_ticket_intake.test.mjs test_env/tests/test_t162_ticket_execution_contract_admission.test.mjs test_env/tests/test_t162_overlay_segment_ticket_continuation.test.mjs`
-  passed 6/6.
+  passed 7/7.
 - `npm run guard:data-mapper-boundary` passed 7/7.
 - `npm run test:t162:terminal-gap-data-mapper-live` passed and wrote
   `run_summary.json` in the archive above.
 
-Remaining before ticket closure:
+Closure reconciliation:
 
-- deterministic unavailable-reviewer and schema-incompatible reviewer output
-  rejection cases;
-- scenario proof that starts from a review comment, records ticket rulings,
-  implements only accepted findings, and leaves deferred findings visible;
-- scenario proof that starts from a completed lite overlay segment with
-  `productConverged: false`, emits or references a code-review/triage ticket,
-  starts the continuation through admitted ABG public start or runtime re-entry
-  at `overlay://odd-sdlc/current-full-traversal`, and preserves source segment
-  refs in handoff, ledger, next-action, and archive truth.
+- Product wording is preserved: tickets and overlays are `odd_sdlc` product
+  views over admitted work, while ABG remains the owner of traversal, event,
+  continuation, replay, and closure truth.
+- Ticket wording is preserved: comments, review posts, run summaries, and
+  terminal-gap archives are evidence only; ticket files and admitted execution
+  contracts remain the work authority.
+- Proof claims now match the implemented surfaces: reviewer selection and
+  rejection, review-comment rulings, terminal-gap ticket intake, and
+  final-node current-full continuation are all covered by deterministic tests,
+  and the installed CLI live proof covers projection, admission, and start.

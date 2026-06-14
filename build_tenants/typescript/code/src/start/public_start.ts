@@ -818,9 +818,18 @@ function evaluateInitialPublicStartAction(input: {
     }
     if (ticketResolution.kind === "admitted") {
       ticketExecutionContract = ticketResolution.contract;
+      const ticketContinuationOverlayRef =
+        ticketExecutionContract.overlayContinuationRows.some(
+          (row) =>
+            row.selectedStartTargetRef === SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF &&
+            row.ruling !== "close" &&
+            row.ruling !== "defer"
+        )
+          ? SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF
+          : SDLC_TICKET_WORKFLOW_OVERLAY_REF;
       requestedOverlay = resolveSdlcTraversalOverlay({
         catalog: getOverlayCatalog(),
-        overlayRef: SDLC_TICKET_WORKFLOW_OVERLAY_REF
+        overlayRef: ticketContinuationOverlayRef
       });
       if (requestedOverlay === null) {
         return Object.freeze({
@@ -835,9 +844,19 @@ function evaluateInitialPublicStartAction(input: {
           bootstrapOptimization: null
         });
       }
+      if (selectedTraversal === null) {
+        selectedTraversal = overlayTraversalSelection({
+          overlay: requestedOverlay,
+          profile: input.conformedProject
+        });
+      }
+      const selectedTicketGraphFunction =
+        ticketContinuationOverlayRef === SDLC_TICKET_WORKFLOW_OVERLAY_REF
+          ? SDLC_ROUTE_TICKET_WORK_ITEM_GRAPH_FUNCTION
+          : requestedOverlay.defaultStartTarget;
       const candidate = candidateForGraphFunction({
         module: input.module,
-        graphFunctionName: SDLC_ROUTE_TICKET_WORK_ITEM_GRAPH_FUNCTION,
+        graphFunctionName: selectedTicketGraphFunction,
         sourceRef
       });
       candidates = Object.freeze(candidate === null ? [] : [candidate]);

@@ -489,7 +489,7 @@ function fieldsFromContent(content: string): FieldMap {
 
 function jsonRecord(value: unknown): Readonly<Record<string, unknown>> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? value as Readonly<Record<string, unknown>>
+    ? Object.freeze({ ...value })
     : null;
 }
 
@@ -509,6 +509,14 @@ function recordString(
   return typeof value === "string" && value.trim().length > 0
     ? value.trim()
     : null;
+}
+
+function recordBoolean(
+  record: Readonly<Record<string, unknown>>,
+  key: string
+): boolean | null {
+  const value = record[key];
+  return typeof value === "boolean" ? value : null;
 }
 
 function recordArray(
@@ -604,11 +612,11 @@ function allocateTicketIds(input: {
   readonly count: number;
 }): readonly string[] {
   const maxExisting = Math.max(0, ...existingTicketNumbers(input.workspaceRoot));
-  return Object.freeze(
-    Array.from({ length: input.count }, (_, index) =>
-      `T-${String(maxExisting + index + 1).padStart(3, "0")}`
-    )
-  );
+  const ids: string[] = [];
+  for (let index = 0; index < input.count; index += 1) {
+    ids.push(`T-${String(maxExisting + index + 1).padStart(3, "0")}`);
+  }
+  return Object.freeze(ids);
 }
 
 function createdTicket(input: {
@@ -1468,6 +1476,73 @@ function defaultReviewerProfiles(): readonly SdlcReviewerProfile[] {
   );
 }
 
+function reviewerProfileFromConfig(input: {
+  readonly fallback: SdlcReviewerProfile;
+  readonly config: Readonly<Record<string, unknown>>;
+}): SdlcReviewerProfile {
+  const profile = Object.freeze({
+    profileId: input.fallback.profileId,
+    displayName:
+      recordString(input.config, "displayName") ?? input.fallback.displayName,
+    available:
+      recordBoolean(input.config, "available") ?? input.fallback.available,
+    outputSchemaRef:
+      recordString(input.config, "outputSchemaRef") ??
+      recordString(input.config, "output_schema_ref") ??
+      "",
+    evidenceContractRefs: recordStringArray(
+      input.config,
+      "evidenceContractRefs"
+    ).length > 0
+      ? recordStringArray(input.config, "evidenceContractRefs")
+      : recordStringArray(input.config, "evidence_contract_refs").length > 0
+        ? recordStringArray(input.config, "evidence_contract_refs")
+        : input.fallback.evidenceContractRefs
+  });
+  return Object.freeze({
+    kind: "sdlc_reviewer_profile" as const,
+    profileId: profile.profileId,
+    profileRef: `reviewer-profile://odd-sdlc/${profile.profileId}`,
+    displayName: profile.displayName,
+    available: profile.available,
+    outputSchemaRef: profile.outputSchemaRef,
+    configDigest: sha256Text(JSON.stringify(profile)),
+    evidenceContractRefs: Object.freeze(profile.evidenceContractRefs)
+  });
+}
+
+function reviewerProfilesFromWorkspace(input: {
+  readonly workspaceRoot: string;
+}): readonly SdlcReviewerProfile[] {
+  const defaults = defaultReviewerProfiles();
+  const registryPath = path.join(
+    input.workspaceRoot,
+    ".ai-workspace",
+    "tickets",
+    "reviewer_profiles.json"
+  );
+  if (!existsSync(registryPath)) {
+    return defaults;
+  }
+  const registry = readJsonRecord(registryPath);
+  const configById = new Map<string, Readonly<Record<string, unknown>>>();
+  for (const profileConfig of recordObjectArray(registry, "profiles")) {
+    const profileId = recordString(profileConfig, "profileId") ??
+      recordString(profileConfig, "profile_id");
+    if (profileId === "codex" || profileId === "claude") {
+      configById.set(profileId, profileConfig);
+    }
+  }
+  return Object.freeze(
+    defaults.map((fallback) => {
+      const config = configById.get(fallback.profileId);
+      return config === undefined
+        ? fallback
+        : reviewerProfileFromConfig({ fallback, config });
+    })
+  );
+}
+
 function reviewPanelBinding(input: {
   readonly ticketId: string;
   readonly fields: FieldMap;
@@ -1850,7 +1925,9 @@ function duplicateIdDiagnostics(
 export function projectSdlcTicketWorkflow(input: {
   readonly workspaceRoot: string;
 }): SdlcTicketWorkflowProjection {
-  const profiles = defaultReviewerProfiles();
+  const profiles = reviewerProfilesFromWorkspace({
+    workspaceRoot: input.workspaceRoot
+  });
   const rows = Object.freeze(
     SDLC_TICKET_WORKFLOW_DIRECTORIES.flatMap((directory) =>
       ticketFiles({ workspaceRoot: input.workspaceRoot, directory }).map((filePath) =>

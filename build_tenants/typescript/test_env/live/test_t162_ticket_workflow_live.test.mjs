@@ -9,6 +9,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
   SDLC_TICKET_WORKFLOW_OVERLAY_REF
 } from "../../build/semantic/code/src/index.js";
 import { liveTestArchiveRoot } from "./archive_root.mjs";
@@ -266,7 +267,7 @@ test("T-162 live CLI projects, admits, and starts an active ticket", () => {
   );
   assert.equal(
     started.result.payload.summary.graphFunctionName,
-    "route_ticket_work_item"
+    "derive_intent_surface"
   );
   assert.equal(
     started.result.payload.summary.nextLawfulAction,
@@ -281,7 +282,8 @@ test("T-162 live CLI projects, admits, and starts an active ticket", () => {
         workspace,
         ticketRowRef: row.rowRef,
         executionContractRef: admitted.result.payload.executionContractRef,
-        selectedOverlayRef: SDLC_TICKET_WORKFLOW_OVERLAY_REF,
+        ticketWorkflowOverlayRef: SDLC_TICKET_WORKFLOW_OVERLAY_REF,
+        selectedOverlayRef: SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
         selectedGraphFunction: started.result.payload.summary.graphFunctionName,
         startBlockingReason: started.result.payload.summary.blockingReason,
         ticketDigest: admitted.result.payload.ticketDigest
