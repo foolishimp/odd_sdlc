@@ -3,7 +3,9 @@ id: T-202
 title: Project ABG consequence traversal catalog onto SDLC overlays
 type: feature
 ticket_category: consequence_traversal_algebra
-status: backlog
+status: active
+review_status: implementation_started
+proof_status: rc21_pin_complete_overlay_catalog_projection_pending
 goal: sdlc-overlays-declare-the-abg-admitted-consequence-traversal-options-for-each-edge
 build_tenant: typescript
 owner: odd_sdlc
@@ -50,9 +52,13 @@ dependencies:
   - ABG T-156 exposed through a released abiogenesis TypeScript tenant snapshot
   - SDLC substrate pin migrated to the ABG release containing T-156
 affected_boundary:
+  - specification/PRODUCT.md
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_OPTIMISING_OVERLAY.md
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_DEPTH_TRAVERSAL_FUNCTION.md
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_STAGED_COMPUTE_BOUNDARY.md
+  - build_tenants/typescript/design/ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.md
+  - build_tenants/typescript/package.json
+  - build_tenants/typescript/package-lock.json
   - build_tenants/typescript/code/src/graph/overlays.ts
   - build_tenants/typescript/code/src/graph/optimising_overlay.ts
   - build_tenants/typescript/code/src/graph/catalog.ts
@@ -248,18 +254,15 @@ Consequence.C must not:
 
 Review date: 2026-06-15.
 
-T-202 is not ABG-compliant yet. The following are blockers, not accepted
+T-202 is not fully ABG-compliant yet. The following are blockers, not accepted
 exceptions or tech debt:
 
-1. `odd_sdlc.TS` still pins `@abiogenesis/typescript-tenant@4.0.0-rc.19`.
-   T-202 requires a substrate pin to the ABG release containing T-156
-   (`4.0.0-rc.20` or later).
-2. The installed `consequence.C` path currently returns
+1. The installed `consequence.C` path currently returns
    `ConsequenceProjectionOutcome` from SDLC read models without consulting
    `EnginePluginInput.allowedConsequenceTraversalCatalog`.
-3. Existing overlay annotations expose depth policy and ticket workflow policy,
+2. Existing overlay annotations expose depth policy and ticket workflow policy,
    but they do not yet lower into the ABG T-156 GTL declaration keys.
-4. Existing depth binding constructs a traversal action path, but T-202 must
+3. Existing depth binding constructs a traversal action path, but T-202 must
    require explicit `selectedTraversalFamily` and ABG catalog admission before
    execution.
 
@@ -267,10 +270,30 @@ There are no lawful permanent exceptions. Closure requires one ABG truth:
 GTL declarations -> ABG catalog -> SDLC selection over that catalog -> ABG
 admission/execution/replay/terminal truth.
 
+## Current Proof
+
+2026-06-15 substrate pin proof:
+
+- ABG `@abiogenesis/typescript-tenant@4.0.0-rc.21` is released from
+  `/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.0.0-rc.21/`.
+- rc21 includes ABG T-156 static `typecheckGtlProgram(...)` validation for
+  `abg.consequence.allowed_traversal_families` and
+  `abg.consequence.allowed_traversals`.
+- `odd_sdlc.TS` dependency, package lock, product substrate text, and substrate
+  contract now target rc21.
+
+Current non-closure after the pin:
+
+- overlay declarations still need to lower into ABG T-156 GTL declaration rows
+- consequence.C still needs to consume the ABG-provided catalog before selecting
+  depth, ticket, retry, re-entry, or terminal outcomes
+- live data-mapper builder proof remains pending after overlay lowering
+
 ## Work Ledger
 
 | id | task | proof | status |
 | --- | --- | --- | --- |
+| D0 | Pin SDLC to ABG rc21 containing T-156 static compiler validation. | package dependency, substrate contract, product text, and identity tests name `@abiogenesis/typescript-tenant@4.0.0-rc.21`. | done |
 | D1 | Update overlay design with T-156 declaration mapping and the exact overlay edge matrix. | design explains overlay rows -> GTL declarations -> ABG catalog and names the graph-function targets for current-full, deep, lite, framework-smoke, bootstrap, solution-architecture, and ticket-workflow overlays. | pending |
 | D2 | Add overlay carrier fields for allowed consequence traversal families and route constraints. | carrier/admission tests reject unknown families, duplicate rows, storage-target ticket traversal, annotation-only effects, and missing explicit selected family for nonlocal rows. | pending |
 | D3 | Lower overlay declarations into GTL graph-function/vector declarations. | catalog/query tests prove declarations appear on the intended edge and not globally. | pending |

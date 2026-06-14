@@ -4,6 +4,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  ABG_ALLOWED_CONSEQUENCE_TRAVERSAL_FAMILIES_DECLARATION_KEY,
+  ABG_ALLOWED_CONSEQUENCE_TRAVERSAL_ROWS_DECLARATION_KEY,
   ABG_FN_COMPOSITION_DECLARATION_KEY,
   admitExecutionBasis,
   admitModule,
@@ -158,6 +160,24 @@ function node(id, name, kind, markov) {
 }
 
 function stageGraphFunction(name, source, target, edgeName) {
+  const vectorDeclarations = edgeName === "design_to_code"
+    ? attrs([
+        stringListEntry(
+          ABG_ALLOWED_CONSEQUENCE_TRAVERSAL_FAMILIES_DECLARATION_KEY,
+          ["depth_traversal"]
+        ),
+        jsonEntry(ABG_ALLOWED_CONSEQUENCE_TRAVERSAL_ROWS_DECLARATION_KEY, [
+          {
+            traversalFamily: "depth_traversal",
+            allowedActionKinds: ["reenter_graph_span"],
+            requiredAuthorityRefs: ["REQ-F-ODDSDLC-165"],
+            proportionalityBasisRefs: [
+              "proportionality://t165/simple-then-depth"
+            ]
+          }
+        ])
+      ])
+    : attrs();
   const vector = edge([source], target, {
     id: `graph-vector://t165/${name}`,
     name: edgeName,
@@ -170,7 +190,7 @@ function stageGraphFunction(name, source, target, edgeName) {
         tags: ["t165"]
       }
     ],
-    declarations: attrs(),
+    declarations: vectorDeclarations,
     tags: ["t165"]
   }).vectors[0];
   assert.ok(vector);

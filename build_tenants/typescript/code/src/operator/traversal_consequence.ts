@@ -2022,6 +2022,7 @@ export function constructSdlcConsequenceTraversalActionBinding(input: {
     strategyDecisionRef: decisionRef,
     parentObligationRef,
     actionKind: "reenter_graph_span",
+    selectedTraversalFamily: "depth_traversal",
     selectedGraphFunctionRef,
     selectedOverlayRef: input.selectedOverlayRef ?? nextActionProjection.overlayRef,
     selectedCandidateFamilyRef: input.selectedCandidateFamilyRef ?? null,

@@ -185,10 +185,10 @@ write ledgers, close work, or fall back to a local family switch.
 
 ### Current Non-Compliance Register
 
-The following are blockers for T-202 implementation, not accepted exceptions:
+The substrate pin is resolved by ABG `4.0.0-rc.21`, which carries T-156 and
+static GTL annotation validation. The following remain blockers for T-202
+implementation, not accepted exceptions:
 
-- `odd_sdlc.TS` currently consumes ABG `4.0.0-rc.19`; T-202 requires an ABG
-  release containing T-156, `4.0.0-rc.20` or later.
 - installed `consequence.C` currently projects consequence read models without
   consuming `EnginePluginInput.allowedConsequenceTraversalCatalog`.
 - overlay annotations currently expose depth/ticket policy but do not lower

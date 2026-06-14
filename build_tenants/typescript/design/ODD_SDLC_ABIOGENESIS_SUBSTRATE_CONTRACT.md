@@ -16,7 +16,7 @@ structure probes.
 | Surface | Binding |
 | --- | --- |
 | Package | `@abiogenesis/typescript-tenant` |
-| Version | `4.0.0-rc.4` |
+| Version | `4.0.0-rc.21` |
 | Dependency form | release snapshot package dependency |
 | odd_sdlc role | domain product over ABIogenesis substrate |
 | ABIogenesis role | GTL/ABG carrier and runtime truth authority |
@@ -60,12 +60,14 @@ The adapter relies on ABIogenesis TypeScript evidence:
 - `T-060`: missing compute basis fails closed
 - `T-065`: traversal structure probe exposes deterministic diagnostic evidence
 - `T-066`: ABG internal control loop owns iteration sufficiency
+- `T-156`: consequence traversal eligibility is catalog-admitted from GTL
+  declarations and statically validated by `typecheckGtlProgram(...)`
 
 These assumptions are dependencies, not copied law.
 
 ## ABIogenesis Runtime, Temporal, Process Callout, Defaults, Evaluator, And Liveness Substrate
 
-As of ABIogenesis `4.0.0-rc.4`, worker process execution remains substrate-owned, the
+As of ABIogenesis `4.0.0-rc.21`, worker process execution remains substrate-owned, the
 first ABG defaults bundle slice remains visible installed configuration, and
 temporal/time-related runtime truth is ABG-owned event and replay projection
 truth. ABIogenesis publishes the T-127 F_P construction evaluator substrate:
@@ -87,6 +89,8 @@ ABG owns:
 - F_P construction evaluator carrier admission and projection truth
 - read-only public gaps evaluator ranking over typed asset gaps and lawful
   candidate graph actions
+- consequence allowed traversal catalog derivation, runtime admission, and
+  static GTL annotation validation for traversal-family declaration keys
 - construction observation snapshots, action catalogs, binding projections,
   priority schemes, affect policies, and construction priority projections
 - declared runtime system probe contracts and

@@ -52,7 +52,7 @@ import {
 
 export const ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT = Object.freeze({
   packageName: "@abiogenesis/typescript-tenant",
-  packageVersion: "4.0.0-rc.19",
+  packageVersion: "4.0.0-rc.21",
   boundary: "consumed_substrate",
   runtimeTruthAuthority: "abiogenesis",
   temporalTruthAuthority: "abiogenesis",
@@ -76,17 +76,18 @@ export const ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT = Object.freeze({
     "ABIogenesis T-119 temporal GTL algebra is admitted through ABG runtime events",
     "ABIogenesis T-120 Event Calculus replay derives HoldsAt truth from admitted events",
     "ABIogenesis T-122 deadline pressure is replay-derived temporal projection truth",
-    "ABIogenesis T-125 temporal and non-temporal GTL live lanes remain regression inputs carried by 4.0.0-rc.19",
-    "ABIogenesis T-127 publishes the F_P construction evaluator and read-only public gaps ranking substrate carried by 4.0.0-rc.19",
-    "ABIogenesis T-129 publishes the runtime system probe observer liveness substrate carried by 4.0.0-rc.19",
-    "ABIogenesis T-144/T-145/T-146 publish the staged compute substrate for transform.C, evaluate.C, consequence.C, evaluation sets, and composed stage tasks carried by 4.0.0-rc.19",
-    "ABIogenesis T-147 publishes replay-derived retry context, output authority projection, and target-carrier output admission before closure carried by 4.0.0-rc.19",
-    "ABIogenesis T-148 publishes the runtime continuation-transition projection carried by 4.0.0-rc.19",
-    "ABIogenesis T-149 publishes the primitive iteration-outcome projection carried by 4.0.0-rc.19",
-    "ABIogenesis T-151 publishes segment-scoped evaluation redispatch metadata carried by 4.0.0-rc.19",
-    "ABIogenesis T-152 publishes the static GTL program conformance gate, compute-stage binding rows, ABG runtime binding rows, repair-surface triage binding, and graph-vector reentry application carried by 4.0.0-rc.19",
-    "ABIogenesis T-154 publishes runtime authorship routes for explicit graph-vector resume cursor and graph-span reentry consumption carried by 4.0.0-rc.19",
-    "ABIogenesis T-155 publishes GTL graph-function zoom planning and application carried by 4.0.0-rc.19"
+    "ABIogenesis T-125 temporal and non-temporal GTL live lanes remain regression inputs carried by 4.0.0-rc.21",
+    "ABIogenesis T-127 publishes the F_P construction evaluator and read-only public gaps ranking substrate carried by 4.0.0-rc.21",
+    "ABIogenesis T-129 publishes the runtime system probe observer liveness substrate carried by 4.0.0-rc.21",
+    "ABIogenesis T-144/T-145/T-146 publish the staged compute substrate for transform.C, evaluate.C, consequence.C, evaluation sets, and composed stage tasks carried by 4.0.0-rc.21",
+    "ABIogenesis T-147 publishes replay-derived retry context, output authority projection, and target-carrier output admission before closure carried by 4.0.0-rc.21",
+    "ABIogenesis T-148 publishes the runtime continuation-transition projection carried by 4.0.0-rc.21",
+    "ABIogenesis T-149 publishes the primitive iteration-outcome projection carried by 4.0.0-rc.21",
+    "ABIogenesis T-151 publishes segment-scoped evaluation redispatch metadata carried by 4.0.0-rc.21",
+    "ABIogenesis T-152 publishes the static GTL program conformance gate, compute-stage binding rows, ABG runtime binding rows, repair-surface triage binding, and graph-vector reentry application carried by 4.0.0-rc.21",
+    "ABIogenesis T-154 publishes runtime authorship routes for explicit graph-vector resume cursor and graph-span reentry consumption carried by 4.0.0-rc.21",
+    "ABIogenesis T-155 publishes GTL graph-function zoom planning and application carried by 4.0.0-rc.21",
+    "ABIogenesis T-156 publishes the consequence allowed traversal catalog, runtime catalog gate, and static GTL annotation validation carried by 4.0.0-rc.21"
   ])
 } as const);
 
