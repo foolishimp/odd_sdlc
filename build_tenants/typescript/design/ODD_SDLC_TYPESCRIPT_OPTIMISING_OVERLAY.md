@@ -86,6 +86,117 @@ child graph-function foldback are implemented, this sibling overlay is an
 admitted route marker and testable selection surface, not completion of depth
 traversal.
 
+## T-202 Consequence Traversal Catalog Projection
+
+ABG T-156 makes consequence traversal eligibility an ABG-derived catalog over
+GTL declarations. `odd_sdlc` consumes that substrate through overlays, but the
+overlay remains product policy only. There is one runtime truth:
+
+```text
+overlay declaration
+  -> GTL graph-function/vector declaration
+  -> ABG allowedConsequenceTraversalCatalog
+  -> consequence.C chooses one catalog row
+  -> ABG admits or blocks the selected ConsequenceTraversalAction
+  -> ABG construction/re-entry/events/replay/terminal truth
+```
+
+The overlay annotation is never an execution trigger. It is declaration source
+and proportionality evidence. It cannot create tickets, invoke workers, move a
+vector cursor, emit events, write ledgers, or close work.
+
+### Declaration Lowering
+
+The overlay carrier adds explicit allowed-consequence traversal rows. Each row
+lowers onto the selected GTL graph function or graph vector through ABG T-156
+declaration keys:
+
+```text
+abg.consequence.allowed_traversal_families
+abg.consequence.allowed_traversals
+```
+
+Rows lower to ABG `AllowedConsequenceTraversalRow` shape:
+
+```text
+traversalFamily
+allowedActionKinds
+allowedGraphFunctionRefs
+allowedTraversalTargetRefs
+requiredAuthorityRefs
+proportionalityBasisRefs
+declarationSourceRefs
+```
+
+Empty allow-lists are permitted only when row presence itself is the edge-local
+authority. Nonlocal traversal families must carry a concrete authority row:
+depth rows cite the zoom/decomposition authority; ticket rows cite a product
+route; public-start rows cite a declared next overlay or public start target.
+
+### Overlay Edge Matrix
+
+The first implementation targets these overlay edges:
+
+| overlay | edge/function targets | declared families | constraints |
+| --- | --- | --- | --- |
+| `overlay://odd-sdlc/current-full-traversal` | every selected full traversal graph function | `same_edge_retry`, `gap_stop`, `non_admit` | generic baseline; no depth declaration |
+| `overlay://odd-sdlc/current-full-traversal` | `derive_component_code_surface`, `qualify_component_realization_surface`, `derive_code_surface`, `derive_test_design_surface`, `derive_component_test_surface`, `prepare_test_execution_surface`, `derive_test_execution_result_surface`, `qualify_component_test_execution_surface`, `derive_component_repair_schedule_surface`, `derive_test_run_archive_surface` | `ticket_traversal` | route only through `asset:ticket/...`, `ticket-route:...`, `graph-function:route_ticket_work_item`, or `published-traversal-target:...`; never direct `.ai-workspace/tickets` storage |
+| `overlay://odd-sdlc/deep-sdlc-traversal` | the same code/test/review pressure functions | `depth_traversal`, `ticket_traversal`, `same_edge_retry`, `gap_stop`, `non_admit` | depth requires `Fg_decompose_depth_between_nodes`, the deep overlay annotation ref, selected graph-function/vector refs, and refinement/candidate/published traversal-target authority |
+| `overlay://odd-sdlc/lite-design-module-implementation` | `lite_design_module_implementation`, `derive_lite_design_adr_surface`, `derive_lite_component_code_surface`, `prepare_test_execution_surface`, `derive_test_execution_result_surface` | `same_edge_retry`, `graph_span_reentry`, `public_start_reentry`, `ticket_traversal`, `gap_stop`, `non_admit` | repair re-entry is limited to declared test-execution-failed routes; public-start re-entry is limited to declared continuation into current-full |
+| `overlay://odd-sdlc/framework-smoke-min-fp` | `framework_smoke_min_fp`, `derive_lite_design_adr_surface`, `derive_lite_component_code_surface`, `prepare_test_execution_surface`, `derive_test_execution_result_surface` | `same_edge_retry`, `graph_span_reentry`, `gap_stop`, `non_admit` | repair re-entry is limited to the declared test-execution-failed route; no depth declaration |
+| `overlay://odd-sdlc/ticket-workflow` | `route_ticket_work_item` | `same_edge_retry`, `public_start_reentry`, `gap_stop`, `non_admit` | this is the product route after ticket traversal selection; it does not recursively create tickets |
+| `overlay://odd-sdlc/bootstrap-requirements` | `Fg_conform_project`, `bootstrap_requirements` | `same_edge_retry`, `public_start_reentry`, `gap_stop`, `non_admit` | public-start re-entry is limited to declared next-eligible overlays |
+| `overlay://odd-sdlc/solution-architecture` | `solution_architecture` | `same_edge_retry`, `public_start_reentry`, `gap_stop`, `non_admit` | public-start re-entry is limited to declared next-eligible overlays |
+
+Graph functions are the product-visible route unit. Graph vectors remain
+internal execution structure and may appear in rows only as ABG-derived edge
+identity or as part of an admitted graph-function/re-entry/zoom authority.
+
+### Consequence.C Contract
+
+The SDLC consequence plugin is the product policy selector. It is not route
+authority. Its traversal algorithm is:
+
+```text
+catalog = EnginePluginInput.allowedConsequenceTraversalCatalog
+eligibleFamilies = catalog.rows.traversalFamily
+
+derive desired family from admitted SDLC pressure:
+  depth_traversal for deep overlay code/test/review depth pressure
+  ticket_traversal for admitted terminal/review-grade ticket pressure
+  graph_span_reentry or same_edge_retry for declared repair pressure
+  public_start_reentry for declared overlay continuation
+  gap_stop or non_admit for declared terminal outcomes
+
+if desired family has no matching catalog row:
+  return blocked/non-admitted consequence evidence with no traversalAction
+
+otherwise:
+  construct ConsequenceTraversalAction with explicit selectedTraversalFamily
+  cite product evidence as proportionality, not route authority
+  return it only through ConsequenceProjectionOutcome.traversalAction
+```
+
+ABG then gates the action against the catalog before construction projection or
+runtime execution. The plugin must not synthesize catalog rows, infer
+permission from annotations, choose relative cursors, target bare graph
+vectors, write tickets, emit runtime events, move cursors, invoke workers,
+write ledgers, close work, or fall back to a local family switch.
+
+### Current Non-Compliance Register
+
+The following are blockers for T-202 implementation, not accepted exceptions:
+
+- `odd_sdlc.TS` currently consumes ABG `4.0.0-rc.19`; T-202 requires an ABG
+  release containing T-156, `4.0.0-rc.20` or later.
+- installed `consequence.C` currently projects consequence read models without
+  consuming `EnginePluginInput.allowedConsequenceTraversalCatalog`.
+- overlay annotations currently expose depth/ticket policy but do not lower
+  into ABG T-156 GTL declaration rows.
+- existing depth action construction must be tightened to include explicit
+  `selectedTraversalFamily` and to fail closed when the ABG catalog has no
+  matching row.
+
 ## Prime Law
 
 Graph functions remain the primary constructive carrier.

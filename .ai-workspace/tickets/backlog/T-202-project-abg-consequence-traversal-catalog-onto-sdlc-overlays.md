@@ -36,6 +36,7 @@ source_documents:
   - .ai-workspace/tickets/completed/T-165-define-optimising-overlay-for-landscape-conditioned-fd-specialization.md
   - .ai-workspace/tickets/completed/T-200-implement-depth-traversal-function-and-decomposition-trace-foldback.md
   - /Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/active/T-156-admit-consequence-allowed-traversal-catalog.md
+  - /Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/typescript/design/M03_CONSEQUENCE_ALLOWED_TRAVERSAL_CATALOG_DERIVATION.md
   - /Users/jim/src/apps/specification_methodology/specification/standards/SPEC_METHOD.md
   - /Users/jim/src/apps/specification_methodology/specification/standards/DESIGN_MODULE_METHOD.md
   - /Users/jim/src/apps/specification_methodology/specification/standards/ODD_METHOD.md
@@ -109,6 +110,9 @@ non_closure_conditions:
   - current-full overlay is mutated to force depth instead of using the deep sibling overlay
   - public start or query-domain becomes route authority for dynamic traversal selection
   - tests prove synthetic catalog objects but not actual overlay-derived GTL declarations
+  - any "temporary" exception lets consequence.C select a traversal family without an ABG-provided catalog row
+  - SDLC remains pinned to an ABG release that does not expose T-156
+  - installed consequence.C keeps a local family switch instead of deriving eligibility from `EnginePluginInput.allowedConsequenceTraversalCatalog`
 ---
 
 # T-202: ABG Consequence Traversal Catalog On SDLC Overlays
@@ -152,14 +156,125 @@ system. It should specify:
 - how query-domain exposes catalog availability without making it route
   authority
 
+## Required Overlay Edge Declaration Matrix
+
+T-202 must make the edge targets explicit. "Annotated overlay" means the
+overlay definition publishes declaration rows that lower into GTL attributes
+for the graph function or graph vector currently being run. The annotation is
+not the trigger. The only runtime trigger is ABG deriving
+`allowedConsequenceTraversalCatalog` from GTL declarations and admitting the
+selected `ConsequenceTraversalAction` against that catalog.
+
+The ABG declaration keys are:
+
+- `abg.consequence.allowed_traversal_families`
+- `abg.consequence.allowed_traversals`
+
+The SDLC overlay declaration row must lower to ABG
+`AllowedConsequenceTraversalRow` fields: `traversalFamily`,
+`allowedActionKinds`, `allowedGraphFunctionRefs`,
+`allowedTraversalTargetRefs`, `requiredAuthorityRefs`,
+`proportionalityBasisRefs`, and `declarationSourceRefs`.
+
+Initial target matrix:
+
+| overlay | edge/function targets | allowed families | route constraints |
+| --- | --- | --- | --- |
+| `overlay://odd-sdlc/current-full-traversal` | every selected full traversal graph function | `same_edge_retry`, `gap_stop`, `non_admit` | baseline only; no depth row on this overlay |
+| `overlay://odd-sdlc/current-full-traversal` | code/test/review pressure functions: `derive_component_code_surface`, `qualify_component_realization_surface`, `derive_code_surface`, `derive_test_design_surface`, `derive_component_test_surface`, `prepare_test_execution_surface`, `derive_test_execution_result_surface`, `qualify_component_test_execution_surface`, `derive_component_repair_schedule_surface`, `derive_test_run_archive_surface` | `ticket_traversal` | target must be a product route: `asset:ticket/...`, `ticket-route:...`, `graph-function:route_ticket_work_item`, or `published-traversal-target:...`; direct `.ai-workspace/tickets` storage is forbidden |
+| `overlay://odd-sdlc/deep-sdlc-traversal` | same code/test/review pressure functions listed above | `depth_traversal`, `ticket_traversal`, `same_edge_retry`, `gap_stop`, `non_admit` | `depth_traversal` must cite `Fg_decompose_depth_between_nodes`, the deep overlay annotation ref, the selected graph function, the selected graph vector, and a refinement/candidate/published traversal target authority; it is not a local cursor |
+| `overlay://odd-sdlc/lite-design-module-implementation` | `lite_design_module_implementation`, `derive_lite_design_adr_surface`, `derive_lite_component_code_surface`, `prepare_test_execution_surface`, `derive_test_execution_result_surface` | `same_edge_retry`, `graph_span_reentry`, `public_start_reentry`, `ticket_traversal`, `gap_stop`, `non_admit` | `graph_span_reentry` is limited to declared repair routes such as test-execution-failed to component-code; `public_start_reentry` is limited to declared continuation into `overlay://odd-sdlc/current-full-traversal`; `ticket_traversal` uses the product ticket route only |
+| `overlay://odd-sdlc/framework-smoke-min-fp` | `framework_smoke_min_fp`, `derive_lite_design_adr_surface`, `derive_lite_component_code_surface`, `prepare_test_execution_surface`, `derive_test_execution_result_surface` | `same_edge_retry`, `graph_span_reentry`, `gap_stop`, `non_admit` | repair re-entry is limited to the declared test-execution-failed to component-code route; no depth row |
+| `overlay://odd-sdlc/ticket-workflow` | `route_ticket_work_item` | `same_edge_retry`, `public_start_reentry`, `gap_stop`, `non_admit` | this overlay is the product route after ticket traversal selection; it does not recursively create tickets unless a later declared row explicitly permits it |
+| `overlay://odd-sdlc/bootstrap-requirements` | `Fg_conform_project`, `bootstrap_requirements` | `same_edge_retry`, `public_start_reentry`, `gap_stop`, `non_admit` | public-start reentry is limited to declared next-eligible overlays |
+| `overlay://odd-sdlc/solution-architecture` | `solution_architecture` | `same_edge_retry`, `public_start_reentry`, `gap_stop`, `non_admit` | public-start reentry is limited to declared next-eligible overlays |
+
+No overlay edge may receive `depth_traversal` merely because the overlay has a
+depth annotation. The declared row must be present on the current ABG edge, and
+ABG must provide that row back through the catalog before consequence.C can
+select it.
+
+## Consequence.C Design
+
+The SDLC consequence plugin remains product-owned, but its traversal selection
+authority is read-only and catalog bounded.
+
+Required algorithm:
+
+```text
+input: EnginePluginInput, admitted SDLC replay/projection/read-model state
+
+catalog = input.allowedConsequenceTraversalCatalog
+eligibleFamilies = catalog.rows.traversalFamily
+
+derive product pressure from admitted ledgers, closure decisions, strategy rows,
+overlay binding, decomposition trace state, ticket workflow admission, and
+review-grade evidence
+
+rank desired family:
+  1. depth_traversal when residual feature-depth pressure is present,
+     selected overlay is deep-sdlc-traversal, selected edge is one of the
+     code/test/review pressure targets, and the catalog contains a matching row
+  2. ticket_traversal when admitted review-grade or retry-exhaustion pressure
+     says generated-product defects must become governed ticket work and the
+     catalog contains a product-route row
+  3. graph_span_reentry or same_edge_retry only when a declared repair route
+     and matching catalog row exist
+  4. public_start_reentry only for declared next-eligible overlay continuation
+  5. gap_stop or non_admit only when the catalog declares the terminal family
+
+if desired family is absent from catalog:
+  return blocked/non-admitted consequence evidence with no traversalAction
+
+if selected:
+  construct ConsequenceTraversalAction with explicit selectedTraversalFamily
+  include only product refs as selection/proportionality evidence
+  pass action through ConsequenceProjectionOutcome.traversalAction
+  rely on ABG admission, construction projection, runtime transition, events,
+  replay, and terminal truth
+```
+
+Consequence.C must not:
+
+- infer permission from overlay annotation presence
+- synthesize catalog rows
+- target bare graph vectors without graph-function/re-entry/zoom authority
+- use relative cursors such as `-2`
+- write tickets or mutate `.ai-workspace/tickets` storage
+- invoke workers, emit runtime events, write ledgers, or close work
+- fall back to a local switch when the ABG catalog is absent or empty
+
+## Current Review Findings
+
+Review date: 2026-06-15.
+
+T-202 is not ABG-compliant yet. The following are blockers, not accepted
+exceptions or tech debt:
+
+1. `odd_sdlc.TS` still pins `@abiogenesis/typescript-tenant@4.0.0-rc.19`.
+   T-202 requires a substrate pin to the ABG release containing T-156
+   (`4.0.0-rc.20` or later).
+2. The installed `consequence.C` path currently returns
+   `ConsequenceProjectionOutcome` from SDLC read models without consulting
+   `EnginePluginInput.allowedConsequenceTraversalCatalog`.
+3. Existing overlay annotations expose depth policy and ticket workflow policy,
+   but they do not yet lower into the ABG T-156 GTL declaration keys.
+4. Existing depth binding constructs a traversal action path, but T-202 must
+   require explicit `selectedTraversalFamily` and ABG catalog admission before
+   execution.
+
+There are no lawful permanent exceptions. Closure requires one ABG truth:
+GTL declarations -> ABG catalog -> SDLC selection over that catalog -> ABG
+admission/execution/replay/terminal truth.
+
 ## Work Ledger
 
 | id | task | proof | status |
 | --- | --- | --- | --- |
-| D1 | Update overlay design with T-156 declaration mapping. | design explains overlay rows -> GTL declarations -> ABG catalog. | pending |
-| D2 | Add overlay carrier fields for allowed consequence traversal families and route constraints. | carrier/admission tests reject unknown families, duplicate rows, storage-target ticket traversal, and annotation-only effects. | pending |
+| D1 | Update overlay design with T-156 declaration mapping and the exact overlay edge matrix. | design explains overlay rows -> GTL declarations -> ABG catalog and names the graph-function targets for current-full, deep, lite, framework-smoke, bootstrap, solution-architecture, and ticket-workflow overlays. | pending |
+| D2 | Add overlay carrier fields for allowed consequence traversal families and route constraints. | carrier/admission tests reject unknown families, duplicate rows, storage-target ticket traversal, annotation-only effects, and missing explicit selected family for nonlocal rows. | pending |
 | D3 | Lower overlay declarations into GTL graph-function/vector declarations. | catalog/query tests prove declarations appear on the intended edge and not globally. | pending |
-| D4 | Make SDLC consequence.C consume the ABG-provided catalog when constructing traversal action bindings. | tests prove catalog-present depth/ticket selection succeeds and catalog-absent selection blocks. | pending |
+| D4 | Make SDLC consequence.C consume the ABG-provided catalog when constructing traversal action bindings. | tests prove catalog-present depth/ticket selection succeeds, catalog-absent selection blocks, and no local switch can choose a traversal family. | pending |
 | D5 | Preserve authority boundary. | tests prove no SDLC runtime events, cursor moves, local loops, ticket storage mutation, or closure truth are introduced. | pending |
 | D6 | Run focused regressions and ABG conformance/typecheck proof. | semantic build, focused T-202 tests, T-160/T-162/T-165/T-197/T-200 regressions, ABG gate. | pending |
 | D7 | Run live builder proof after substrate release pin. | data-mapper builder route uses deep overlay for code/test build depth and creates lawful ticket pressure for generated-product defects. | pending |
