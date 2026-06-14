@@ -75,7 +75,7 @@ excluded_boundary:
   - allowing backlog tickets to execute as admitted active work without promotion/admission
   - adding a second runtime, backlog database, or non-markdown ticket truth store
   - weakening ABG ownership of event, frame, continuation, projection, or replay truth
-target_truth: Tickets under .ai-workspace/tickets are the first-class durable work authority for substantive odd_sdlc change. The installed TypeScript operator can inspect, validate, admit, start, select configured reviewers, execute, review, and close work from ticket authority while preserving comments as evidence/publication only. Overlay segment completion with remaining graph, requirement, asset, or next-overlay pressure is also ticket intake pressure: the workflow may emit or update a code-review/triage ticket that carries the segment-completion refs and enters through an admitted ABG start such as current-full-traversal instead of treating the completed segment as product convergence.
+target_truth: Tickets under .ai-workspace/tickets are the first-class durable work authority for substantive odd_sdlc change. The installed TypeScript operator can inspect, validate, admit, start, select configured reviewers, execute, review, and close work from ticket authority while preserving comments as evidence/publication only. Overlay segment completion with remaining graph, requirement, asset, or next-overlay pressure is also ticket intake pressure: the workflow may emit or update a code-review/triage ticket that carries the segment-completion refs and enters through an admitted ABG start such as current-full-traversal instead of treating the completed segment as product convergence. Terminal builder gaps are also ticket intake pressure: bounded same-edge retry exhaustion and terminal review-grade triage blocks with residual findings or triage-gap blocking reasons emit an active parent code-review/triage ticket plus split product-gap tickets from the operator-run archive, admit those tickets through the ticket execution contract, and preserve the source run as evidence instead of patching generated work outside the builder.
 superseded_truth: Substantive specification edits, code review fixes, selective implementation choices, and bug repairs may be driven directly from prompt text, chat memory, comment files, or review notes without first admitting a ticket-shaped execution contract.
 closure_law: This ticket closes only when the TypeScript tenant exposes a ticket workflow projection, validates TICKET_METHOD-required fields, admits active tickets into execution contracts, routes asset:ticket/<id> start through admitted ticket authority, selects configured reviewer profiles or review panels before review execution, records review/bug/spec-change decisions inside the ticket workflow, projects overlay-segment remaining pressure into governed code-review/triage ticket intake, and proves that comments, raw prompts, or segment-complete artifacts cannot become closure authority.
 evaluation_criteria:
@@ -357,6 +357,7 @@ odd-sdlc-ts ticket-admit --workspace . --ticket T-162
 odd-sdlc-ts reviewers --workspace .
 odd-sdlc-ts ticket-review --workspace . --ticket T-162 --reviewers codex,claude
 odd-sdlc-ts ticket-intake --workspace . --from-overlay-segment <path> --kind code_review_triage
+odd-sdlc-ts ticket-intake --workspace . --from-run <operator-run-archive> --kind code_review_triage
 odd-sdlc-ts start --workspace . --target asset:ticket/T-162 --until blocked
 ```
 
@@ -494,6 +495,16 @@ Inside-out sequencing is required.
 - [x] carry remaining graph, requirement, asset, and next-overlay pressure refs
   from `sdlc_overlay_segment_completion` into the ticket projection and admitted
   execution contract
+- [x] add retry-exhaustion ticket intake from `operator_summary`,
+  `sdlc_edge_closure_decision`, and review-grade residual findings into an
+  active parent code-review/triage ticket plus split implementation-gap tickets
+- [x] admit retry-exhaustion generated tickets through
+  `SdlcTicketExecutionContract` and prove the parent can enter through
+  `asset:ticket/<id>`
+- [x] add terminal review-grade triage-block ticket intake from
+  `operator_summary`, `sdlc_edge_closure_decision`, residual review-grade
+  findings, and `lawfulReentryPoint: triage_gap` blocking reasons into the same
+  governed parent/split ticket workflow
 - [ ] route final-node code-review/triage tickets through admitted ABG public
   start or runtime re-entry at `overlay://odd-sdlc/current-full-traversal`
   without an SDLC-local loop
@@ -506,6 +517,11 @@ Inside-out sequencing is required.
 - [ ] add deterministic tests for configured `codex` and `claude` reviewer selection, unknown-reviewer rejection, unavailable-reviewer blocking, and reviewer output schema rejection
 - [x] add deterministic tests for overlay-segment continuation ticket intake,
   remaining-pressure preservation, and current-full-traversal start admission
+- [x] add deterministic tests for retry-exhaustion gap-ticket intake, split
+  product-gap ticket admission, and parent `asset:ticket/<id>` start admission
+- [x] add deterministic tests for terminal review-grade triage-block gap-ticket
+  intake, split product-gap ticket admission, and parent `asset:ticket/<id>`
+  start admission
 - [ ] add one scenario proof that starts from a review comment, records rulings in a ticket, implements only accepted findings, and leaves deferred findings visible
 - [ ] add one scenario proof that starts from a completed lite overlay segment
   with `productConverged: false`, emits a code-review/triage ticket, starts the
@@ -547,6 +563,10 @@ New truth path:
 - start/handoff/ledger/eval/archive/closure all carry the admitted ticket basis.
 - overlay segment completion with remaining pressure emits or references a
   ticket workflow continuation row before any full-traversal closure claim.
+- retry-exhausted same-edge builder failure with review-grade residuals emits
+  active parent/split tickets before generated product repair continues.
+- terminal review-grade triage blocks with `lawfulReentryPoint: triage_gap`
+  emit active parent/split tickets before generated product repair continues.
 
 Producer set:
 
@@ -735,22 +755,48 @@ Implemented and verified surfaces:
   workflow projection/admission without creating runtime authority.
 - worker handoff, traversal intent package, ledgers, closure/consequence basis,
   and next-action projection carry admitted ticket execution refs.
+- `ticket-intake --from-run <operator-run-archive> --kind code_review_triage`
+  converts terminal builder gaps into first-class ticket workflow pressure:
+  retry exhaustion and review-grade triage blocks both emit an active parent
+  code-review/triage ticket plus split product-gap tickets, admit those tickets,
+  and cite the source operator run instead of authorizing direct generated
+  product edits.
+- `test_t162_terminal_gap_ticket_intake.test.mjs` proves both terminal
+  intake shapes: retry exhaustion and review-grade `triage_gap` blocks create
+  parent/split tickets, admit execution contracts, and start through
+  `asset:ticket/<id>`.
 - `test_env/live/test_t162_ticket_workflow_live.test.mjs` creates a live
   workspace with an active `T-162` ticket, registered reviewer selection,
   accepted review finding, review evidence comment, and overlay-continuation
   ruling; it drives the built CLI through `tickets`, `ticket-admit`, and
   `start --target asset:ticket/T-162`, proving the ticket projects, admits,
   and routes to `route_ticket_work_item` through the installed command surface.
+- `test:t162:terminal-gap-data-mapper-live` runs the deep data-mapper builder
+  lane and the terminal-gap ticket workflow exercise. Archive:
+  `build_tenants/typescript/test_env/test_runs/t162_terminal_gap_data_mapper_sandbox/20260613T233152914Z_pid17441`.
+  The run observed code/test detail zoom edges, same-edge retries in the
+  generated code and component-test phases, created `asset:ticket/T-001`,
+  `asset:ticket/T-002`, and `asset:ticket/T-003` from a terminal review-grade
+  triage gap, admitted parent ticket execution contract
+  `ticket-execution-contract://odd-sdlc/T-001/c215f227cc5314bdaf692ff9f59ce6911170e429f2265ca1f0173622a0ae93c0`,
+  and re-entered the parent ticket through `route_ticket_work_item` on
+  `overlay://odd-sdlc/ticket-workflow`.
 
 Verification:
 
-- `npm run test:t162` passed 10/10.
+- `npm run test:t162` passed 12/12.
 - `npm run lint:semantic` passed.
 - `npm run test:t033` passed 8/8.
 - `npm run test:t058` passed 17/17.
 - `npm run test:semantic` passed 1023/1023.
 - `npm run test:t162:ticket-workflow-live` passed 1/1.
 - `npm run lint:test-harness` passed.
+- `npm run build:semantic` passed.
+- `node --test test_env/tests/test_t162_terminal_gap_ticket_intake.test.mjs test_env/tests/test_t162_ticket_execution_contract_admission.test.mjs test_env/tests/test_t162_overlay_segment_ticket_continuation.test.mjs`
+  passed 6/6.
+- `npm run guard:data-mapper-boundary` passed 7/7.
+- `npm run test:t162:terminal-gap-data-mapper-live` passed and wrote
+  `run_summary.json` in the archive above.
 
 Remaining before ticket closure:
 

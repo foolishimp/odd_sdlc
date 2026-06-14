@@ -2,9 +2,11 @@
 
 import {
   existsSync,
+  mkdirSync,
   readdirSync,
   readFileSync,
-  statSync
+  statSync,
+  writeFileSync
 } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
@@ -288,6 +290,40 @@ export type SdlcTicketAssetStartResolution =
       readonly diagnostics: readonly SdlcTicketWorkflowDiagnostic[];
     };
 
+export interface SdlcTicketIntakeCreatedTicket {
+  readonly kind: "sdlc_ticket_intake_created_ticket";
+  readonly ticketId: string;
+  readonly ticketRef: string;
+  readonly ticketPath: string;
+  readonly ticketUri: string;
+  readonly title: string;
+  readonly sourceRunArchiveRoot: string;
+  readonly sourceRunRef: string;
+}
+
+export type SdlcTerminalGapTicketIntakeSourceStopKind =
+  | "retry_exhaustion"
+  | "review_grade_triage_gap";
+
+export interface SdlcTerminalGapTicketIntakeResult {
+  readonly kind: "sdlc_terminal_gap_ticket_intake_result";
+  readonly intakeKind: "code_review_triage";
+  readonly sourceStopKind: SdlcTerminalGapTicketIntakeSourceStopKind;
+  readonly sourceRunArchiveRoot: string;
+  readonly sourceRunRef: string;
+  readonly edgeName: string;
+  readonly blockingReason: string;
+  readonly closureDisposition: string;
+  readonly parentTicket: SdlcTicketIntakeCreatedTicket;
+  readonly gapTickets: readonly SdlcTicketIntakeCreatedTicket[];
+  readonly createdTicketRefs: readonly string[];
+  readonly residualFindingRefs: readonly string[];
+  readonly governingRequirementRefs: readonly string[];
+  readonly governingDesignRefs: readonly string[];
+  readonly evidenceRefs: readonly string[];
+  readonly admittedExecutionContractRefs: readonly string[];
+}
+
 type FieldValue = string | readonly string[];
 
 type FieldMap = ReadonlyMap<string, FieldValue>;
@@ -449,6 +485,652 @@ function mergeFields(frontMatter: FieldMap, bulletMetadata: FieldMap): FieldMap 
 
 function fieldsFromContent(content: string): FieldMap {
   return mergeFields(parseTicketFrontMatter(content), parseBulletMetadata(content));
+}
+
+function jsonRecord(value: unknown): Readonly<Record<string, unknown>> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Readonly<Record<string, unknown>>
+    : null;
+}
+
+function readJsonRecord(filePath: string): Readonly<Record<string, unknown>> {
+  const record = jsonRecord(JSON.parse(readFileSync(filePath, "utf8")));
+  if (record === null) {
+    throw new TypeError(`expected JSON object: ${filePath}`);
+  }
+  return record;
+}
+
+function recordString(
+  record: Readonly<Record<string, unknown>>,
+  key: string
+): string | null {
+  const value = record[key];
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function recordArray(
+  record: Readonly<Record<string, unknown>>,
+  key: string
+): readonly unknown[] {
+  const value = record[key];
+  return Array.isArray(value) ? value : Object.freeze([]);
+}
+
+function recordStringArray(
+  record: Readonly<Record<string, unknown>>,
+  key: string
+): readonly string[] {
+  return Object.freeze(
+    recordArray(record, key)
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => value.trim())
+      .filter(Boolean)
+  );
+}
+
+function recordObjectArray(
+  record: Readonly<Record<string, unknown>>,
+  key: string
+): readonly Readonly<Record<string, unknown>>[] {
+  return Object.freeze(recordArray(record, key).map(jsonRecord).filter((value) => value !== null));
+}
+
+function uniqueStrings(values: readonly string[]): readonly string[] {
+  return Object.freeze([...new Set(values.filter((value) => value.trim().length > 0))].sort());
+}
+
+function oneLine(value: string): string {
+  return value.replace(/\s+/gu, " ").trim();
+}
+
+function yamlScalar(value: string): string {
+  return oneLine(value).replace(/"/gu, "'");
+}
+
+function yamlBlockField(key: string, value: string): string {
+  const lines = (value.trim().length === 0 ? "unspecified" : value)
+    .replace(/\r\n/gu, "\n")
+    .split("\n")
+    .map((line) => `  ${line}`);
+  return `${key}: |\n${lines.join("\n")}`;
+}
+
+function yamlListField(key: string, values: readonly string[]): string {
+  if (values.length === 0) {
+    return `${key}: []`;
+  }
+  return `${key}:\n${values.map((value) => `  - ${yamlScalar(value)}`).join("\n")}`;
+}
+
+function ticketSlug(input: string): string {
+  const slug = input
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, "-")
+    .replace(/^-+|-+$/gu, "");
+  return slug.length === 0 ? "gap-ticket" : slug.slice(0, 80);
+}
+
+function existingTicketNumbers(workspaceRoot: string): readonly number[] {
+  const numbers: number[] = [];
+  for (const directory of SDLC_TICKET_WORKFLOW_DIRECTORIES) {
+    const directoryPath = path.join(workspaceRoot, ".ai-workspace", "tickets", directory);
+    if (!existsSync(directoryPath) || !statSync(directoryPath).isDirectory()) {
+      continue;
+    }
+    for (const fileName of readdirSync(directoryPath)) {
+      if (!fileName.endsWith(".md")) {
+        continue;
+      }
+      const filePath = path.join(directoryPath, fileName);
+      if (!statSync(filePath).isFile()) {
+        continue;
+      }
+      const content = readFileSync(filePath, "utf8");
+      const id = fieldString(fieldsFromContent(content), "id") ?? path.basename(fileName, ".md");
+      const match = /^T-(\d+)$/u.exec(normalizeTicketId(id));
+      if (match !== null) {
+        numbers.push(Number.parseInt(match[1] ?? "0", 10));
+      }
+    }
+  }
+  return Object.freeze(numbers);
+}
+
+function allocateTicketIds(input: {
+  readonly workspaceRoot: string;
+  readonly count: number;
+}): readonly string[] {
+  const maxExisting = Math.max(0, ...existingTicketNumbers(input.workspaceRoot));
+  return Object.freeze(
+    Array.from({ length: input.count }, (_, index) =>
+      `T-${String(maxExisting + index + 1).padStart(3, "0")}`
+    )
+  );
+}
+
+function createdTicket(input: {
+  readonly ticketId: string;
+  readonly ticketPath: string;
+  readonly title: string;
+  readonly sourceRunArchiveRoot: string;
+  readonly sourceRunRef: string;
+}): SdlcTicketIntakeCreatedTicket {
+  return Object.freeze({
+    kind: "sdlc_ticket_intake_created_ticket" as const,
+    ticketId: input.ticketId,
+    ticketRef: `asset:ticket/${input.ticketId}`,
+    ticketPath: input.ticketPath,
+    ticketUri: pathToFileURL(input.ticketPath).href,
+    title: input.title,
+    sourceRunArchiveRoot: input.sourceRunArchiveRoot,
+    sourceRunRef: input.sourceRunRef
+  });
+}
+
+function reviewGradeResidualFindings(
+  assessment: Readonly<Record<string, unknown>>
+): readonly Readonly<Record<string, unknown>>[] {
+  return Object.freeze(
+    recordObjectArray(assessment, "findings").filter(
+      (finding) => recordString(finding, "fulfillmentStatus") === "blocked"
+    )
+  );
+}
+
+function terminalGapBlockingReasons(
+  summary: Readonly<Record<string, unknown>>
+): readonly Readonly<Record<string, unknown>>[] {
+  return Object.freeze(
+    recordObjectArray(summary, "blockingReasons").filter((reason) => {
+      const reentryPoint = recordString(reason, "lawfulReentryPoint");
+      const code = recordString(reason, "code") ?? "";
+      return (
+        reentryPoint === "triage_gap" ||
+        code === "review_grade_assessment_invalid" ||
+        code === "review_grade_edge_fulfillment_blocked"
+      );
+    })
+  );
+}
+
+function terminalGapIntakeSourceStopKind(input: {
+  readonly summary: Readonly<Record<string, unknown>>;
+  readonly closureDisposition: string | null;
+}): SdlcTerminalGapTicketIntakeSourceStopKind | null {
+  const blockingReason = recordString(input.summary, "blockingReason") ?? "";
+  if (blockingReason === "retry_budget_exhausted" && input.closureDisposition === "retry") {
+    return "retry_exhaustion";
+  }
+  const status = recordString(input.summary, "status");
+  if (
+    status === "blocked" &&
+    input.closureDisposition === "block" &&
+    (terminalGapBlockingReasons(input.summary).length > 0 ||
+      blockingReason.includes("review_grade_assessment_invalid") ||
+      blockingReason.includes("evaluation_set_incomplete") ||
+      blockingReason.includes("triage_gap"))
+  ) {
+    return "review_grade_triage_gap";
+  }
+  return null;
+}
+
+function blockingReasonResidualFindings(
+  summary: Readonly<Record<string, unknown>>
+): readonly Readonly<Record<string, unknown>>[] {
+  return Object.freeze(
+    terminalGapBlockingReasons(summary).map((reason, index) =>
+      Object.freeze({
+        kind: "sdlc_review_grade_obligation_finding",
+        obligationId: `blocking-reason://odd-sdlc/${recordString(reason, "code") ?? "terminal_gap"}/${index + 1}`,
+        fulfillmentStatus: "blocked",
+        failureClass:
+          recordString(reason, "code") ?? recordString(reason, "reasonClass") ?? "terminal_gap",
+        requiredAction: `Triage terminal builder gap: ${recordString(reason, "detail") ?? recordString(reason, "message") ?? recordString(reason, "code") ?? "unknown"}.`,
+        evidenceRefs: recordStringArray(reason, "evidenceRefs")
+      })
+    )
+  );
+}
+
+function terminalGapResidualFindings(input: {
+  readonly summary: Readonly<Record<string, unknown>>;
+  readonly assessment: Readonly<Record<string, unknown>>;
+}): readonly Readonly<Record<string, unknown>>[] {
+  const reviewFindings = reviewGradeResidualFindings(input.assessment);
+  return reviewFindings.length > 0
+    ? reviewFindings
+    : blockingReasonResidualFindings(input.summary);
+}
+
+function findingRef(finding: Readonly<Record<string, unknown>>, index: number): string {
+  return recordString(finding, "obligationId") ?? `review-finding://odd-sdlc/terminal-gap/${index + 1}`;
+}
+
+function findingRequiredAction(finding: Readonly<Record<string, unknown>>): string {
+  return recordString(finding, "requiredAction") ??
+    `Resolve ${recordString(finding, "failureClass") ?? "blocked"} review-grade finding ${recordString(finding, "obligationId") ?? "unknown"}`;
+}
+
+function findingEvidenceRefs(
+  finding: Readonly<Record<string, unknown>>
+): readonly string[] {
+  return recordStringArray(finding, "evidenceRefs");
+}
+
+function designEvidenceRefs(values: readonly string[]): readonly string[] {
+  return uniqueStrings(
+    values.filter(
+      (ref) =>
+        ref.includes("/design/") ||
+        ref.includes("implementation_design_surface") ||
+        ref.includes("ADR-")
+    )
+  );
+}
+
+function requirementEvidenceRefs(values: readonly string[]): readonly string[] {
+  return uniqueStrings(
+    values.filter(
+      (ref) =>
+        ref.startsWith("requirement:") ||
+        ref.includes("/specification/") ||
+        ref.includes("specification/")
+    )
+  );
+}
+
+function runEvidenceRefs(input: {
+  readonly operatorRunRoot: string;
+  readonly summary: Readonly<Record<string, unknown>>;
+  readonly findings: readonly Readonly<Record<string, unknown>>[];
+}): readonly string[] {
+  const blockingEvidence = recordObjectArray(input.summary, "blockingReasons")
+    .flatMap((reason) => recordStringArray(reason, "evidenceRefs"));
+  return uniqueStrings([
+    pathToFileURL(input.operatorRunRoot).href,
+    pathToFileURL(path.join(input.operatorRunRoot, "operator_summary.json")).href,
+    pathToFileURL(path.join(input.operatorRunRoot, "sdlc_edge_closure_decision.json")).href,
+    pathToFileURL(path.join(input.operatorRunRoot, "review_grade_edge_fulfillment_assessment.json")).href,
+    ...blockingEvidence,
+    ...input.findings.flatMap(findingEvidenceRefs)
+  ]);
+}
+
+function groupFindingsByAction(
+  findings: readonly Readonly<Record<string, unknown>>[]
+): readonly {
+  readonly requiredAction: string;
+  readonly failureClass: string;
+  readonly findings: readonly Readonly<Record<string, unknown>>[];
+}[] {
+  const groups = new Map<string, {
+    requiredAction: string;
+    failureClass: string;
+    findings: Readonly<Record<string, unknown>>[];
+  }>();
+  for (const finding of findings) {
+    const requiredAction = findingRequiredAction(finding);
+    const failureClass = recordString(finding, "failureClass") ?? "blocked";
+    const key = `${failureClass}\n${requiredAction}`;
+    const group = groups.get(key);
+    if (group === undefined) {
+      groups.set(key, { requiredAction, failureClass, findings: [finding] });
+    } else {
+      group.findings.push(finding);
+    }
+  }
+  return Object.freeze(
+    [...groups.values()].map((group) => Object.freeze({
+      requiredAction: group.requiredAction,
+      failureClass: group.failureClass,
+      findings: Object.freeze(group.findings)
+    }))
+  );
+}
+
+function writeTicketFile(input: {
+  readonly workspaceRoot: string;
+  readonly ticketId: string;
+  readonly title: string;
+  readonly sourceRunArchiveRoot: string;
+  readonly sourceRunRef: string;
+  readonly body: string;
+}): SdlcTicketIntakeCreatedTicket {
+  const directoryPath = path.join(input.workspaceRoot, ".ai-workspace", "tickets", "active");
+  mkdirSync(directoryPath, { recursive: true });
+  const ticketPath = path.join(
+    directoryPath,
+    `${input.ticketId}-${ticketSlug(input.title)}.md`
+  );
+  writeFileSync(ticketPath, input.body, "utf8");
+  return createdTicket({
+    ticketId: input.ticketId,
+    ticketPath,
+    title: input.title,
+    sourceRunArchiveRoot: input.sourceRunArchiveRoot,
+    sourceRunRef: input.sourceRunRef
+  });
+}
+
+function ticketMarkdown(input: {
+  readonly ticketId: string;
+  readonly title: string;
+  readonly category: string;
+  readonly goal: string;
+  readonly changeIntent: string;
+  readonly targetTruth: string;
+  readonly supersededTruth: string;
+  readonly closureLaw: string;
+  readonly evaluationCriteria: readonly string[];
+  readonly nonClosureConditions: readonly string[];
+  readonly sourceDocuments: readonly string[];
+  readonly expectedBehavior: string;
+  readonly actualBehavior: string;
+  readonly reproductionRefs: readonly string[];
+  readonly bugEvidenceRefs: readonly string[];
+  readonly firstMissingLayer: SdlcTicketBugFirstMissingLayer;
+  readonly governingRequirementRefs: readonly string[];
+  readonly governingDesignRefs: readonly string[];
+  readonly reviewFindingRefs?: readonly string[] | undefined;
+  readonly reviewFindingRulings?: readonly SdlcTicketReviewDecisionRuling[] | undefined;
+  readonly reviewFindingSeverities?: readonly string[] | undefined;
+  readonly reviewEvidenceRefs?: readonly string[] | undefined;
+  readonly splitTicketRefs?: readonly string[] | undefined;
+  readonly acceptedChangeScopes?: readonly string[] | undefined;
+  readonly reviewProofRequired?: readonly string[] | undefined;
+  readonly sourceOperatorRunRef: string;
+  readonly sourceRunNarrative: string;
+  readonly selectedStartTargetRef: string;
+}): string {
+  const today = new Date().toISOString().slice(0, 10);
+  return `${[
+    "---",
+    `id: ${input.ticketId}`,
+    `title: ${yamlScalar(input.title)}`,
+    "type: bug",
+    `ticket_category: ${yamlScalar(input.category)}`,
+    "status: active",
+    `goal: ${yamlScalar(input.goal)}`,
+    yamlBlockField("change_intent", input.changeIntent),
+    "change_class: realization_refactor",
+    "re_entry_point: code",
+    `triaged_at: ${today}`,
+    `created_at: ${today}`,
+    `updated_at: ${today}`,
+    yamlBlockField("target_truth", input.targetTruth),
+    yamlBlockField("superseded_truth", input.supersededTruth),
+    yamlBlockField("closure_law", input.closureLaw),
+    yamlListField("evaluation_criteria", input.evaluationCriteria),
+    yamlListField("non_closure_conditions", input.nonClosureConditions),
+    yamlListField("source_documents", input.sourceDocuments),
+    yamlBlockField("expected_behavior", input.expectedBehavior),
+    yamlBlockField("actual_behavior", input.actualBehavior),
+    yamlListField("reproduction_refs", input.reproductionRefs),
+    yamlListField("bug_evidence_refs", input.bugEvidenceRefs),
+    `first_missing_layer: ${input.firstMissingLayer}`,
+    yamlListField("governing_requirement_refs", input.governingRequirementRefs),
+    yamlListField("governing_design_refs", input.governingDesignRefs),
+    ...(input.reviewFindingRefs === undefined
+      ? []
+      : [
+          yamlListField("review_finding_refs", input.reviewFindingRefs),
+          yamlListField("review_finding_rulings", input.reviewFindingRulings ?? []),
+          yamlListField("review_finding_severities", input.reviewFindingSeverities ?? []),
+          yamlListField("review_evidence_refs", input.reviewEvidenceRefs ?? []),
+          yamlListField("split_ticket_refs", input.splitTicketRefs ?? []),
+          yamlListField("accepted_change_scopes", input.acceptedChangeScopes ?? []),
+          yamlListField("review_proof_required", input.reviewProofRequired ?? [])
+        ]),
+    `source_operator_run_ref: ${input.sourceOperatorRunRef}`,
+    `selected_start_target_ref: ${input.selectedStartTargetRef}`,
+    "---",
+    "",
+    `# ${input.title}`,
+    "",
+    `This ticket was emitted by the installed ticket-intake workflow from ${input.sourceRunNarrative}. It is product/worksite pressure, not permission to patch generated source from outside the governed builder lane.`,
+    ""
+  ].join("\n")}`;
+}
+
+export function createSdlcTerminalGapTicketsFromOperatorRun(input: {
+  readonly workspaceRoot: string;
+  readonly operatorRunRoot: string;
+  readonly intakeKind: "code_review_triage";
+}): SdlcTerminalGapTicketIntakeResult {
+  const summaryPath = path.join(input.operatorRunRoot, "operator_summary.json");
+  const assessmentPath = path.join(
+    input.operatorRunRoot,
+    "review_grade_edge_fulfillment_assessment.json"
+  );
+  const closurePath = path.join(input.operatorRunRoot, "sdlc_edge_closure_decision.json");
+  for (const requiredPath of [summaryPath, assessmentPath, closurePath]) {
+    if (!existsSync(requiredPath)) {
+      throw new TypeError(`retry-exhaustion ticket intake missing ${requiredPath}`);
+    }
+  }
+  const summary = readJsonRecord(summaryPath);
+  const assessment = readJsonRecord(assessmentPath);
+  const closure = readJsonRecord(closurePath);
+  const blockingReason = recordString(summary, "blockingReason");
+  const closureDisposition = recordString(closure, "disposition");
+  const sourceStopKind = terminalGapIntakeSourceStopKind({
+    summary,
+    closureDisposition
+  });
+  if (sourceStopKind === null || blockingReason === null || closureDisposition === null) {
+    throw new TypeError(
+      `terminal-gap ticket intake requires retry_budget_exhausted/retry or blocked triage_gap/block, got blockingReason=${blockingReason ?? "null"} disposition=${closureDisposition ?? "null"}`
+    );
+  }
+  const findings = terminalGapResidualFindings({ summary, assessment });
+  if (findings.length === 0) {
+    throw new TypeError("terminal-gap ticket intake requires blocked review-grade findings or triage-gap blocking reasons");
+  }
+  const sourceRunNarrative = sourceStopKind === "retry_exhaustion"
+    ? "an exhausted same-edge retry run"
+    : "a terminal review-grade triage block";
+  const edgeName =
+    recordString(summary, "currentEdge") ??
+    recordString(summary, "edgeName") ??
+    recordString(assessment, "edgeName") ??
+    "unknown_edge";
+  const sourceRunRef = pathToFileURL(input.operatorRunRoot).href;
+  const allEvidenceRefs = runEvidenceRefs({
+    operatorRunRoot: input.operatorRunRoot,
+    summary,
+    findings
+  });
+  const residualFindingRefs = uniqueStrings(
+    findings.map((finding, index) => findingRef(finding, index))
+  );
+  const governingRequirementRefs = uniqueStrings(
+    findings
+      .map((finding, index) => findingRef(finding, index))
+      .filter((ref) => ref.startsWith("requirement:"))
+  );
+  const governingDesignRefs = uniqueStrings([
+    ...designEvidenceRefs(allEvidenceRefs),
+    "source_asset:implementation_design_surface"
+  ]);
+  const sourceDocuments = uniqueStrings([
+    ...requirementEvidenceRefs(allEvidenceRefs),
+    ...governingDesignRefs
+  ]);
+  const groups = groupFindingsByAction(findings);
+  const ids = allocateTicketIds({
+    workspaceRoot: input.workspaceRoot,
+    count: groups.length + 1
+  });
+  const parentTicketId = ids[0] ?? "T-001";
+  const childTicketIds = ids.slice(1);
+  const childTickets = groups.map((group, index) => {
+    const ticketId = childTicketIds[index] ?? `T-${String(index + 2).padStart(3, "0")}`;
+    const groupFindingRefs = uniqueStrings(
+      group.findings.map((finding, findingIndex) => findingRef(finding, findingIndex))
+    );
+    const groupRequirementRefs = uniqueStrings(
+      groupFindingRefs.filter((ref) => ref.startsWith("requirement:"))
+    );
+    const groupEvidenceRefs = uniqueStrings([
+      ...group.findings.flatMap(findingEvidenceRefs),
+      ...allEvidenceRefs
+    ]);
+    const title = `${group.failureClass}: ${group.requiredAction}`;
+    return writeTicketFile({
+      workspaceRoot: input.workspaceRoot,
+      ticketId,
+      title,
+      sourceRunArchiveRoot: input.operatorRunRoot,
+      sourceRunRef,
+      body: ticketMarkdown({
+        ticketId,
+        title,
+        category: "implementation_gap",
+        goal: "repair-builder-observed-product-gap",
+        changeIntent:
+          "Repair a product/worksite gap emitted by the builder after lawful terminal gap intake.",
+        targetTruth: group.requiredAction,
+        supersededTruth:
+          "Builder-observed product gaps can remain only in terminal run summaries or be patched outside the governed SDLC lane.",
+        closureLaw:
+          "The gap closes only when the generated product source, component code surface, and review-grade assessment prove the listed requirement obligations fulfilled through the builder workflow.",
+        evaluationCriteria: [
+          "governing requirements remain cited",
+          "governing design authority remains cited",
+          "component_code_surface carries source evidence for the repaired behavior",
+          "review-grade assessment closes the residual finding"
+        ],
+        nonClosureConditions: [
+          "manual outside-in generated source patch",
+          "command success without review-grade obligation closure",
+          "requirement lineage or design evidence is dropped"
+        ],
+        sourceDocuments: uniqueStrings([
+          ...requirementEvidenceRefs(groupEvidenceRefs),
+          ...governingDesignRefs
+        ]),
+        expectedBehavior: group.requiredAction,
+        actualBehavior:
+          `The builder stopped on ${edgeName} with ${sourceRunNarrative} and ${groupFindingRefs.length} residual review-grade or triage finding(s).`,
+        reproductionRefs: [sourceRunRef],
+        bugEvidenceRefs: groupEvidenceRefs,
+        firstMissingLayer: "realization",
+        governingRequirementRefs: groupRequirementRefs.length === 0
+          ? governingRequirementRefs
+          : groupRequirementRefs,
+        governingDesignRefs,
+        sourceOperatorRunRef: sourceRunRef,
+        sourceRunNarrative,
+        selectedStartTargetRef: "overlay://odd-sdlc/current-full-traversal"
+      })
+    });
+  });
+  const splitTicketRefsByFinding = findings.map((finding) => {
+    const requiredAction = findingRequiredAction(finding);
+    const failureClass = recordString(finding, "failureClass") ?? "blocked";
+    const groupIndex = groups.findIndex(
+      (group) => group.requiredAction === requiredAction && group.failureClass === failureClass
+    );
+    const ticket = childTickets[groupIndex] ?? childTickets[0];
+    return ticket?.ticketRef ?? `asset:ticket/${parentTicketId}`;
+  });
+  const parentTitle = sourceStopKind === "retry_exhaustion"
+    ? `Retry budget exhausted for ${edgeName}`
+    : `Review-grade triage gap for ${edgeName}`;
+  const parentGoal = sourceStopKind === "retry_exhaustion"
+    ? "triage-builder-retry-exhaustion"
+    : "triage-builder-review-grade-gap";
+  const parentChangeIntent = sourceStopKind === "retry_exhaustion"
+    ? "Convert a lawful builder retry-exhaustion failure into governed ticket workflow pressure and split product gaps without outside-in generated source repair."
+    : "Convert a terminal review-grade triage block into governed ticket workflow pressure and split product gaps without outside-in generated source repair.";
+  const parentTargetTruth = sourceStopKind === "retry_exhaustion"
+    ? "Retry exhaustion is preserved as active ticket workflow pressure with split product-gap tickets and an admitted current-full traversal entrypoint."
+    : "Terminal review-grade triage blocks are preserved as active ticket workflow pressure with split product-gap tickets and an admitted current-full traversal entrypoint.";
+  const parentSupersededTruth = sourceStopKind === "retry_exhaustion"
+    ? "A data-mapper live run may stop at retry_budget_exhausted with only run_summary evidence and no ticket intake."
+    : "A data-mapper live run may stop at a review-grade triage block with only run_summary evidence and no ticket intake.";
+  const parentTicket = writeTicketFile({
+    workspaceRoot: input.workspaceRoot,
+    ticketId: parentTicketId,
+    title: parentTitle,
+    sourceRunArchiveRoot: input.operatorRunRoot,
+    sourceRunRef,
+    body: ticketMarkdown({
+      ticketId: parentTicketId,
+      title: parentTitle,
+      category: "code_review_triage",
+      goal: parentGoal,
+      changeIntent: parentChangeIntent,
+      targetTruth: parentTargetTruth,
+      supersededTruth: parentSupersededTruth,
+      closureLaw:
+        "The triage ticket closes only after each split gap ticket has an explicit ruling or proof, and the source operator run remains cited in ticket workflow projection and admission.",
+      evaluationCriteria: [
+        "source operator run is cited",
+        "blocked review-grade findings are preserved",
+        "split gap tickets are active and admissible",
+        "asset:ticket start remains the only workflow entrypoint"
+      ],
+      nonClosureConditions: [
+        "generated product source is patched outside the builder workflow",
+        "review-grade findings are summarized without split tickets",
+        "retry exhaustion is treated as product convergence",
+        "ticket workflow projection cannot admit the generated tickets"
+      ],
+      sourceDocuments,
+      expectedBehavior:
+        "The builder retries or blocks lawfully and emits governed gap tickets instead of hiding or hand-repairing the residual.",
+      actualBehavior:
+        `The latest run stopped on ${edgeName} with ${sourceRunNarrative} and ${findings.length} blocked review-grade or triage finding(s).`,
+      reproductionRefs: [sourceRunRef],
+      bugEvidenceRefs: allEvidenceRefs,
+      firstMissingLayer: "realization",
+      governingRequirementRefs,
+      governingDesignRefs,
+      reviewFindingRefs: findings.map((finding, index) => findingRef(finding, index)),
+      reviewFindingRulings: findings.map(() => "split_ticket" as const),
+      reviewFindingSeverities: findings.map(() => "medium"),
+      reviewEvidenceRefs: allEvidenceRefs,
+      splitTicketRefs: splitTicketRefsByFinding,
+      acceptedChangeScopes: findings.map(findingRequiredAction),
+      reviewProofRequired: findings.map(
+        () => "split ticket must close through builder workflow evidence"
+      ),
+      sourceOperatorRunRef: sourceRunRef,
+      sourceRunNarrative,
+      selectedStartTargetRef: "overlay://odd-sdlc/current-full-traversal"
+    })
+  });
+  const workflow = projectSdlcTicketWorkflow({ workspaceRoot: input.workspaceRoot });
+  const createdTickets = [parentTicket, ...childTickets];
+  const admittedExecutionContractRefs = createdTickets.map((ticket) =>
+    admitSdlcTicketExecutionContract({
+      workflow,
+      ticketId: ticket.ticketId
+    }).executionContractRef
+  );
+  return Object.freeze({
+    kind: "sdlc_terminal_gap_ticket_intake_result" as const,
+    intakeKind: input.intakeKind,
+    sourceStopKind,
+    sourceRunArchiveRoot: input.operatorRunRoot,
+    sourceRunRef,
+    edgeName,
+    blockingReason,
+    closureDisposition,
+    parentTicket,
+    gapTickets: Object.freeze(childTickets),
+    createdTicketRefs: Object.freeze(createdTickets.map((ticket) => ticket.ticketRef)),
+    residualFindingRefs,
+    governingRequirementRefs,
+    governingDesignRefs,
+    evidenceRefs: allEvidenceRefs,
+    admittedExecutionContractRefs: Object.freeze(admittedExecutionContractRefs)
+  });
 }
 
 function diagnostic(input: {

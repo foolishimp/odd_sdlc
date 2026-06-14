@@ -60,6 +60,8 @@ const DATA_MAPPER_MAX_ADVANCES = Number.parseInt(
 );
 const DATA_MAPPER_STOP_AFTER_DETAIL_ZOOM =
   process.env["ODD_SDLC_TS_DATA_MAPPER_STOP_AFTER_DETAIL_ZOOM"] !== "false";
+const DATA_MAPPER_EXERCISE_TERMINAL_GAP_TICKETS =
+  process.env["ODD_SDLC_TS_DATA_MAPPER_EXERCISE_TERMINAL_GAP_TICKETS"] === "true";
 const DATA_MAPPER_DETAIL_ZOOM_EDGES = Object.freeze([
   "derive_component_code_surface",
   "qualify_component_realization_surface",
@@ -561,6 +563,282 @@ function terminalReasonFromStart(start) {
   );
 }
 
+function startArchiveRoot(start) {
+  return start?.archiveRoot ?? start?.summary?.archiveRoot ?? null;
+}
+
+function startBlockingReason(start) {
+  return start?.summary?.blockingReason ?? start?.blockingReason ?? null;
+}
+
+function startBlockingReasons(start) {
+  const summaryReasons = start?.summary?.blockingReasons;
+  if (Array.isArray(summaryReasons)) {
+    return summaryReasons;
+  }
+  const directReasons = start?.blockingReasons;
+  return Array.isArray(directReasons) ? directReasons : [];
+}
+
+function shouldRunTerminalGapTicketWorkflow(start) {
+  const blockingReason = startBlockingReason(start);
+  if (blockingReason === "retry_budget_exhausted") {
+    return true;
+  }
+  const status = start?.status ?? start?.summary?.status ?? null;
+  if (status !== "blocked") {
+    return false;
+  }
+  if (
+    typeof blockingReason === "string" &&
+    (blockingReason.includes("review_grade_assessment_invalid") ||
+      blockingReason.includes("evaluation_set_incomplete") ||
+      blockingReason.includes("triage_gap"))
+  ) {
+    return true;
+  }
+  return startBlockingReasons(start).some((reason) => {
+    const code = reason?.code ?? null;
+    return (
+      reason?.lawfulReentryPoint === "triage_gap" ||
+      code === "review_grade_assessment_invalid" ||
+      code === "review_grade_edge_fulfillment_blocked"
+    );
+  });
+}
+
+function maybeRunTerminalGapTicketWorkflow(input) {
+  const operatorRunRoot = startArchiveRoot(input.start);
+  if (operatorRunRoot === null || !shouldRunTerminalGapTicketWorkflow(input.start)) {
+    return null;
+  }
+  const intake = specPayload(
+    runCommand({
+      label: "ticket-intake-terminal-gap",
+      command: input.installedCommand,
+      args: [
+        "ticket-intake",
+        "--workspace",
+        ".",
+        "--from-run",
+        operatorRunRoot,
+        "--kind",
+        "code_review_triage"
+      ],
+      cwd: input.workspace,
+      env: input.env,
+      archiveRoot: input.archiveRoot
+    }),
+    "ticket-intake"
+  );
+  const parentTicketRef = intake?.parentTicket?.ticketRef;
+  if (typeof parentTicketRef !== "string" || parentTicketRef.length === 0) {
+    throw new Error(
+      `ticket-intake did not return a parent ticket ref: ${JSON.stringify(intake, null, 2)}`
+    );
+  }
+  const admitted = specPayload(
+    runCommand({
+      label: "ticket-admit-terminal-gap",
+      command: input.installedCommand,
+      args: [
+        "ticket-admit",
+        "--workspace",
+        ".",
+        "--target",
+        parentTicketRef
+      ],
+      cwd: input.workspace,
+      env: input.env,
+      archiveRoot: input.archiveRoot
+    }),
+    "ticket-admit"
+  );
+  const ticketStart = unwrapStartPayload(
+    runCommand({
+      label: "ticket-start-terminal-gap",
+      command: input.installedCommand,
+      args: [
+        "start",
+        "--workspace",
+        ".",
+        "--target",
+        parentTicketRef,
+        "--until",
+        "blocked",
+        "--worker",
+        WORKER_TRANSPORT
+      ],
+      cwd: input.workspace,
+      env: input.env,
+      archiveRoot: input.archiveRoot,
+      acceptedStatuses: Object.freeze([0, 4])
+    }),
+    "ticket-start-terminal-gap"
+  );
+  return Object.freeze({
+    kind: "data_mapper_terminal_gap_ticket_workflow",
+    sourceStopKind: intake.sourceStopKind ?? null,
+    operatorRunRoot,
+    parentTicketRef,
+    createdTicketRefs: intake.createdTicketRefs ?? [],
+    residualFindingRefs: intake.residualFindingRefs ?? [],
+    ticketIntake: intake,
+    admittedTicketExecutionContractRef: admitted.executionContractRef ?? null,
+    ticketStart: compactStartForSummary(ticketStart)
+  });
+}
+
+function writeTerminalGapTicketWorkflowExerciseOperatorRun(input) {
+  const runRoot = path.join(
+    input.workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs/t162-terminal-gap-ticket-workflow-live"
+  );
+  rmSync(runRoot, { recursive: true, force: true });
+  mkdirSync(runRoot, { recursive: true });
+  const reviewGradeRef =
+    "workspace://.ai-workspace/runtime/odd_sdlc/operator-runs/t162-terminal-gap-ticket-workflow-live/review_grade_edge_fulfillment_assessment.json";
+  const stdoutRef =
+    "workspace://.ai-workspace/runtime/odd_sdlc/operator-runs/t162-terminal-gap-ticket-workflow-live/review_grade_edge_fulfillment_stdout.log";
+  writeJson(path.join(runRoot, "operator_summary.json"), {
+    kind: "sdlc_operator_summary",
+    currentEdge: "derive_component_code_surface",
+    status: "blocked",
+    blockingReason:
+      "evaluation_set_incomplete blocked:evaluation-rule://odd-sdlc/review-grade-edge-fulfillment/fp:review_grade_fulfillment_binding_requirement_mismatch:module:cdme-accounting",
+    blockingReasons: [
+      {
+        kind: "sdlc_blocking_reason",
+        code: "review_grade_assessment_invalid",
+        reasonClass: "assurance",
+        lawfulReentryPoint: "triage_gap",
+        detail:
+          "review_grade_fulfillment_binding_requirement_mismatch:module:cdme-accounting",
+        evidenceRefs: [reviewGradeRef, stdoutRef]
+      }
+    ]
+  });
+  writeJson(path.join(runRoot, "sdlc_edge_closure_decision.json"), {
+    kind: "sdlc_edge_closure_decision",
+    disposition: "block"
+  });
+  writeJson(path.join(runRoot, "worker_result_report.json"), {
+    kind: "sdlc_worker_result_report",
+    edgeName: "derive_component_code_surface",
+    status: "completed",
+    outputAssetRefs: [
+      "workspace://build_tenants/scala_spark/design/component_code_surface.md"
+    ]
+  });
+  writeJson(path.join(runRoot, "review_grade_edge_fulfillment_assessment.json"), {
+    kind: "sdlc_review_grade_edge_fulfillment_assessment",
+    edgeName: "derive_component_code_surface",
+    status: "blocked",
+    findings: [
+      {
+        kind: "sdlc_review_grade_obligation_finding",
+        obligationId:
+          "requirement:data_mapper.ai_workspace_context_project_bootstrap.req_ldm_004_a",
+        fulfillmentStatus: "blocked",
+        failureClass: "trace_missing",
+        requiredAction:
+          "Repair component code lineage through builder workflow evidence instead of manual sandbox product edits.",
+        evidenceRefs: [
+          "workspace://.ai-workspace/context/project_bootstrap.md",
+          "workspace://build_tenants/scala_spark/design/component_code_surface.md",
+          "workspace://.ai-workspace/runtime/odd_sdlc/operator-runs/t162-terminal-gap-ticket-workflow-live/worker_result_report.json"
+        ]
+      },
+      {
+        kind: "sdlc_review_grade_obligation_finding",
+        obligationId: "requirement:data_mapper.requirements.req_int_006",
+        fulfillmentStatus: "blocked",
+        failureClass: "semantic_not_realized",
+        requiredAction:
+          "Create a governed product-gap ticket for versioned lookup lineage instead of patching the generated mapper directly.",
+        evidenceRefs: [
+          "workspace://specification/REQUIREMENTS.md",
+          "workspace://build_tenants/scala_spark/design/component_code_surface.md"
+        ]
+      }
+    ]
+  });
+  writeFileSync(
+    path.join(runRoot, "review_grade_edge_fulfillment_stdout.log"),
+    [
+      "review grade blocked",
+      "review_grade_fulfillment_binding_requirement_mismatch:module:cdme-accounting",
+      "lawfulReentryPoint=triage_gap"
+    ].join("\n"),
+    "utf8"
+  );
+  return Object.freeze({
+    runRoot,
+    start: Object.freeze({
+      kind: "sdlc_installed_operator_start_cli_projection",
+      status: "blocked",
+      archiveRoot: runRoot,
+      summary: Object.freeze({
+        status: "blocked",
+        archiveRoot: runRoot,
+        currentEdge: "derive_component_code_surface",
+        blockingReason:
+          "evaluation_set_incomplete blocked:evaluation-rule://odd-sdlc/review-grade-edge-fulfillment/fp:review_grade_fulfillment_binding_requirement_mismatch:module:cdme-accounting",
+        blockingReasons: Object.freeze([
+          Object.freeze({
+            kind: "sdlc_blocking_reason",
+            code: "review_grade_assessment_invalid",
+            reasonClass: "assurance",
+            lawfulReentryPoint: "triage_gap",
+            detail:
+              "review_grade_fulfillment_binding_requirement_mismatch:module:cdme-accounting",
+            evidenceRefs: Object.freeze([reviewGradeRef, stdoutRef])
+          })
+        ])
+      })
+    })
+  });
+}
+
+function runTerminalGapTicketWorkflowExercise(input) {
+  if (!DATA_MAPPER_EXERCISE_TERMINAL_GAP_TICKETS) {
+    return null;
+  }
+  const exercise = writeTerminalGapTicketWorkflowExerciseOperatorRun({
+    workspace: input.workspace
+  });
+  const workflow = maybeRunTerminalGapTicketWorkflow({
+    start: exercise.start,
+    installedCommand: input.installedCommand,
+    workspace: input.workspace,
+    env: input.env,
+    archiveRoot: input.archiveRoot
+  });
+  if (workflow === null) {
+    throw new Error("terminal gap ticket workflow exercise did not run");
+  }
+  if (workflow.sourceStopKind !== "review_grade_triage_gap") {
+    throw new Error(
+      `terminal gap exercise used wrong source stop kind: ${workflow.sourceStopKind}`
+    );
+  }
+  if (workflow.createdTicketRefs.length < 2) {
+    throw new Error(
+      `terminal gap exercise did not create parent/split tickets: ${JSON.stringify(workflow, null, 2)}`
+    );
+  }
+  if (workflow.ticketStart.graphFunctionName !== "route_ticket_work_item") {
+    throw new Error(
+      `terminal gap ticket did not re-enter through route_ticket_work_item: ${JSON.stringify(workflow.ticketStart, null, 2)}`
+    );
+  }
+  return Object.freeze({
+    kind: "data_mapper_terminal_gap_ticket_workflow_exercise",
+    exerciseOperatorRunRoot: exercise.runRoot,
+    workflow
+  });
+}
+
 function isSuccessfulSdlcTraversalStart(start) {
   const status = start?.status ?? start?.summary?.status ?? null;
   return (
@@ -681,6 +959,7 @@ function main() {
     targetGraphFunction: TARGET_GRAPH_FUNCTION,
     maxAdvances: DATA_MAPPER_MAX_ADVANCES,
     stopAfterDetailZoomEdges: DATA_MAPPER_STOP_AFTER_DETAIL_ZOOM,
+    exerciseTerminalGapTickets: DATA_MAPPER_EXERCISE_TERMINAL_GAP_TICKETS,
     requiredDetailZoomEdges: DATA_MAPPER_DETAIL_ZOOM_EDGES,
     steps: []
   };
@@ -771,6 +1050,23 @@ function main() {
   summary.productMaterializationPackages = findProductMaterializationPackages(workspace);
   summary.observedDetailZoomEdges = observedDetailZoomEdges(workspace);
   summary.terminalReason = startResult.terminalReason ?? terminalReasonFromStart(start);
+  summary.terminalGapTicketWorkflow = maybeRunTerminalGapTicketWorkflow({
+    start,
+    installedCommand,
+    workspace,
+    env: baseEnv,
+    archiveRoot
+  });
+  summary.retryExhaustionTicketWorkflow =
+    summary.terminalGapTicketWorkflow?.sourceStopKind === "retry_exhaustion"
+      ? summary.terminalGapTicketWorkflow
+      : null;
+  summary.terminalGapTicketWorkflowExercise = runTerminalGapTicketWorkflowExercise({
+    installedCommand,
+    workspace,
+    env: baseEnv,
+    archiveRoot
+  });
   writeJson(path.join(archiveRoot, "run_summary.json"), summary);
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 }

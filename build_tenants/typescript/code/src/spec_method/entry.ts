@@ -99,13 +99,17 @@ import {
 } from "../workspace/index.js";
 import { assertCurrentSdlcGtlProgramConformance } from "../gtl_conformance/index.js";
 import { isRecord } from "../admission/codecs.js";
-import { admitSdlcTicketExecutionContract } from "../tickets/index.js";
+import {
+  admitSdlcTicketExecutionContract,
+  createSdlcTerminalGapTicketsFromOperatorRun
+} from "../tickets/index.js";
 
 export const ODD_SDLC_SPEC_METHOD_COMMAND_VALUES = Object.freeze([
   "catalog",
   "query-domain",
   "tickets",
   "reviewers",
+  "ticket-intake",
   "ticket-admit",
   "gaps",
   "start",
@@ -142,7 +146,7 @@ export interface OddSdlcSpecMethodTraversalRequest {
   readonly kind: "odd_sdlc_spec_method_request";
   readonly command: Exclude<
     OddSdlcSpecMethodCommand,
-    "install" | "release-cut" | "release-snapshot" | "analyze-run"
+    "install" | "release-cut" | "release-snapshot" | "analyze-run" | "ticket-intake"
   >;
   readonly workspaceRoot: string;
   readonly outputWorkspaceRoot: string | null;
@@ -200,12 +204,21 @@ export interface OddSdlcSpecMethodAnalyzeRunRequest {
   readonly strict: boolean;
 }
 
+export interface OddSdlcSpecMethodTicketIntakeRequest {
+  readonly kind: "odd_sdlc_spec_method_ticket_intake_request";
+  readonly command: "ticket-intake";
+  readonly workspaceRoot: string;
+  readonly fromRun: string;
+  readonly intakeKind: "code_review_triage";
+}
+
 export type OddSdlcSpecMethodRequest =
   | OddSdlcSpecMethodTraversalRequest
   | OddSdlcSpecMethodInstallRequest
   | OddSdlcSpecMethodReleaseCutRequest
   | OddSdlcSpecMethodReleaseSnapshotRequest
-  | OddSdlcSpecMethodAnalyzeRunRequest;
+  | OddSdlcSpecMethodAnalyzeRunRequest
+  | OddSdlcSpecMethodTicketIntakeRequest;
 
 export interface OddSdlcSpecMethodResult {
   readonly kind: "odd_sdlc_spec_method_result";
@@ -268,6 +281,12 @@ interface SpecMethodAnalyzeRunOptionReadModel {
   readonly format: SdlcFdRunAnalysisFormat;
   readonly outputPath: string | null;
   readonly strict: boolean;
+}
+
+interface SpecMethodTicketIntakeOptionReadModel {
+  readonly workspaceRoot: string;
+  readonly fromRun: string;
+  readonly intakeKind: "code_review_triage";
 }
 
 interface SpecMethodWorkspaceContext {
@@ -733,6 +752,44 @@ function parseAnalyzeRunOptions(argv: readonly string[]): SpecMethodAnalyzeRunOp
   });
 }
 
+function parseTicketIntakeOptions(
+  argv: readonly string[]
+): SpecMethodTicketIntakeOptionReadModel {
+  let workspaceRoot = ".";
+  let fromRun: string | null = null;
+  let intakeKind: "code_review_triage" | null = null;
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (token === "--workspace") {
+      workspaceRoot = requireOptionValue(argv, index, token);
+      index += 1;
+    } else if (token === "--from-run" || token === "--operator-run") {
+      fromRun = requireOptionValue(argv, index, token);
+      index += 1;
+    } else if (token === "--kind") {
+      const value = requireOptionValue(argv, index, token);
+      if (value !== "code_review_triage") {
+        throw new TypeError("--kind expected code_review_triage");
+      }
+      intakeKind = value;
+      index += 1;
+    } else {
+      throw new TypeError(`unknown ticket-intake option: ${token ?? ""}`);
+    }
+  }
+  if (fromRun === null) {
+    throw new TypeError("ticket-intake requires --from-run <operator-run-archive>");
+  }
+  if (intakeKind === null) {
+    throw new TypeError("ticket-intake requires --kind code_review_triage");
+  }
+  return Object.freeze({
+    workspaceRoot,
+    fromRun,
+    intakeKind
+  });
+}
+
 function parseTarget(rawTarget: string): OddSdlcSpecMethodTraversalRequest["target"] {
   if (rawTarget === "next") {
     return Object.freeze({ kind: "next", handle: "next" });
@@ -826,9 +883,19 @@ export function admitOddSdlcSpecMethodRequest(argv: readonly string[]): OddSdlcS
       strict: options.strict
     });
   }
+  if (command === "ticket-intake") {
+    const options = parseTicketIntakeOptions(argv.slice(1));
+    return Object.freeze({
+      kind: "odd_sdlc_spec_method_ticket_intake_request",
+      command,
+      workspaceRoot: resolve(options.workspaceRoot),
+      fromRun: resolve(options.fromRun),
+      intakeKind: options.intakeKind
+    });
+  }
   const traversalCommand: Exclude<
     OddSdlcSpecMethodCommand,
-    "install" | "release-cut" | "release-snapshot" | "analyze-run"
+    "install" | "release-cut" | "release-snapshot" | "analyze-run" | "ticket-intake"
   > = command;
   const options = parseOptions(traversalCommand, argv.slice(1));
   return Object.freeze({
@@ -2140,10 +2207,20 @@ function analyzeRunPayload(
 }
 
 function commandPayload(
-  request: OddSdlcSpecMethodTraversalRequest | OddSdlcSpecMethodAnalyzeRunRequest
+  request:
+    | OddSdlcSpecMethodTraversalRequest
+    | OddSdlcSpecMethodAnalyzeRunRequest
+    | OddSdlcSpecMethodTicketIntakeRequest
 ): unknown {
   if (request.command === "analyze-run") {
     return analyzeRunPayload(request);
+  }
+  if (request.command === "ticket-intake") {
+    return createSdlcTerminalGapTicketsFromOperatorRun({
+      workspaceRoot: request.workspaceRoot,
+      operatorRunRoot: request.fromRun,
+      intakeKind: request.intakeKind
+    });
   }
   if (request.command === "catalog") {
     return constructSdlcGraphFunctionCatalog();
