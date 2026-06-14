@@ -493,6 +493,50 @@ function detailZoomStopSatisfied(workspace) {
   );
 }
 
+function releaseDepthParityMet(workspace) {
+  const releaseDepthParityPath = path.join(
+    workspace,
+    "build_tenants/scala_spark/design/release_depth_parity_surface.md"
+  );
+  if (!existsSync(releaseDepthParityPath)) {
+    return false;
+  }
+  let register;
+  try {
+    register = readJsonFile(releaseDepthParityPath);
+  } catch {
+    return false;
+  }
+  return (
+    register?.releaseDepthParity?.status === "met" &&
+    Array.isArray(register.releaseDepthParity.blockingReasons) &&
+    register.releaseDepthParity.blockingReasons.length === 0
+  );
+}
+
+function releaseSurfacePresent(workspace) {
+  const releaseSurfacePath = path.join(
+    workspace,
+    "build_tenants/scala_spark/design/release_surface.md"
+  );
+  return (
+    existsSync(releaseSurfacePath) &&
+    readFileSync(releaseSurfacePath, "utf8").includes("# release_surface")
+  );
+}
+
+function releaseProofStopSatisfied(workspace) {
+  return (
+    !DATA_MAPPER_STOP_AFTER_DETAIL_ZOOM &&
+    observedHandoffEdgesIncludeInOrder(
+      observedDetailZoomEdges(workspace),
+      DATA_MAPPER_DETAIL_ZOOM_EDGES
+    ) &&
+    releaseDepthParityMet(workspace) &&
+    releaseSurfacePresent(workspace)
+  );
+}
+
 function graphFunctionFromStartTarget(startTarget) {
   return startTarget.startsWith("graph_function:")
     ? startTarget.slice("graph_function:".length)
@@ -966,6 +1010,11 @@ function sdlcOverlayStartLoop(input) {
       break;
     }
 
+    if (releaseProofStopSatisfied(input.workspace)) {
+      terminalReason = "sdlc_release_proof_converged";
+      break;
+    }
+
     const graphFunctionName =
       start?.summary?.graphFunctionName ??
       start?.start?.executionContract?.targetGraphFunction ??
@@ -1132,6 +1181,7 @@ function main() {
     graphFunctionFromStartTarget(START_TARGET) ?? start.resolved_target ?? null;
   summary.productMaterializationPackages = findProductMaterializationPackages(workspace);
   summary.observedDetailZoomEdges = observedDetailZoomEdges(workspace);
+  summary.releaseProofConverged = releaseProofStopSatisfied(workspace);
   summary.terminalReason = startResult.terminalReason ?? terminalReasonFromStart(start);
   summary.terminalGapTicketWorkflow = maybeRunTerminalGapTicketWorkflow({
     start,

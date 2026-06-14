@@ -220,6 +220,28 @@ test("T-188 data_mapper release proof installs the release snapshot package", ()
   assert.match(runbook, /packageSource\.kind =\s*release_snapshot_package/u);
 });
 
+test("T-188 data_mapper release proof completion is not reported as overlay no-progress", () => {
+  const runnerSource = readFileSync(
+    path.join(PACKAGE_ROOT, "test_env/live/run_full_external_data_mapper_sandbox.mjs"),
+    "utf8"
+  );
+  assert.match(runnerSource, /function releaseProofStopSatisfied\(workspace\)/u);
+  assert.match(runnerSource, /function releaseDepthParityMet\(workspace\)/u);
+  assert.match(runnerSource, /releaseDepthParity\?\.status === "met"/u);
+  assert.match(runnerSource, /function releaseSurfacePresent\(workspace\)/u);
+  assert.match(runnerSource, /sdlc_release_proof_converged/u);
+  assert.match(runnerSource, /summary\.releaseProofConverged = releaseProofStopSatisfied\(workspace\)/u);
+
+  const releaseStopCheck = runnerSource.indexOf("releaseProofStopSatisfied(input.workspace)");
+  const noProgressCheck = runnerSource.indexOf("sameGraphFunctionAfterConverge >= 2");
+  assert.notEqual(releaseStopCheck, -1);
+  assert.notEqual(noProgressCheck, -1);
+  assert.ok(
+    releaseStopCheck < noProgressCheck,
+    "completed release proof must be classified before generic overlay no-progress"
+  );
+});
+
 test("T-188 explicit graph-function resume is not hijacked by overlay replay", () => {
   const source = readFileSync(
     path.join(PACKAGE_ROOT, "code/src/spec_method/entry.ts"),
