@@ -33,6 +33,8 @@ import {
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
 const REPO_ROOT = resolve(PACKAGE_ROOT, "../..");
+const PACKAGE_JSON = readJson(path.join(PACKAGE_ROOT, "package.json"));
+const ODD_SDLC_PACKAGE_VERSION = PACKAGE_JSON.version;
 const ABG_TYPESCRIPT_ROOT = resolve(
   REPO_ROOT,
   "../abiogenesis/build_tenants/abiogenesis/typescript"
@@ -564,14 +566,14 @@ test("T-059 release-cut adapter writes package artifact and binary evidence", as
 test("T-177 release-snapshot adapter writes versioned package evidence and ABG substrate pin", async () => {
   const snapshotRoot = path.join(
     mkdtempSync(path.join(tmpdir(), "odd-sdlc-ts-release-snapshot-")),
-    "0.0.0-dev"
+    ODD_SDLC_PACKAGE_VERSION
   );
   const outcome = await deriveOddSdlcTypescriptReleaseSnapshot({
-    releaseIdentity: "0.0.0-dev",
+    releaseIdentity: ODD_SDLC_PACKAGE_VERSION,
     packageSourceRoot: PACKAGE_ROOT,
     snapshotRoot,
     expectedPackageName: "@odd-sdlc/typescript-tenant",
-    expectedPackageVersion: "0.0.0-dev",
+    expectedPackageVersion: ODD_SDLC_PACKAGE_VERSION,
     allowDirtySource: true,
     npmCacheRoot: path.join(dirname(snapshotRoot), ".npm-cache")
   });
@@ -580,7 +582,12 @@ test("T-177 release-snapshot adapter writes versioned package evidence and ABG s
   assert.equal(existsSync(outcome.manifestPath), true);
   assert.equal(existsSync(outcome.checksumPath), true);
   assert.equal(
-    existsSync(path.join(snapshotRoot, "odd-sdlc-typescript-tenant-0.0.0-dev.tgz")),
+    existsSync(
+      path.join(
+        snapshotRoot,
+        `odd-sdlc-typescript-tenant-${ODD_SDLC_PACKAGE_VERSION}.tgz`
+      )
+    ),
     true
   );
   assert.equal(outcome.manifest.kind, "odd_sdlc_release_snapshot_manifest");
@@ -591,12 +598,12 @@ test("T-177 release-snapshot adapter writes versioned package evidence and ABG s
 
   const cliSnapshotRoot = path.join(
     mkdtempSync(path.join(tmpdir(), "odd-sdlc-ts-release-snapshot-cli-")),
-    "0.0.0-dev"
+    ODD_SDLC_PACKAGE_VERSION
   );
   const cliResult = await invokeOddSdlcSpecMethodCommand([
     "release-snapshot",
     "--release-identity",
-    "0.0.0-dev",
+    ODD_SDLC_PACKAGE_VERSION,
     "--snapshot-root",
     cliSnapshotRoot,
     "--package-source",
@@ -604,7 +611,7 @@ test("T-177 release-snapshot adapter writes versioned package evidence and ABG s
     "--expected-package-name",
     "@odd-sdlc/typescript-tenant",
     "--expected-package-version",
-    "0.0.0-dev",
+    ODD_SDLC_PACKAGE_VERSION,
     "--allow-dirty-source",
     "--npm-cache-root",
     path.join(dirname(cliSnapshotRoot), ".npm-cache")

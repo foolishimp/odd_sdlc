@@ -8,11 +8,15 @@ surfaces under `build_tenants/`.
 
 ## Current Supporting Docs
 
+- [ODD_SDLC_V2_0_0_RELEASE_NOTE.md](./ODD_SDLC_V2_0_0_RELEASE_NOTE.md)
+  records the final tapped `odd_sdlc` v2.0.0 release identity, qualification
+  boundary, and release-proof framing
 - [ODD_SDLC_V2_0_0_RC_2_RELEASE_NOTE.md](./ODD_SDLC_V2_0_0_RC_2_RELEASE_NOTE.md)
-  records the current `odd_sdlc` v2.0.0-rc.2 release-candidate identity,
+  records historical `odd_sdlc` v2.0.0-rc.2 release-candidate identity,
   shipment summary, qualification bundle, and known limitations
 - [ODD_SDLC_V2_0_0_RC_1_RELEASE_NOTE.md](./ODD_SDLC_V2_0_0_RC_1_RELEASE_NOTE.md)
-  records the first `odd_sdlc` v2.0.0 release-candidate identity and boundary
+  records the first historical `odd_sdlc` v2.0.0 release-candidate identity
+  and boundary
 
 ## Archived Material
 
