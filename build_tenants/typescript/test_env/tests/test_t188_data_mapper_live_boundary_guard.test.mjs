@@ -188,6 +188,36 @@ test("T-188 data_mapper live harness worker binding comes from runtime policy", 
   assert.match(resumeSource, /ODD_SDLC_TEST_ONLY_MINIMUM_OPERATOR_TIMEOUT_MS/u);
 });
 
+test("T-188 data_mapper release proof installs the release snapshot package", () => {
+  const runnerSource = readFileSync(
+    path.join(PACKAGE_ROOT, "test_env/live/run_full_external_data_mapper_sandbox.mjs"),
+    "utf8"
+  );
+  assert.match(
+    runnerSource,
+    /ODD_SDLC_TS_DATA_MAPPER_RELEASE_SNAPSHOT_ROOT/u
+  );
+  assert.match(
+    runnerSource,
+    /ODD_SDLC_TS_DATA_MAPPER_PACKAGE_SOURCE_ROOT/u
+  );
+  assert.match(runnerSource, /release_snapshot_package/u);
+  assert.match(runnerSource, /release-package-source/u);
+  assert.match(runnerSource, /packageSource\.packageSourceRoot/u);
+  assert.doesNotMatch(
+    runnerSource,
+    /"--package-source",\s*PACKAGE_ROOT/u
+  );
+
+  const runbook = readFileSync(
+    path.join(PACKAGE_ROOT, "test_env/live/DATA_MAPPER_LIVE_RUNBOOK.md"),
+    "utf8"
+  );
+  assert.match(runbook, /release proof/u);
+  assert.match(runbook, /ODD_SDLC_TS_DATA_MAPPER_RELEASE_SNAPSHOT_ROOT/u);
+  assert.match(runbook, /packageSource\.kind =\s*release_snapshot_package/u);
+});
+
 test("T-188 explicit graph-function resume is not hijacked by overlay replay", () => {
   const source = readFileSync(
     path.join(PACKAGE_ROOT, "code/src/spec_method/entry.ts"),

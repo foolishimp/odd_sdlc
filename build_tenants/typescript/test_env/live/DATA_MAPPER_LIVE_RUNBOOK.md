@@ -43,6 +43,20 @@ authority, but prune copied build/tool byproducts (`target`, `.bloop`,
 tenant-stack modules or missing lineage traces are product pressure unless they
 prove a framework prompt, admission, replay, or closure defect.
 
+For a release proof, run the full data_mapper lane against the release snapshot
+package instead of the mutable source package:
+
+```bash
+ODD_SDLC_TS_DATA_MAPPER_RELEASE_SNAPSHOT_ROOT=release_snapshots/odd-sdlc-typescript-tenant/2.0.0 \
+ODD_SDLC_TS_DATA_MAPPER_LANE_NAME=data_mapper_v2_0_0_release_proof \
+ODD_SDLC_TS_DATA_MAPPER_START_TARGET=overlay:deep-sdlc-traversal \
+npm run live:data-mapper-sandbox
+```
+
+The run archive must record `packageSource.kind =
+release_snapshot_package`. If it records `source_package`, the run is source
+checkout evidence, not release evidence.
+
 ## Failure Classification
 
 Classify generated workspace compile, test, source, lineage, and tenant-stack failures as F_P worksite repair pressure by default.

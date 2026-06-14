@@ -37,6 +37,10 @@ const LANE_NAME =
   process.env["ODD_SDLC_TS_DATA_MAPPER_LANE_NAME"] ??
   "full_external_data_mapper_sandbox";
 const DATA_MAPPER_TEMPLATE_ROOT = canonicalDataMapperFixtureRoot();
+const DATA_MAPPER_RELEASE_SNAPSHOT_ROOT =
+  process.env["ODD_SDLC_TS_DATA_MAPPER_RELEASE_SNAPSHOT_ROOT"] ?? "";
+const DATA_MAPPER_PACKAGE_SOURCE_ROOT =
+  process.env["ODD_SDLC_TS_DATA_MAPPER_PACKAGE_SOURCE_ROOT"] ?? "";
 const WORKER_TRANSPORT = RUNTIME_POLICY.liveHarnessDataMapperWorkerTransport;
 const DATA_MAPPER_WORKER_MINIMUM_OPERATOR_TIMEOUT_MS =
   process.env["ODD_SDLC_TS_DATA_MAPPER_WORKER_MINIMUM_OPERATOR_TIMEOUT_MS"] ??
@@ -92,6 +96,72 @@ function assertExists(filePath, label) {
   if (!existsSync(filePath)) {
     throw new Error(`missing ${label}: ${filePath}`);
   }
+}
+
+function packageSourceForRun(archiveRoot) {
+  if (
+    DATA_MAPPER_RELEASE_SNAPSHOT_ROOT.length > 0 &&
+    DATA_MAPPER_PACKAGE_SOURCE_ROOT.length > 0
+  ) {
+    throw new Error(
+      "declare only one of ODD_SDLC_TS_DATA_MAPPER_RELEASE_SNAPSHOT_ROOT or ODD_SDLC_TS_DATA_MAPPER_PACKAGE_SOURCE_ROOT"
+    );
+  }
+  if (DATA_MAPPER_PACKAGE_SOURCE_ROOT.length > 0) {
+    const packageSourceRoot = resolve(DATA_MAPPER_PACKAGE_SOURCE_ROOT);
+    assertExists(path.join(packageSourceRoot, "package.json"), "override package.json");
+    return Object.freeze({
+      kind: "package_source_override",
+      packageSourceRoot,
+      releaseSnapshotRoot: null,
+      releaseTarballPath: null
+    });
+  }
+  if (DATA_MAPPER_RELEASE_SNAPSHOT_ROOT.length === 0) {
+    return Object.freeze({
+      kind: "source_package",
+      packageSourceRoot: PACKAGE_ROOT,
+      releaseSnapshotRoot: null,
+      releaseTarballPath: null
+    });
+  }
+
+  const releaseSnapshotRoot = resolve(DATA_MAPPER_RELEASE_SNAPSHOT_ROOT);
+  const manifestPath = path.join(releaseSnapshotRoot, "release-snapshot-manifest.json");
+  const manifest = readJsonFile(manifestPath);
+  const tarballRelativePath = manifest?.tarball?.relativePath;
+  if (typeof tarballRelativePath !== "string" || tarballRelativePath.length === 0) {
+    throw new Error(`release snapshot manifest does not declare a tarball: ${manifestPath}`);
+  }
+  const releaseTarballPath = path.join(releaseSnapshotRoot, tarballRelativePath);
+  assertExists(releaseTarballPath, "release snapshot tarball");
+
+  const packageSourceRoot = path.join(archiveRoot, "release-package-source");
+  rmSync(packageSourceRoot, { recursive: true, force: true });
+  mkdirSync(packageSourceRoot, { recursive: true });
+  const extract = spawnSync(
+    "tar",
+    ["-xzf", releaseTarballPath, "-C", packageSourceRoot, "--strip-components=1"],
+    {
+      encoding: "utf8"
+    }
+  );
+  if (extract.status !== 0) {
+    throw new Error(
+      `release snapshot package extraction failed: ${extract.stderr || extract.error?.message || extract.status}`
+    );
+  }
+  assertExists(path.join(packageSourceRoot, "package.json"), "extracted release package.json");
+  assertExists(
+    path.join(packageSourceRoot, "build/semantic/code/src/cli/main.js"),
+    "extracted release odd-sdlc-ts CLI"
+  );
+  return Object.freeze({
+    kind: "release_snapshot_package",
+    packageSourceRoot,
+    releaseSnapshotRoot,
+    releaseTarballPath
+  });
 }
 
 function freshWorkspace(archiveRoot) {
@@ -922,6 +992,7 @@ function main() {
   const archiveRoot = path.join(testRunRoot, LANE_NAME, `${archiveTimestamp()}_pid${process.pid}`);
   mkdirSync(archiveRoot, { recursive: true });
   const workspace = freshWorkspace(archiveRoot);
+  const packageSource = packageSourceForRun(archiveRoot);
   const sourceCli = path.join(PACKAGE_ROOT, "build/semantic/code/src/cli/main.js");
   assertExists(sourceCli, "built source odd-sdlc-ts CLI");
   const toolCache = sandboxToolCache({ archiveRoot, workspace });
@@ -944,6 +1015,7 @@ function main() {
     archiveRoot,
     workspace,
     templateRoot: DATA_MAPPER_TEMPLATE_ROOT,
+    packageSource,
     workerTransport: WORKER_TRANSPORT,
     workerRuntimeEnv: dataMapperWorkerRuntimeEnv(),
     sandboxToolCache: {
@@ -975,7 +1047,7 @@ function main() {
         "--target",
         ".",
         "--package-source",
-        PACKAGE_ROOT,
+        packageSource.packageSourceRoot,
         "--abg-package-source",
         ABG_TYPESCRIPT_ROOT,
         "--installed-package-name",
