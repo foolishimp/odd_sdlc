@@ -40,6 +40,7 @@ import {
   snapshotProductMaterializationRoot,
   SDLC_EDGE_GAIN_CLOSURE_CONTRACTS,
   SDLC_OPERATOR_RUN_ARTIFACT_CATALOG,
+  sdlcFpEvaluateOpenObligationPressureRefs,
   SDLC_PRODUCT_GRAPH_EDGE_POLICY_ROWS,
   sdlcTargetCarrierContractRef,
   sdlcTargetCarrierOutputKind,
@@ -2143,6 +2144,37 @@ test("T-182 review-grade prompt routes lawful downstream carryover through wrong
   assert.match(
     source,
     /wrong_stage is only for lawful downstream carryover/u
+  );
+});
+
+test("T-202 review-grade downstream carryover does not force same-edge retry", () => {
+  const carryoverReason =
+    "requirement_carried_for_downstream_closure:data_mapper.requirements.req_pdm_006";
+  assert.deepEqual(
+    sdlcFpEvaluateOpenObligationPressureRefs({
+      runRef: "t202-downstream-carryover",
+      status: "admitted_with_open_obligations",
+      obligationAssessmentCounts: {
+        total: 2,
+        fulfilled: 0,
+        partial: 0,
+        blocked: 2,
+        unassessed: 0
+      },
+      obligationAssessments: [
+        {
+          fulfillmentStatus: "blocked",
+          blockingReasons: [carryoverReason]
+        },
+        {
+          fulfillmentStatus: "blocked",
+          blockingReasons: [
+            "requirement_carried_for_downstream_closure:data_mapper.stage_10_generated_bootstrap.req_pdm_006"
+          ]
+        }
+      ]
+    }),
+    []
   );
 });
 

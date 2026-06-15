@@ -209,6 +209,53 @@ function writeReviewGradeTriageBlockRun(root) {
   return runRoot;
 }
 
+function writeAssessmentInvalidBlockingReasonOnlyRun(root) {
+  const runRoot = join(root, ".ai-workspace", "runtime", "odd_sdlc", "operator-runs", "run-1");
+  writeJson(join(runRoot, "operator_summary.json"), {
+    kind: "sdlc_operator_summary",
+    currentEdge: "derive_component_code_surface",
+    status: "blocked",
+    blockingReason:
+      "evaluation_set_incomplete blocked:evaluation-rule://odd-sdlc/review-grade-edge-fulfillment/fp:review_grade_fulfillment_binding_requirement_mismatch:target_asset:component_code_surface",
+    blockingReasons: [
+      {
+        kind: "sdlc_blocking_reason",
+        code: "review_grade_assessment_invalid",
+        reasonClass: "assurance",
+        lawfulReentryPoint: "triage_gap",
+        detail:
+          "review_grade_fulfillment_binding_requirement_mismatch:target_asset:component_code_surface",
+        evidenceRefs: [
+          "workspace://.ai-workspace/runtime/odd_sdlc/operator-runs/run-1/review_grade_edge_fulfillment_assessment.json",
+          "workspace://.ai-workspace/runtime/odd_sdlc/operator-runs/run-1/review_grade_edge_fulfillment_stdout.log"
+        ]
+      }
+    ]
+  });
+  writeJson(join(runRoot, "sdlc_edge_closure_decision.json"), {
+    kind: "sdlc_edge_closure_decision",
+    disposition: "block"
+  });
+  writeJson(join(runRoot, "review_grade_edge_fulfillment_assessment.json"), {
+    kind: "sdlc_review_grade_edge_fulfillment_assessment",
+    edgeName: "derive_component_code_surface",
+    status: "blocked",
+    findings: [
+      {
+        kind: "sdlc_review_grade_obligation_finding",
+        obligationId: "module:cdme-compiler",
+        fulfillmentStatus: "fulfilled",
+        failureClass: "none",
+        requiredAction: "Already fulfilled.",
+        evidenceRefs: [
+          "workspace://build_tenants/scala_spark/design/component_code_surface.md"
+        ]
+      }
+    ]
+  });
+  return runRoot;
+}
+
 test("T-162 retry exhaustion emits gap tickets and admits ticket workflow start", () => {
   const root = workspace();
   const runRoot = writeRetryExhaustedRun(root);
@@ -260,6 +307,48 @@ test("T-162 retry exhaustion emits gap tickets and admits ticket workflow start"
     start.executionContract.ticketExecutionContract?.ticketId,
     intake.parentTicket.ticketId
   );
+});
+
+test("T-162 terminal assessment-invalid blocking reason emits admitted tickets without product requirement findings", () => {
+  const root = workspace();
+  const runRoot = writeAssessmentInvalidBlockingReasonOnlyRun(root);
+  const intake = createSdlcTerminalGapTicketsFromOperatorRun({
+    workspaceRoot: root,
+    operatorRunRoot: runRoot,
+    intakeKind: "code_review_triage"
+  });
+
+  assert.equal(intake.sourceStopKind, "review_grade_triage_gap");
+  assert.deepStrictEqual(intake.residualFindingRefs, [
+    "blocking-reason://odd-sdlc/review_grade_assessment_invalid/1"
+  ]);
+  assert.deepStrictEqual(intake.governingRequirementRefs, [
+    "requirement:REQ-F-ODDSDLC-034",
+    "requirement:REQ-F-ODDSDLC-035"
+  ]);
+  assert.equal(intake.gapTickets.length, 1);
+
+  const workflow = projectSdlcTicketWorkflow({ workspaceRoot: root });
+  const createdTicketIds = [
+    intake.parentTicket.ticketId,
+    ...intake.gapTickets.map((ticket) => ticket.ticketId)
+  ];
+  for (const ticketId of createdTicketIds) {
+    const row = workflow.rows.find((candidate) => candidate.ticketId === ticketId);
+    assert(row, `expected workflow row for ${ticketId}`);
+    assert.equal(row.workflowStatus, "valid");
+    assert.equal(
+      row.diagnostics.some((diagnostic) => diagnostic.code === "missing_governing_requirement"),
+      false
+    );
+    const contract = admitSdlcTicketExecutionContract({ workflow, ticketId });
+    assert(contract.bugTriageRows[0].governingRequirementRefs.length > 0);
+  }
+
+  const start = startTicket(root, intake.parentTicket.ticketId);
+  assert.equal(start.kind, "sdlc_public_start_projected");
+  assert.equal(start.executionContract.targetGraphFunction, "route_ticket_work_item");
+  assert.equal(start.executionContract.overlayRef, SDLC_TICKET_WORKFLOW_OVERLAY_REF);
 });
 
 test("T-162 review-grade triage block emits gap tickets and admits ticket workflow start", () => {

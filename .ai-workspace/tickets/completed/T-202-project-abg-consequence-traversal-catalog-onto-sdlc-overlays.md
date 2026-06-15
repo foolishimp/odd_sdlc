@@ -3,9 +3,9 @@ id: T-202
 title: Project ABG consequence traversal catalog onto SDLC overlays
 type: feature
 ticket_category: consequence_traversal_algebra
-status: active
-review_status: implementation_started
-proof_status: rc21_pin_complete_overlay_catalog_projection_pending
+status: completed
+review_status: closed
+proof_status: overlay_catalog_projection_live_builder_proven
 goal: sdlc-overlays-declare-the-abg-admitted-consequence-traversal-options-for-each-edge
 build_tenant: typescript
 owner: odd_sdlc
@@ -257,14 +257,16 @@ Review date: 2026-06-15.
 T-202 is not fully ABG-compliant yet. The following are blockers, not accepted
 exceptions or tech debt:
 
-1. The installed `consequence.C` path currently returns
-   `ConsequenceProjectionOutcome` from SDLC read models without consulting
-   `EnginePluginInput.allowedConsequenceTraversalCatalog`.
-2. Existing overlay annotations expose depth policy and ticket workflow policy,
-   but they do not yet lower into the ABG T-156 GTL declaration keys.
-3. Existing depth binding constructs a traversal action path, but T-202 must
-   require explicit `selectedTraversalFamily` and ABG catalog admission before
-   execution.
+1. The installed `consequence.C` path must continue to return traversal
+   selections only through `ConsequenceProjectionOutcome.traversalAction` after
+   the active edge's ABG-derived
+   `EnginePluginInput.allowedConsequenceTraversalCatalog` admits the selection.
+2. Overlay annotations may remain product policy and proportionality evidence
+   only. Their executable effect is the GTL declaration row lowered for the
+   current graph function/vector and then re-derived by ABG T-156.
+3. Depth binding must continue to carry explicit `selectedTraversalFamily =
+   depth_traversal` and fail closed when the overlay-scoped ABG catalog has no
+   matching row.
 
 There are no lawful permanent exceptions. Closure requires one ABG truth:
 GTL declarations -> ABG catalog -> SDLC selection over that catalog -> ABG
@@ -282,25 +284,89 @@ admission/execution/replay/terminal truth.
 - `odd_sdlc.TS` dependency, package lock, product substrate text, and substrate
   contract now target rc21.
 
-Current non-closure after the pin:
+2026-06-15 overlay catalog implementation proof:
 
-- overlay declarations still need to lower into ABG T-156 GTL declaration rows
-- consequence.C still needs to consume the ABG-provided catalog before selecting
-  depth, ticket, retry, re-entry, or terminal outcomes
-- live data-mapper builder proof remains pending after overlay lowering
+- `graph/module.ts` lowers SDLC overlay policy into ABG
+  `abg.consequence.allowed_traversals` GTL graph-vector declarations. The
+  lowering decorates the constructed SDLC GTL module, so ABG conformance sees
+  the same declarations the runtime catalog derives.
+- `graph/overlays.ts` exposes `allowedConsequenceTraversalDeclarations` as a
+  read-only overlay projection derived from the ABG catalog rows, not as a
+  second route-authority surface.
+- `operator/traversal_consequence.ts` and `operator/installed_operator.ts`
+  construct depth traversal actions with explicit `selectedTraversalFamily`,
+  published traversal targets, and overlay-scoped ABG catalog admission before
+  returning `traversalAction`.
+- `test_t202_consequence_traversal_overlay_catalog.test.mjs` proves
+  current-full baseline/ticket rows, deep depth/ticket rows, ticket-workflow
+  non-recursive rows, real GTL declaration derivation, catalog-present
+  selection admission, catalog-absent selection rejection, and current SDLC GTL
+  typecheck.
+- `npm run test:semantic` passes 1042/1042 after the implementation and
+  closure-guard expansion.
+
+2026-06-15 live builder proof:
+
+- `npm run test:t200:hello-world-js-zoom-live` passes after the SDLC
+  design-depth evaluator accepts/canonicalizes numeric tranche ids from live
+  builder output.
+- `npm run test:t200:rust-detailed-live` passes against the installed surface.
+- `npm run test:t200:data-mapper-detailed-live` passes as a builder proof:
+  deep overlay execution drives the data-mapper component-code edge through
+  repeated governed builder retries, then preserves the remaining external
+  Spark/Hadoop-on-Java-25 proof block as ticket pressure instead of outside-in
+  product patching.
+- Data-mapper archive:
+  `build_tenants/typescript/test_env/test_runs/data_mapper_deep_sdlc_detail_sandbox/20260614T231925200Z_pid90843/run_summary.json`.
+- Final component-code review assessment:
+  `workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260615T005410865Z_pid61394/review_grade_edge_fulfillment_assessment.json`,
+  `status = blocked`, 170 reviewed findings. The block is external proof
+  environment pressure: `Java 25/Spark-Hadoop runtime incompatibility`.
+- Terminal gap intake creates admitted tickets `asset:ticket/T-001` and
+  `asset:ticket/T-002`, cites `requirement:REQ-F-ODDSDLC-034` and
+  `requirement:REQ-F-ODDSDLC-035`, and records admitted execution contracts for
+  both.
+- Ticket route start
+  `workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260615T011409585Z_pid73323`
+  executes `asset:ticket/T-001` through `overlay://odd-sdlc/ticket-workflow`
+  and `route_ticket_work_item`; the start projection is `status = converged`,
+  `nextLawfulAction = disposition://close`, `productConverged = false`.
+- Ticket-route review assessment records 162 reviewed findings: 38 fulfilled
+  route obligations and 124 lawful `downstream_deferred` partials preserved for
+  `asset:ticket/T-002`. This is the intended builder-of-builder result, not a
+  generated data-mapper product completion claim.
+
+2026-06-15 SDLC builder bugs fixed during live proof:
+
+- `component_depth_register.ts` now canonicalizes live numeric `trancheId`
+  values into string ids and keeps `null` legal; prompts now state the
+  target-carrier contract explicitly.
+- Review-grade downstream carryover no longer forces same-edge retry churn when
+  all remaining open obligations are `requirement_carried_for_downstream_closure`.
+- Terminal gap ticket intake now admits assessment-invalid or environment-only
+  residuals that lack product requirement refs by attaching governed SDLC
+  workflow requirement refs `REQ-F-ODDSDLC-034` and `REQ-F-ODDSDLC-035`.
+
+Current closure finding:
+
+- T-202 is complete. The ABG catalog is the single traversal-eligibility truth;
+  SDLC overlays lower policy into GTL declarations, consequence.C selects only
+  against the ABG-provided catalog, and live builder proof shows depth and
+  ticket traversal use the same admitted path without SDLC runtime authority or
+  outside-in generated-product patching.
 
 ## Work Ledger
 
 | id | task | proof | status |
 | --- | --- | --- | --- |
 | D0 | Pin SDLC to ABG rc21 containing T-156 static compiler validation. | package dependency, substrate contract, product text, and identity tests name `@abiogenesis/typescript-tenant@4.0.0-rc.21`. | done |
-| D1 | Update overlay design with T-156 declaration mapping and the exact overlay edge matrix. | design explains overlay rows -> GTL declarations -> ABG catalog and names the graph-function targets for current-full, deep, lite, framework-smoke, bootstrap, solution-architecture, and ticket-workflow overlays. | pending |
-| D2 | Add overlay carrier fields for allowed consequence traversal families and route constraints. | carrier/admission tests reject unknown families, duplicate rows, storage-target ticket traversal, annotation-only effects, and missing explicit selected family for nonlocal rows. | pending |
-| D3 | Lower overlay declarations into GTL graph-function/vector declarations. | catalog/query tests prove declarations appear on the intended edge and not globally. | pending |
-| D4 | Make SDLC consequence.C consume the ABG-provided catalog when constructing traversal action bindings. | tests prove catalog-present depth/ticket selection succeeds, catalog-absent selection blocks, and no local switch can choose a traversal family. | pending |
-| D5 | Preserve authority boundary. | tests prove no SDLC runtime events, cursor moves, local loops, ticket storage mutation, or closure truth are introduced. | pending |
-| D6 | Run focused regressions and ABG conformance/typecheck proof. | semantic build, focused T-202 tests, T-160/T-162/T-165/T-197/T-200 regressions, ABG gate. | pending |
-| D7 | Run live builder proof after substrate release pin. | data-mapper builder route uses deep overlay for code/test build depth and creates lawful ticket pressure for generated-product defects. | pending |
+| D1 | Update overlay design with T-156 declaration mapping and the exact overlay edge matrix. | `ODD_SDLC_TYPESCRIPT_OPTIMISING_OVERLAY.md` explains overlay rows -> GTL declarations -> ABG catalog and names the graph-function targets for current-full, deep, lite, framework-smoke, bootstrap, solution-architecture, and ticket-workflow overlays. | done |
+| D2 | Add overlay carrier fields for allowed consequence traversal families and route constraints. | `SdlcTraversalOverlay.allowedConsequenceTraversalDeclarations` projects ABG-derived rows as read-only overlay data; focused tests prove current-full, deep, and ticket-workflow family availability and absence. | done |
+| D3 | Lower overlay declarations into GTL graph-function/vector declarations. | `graph/module.ts` decorates the current SDLC GTL module with ABG T-156 declaration rows; focused tests prove declarations appear on intended deep/current-full code/test edges and not on unrelated vectors. | done |
+| D4 | Make SDLC consequence.C consume the ABG-provided catalog when constructing traversal action bindings. | traversal binding admits against an overlay-scoped `AllowedConsequenceTraversalCatalog`; focused tests prove catalog-present depth selection succeeds and current-full catalog absence rejects depth. | done |
+| D5 | Preserve authority boundary. | implementation adds no SDLC runtime events, cursor moves, local loops, ticket storage mutation, or closure truth; T-162/T-165/T-197 regressions remain clean after the catalog gate. | done |
+| D6 | Run focused regressions and ABG conformance/typecheck proof. | `npm run test:t202`, T-160/T-162/T-165/T-197/T-200 focused regressions, `npm run lint:test-harness`, `npm run lint:semantic`, and `npm run test:semantic` (1042/1042) pass. | done |
+| D7 | Run live builder proof after substrate release pin. | JS zoom and Rust detailed live tests pass. Data-mapper detailed live runs the deep overlay, exercises component-code depth/retry, creates admitted terminal gap tickets for the remaining external proof block, and routes `asset:ticket/T-001` through the installed ticket-workflow overlay. | done |
 
 ## Closure Criteria
 

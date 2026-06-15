@@ -335,12 +335,15 @@ export function sdlcFpEvaluateOpenObligationPressureRefs(input: {
     input.obligationAssessments === undefined
       ? input.obligationAssessmentCounts
       : effectiveCountsForAssessments(input.obligationAssessments);
-  const partialsAreDownstreamCarryover =
-    counts.partial > 0 &&
+  const openAssessmentsAreDownstreamCarryover =
+    counts.partial + counts.blocked > 0 &&
     input.obligationAssessments !== undefined &&
     input.obligationAssessments.filter(
-      (assessment) => assessment.fulfillmentStatus === "partial"
-    ).length === counts.partial &&
+      (assessment) =>
+        assessment.fulfillmentStatus === "partial" ||
+        assessment.fulfillmentStatus === "blocked"
+    ).length ===
+      counts.partial + counts.blocked &&
     input.obligationAssessments
       .filter((assessment) => assessment.fulfillmentStatus === "partial")
       .every((assessment) =>
@@ -349,11 +352,18 @@ export function sdlcFpEvaluateOpenObligationPressureRefs(input: {
             reason.startsWith("requirement_recorded_for_future_closure:") ||
             reason.startsWith("requirement_carried_for_downstream_closure:")
         )
+      ) &&
+    input.obligationAssessments
+      .filter((assessment) => assessment.fulfillmentStatus === "blocked")
+      .every((assessment) =>
+        assessment.blockingReasons.some((reason) =>
+          reason.startsWith("requirement_carried_for_downstream_closure:")
+        )
       );
   if (
     (input.status === "passed" ||
       (input.status === "admitted_with_open_obligations" &&
-        partialsAreDownstreamCarryover)) &&
+        openAssessmentsAreDownstreamCarryover)) &&
     counts.partial === 0 &&
     counts.blocked === 0 &&
     counts.unassessed === 0
@@ -362,18 +372,19 @@ export function sdlcFpEvaluateOpenObligationPressureRefs(input: {
   }
   if (
     input.status === "admitted_with_open_obligations" &&
-    partialsAreDownstreamCarryover &&
-    counts.blocked === 0 &&
+    openAssessmentsAreDownstreamCarryover &&
     counts.unassessed === 0
   ) {
     return Object.freeze([]);
   }
   const reasons = [
     ...(input.status === "passed" ? [] : [`status:${input.status}`]),
-    ...(counts.partial === 0 || partialsAreDownstreamCarryover
+    ...(counts.partial === 0 || openAssessmentsAreDownstreamCarryover
       ? []
       : [`partial-${counts.partial}`]),
-    ...(counts.blocked === 0 ? [] : [`blocked-${counts.blocked}`]),
+    ...(counts.blocked === 0 || openAssessmentsAreDownstreamCarryover
+      ? []
+      : [`blocked-${counts.blocked}`]),
     ...(counts.unassessed === 0 ? [] : [`unassessed-${counts.unassessed}`])
   ];
   return Object.freeze(

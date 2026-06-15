@@ -339,6 +339,11 @@ const SDLC_TICKET_DECLARED_STATUS_SET: ReadonlySet<string> = new Set(
   SDLC_TICKET_DECLARED_STATUS_VALUES
 );
 
+const SDLC_TERMINAL_GAP_TICKET_WORKFLOW_REQUIREMENT_REFS = Object.freeze([
+  "requirement:REQ-F-ODDSDLC-034",
+  "requirement:REQ-F-ODDSDLC-035"
+] as const);
+
 function sha256Text(content: string): string {
   return `sha256:${createHash("sha256").update(content, "utf8").digest("hex")}`;
 }
@@ -955,16 +960,22 @@ export function createSdlcTerminalGapTicketsFromOperatorRun(input: {
   const residualFindingRefs = uniqueStrings(
     findings.map((finding, index) => findingRef(finding, index))
   );
-  const governingRequirementRefs = uniqueStrings(
+  const productGoverningRequirementRefs = uniqueStrings(
     findings
       .map((finding, index) => findingRef(finding, index))
       .filter((ref) => ref.startsWith("requirement:"))
+  );
+  const governingRequirementRefs = uniqueStrings(
+    productGoverningRequirementRefs.length === 0
+      ? [...SDLC_TERMINAL_GAP_TICKET_WORKFLOW_REQUIREMENT_REFS]
+      : productGoverningRequirementRefs
   );
   const governingDesignRefs = uniqueStrings([
     ...designEvidenceRefs(allEvidenceRefs),
     "source_asset:implementation_design_surface"
   ]);
   const sourceDocuments = uniqueStrings([
+    ...governingRequirementRefs,
     ...requirementEvidenceRefs(allEvidenceRefs),
     ...governingDesignRefs
   ]);
@@ -983,6 +994,9 @@ export function createSdlcTerminalGapTicketsFromOperatorRun(input: {
     const groupRequirementRefs = uniqueStrings(
       groupFindingRefs.filter((ref) => ref.startsWith("requirement:"))
     );
+    const admittedGroupRequirementRefs = groupRequirementRefs.length === 0
+      ? governingRequirementRefs
+      : groupRequirementRefs;
     const groupEvidenceRefs = uniqueStrings([
       ...group.findings.flatMap(findingEvidenceRefs),
       ...allEvidenceRefs
@@ -1018,6 +1032,7 @@ export function createSdlcTerminalGapTicketsFromOperatorRun(input: {
           "requirement lineage or design evidence is dropped"
         ],
         sourceDocuments: uniqueStrings([
+          ...admittedGroupRequirementRefs,
           ...requirementEvidenceRefs(groupEvidenceRefs),
           ...governingDesignRefs
         ]),
@@ -1027,9 +1042,7 @@ export function createSdlcTerminalGapTicketsFromOperatorRun(input: {
         reproductionRefs: [sourceRunRef],
         bugEvidenceRefs: groupEvidenceRefs,
         firstMissingLayer: "realization",
-        governingRequirementRefs: groupRequirementRefs.length === 0
-          ? governingRequirementRefs
-          : groupRequirementRefs,
+        governingRequirementRefs: admittedGroupRequirementRefs,
         governingDesignRefs,
         sourceOperatorRunRef: sourceRunRef,
         sourceRunNarrative,

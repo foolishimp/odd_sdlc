@@ -183,19 +183,46 @@ permission from annotations, choose relative cursors, target bare graph
 vectors, write tickets, emit runtime events, move cursors, invoke workers,
 write ledgers, close work, or fall back to a local family switch.
 
-### Current Non-Compliance Register
+### T-202 Implementation State
 
 The substrate pin is resolved by ABG `4.0.0-rc.21`, which carries T-156 and
-static GTL annotation validation. The following remain blockers for T-202
-implementation, not accepted exceptions:
+static GTL annotation validation.
 
-- installed `consequence.C` currently projects consequence read models without
-  consuming `EnginePluginInput.allowedConsequenceTraversalCatalog`.
-- overlay annotations currently expose depth/ticket policy but do not lower
-  into ABG T-156 GTL declaration rows.
-- existing depth action construction must be tightened to include explicit
-  `selectedTraversalFamily` and to fail closed when the ABG catalog has no
-  matching row.
+The TypeScript tenant now lowers SDLC overlay policy into ABG T-156 GTL
+declaration rows during SDLC GTL module construction. The overlay read model
+then exposes `allowedConsequenceTraversalDeclarations` by projecting the
+ABG-derived catalog rows for that overlay. This is a read model only; it does
+not create route authority outside ABG.
+
+The installed consequence path consumes
+`EnginePluginInput.allowedConsequenceTraversalCatalog` for depth traversal
+selection. A depth traversal action must carry explicit
+`selectedTraversalFamily = depth_traversal`, a published traversal target, the
+deep overlay annotation and zoom/decomposition authority refs, and must admit
+against the active overlay's ABG catalog before it can be returned through
+`ConsequenceProjectionOutcome.traversalAction`.
+
+Focused semantic proof covers current-full baseline/ticket rows, deep
+depth/ticket rows, ticket-workflow non-recursive rows, GTL declaration
+derivation, catalog-present selection admission, catalog-absent selection
+rejection, annotation-only depth rejection, bare-vector target rejection,
+direct ticket-storage rejection, installed consequence non-execution guards,
+and current SDLC GTL typecheck. Full semantic verification passes 1042/1042.
+
+Live builder proof covers the installed surface:
+
+- hello-world JS zoom passes against the deep zoom path
+- Rust detailed passes against the installed release surface
+- data-mapper detailed runs the deep overlay through component-code depth and
+  governed retries, then creates `asset:ticket/T-001` and `asset:ticket/T-002`
+  for the remaining external Spark/Hadoop-on-Java-25 proof block
+- `asset:ticket/T-001` starts through `overlay://odd-sdlc/ticket-workflow` and
+  `route_ticket_work_item`, preserving `T-002` as downstream builder pressure
+
+The data-mapper live proof is intentionally a builder-of-builder proof. It does
+not claim generated data-mapper product convergence, and generated sandbox
+product defects remain ticket/retry pressure rather than outside-in sandbox
+patches.
 
 ## Prime Law
 

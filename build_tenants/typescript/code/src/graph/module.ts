@@ -1,4 +1,7 @@
 import {
+  ABG_ALLOWED_CONSEQUENCE_TRAVERSAL_ROWS_DECLARATION_KEY,
+  type AllowedConsequenceTraversalActionKind,
+  type AllowedConsequenceTraversalFamily,
   admitEvaluator,
   admitGraphFunction,
   admitModule,
@@ -15,15 +18,21 @@ import {
   type Module,
   type Node,
   type SerializedAttrEntry,
+  type SerializedJsonValue,
   type SerializedAttrValue,
   type SerializedAttrs
 } from "@abiogenesis/typescript-tenant";
 import {
   BOOTSTRAP_RELEASE_FUNCTION_CATALOG,
   BOOTSTRAP_REQUIREMENTS_EXECUTIVE_STEPS,
+  FG_DECOMPOSE_DEPTH_BETWEEN_NODES,
+  FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+  FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+  FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
   FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
   FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE,
   FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
+  FG_PREPARE_TEST_EXECUTION_SURFACE,
   FG_SOLUTION_ARCHITECTURE_EXECUTIVE,
   FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE_STEPS,
   LITE_FUNCTION_CATALOG,
@@ -39,8 +48,16 @@ import {
   type SdlcFunctionCatalogEntry,
   type SdlcGraphFunctionCatalog
 } from "./catalog.js";
-import type { SdlcReusableGraphFunctionCatalogEntry } from "./library.js";
+import {
+  FG_CONFORM_PROJECT,
+  type SdlcReusableGraphFunctionCatalogEntry
+} from "./library.js";
 import { sdlcTargetCarrierDeclarationForTarget } from "./target_carrier_contracts.js";
+import {
+  sdlcGraphFunctionBoundaryRef,
+  sdlcGraphVectorBoundaryRef,
+  sdlcPublishedTraversalTargetRef
+} from "./boundary_refs.js";
 import {
   activeOddSdlcTraversalStrategyPlan,
   defaultSdlcTraversalContinuationConfigForName,
@@ -68,6 +85,47 @@ function stringListValue(value: readonly string[]): SerializedAttrValue {
   return Object.freeze({
     kind: "string_list",
     value: Object.freeze([...value])
+  });
+}
+
+function jsonValue(value: unknown): SerializedJsonValue {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return Object.freeze({
+      kind: "array" as const,
+      items: Object.freeze(value.map(jsonValue))
+    });
+  }
+  if (value !== null && typeof value === "object") {
+    const entries: [string, unknown][] = [];
+    for (const key of Object.keys(value)) {
+      entries.push([key, Reflect.get(value, key)]);
+    }
+    return Object.freeze({
+      kind: "object" as const,
+      entries: Object.freeze(
+        entries
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([key, entryValue]) =>
+            Object.freeze({ key, value: jsonValue(entryValue) })
+          )
+      )
+    });
+  }
+  throw new TypeError("Serialized JSON attribute value must be JSON-compatible");
+}
+
+function jsonBlobValue(value: unknown): SerializedAttrValue {
+  return Object.freeze({
+    kind: "json_blob" as const,
+    value: jsonValue(value)
   });
 }
 
@@ -265,6 +323,258 @@ function graphFunctionDeclarations(): SerializedAttrs {
       "REQ-F-ODDSDLC-015"
     ]))
   ]);
+}
+
+const CONSEQUENCE_CODE_TEST_REVIEW_TARGETS = Object.freeze([
+  "derive_component_code_surface",
+  "qualify_component_realization_surface",
+  "derive_code_surface",
+  "derive_test_design_surface",
+  "derive_component_test_surface",
+  "prepare_test_execution_surface",
+  "derive_test_execution_result_surface",
+  "qualify_component_test_execution_surface",
+  "derive_component_repair_schedule_surface",
+  "derive_test_run_archive_surface"
+] as const);
+
+const BASELINE_CONSEQUENCE_TRAVERSAL_FAMILIES = Object.freeze([
+  "same_edge_retry",
+  "gap_stop",
+  "non_admit"
+] as const satisfies readonly AllowedConsequenceTraversalFamily[]);
+
+function actionKindsForConsequenceFamily(
+  family: AllowedConsequenceTraversalFamily
+): readonly AllowedConsequenceTraversalActionKind[] {
+  switch (family) {
+    case "same_edge_retry":
+      return Object.freeze(["repair_same_edge"]);
+    case "depth_traversal":
+      return Object.freeze(["reenter_graph_span"]);
+    case "graph_span_reentry":
+      return Object.freeze(["reenter_graph_span"]);
+    case "public_start_reentry":
+      return Object.freeze(["invoke_graph_function", "continue_graph_call"]);
+    case "ticket_traversal":
+      return Object.freeze(["invoke_graph_function", "create_ticket"]);
+    case "fh_input_required":
+      return Object.freeze(["open_fh_gate"]);
+    case "escalation_or_reprice":
+      return Object.freeze(["propose_reprice"]);
+    case "gap_stop":
+      return Object.freeze(["block_episode"]);
+    case "non_admit":
+      return Object.freeze(["non_admit"]);
+  }
+}
+
+function uniqueStrings(values: readonly string[]): readonly string[] {
+  return Object.freeze([...new Set(values)]);
+}
+
+function includesString(values: readonly string[], value: string): boolean {
+  return values.includes(value);
+}
+
+function consequenceTraversalPolicyRowsForVector(input: {
+  readonly graphFunctionRef: string;
+  readonly graphVectorRef: string;
+  readonly graphVectorName: string;
+}): readonly {
+  readonly overlayRef: string;
+  readonly traversalFamily: AllowedConsequenceTraversalFamily;
+  readonly allowedTraversalTargetRefs: readonly string[];
+  readonly requiredAuthorityRefs: readonly string[];
+  readonly proportionalityBasisRefs: readonly string[];
+}[] {
+  const rows: {
+    readonly overlayRef: string;
+    readonly traversalFamily: AllowedConsequenceTraversalFamily;
+    readonly allowedTraversalTargetRefs: readonly string[];
+    readonly requiredAuthorityRefs: readonly string[];
+    readonly proportionalityBasisRefs: readonly string[];
+  }[] = [];
+  const addFamilies = (
+    overlayRef: string,
+    families: readonly AllowedConsequenceTraversalFamily[],
+    options: {
+      readonly allowedTraversalTargetRefs?: readonly string[];
+      readonly requiredAuthorityRefs?: readonly string[];
+      readonly proportionalityBasisRefs?: readonly string[];
+    } = {}
+  ): void => {
+    for (const traversalFamily of families) {
+      rows.push({
+        overlayRef,
+        traversalFamily,
+        allowedTraversalTargetRefs: Object.freeze([
+          ...(options.allowedTraversalTargetRefs ?? [])
+        ]),
+        requiredAuthorityRefs: Object.freeze([
+          ...(options.requiredAuthorityRefs ?? [])
+        ]),
+        proportionalityBasisRefs: Object.freeze([
+          ...(options.proportionalityBasisRefs ?? [])
+        ])
+      });
+    }
+  };
+  const currentFullOverlayRef = "overlay://odd-sdlc/current-full-traversal";
+  const deepOverlayRef = "overlay://odd-sdlc/deep-sdlc-traversal";
+  const ticketWorkflowOverlayRef = "overlay://odd-sdlc/ticket-workflow";
+  const liteOverlayRef = "overlay://odd-sdlc/lite-design-module-implementation";
+  const frameworkSmokeOverlayRef = "overlay://odd-sdlc/framework-smoke-min-fp";
+  const bootstrapOverlayRef = "overlay://odd-sdlc/bootstrap-requirements";
+  const solutionOverlayRef = "overlay://odd-sdlc/solution-architecture";
+  const publishedTraversalTargetRef = sdlcPublishedTraversalTargetRef({
+    graphFunctionRef: input.graphFunctionRef,
+    graphVectorRef: input.graphVectorRef
+  });
+  const depthAuthorityRefs = Object.freeze([
+    `${deepOverlayRef}/annotation/deep_sdlc_traversal_candidate`,
+    FG_DECOMPOSE_DEPTH_BETWEEN_NODES,
+    publishedTraversalTargetRef
+  ]);
+  addFamilies(currentFullOverlayRef, BASELINE_CONSEQUENCE_TRAVERSAL_FAMILIES);
+  addFamilies(deepOverlayRef, BASELINE_CONSEQUENCE_TRAVERSAL_FAMILIES);
+  if (includesString(CONSEQUENCE_CODE_TEST_REVIEW_TARGETS, input.graphVectorName)) {
+    addFamilies(currentFullOverlayRef, ["ticket_traversal"]);
+    addFamilies(
+      deepOverlayRef,
+      ["depth_traversal"],
+      {
+        allowedTraversalTargetRefs: [publishedTraversalTargetRef],
+        requiredAuthorityRefs: depthAuthorityRefs,
+        proportionalityBasisRefs: [
+          "proportionality://odd-sdlc/deep-sdlc-traversal/depth"
+        ]
+      }
+    );
+    addFamilies(deepOverlayRef, ["ticket_traversal"]);
+  }
+  if (
+    includesString([
+      FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
+      FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+      FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+      FG_PREPARE_TEST_EXECUTION_SURFACE,
+      FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
+    ], input.graphVectorName)
+  ) {
+    addFamilies(liteOverlayRef, [
+      "same_edge_retry",
+      "graph_span_reentry",
+      "public_start_reentry",
+      "ticket_traversal",
+      "gap_stop",
+      "non_admit"
+    ]);
+  }
+  if (
+    includesString([
+      FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
+      FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+      FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+      FG_PREPARE_TEST_EXECUTION_SURFACE,
+      FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
+    ], input.graphVectorName)
+  ) {
+    addFamilies(frameworkSmokeOverlayRef, [
+      "same_edge_retry",
+      "graph_span_reentry",
+      "gap_stop",
+      "non_admit"
+    ]);
+  }
+  if (
+    includesString(
+      [FG_CONFORM_PROJECT, FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE, ...BOOTSTRAP_REQUIREMENTS_EXECUTIVE_STEPS],
+      input.graphVectorName
+    )
+  ) {
+    addFamilies(bootstrapOverlayRef, [
+      "same_edge_retry",
+      "public_start_reentry",
+      "gap_stop",
+      "non_admit"
+    ]);
+  }
+  if (
+    includesString(
+      [FG_SOLUTION_ARCHITECTURE_EXECUTIVE, ...SOLUTION_ARCHITECTURE_EXECUTIVE_STEPS],
+      input.graphVectorName
+    )
+  ) {
+    addFamilies(solutionOverlayRef, [
+      "same_edge_retry",
+      "public_start_reentry",
+      "gap_stop",
+      "non_admit"
+    ]);
+  }
+  if (input.graphVectorName === "route_ticket_work_item") {
+    addFamilies(ticketWorkflowOverlayRef, [
+      "same_edge_retry",
+      "public_start_reentry",
+      "gap_stop",
+      "non_admit"
+    ]);
+  }
+  const seen = new Set<string>();
+  return Object.freeze(
+    rows.filter((row) => {
+      const key = `${row.overlayRef}|${row.traversalFamily}|${row.allowedTraversalTargetRefs.join(",")}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    })
+  );
+}
+
+function allowedConsequenceTraversalDeclarationsForVector(input: {
+  readonly graphFunctionRef: string;
+  readonly graphVectorRef: string;
+  readonly graphVectorName: string;
+}): readonly SerializedAttrEntry[] {
+  const policyRows = consequenceTraversalPolicyRowsForVector(input);
+  if (policyRows.length === 0) {
+    return Object.freeze([]);
+  }
+  const rows = policyRows.map((row) =>
+    Object.freeze({
+      rowRef: [
+        "allowed-consequence-traversal://odd-sdlc",
+        encodeURIComponent(row.overlayRef),
+        encodeURIComponent(input.graphFunctionRef),
+        encodeURIComponent(input.graphVectorRef),
+        row.traversalFamily
+      ].join("/"),
+      traversalFamily: row.traversalFamily,
+      allowedActionKinds: actionKindsForConsequenceFamily(row.traversalFamily),
+      allowedTraversalTargetRefs: row.allowedTraversalTargetRefs,
+      requiredAuthorityRefs: row.requiredAuthorityRefs,
+      proportionalityBasisRefs: uniqueStrings([
+        ...row.proportionalityBasisRefs,
+        `overlay:${row.overlayRef}`
+      ])
+    })
+  );
+  return Object.freeze([
+    attr(ABG_ALLOWED_CONSEQUENCE_TRAVERSAL_ROWS_DECLARATION_KEY, jsonBlobValue(rows))
+  ]);
+}
+
+function attrsWithAdditionalEntries(
+  base: SerializedAttrs,
+  additional: readonly SerializedAttrEntry[]
+): SerializedAttrs {
+  if (additional.length === 0) {
+    return base;
+  }
+  return attrs([...base.entries, ...additional]);
 }
 
 function publishedLeafTagsForEntry(
@@ -558,6 +868,60 @@ function constructExecutive(input: {
   });
 }
 
+function graphFunctionWithAllowedConsequenceTraversalDeclarations(
+  graphFunction: GraphFunction
+): GraphFunction {
+  if (graphFunction.template.kind !== "inline_graph") {
+    return graphFunction;
+  }
+  const graph = materializeGraphFunction(graphFunction);
+  let changed = false;
+  const graphFunctionRef = sdlcGraphFunctionBoundaryRef(graphFunction);
+  const vectors = Object.freeze(
+    graph.vectors.map((vector) => {
+      const graphVectorRef = sdlcGraphVectorBoundaryRef(vector);
+      const additionalDeclarations =
+        allowedConsequenceTraversalDeclarationsForVector({
+          graphFunctionRef,
+          graphVectorRef,
+          graphVectorName: vector.name
+        });
+      if (additionalDeclarations.length === 0) {
+        return vector;
+      }
+      changed = true;
+      return Object.freeze({
+        ...vector,
+        declarations: attrsWithAdditionalEntries(
+          vector.declarations,
+          additionalDeclarations
+        )
+      });
+    })
+  );
+  if (!changed) {
+    return graphFunction;
+  }
+  const decoratedGraph: Graph = Object.freeze({
+    ...graph,
+    vectors
+  });
+  return admitGraphFunction({
+    name: graphFunction.name,
+    environment: graphFunction.environment,
+    inputs: graphFunction.inputs,
+    outputs: graphFunction.outputs,
+    template: {
+      ...graphFunction.template,
+      graph: decoratedGraph
+    },
+    effects: graphFunction.effects,
+    declarations: graphFunction.declarations,
+    tags: graphFunction.tags,
+    id: graphFunction.id
+  });
+}
+
 function executiveEntry(input: {
   readonly name: string;
   readonly intent: string;
@@ -766,7 +1130,7 @@ export function constructSdlcGtlModule(input: {
     ...liteFunctions,
     ...operationalFunctions,
     ...triageFunctions
-  ]);
+  ].map(graphFunctionWithAllowedConsequenceTraversalDeclarations));
   const module = admitModule({
     name: "odd_sdlc_typescript",
     graphs: [],

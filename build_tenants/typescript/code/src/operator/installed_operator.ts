@@ -22,6 +22,7 @@ import { uniqueSorted } from "../shared/collections.js";
 import { sdlcWorkerTargetUsesShellToolProfile } from "./worker_tool_profile.js";
 import {
   admitGraphSpanAssessment,
+  constructAllowedConsequenceTraversalCatalog,
   constructConsequenceProjectionOutcome,
   constructFdEvaluationOutcome,
   constructFpDispatchOutcome,
@@ -140,6 +141,7 @@ import type {
   SdlcRepairSurfaceTriageCarrier,
   SdlcReviewGradeEdgeFulfillmentAssessment,
   SdlcTraversalHopSelection,
+  SdlcTraversalStrategyDecision,
   SdlcTraversalOutcomeClass,
   SdlcWorkerTransportContract
 } from "./carriers.js";
@@ -295,6 +297,7 @@ import {
   constructSdlcEdgeFulfillmentLedger,
   constructSdlcNextActionProjection,
   constructSdlcOverlaySegmentCompletion,
+  constructSdlcConsequenceTraversalActionBinding,
   constructSdlcWorksiteEvidence,
   deriveSdlcEdgeClosureDecision,
   deriveSdlcEdgeFulfillmentCountsFromAssessments,
@@ -4531,12 +4534,21 @@ function workerReportWithReviewGradeAssessment(input: {
       existing?.blockingReasons.some((reason) =>
         reason.startsWith("requirement_carried_for_downstream_closure:")
       ) === true;
+    const existingBlockingReasons = isDownstreamStagePressure
+      ? (existing?.blockingReasons ?? Object.freeze([])).filter(
+          (reason) =>
+            reason.startsWith("requirement_recorded_for_future_closure:") ||
+            reason.startsWith("requirement_carried_for_downstream_closure:")
+        )
+      : existing?.blockingReasons ?? Object.freeze([]);
     const existingStatus =
       existing === undefined
         ? "fulfilled"
+        : isDownstreamStagePressure
+          ? "partial"
         : existingIsDownstreamCarryover
           ? "partial"
-          : existing.blockingReasons.length > 0 &&
+          : existingBlockingReasons.length > 0 &&
             existing.fulfillmentStatus === "fulfilled"
           ? "blocked"
           : existing.fulfillmentStatus;
@@ -4547,7 +4559,7 @@ function workerReportWithReviewGradeAssessment(input: {
       findingStatus
     );
     const blockingReasons = uniqueSorted([
-      ...(existing?.blockingReasons ?? Object.freeze([])),
+      ...existingBlockingReasons,
       ...(finding.fulfillmentStatus === "fulfilled"
         ? Object.freeze([])
         : isDownstreamStagePressure
@@ -8171,6 +8183,136 @@ function deriveInstalledTraversalConsequence(input: {
   });
 }
 
+function overlayScopedAllowedConsequenceTraversalCatalog(input: {
+  readonly pluginInput: EnginePluginInput;
+  readonly overlayRef: string | null;
+}) {
+  if (input.overlayRef === null) {
+    return constructAllowedConsequenceTraversalCatalog({
+      catalogRef: `${input.pluginInput.allowedConsequenceTraversalCatalog.catalogRef}:overlay:none`,
+      graphFunctionRef:
+        input.pluginInput.allowedConsequenceTraversalCatalog.graphFunctionRef,
+      graphVectorRef:
+        input.pluginInput.allowedConsequenceTraversalCatalog.graphVectorRef,
+      vectorIndex: input.pluginInput.allowedConsequenceTraversalCatalog.vectorIndex,
+      edgeRef: input.pluginInput.allowedConsequenceTraversalCatalog.edgeRef,
+      rows: Object.freeze([])
+    });
+  }
+  const overlaySegment = `/${encodeURIComponent(input.overlayRef)}/`;
+  const rows = Object.freeze(
+    input.pluginInput.allowedConsequenceTraversalCatalog.rows.filter((row) =>
+      row.rowRef.includes(overlaySegment)
+    )
+  );
+  return constructAllowedConsequenceTraversalCatalog({
+    catalogRef:
+      `${input.pluginInput.allowedConsequenceTraversalCatalog.catalogRef}:overlay:${encodeURIComponent(input.overlayRef)}`,
+    graphFunctionRef:
+      input.pluginInput.allowedConsequenceTraversalCatalog.graphFunctionRef,
+    graphVectorRef:
+      input.pluginInput.allowedConsequenceTraversalCatalog.graphVectorRef,
+    vectorIndex: input.pluginInput.allowedConsequenceTraversalCatalog.vectorIndex,
+    edgeRef: input.pluginInput.allowedConsequenceTraversalCatalog.edgeRef,
+    rows
+  });
+}
+
+function installedDepthTraversalActionBinding(input: {
+  readonly basis: ExecutionBasis;
+  readonly pluginInput: EnginePluginInput;
+  readonly consequence: SdlcInstalledOperatorTraversalConsequence;
+  readonly executionContract: NonNullable<SdlcPublicStartOutcome["executionContract"]>;
+  readonly traversalStrategyDecision: SdlcTraversalStrategyDecision;
+}) {
+  const nextAction = input.consequence.nextActionProjection;
+  if (
+    input.consequence.edgeClosureDecision.disposition !== "re-enter" ||
+    nextAction.nextActionBasisKind !== "post_reenter" ||
+    !nextAction.choosesNextTraversal ||
+    nextAction.nextGraphFunctionRef === null ||
+    nextAction.nextGraphVectorRef === null
+  ) {
+    return null;
+  }
+  const targetVectorIndex = vectorIndexByEdgeName({
+    basis: input.basis,
+    edgeName: nextAction.nextGraphVectorRef
+  });
+  if (targetVectorIndex === null) {
+    throw new TypeError("consequence.C selected depth re-entry without a published target vector");
+  }
+  const targetVector = input.basis.graph.vectors[targetVectorIndex];
+  const sourceNode = targetVector?.source[0];
+  if (targetVector === undefined || sourceNode === undefined) {
+    throw new TypeError("consequence.C selected depth re-entry with an invalid graph span");
+  }
+  const selectedTraversalTargetRef = sdlcPublishedTraversalTargetRef({
+    graphFunctionRef: nextAction.nextGraphFunctionRef,
+    graphVectorRef: nextAction.nextGraphVectorRef
+  });
+  return constructSdlcConsequenceTraversalActionBinding({
+    replay: {
+      kind: "sdlc_traversal_consequence_replay" as const,
+      refs: {
+        kind: "sdlc_traversal_consequence_refs" as const,
+        compositionRef: input.consequence.selectedComposition.compositionRef,
+        compositionDigest: input.consequence.selectedComposition.compositionDigest,
+        compositionSelectionRef:
+          input.consequence.selectedComposition.compositionSelectionRef,
+        selectedRegimeBindingRef:
+          input.consequence.selectedComposition.selectedRegimeBindingRef,
+        constructionIntentRef: input.consequence.constructionIntent.intentRef,
+        worksiteEvidenceRef: input.consequence.worksiteEvidence.evidenceBundleRef,
+        edgeFulfillmentLedgerRef:
+          input.consequence.edgeFulfillmentLedger.ledgerVersionRef,
+        edgeClosureDecisionRef: input.consequence.edgeClosureDecision.decisionRef,
+        nextActionProjectionRef: nextAction.nextActionProjectionRef,
+        admittedStateRef: input.consequence.admittedStateRef.frameRef,
+        consequenceProjectionRef:
+          input.consequence.consequenceProjection.consequenceRef
+      },
+      constructionIntent: input.consequence.constructionIntent,
+      worksiteEvidence: input.consequence.worksiteEvidence,
+      edgeFulfillmentLedger: input.consequence.edgeFulfillmentLedger,
+      edgeClosureDecision: input.consequence.edgeClosureDecision,
+      nextActionProjection: nextAction,
+      admittedStateRef: input.consequence.admittedStateRef,
+      consequenceProjection: input.consequence.consequenceProjection
+    },
+    traversalStrategyDecision: input.traversalStrategyDecision,
+    sourceNodeRef: sourceNode.id,
+    targetNodeRef: targetVector.target.id,
+    graphSpanRef:
+      `graph-span://odd-sdlc/consequence-depth/${encodeURIComponent(input.pluginInput.edge)}/${String(input.pluginInput.vectorIndex)}/${String(targetVectorIndex)}`,
+    reentryTargetRef:
+      `graph-reentry-point://odd-sdlc/${encodeURIComponent(nextAction.nextGraphFunctionRef)}/${String(targetVectorIndex)}`,
+    targetOutcomeRef: nextAction.nextActionProjectionRef,
+    selectedOverlayRef: input.executionContract.overlayRef,
+    selectedRefinementBoundaryRef:
+      input.executionContract.overlayBinding.annotationRefs[0] ??
+      `refinement-boundary://odd-sdlc/depth/${encodeURIComponent(input.executionContract.overlayRef)}`,
+    selectedTraversalTargetRef,
+    requiredAuthorityRefs: uniqueSorted([
+      selectedTraversalTargetRef,
+      ...input.executionContract.overlayBinding.annotationRefs,
+      ...input.executionContract.overlayBinding.zoomGraphFunctionRefs,
+      ...input.executionContract.overlayBinding.zoomTargetGraphFunctionRefs
+    ]),
+    proportionalityBasisRefs: uniqueSorted([
+      input.executionContract.overlayRef,
+      input.executionContract.overlayBindingRef,
+      ...input.consequence.edgeClosureDecision.reasonRefs,
+      ...nextAction.gapPressureRefs
+    ]),
+    allowedConsequenceTraversalCatalog:
+      overlayScopedAllowedConsequenceTraversalCatalog({
+        pluginInput: input.pluginInput,
+        overlayRef: input.executionContract.overlayRef
+      })
+  });
+}
+
 function writeTraversalConsequenceArchive(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly consequence: SdlcInstalledOperatorTraversalConsequence;
@@ -9277,6 +9419,31 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
         manifest: consequenceState.manifest,
         consequence
       });
+      let traversalAction: ConsequenceProjectionOutcome["traversalAction"] = null;
+      try {
+        const binding = installedDepthTraversalActionBinding({
+          basis,
+          pluginInput,
+          consequence,
+          executionContract,
+          traversalStrategyDecision:
+            consequenceState.manifest.traversalStrategyDecision
+        });
+        traversalAction = binding?.traversalAction ?? null;
+      } catch (error: unknown) {
+        return constructConsequenceProjectionOutcome({
+          status: "blocked",
+          reason:
+            error instanceof Error
+              ? error.message
+              : "consequence traversal catalog admission failed",
+          evidenceRefs: uniqueSorted([
+            pluginInput.sourceProjectionRef,
+            consequence.consequenceProjection.consequenceRef,
+            pluginInput.allowedConsequenceTraversalCatalog.catalogRef
+          ])
+        });
+      }
       return constructConsequenceProjectionOutcome({
         status: "projected",
         consequenceRef: consequence.consequenceProjection.consequenceRef,
@@ -9284,6 +9451,7 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
           ...consequence.consequenceProjection.domainReadModelRefs,
           ...declaredEdgeProjectionRefs
         ]),
+        traversalAction,
         evidenceRefs: uniqueSorted([
           pluginInput.sourceProjectionRef,
           consequence.admittedStateRef.compositionRef,

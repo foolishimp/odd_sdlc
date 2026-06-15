@@ -1,5 +1,8 @@
 import {
+  deriveAllowedConsequenceTraversalCatalogFromGtl,
   materializeGraphFunction,
+  type AllowedConsequenceTraversalActionKind,
+  type AllowedConsequenceTraversalFamily,
   type GraphFunction,
   type Module
 } from "@abiogenesis/typescript-tenant";
@@ -161,6 +164,23 @@ export interface SdlcOverlayReentryRoute {
   readonly reasonRefs: readonly string[];
 }
 
+export interface SdlcOverlayAllowedConsequenceTraversalDeclaration {
+  readonly kind: "sdlc_overlay_allowed_consequence_traversal_declaration";
+  readonly declarationRef: string;
+  readonly rowRef: string;
+  readonly overlayRef: SdlcTraversalOverlayRef;
+  readonly traversalFamily: AllowedConsequenceTraversalFamily;
+  readonly graphFunctionRef: string;
+  readonly graphVectorRef: string;
+  readonly edgeRef: string;
+  readonly allowedActionKinds: readonly AllowedConsequenceTraversalActionKind[];
+  readonly allowedGraphFunctionRefs: readonly string[];
+  readonly allowedTraversalTargetRefs: readonly string[];
+  readonly requiredAuthorityRefs: readonly string[];
+  readonly proportionalityBasisRefs: readonly string[];
+  readonly declarationSourceRefs: readonly string[];
+}
+
 export interface SdlcTraversalOverlay {
   readonly kind: "sdlc_traversal_overlay";
   readonly overlayRef: SdlcTraversalOverlayRef;
@@ -182,6 +202,8 @@ export interface SdlcTraversalOverlay {
   readonly assetTemplates: readonly SdlcOverlayAssetTemplate[];
   readonly requiredLedgersByEdge: readonly SdlcOverlayLedgerRequirement[];
   readonly reentryRoutes: readonly SdlcOverlayReentryRoute[];
+  readonly allowedConsequenceTraversalDeclarations:
+    readonly SdlcOverlayAllowedConsequenceTraversalDeclaration[];
   readonly predecessorOverlayRefs: readonly SdlcTraversalOverlayRef[];
   readonly annotations: readonly SdlcTraversalOverlayAnnotation[];
 }
@@ -751,6 +773,61 @@ function graphVectorRefsFor(input: {
   );
 }
 
+function allowedConsequenceTraversalDeclarationsForOverlay(input: {
+  readonly byName: ReadonlyMap<string, GraphFunction>;
+  readonly names: readonly string[];
+  readonly overlayRef: SdlcTraversalOverlayRef;
+}): readonly SdlcOverlayAllowedConsequenceTraversalDeclaration[] {
+  const overlaySegment = `/${encodeURIComponent(input.overlayRef)}/`;
+  const declarations: SdlcOverlayAllowedConsequenceTraversalDeclaration[] = [];
+  for (const name of input.names) {
+    const graphFunction = input.byName.get(name);
+    if (graphFunction === undefined) {
+      throw new TypeError(`${input.overlayRef}: unpublished graph function ${name}`);
+    }
+    const graph = materializeGraphFunction(graphFunction);
+    for (const [vectorIndex, vector] of graph.vectors.entries()) {
+      const catalog = deriveAllowedConsequenceTraversalCatalogFromGtl({
+        graphFunction,
+        graphVector: vector,
+        vectorIndex,
+        edgeRef: vector.name
+      });
+      for (const row of catalog.rows) {
+        if (!row.rowRef.includes(overlaySegment)) {
+          continue;
+        }
+        declarations.push(Object.freeze({
+          kind: "sdlc_overlay_allowed_consequence_traversal_declaration" as const,
+          declarationRef: [
+            input.overlayRef,
+            "allowed-consequence-traversal",
+            encodeURIComponent(row.graphFunctionRef),
+            encodeURIComponent(row.graphVectorRef),
+            row.traversalFamily
+          ].join("/"),
+          rowRef: row.rowRef,
+          overlayRef: input.overlayRef,
+          traversalFamily: row.traversalFamily,
+          graphFunctionRef: row.graphFunctionRef,
+          graphVectorRef: row.graphVectorRef,
+          edgeRef: row.edgeRef,
+          allowedActionKinds: row.allowedActionKinds,
+          allowedGraphFunctionRefs: row.allowedGraphFunctionRefs,
+          allowedTraversalTargetRefs: row.allowedTraversalTargetRefs,
+          requiredAuthorityRefs: row.requiredAuthorityRefs,
+          proportionalityBasisRefs: row.proportionalityBasisRefs,
+          declarationSourceRefs: row.declarationSourceRefs
+        }));
+      }
+    }
+  }
+  const byRef = new Map(
+    declarations.map((declaration) => [declaration.declarationRef, declaration])
+  );
+  return Object.freeze([...byRef.values()]);
+}
+
 function overlayFromDefinition(input: {
   readonly definition: OverlayDefinition;
   readonly byName: ReadonlyMap<string, GraphFunction>;
@@ -771,6 +848,12 @@ function overlayFromDefinition(input: {
     names: input.definition.graphFunctionNames,
     overlayRef: input.definition.overlayRef
   });
+  const allowedConsequenceTraversalDeclarations =
+    allowedConsequenceTraversalDeclarationsForOverlay({
+      byName: input.byName,
+      names: input.definition.graphFunctionNames,
+      overlayRef: input.definition.overlayRef
+    });
   const assetTemplates = Object.freeze(
     input.definition.assetTemplates.map((template) => {
       const producer = input.byName.get(template.producerGraphFunctionName);
@@ -896,6 +979,7 @@ function overlayFromDefinition(input: {
       )
     ),
     reentryRoutes,
+    allowedConsequenceTraversalDeclarations,
     predecessorOverlayRefs: Object.freeze([
       ...(input.definition.predecessorOverlayRefs ?? [])
     ]),

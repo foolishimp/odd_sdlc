@@ -2,11 +2,13 @@
 // Implements: T-138
 
 import type {
+  AllowedConsequenceTraversalCatalog,
   ConsequenceTraversalAction,
   GtlAdmittedStateRef,
   GtlConsequenceProjectionRef
 } from "@abiogenesis/typescript-tenant";
 import {
+  admitConsequenceTraversalActionForAllowedCatalog,
   constructConsequenceTraversalAction
 } from "@abiogenesis/typescript-tenant";
 import type {
@@ -16,6 +18,7 @@ import type {
 import type { SdlcSelectedAbgFnCompositionIdentity } from "./composition_identity.js";
 import type { SdlcTraversalStrategyDecision } from "./carriers.js";
 import { uniqueSorted } from "../shared/collections.js";
+import { sdlcPublishedTraversalTargetRef } from "../graph/boundary_refs.js";
 
 export type SdlcEdgeClosureDisposition =
   | "close"
@@ -1924,6 +1927,9 @@ export function constructSdlcConsequenceTraversalActionBinding(input: {
   readonly proportionalityBasisRefs?: readonly string[] | undefined;
   readonly evidencePolicyRef?: string | undefined;
   readonly foldbackPolicyRef?: string | undefined;
+  readonly allowedConsequenceTraversalCatalog?:
+    | AllowedConsequenceTraversalCatalog
+    | undefined;
 }): SdlcConsequenceTraversalActionBinding {
   const { replay, traversalStrategyDecision } = input;
   const { edgeClosureDecision, nextActionProjection } = replay;
@@ -1972,7 +1978,11 @@ export function constructSdlcConsequenceTraversalActionBinding(input: {
       "parentObligationRef"
     );
   const selectedTraversalTargetRef =
-    input.selectedTraversalTargetRef ?? selectedGraphVectorRef;
+    input.selectedTraversalTargetRef ??
+    sdlcPublishedTraversalTargetRef({
+      graphFunctionRef: selectedGraphFunctionRef,
+      graphVectorRef: selectedGraphVectorRef
+    });
   const requiredAuthorityRefs = nonEmptyUniqueSorted(
     [
       selectedGraphFunctionRef,
@@ -2074,6 +2084,12 @@ export function constructSdlcConsequenceTraversalActionBinding(input: {
         "foldbackPolicyRef"
       )
   });
+  if (input.allowedConsequenceTraversalCatalog !== undefined) {
+    admitConsequenceTraversalActionForAllowedCatalog({
+      catalog: input.allowedConsequenceTraversalCatalog,
+      action: traversalAction
+    });
+  }
   return Object.freeze({
     kind: "sdlc_consequence_traversal_action_binding" as const,
     bindingVersion: "ts-consequence-traversal-action-v1" as const,

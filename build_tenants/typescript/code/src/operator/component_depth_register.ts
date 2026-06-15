@@ -172,6 +172,16 @@ export function parseComponentTopologyRow(
   });
 }
 
+function parseNullableTrancheId(input: unknown, label: string): string | null {
+  if (input === null) {
+    return null;
+  }
+  if (typeof input === "number" && Number.isSafeInteger(input) && input >= 0) {
+    return String(input);
+  }
+  return parseNonEmptyString(input, label);
+}
+
 export function parseComponentRealizationRow(
   input: unknown,
   label: string
@@ -214,7 +224,7 @@ export function parseComponentRealizationRow(
     trancheId:
       record["trancheId"] === undefined
         ? null
-        : parseNullableNonEmptyString(record["trancheId"], `${label}.trancheId`),
+        : parseNullableTrancheId(record["trancheId"], `${label}.trancheId`),
     firstProductFileToChange,
     upstreamComponentIds:
       record["upstreamComponentIds"] === undefined

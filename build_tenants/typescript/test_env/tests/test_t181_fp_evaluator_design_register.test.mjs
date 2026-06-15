@@ -812,6 +812,123 @@ test("T-181 design-depth content register supports incremental fragment projecti
   }
 });
 
+test("T-181 design-depth content register canonicalizes numeric tranche ids", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForImplementationDesign(
+      workspaceRoot,
+      "t181-numeric-tranche-canonicalization"
+    );
+    mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+    writeFileSync(
+      manifest.outputFile,
+      implementationDesignAdr("numeric-tranche-component"),
+      "utf8"
+    );
+    const registerPath = designDepthFpEvaluatorRegisterPath(manifest);
+    const contentRegisterPath = designDepthFpEvaluatorContentRegisterPath({
+      archiveRoot: manifest.archiveRoot
+    });
+    const composition = selectedComposition();
+    const evidenceRef = pathToFileURL(manifest.outputFile).href;
+    const register = implementationDesignRegister(
+      "numeric-tranche-component",
+      evidenceRef
+    );
+    const registerWithNumericTranche = {
+      ...register,
+      componentRealizationRows: [
+        {
+          ...register.componentRealizationRows[0],
+          trancheId: 1
+        }
+      ]
+    };
+    const sections = [
+      "stackProfileRows",
+      "implementationModuleRows",
+      "aggregateDomainModelRows",
+      "moduleSchemaFragments",
+      "moduleStateDiagramFragments",
+      "aggregateDomainModel",
+      "sunnyDaySequenceRows",
+      "aggregateSunnyDaySequence",
+      "componentTopologyRows",
+      "componentRealizationRows",
+      "fileTargetRows",
+      "designCompletenessVerdict"
+    ];
+    mkdirSync(path.dirname(contentRegisterPath), { recursive: true });
+    writeFileSync(
+      contentRegisterPath,
+      `${JSON.stringify(
+        {
+          kind: "sdlc_evaluate_content_register",
+          registerVersion: "ts-evaluate-content-register-v1",
+          stage: "evaluate.C",
+          ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+          ruleRole: "semantic_judgment",
+          computeMeans: "F_P",
+          authorityFunction: "synthesize_model",
+          selectedCompositionRef: composition.compositionRef,
+          selectedCompositionDigest: composition.compositionDigest,
+          selectedCompositionSelectionRef: composition.compositionSelectionRef,
+          selectedRegimeBindingRef: composition.selectedRegimeBindingRef,
+          compositionContributionRef: composition.selectedRegimeBindingRef,
+          sourceBasisRefs: [evidenceRef],
+          candidateArtifactRefs: [evidenceRef],
+          evidenceRefs: [evidenceRef],
+          contentRows: sections.map((section, index) => ({
+            kind: "sdlc_evaluate_content_register_row",
+            rowRef: `content-register-row://t181/numeric-tranche/${section}`,
+            authorityFunction: "synthesize_model",
+            carrierFamily: "ProductAssetModel",
+            contentKind: "sdlc_design_depth_register_fragment",
+            payload: {
+              kind: "sdlc_design_depth_register_fragment",
+              fragmentVersion: "ts-design-depth-fragment-v1",
+              targetAssetType: "implementation_design_surface",
+              section,
+              sequence: index + 1,
+              mergeMode: "replace",
+              value: registerWithNumericTranche[section]
+            },
+            sourceBasisRefs: [evidenceRef],
+            evidenceRefs: [evidenceRef]
+          }))
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+
+    const admission = admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity({
+      registerPath: contentRegisterPath,
+      selectedIdentity: {
+        selectedCompositionRef: composition.compositionRef,
+        selectedCompositionDigest: composition.compositionDigest,
+        selectedCompositionSelectionRef: composition.compositionSelectionRef,
+        selectedRegimeBindingRef: composition.selectedRegimeBindingRef
+      },
+      ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+      authorityFunction: "synthesize_model"
+    });
+    assert.equal(admission.status, "admitted");
+
+    writeDesignDepthRegisterProjectionFromEvaluateContentRegister({
+      register: admission.register,
+      archiveRoot: manifest.archiveRoot,
+      registerPath
+    });
+    const projected = JSON.parse(readFileSync(registerPath, "utf8"));
+
+    assert.equal(projected.componentRealizationRows[0].trancheId, "1");
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
 test("T-184 evaluator projection rejects object-valued invariants before writing register truth", () => {
   const workspaceRoot = makeWorkspace();
   try {
