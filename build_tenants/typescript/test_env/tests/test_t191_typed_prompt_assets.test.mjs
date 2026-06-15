@@ -67,6 +67,8 @@ const requirementsSource = readFileSync(
   ),
   "utf8"
 );
+const SPEC_METHOD_PROMPT_OPENING_LINE =
+  "Make a plan from governing authority, order the work by closure priority, then work through that priority order.";
 const packageJson = JSON.parse(
   readFileSync(
     fileURLToPath(new URL("../../package.json", import.meta.url)),
@@ -176,7 +178,8 @@ test("T-191 prompt projection renders a GTL Node/AssetSurface sidecar", () => {
 
   assert.match(projection.promptText, /Typed prompt asset:/u);
   assert.match(projection.promptText, /GTL Node\/AssetSurface/u);
-  assert.equal(projection.promptText.startsWith("odd_sdlc F_P.transform launch contract."), true);
+  assert.equal(projection.promptText.startsWith(SPEC_METHOD_PROMPT_OPENING_LINE), true);
+  assert.match(projection.promptText, /odd_sdlc F_P\.transform launch contract\./u);
   assert.equal(projection.invocationAsset.renderedPromptDigest, sha256Text(projection.promptText));
   assert.equal(projection.invocationAsset.gtlNode.assetSurface.kind, "gtl.asset_surface/odd_sdlc.prompt/transform/v1");
   assert.equal(
@@ -298,6 +301,8 @@ test("T-191 evaluator prompt projections carry GTL prompt assets", () => {
   assert.equal(reviewProjection.invocationAsset.promptFamily, "evaluate_review_grade");
   assert.match(designProjection.promptText, /Typed prompt asset:/u);
   assert.match(reviewProjection.promptText, /Typed prompt asset:/u);
+  assert.equal(designProjection.promptText.startsWith(SPEC_METHOD_PROMPT_OPENING_LINE), true);
+  assert.equal(reviewProjection.promptText.startsWith(SPEC_METHOD_PROMPT_OPENING_LINE), true);
   assert.match(designProjection.promptText, /componentTopologyRows\[\] with kind "sdlc_component_topology_row"/u);
   assert.match(designProjection.promptText, /componentRealizationRows\[\] with kind "sdlc_component_realization_row"/u);
   assert.doesNotMatch(designProjection.promptText, /\/Users\/jim\/src\/apps\/specification_methodology/u);

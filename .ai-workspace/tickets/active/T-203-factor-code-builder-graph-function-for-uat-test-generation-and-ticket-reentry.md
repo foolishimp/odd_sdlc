@@ -64,6 +64,10 @@ sandbox outside the builder lane.
    debt. The release line has one designed solution path for code-builder
    source/test materialization, test-run validation, ticket triage, and lawful
    re-entry.
+6. Prompt-bearing code-builder and evaluator turns begin with the SPEC_METHOD
+   planning invariant: make a plan from governing authority, order work by
+   closure priority, and work through that priority order before returning or
+   yielding residual pressure.
 
 ## Superseded Truth
 
@@ -134,6 +138,10 @@ sandbox outside the builder lane.
 - [x] Preserve tenant test-root discoverability for generated UAT test-source
       targets; UAT branches may specialize under the declared test source root
       but must not move outside the tenant's framework-discoverable test tree.
+- [x] Make the typed prompt renderer start transform and evaluator prompts with
+      the SPEC_METHOD planning invariant so full-breadth, steel-thread, and
+      targeted-repair workers all plan, prioritize, and work through evaluated
+      pressure before yielding.
 - [x] Add focused tests proving the graph-code-builder specialization, UAT test
       source generation inputs, deep overlay depth eligibility, and command-only
       non-closure shape.
@@ -150,6 +158,10 @@ sandbox outside the builder lane.
 - `npm run test:t202` passed 6/6, including deep overlay depth rows for both
   component code and component test graph-code-builder specializations.
 - `npm run test:t160` passed 26/26, proving overlay regressions stay intact.
+- `node --test test_env/tests/test_t191_typed_prompt_assets.test.mjs` proves
+  transform, design-depth evaluator, and review-grade evaluator prompts start
+  with the SPEC_METHOD planning invariant while preserving GTL prompt-asset
+  rendering.
 - `node --test test_env/tests/test_t174_feature_dependency_dag_frontier.test.mjs
   test_env/tests/test_t175_source_truth_migration.test.mjs
   test_env/tests/test_t188_data_mapper_live_boundary_guard.test.mjs` passed
@@ -212,6 +224,9 @@ sandbox outside the builder lane.
   are missing, even if a test command ran or returned success.
 - Test-run failures are routed to admitted ticket triage/re-entry pressure
   rather than sandbox source patches.
+- Transform and evaluator prompts start with the SPEC_METHOD planning invariant:
+  make a plan from governing authority, order the work by closure priority, and
+  work through that priority order.
 - No fallback graph declaration, overlay edge, worker policy, or target-carrier
   row lets this behavior bypass the single designed code-builder path.
 - Focused tests and `npm run build:semantic` pass.
@@ -224,6 +239,8 @@ sandbox outside the builder lane.
 - Any direct generated data-mapper patch used as proof for this ticket.
 - Any SDLC path where code generation gets depth annotations but UAT-derived
   test code generation does not.
+- Any prompt-bearing transform/evaluate path whose rendered prompt does not
+  start with the SPEC_METHOD planning invariant.
 - Any unresolved duplicate/confused graph path for source/test materialization,
   test-run validation, ticket triage, or re-entry.
 

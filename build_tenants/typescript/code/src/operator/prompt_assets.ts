@@ -26,6 +26,9 @@ export const SDLC_METHOD_AUTHORITY_COMPRESSION_REFS = Object.freeze([
   "workspace://.abiogenesis/docs/standards/authority_compressions/ux_method.compressed.md"
 ] as const);
 
+const SPEC_METHOD_PROMPT_OPENING_LINE =
+  "Make a plan from governing authority, order the work by closure priority, then work through that priority order.";
+
 export const SDLC_PROMPT_FAMILIES = Object.freeze([
   "transform",
   "evaluate_design_depth",
@@ -362,6 +365,7 @@ function promptHeaderLines(input: {
   readonly methodCompressionRefs: readonly string[];
 }): readonly string[] {
   return Object.freeze([
+    SPEC_METHOD_PROMPT_OPENING_LINE,
     "Typed prompt asset:",
     "- kind: sdlc_prompt_invocation_asset",
     `- promptFamily: ${input.promptFamily}`,
@@ -378,15 +382,10 @@ function promptTextWithHeader(input: {
   readonly headerLines: readonly string[];
 }): string {
   const lines = input.bodyText.split(/\r?\n/u);
-  if (lines.length === 0) {
-    return `${input.headerLines.join("\n")}\n`;
-  }
   return [
-    lines[0],
-    "",
     ...input.headerLines,
     "",
-    ...lines.slice(1)
+    ...lines
   ].join("\n");
 }
 

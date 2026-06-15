@@ -123,6 +123,7 @@ prestep planning for prompt-bearing edges:
 
 ```text
 prestep: graph-owned schedule/work-plan asset
+prompt opening: make a plan from governing authority and order work by closure priority
 execute: F_P worker handoff over the selected edge
 postprocess: postflight + assurance ledgers + satisfaction fold
 ```
@@ -136,6 +137,9 @@ The worker prompt shall not be the only authority carrier. It shall point to the
 canonical `worker_construction_brief.json`, then inline only the local pressure
 needed to start the edge:
 
+- a first-line SPEC_METHOD planning invariant requiring the worker to make a
+  plan from governing authority, order the work by closure priority, and work
+  through that priority order
 - authority index entries with digest-backed refs
 - tranche keys derived from source assets, target asset, declared modules, and
   schedule/tranche roles
