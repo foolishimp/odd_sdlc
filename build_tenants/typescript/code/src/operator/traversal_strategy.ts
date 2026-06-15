@@ -108,17 +108,24 @@ export function deriveSdlcTraversalStrategyDecision(input: {
     targetAssetType: input.targetAssetType,
     retryContext: input.retryContext
   });
+  const retryBackoffApplies =
+    retryTargetedRepair &&
+    (abgSelectedStrategy === null || abgSelectedStrategy === "full_breadth");
   const selectedStrategy =
-    abgSelectedStrategy ??
-    (retryTargetedRepair
+    retryBackoffApplies
       ? "targeted_repair"
-      : strategyForEdge({
+      : abgSelectedStrategy ??
+        strategyForEdge({
           plan: fallbackPlan,
           edgeName: input.edgeName,
           targetAssetType: input.targetAssetType
-        }));
+        });
   const decisionSource =
-    abgSelectedStrategy === null ? "odd_sdlc_fallback_plan" : "abg_selected";
+    retryBackoffApplies
+      ? "retry_backoff"
+      : abgSelectedStrategy === null
+        ? "odd_sdlc_fallback_plan"
+        : "abg_selected";
   const basisRefs = uniqueSorted([
     fallbackPlan.planRef,
     ...(directiveRef === null ? [] : [directiveRef]),

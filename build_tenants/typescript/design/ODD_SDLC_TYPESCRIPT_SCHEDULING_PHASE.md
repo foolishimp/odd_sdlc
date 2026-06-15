@@ -123,7 +123,7 @@ prestep planning for prompt-bearing edges:
 
 ```text
 prestep: graph-owned schedule/work-plan asset
-prompt opening: make a plan from governing authority and order work by closure priority
+prompt opening: make a plan from governing authority and rank work by contextual closure priority
 execute: F_P worker handoff over the selected edge
 postprocess: postflight + assurance ledgers + satisfaction fold
 ```
@@ -138,8 +138,12 @@ canonical `worker_construction_brief.json`, then inline only the local pressure
 needed to start the edge:
 
 - a first-line SPEC_METHOD planning invariant requiring the worker to make a
-  plan from governing authority, order the work by closure priority, and work
-  through that priority order
+  plan from governing authority, rank work by contextual closure priority, and
+  work through that priority order: critical behavior, highest-dependency
+  modules, and shared/common-library foundations first
+- retry-facing gap prompts rank repair rows by critical behavior,
+  highest-dependency modules, common-library foundations, and repeated/common
+  failure rows before editing
 - authority index entries with digest-backed refs
 - tranche keys derived from source assets, target asset, declared modules, and
   schedule/tranche roles

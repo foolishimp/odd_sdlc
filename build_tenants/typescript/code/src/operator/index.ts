@@ -649,6 +649,7 @@ export {
   executeInstalledOperatorStart,
   mergeSdlcWorkerRetryContextWithRuntimeGapRegister,
   normalizePostCloseContinuationVectorIndex,
+  SDLC_ABG_ATTACHED_FP_MAX_RETRY_ATTEMPTS,
   sdlcWorkerRetryContextFromAbgRetryContext,
   sdlcAssessmentCarriesRequirementForDownstreamClosure,
   sdlcWorkerAssessmentCarriesRequirementTransformationSet,

@@ -65,9 +65,15 @@ sandbox outside the builder lane.
    source/test materialization, test-run validation, ticket triage, and lawful
    re-entry.
 6. Prompt-bearing code-builder and evaluator turns begin with the SPEC_METHOD
-   planning invariant: make a plan from governing authority, order work by
-   closure priority, and work through that priority order before returning or
-   yielding residual pressure.
+   planning invariant: make a plan from governing authority, rank work by
+   contextual closure priority, and work through that priority order before
+   returning or yielding residual pressure. Contextual priority means critical
+   behavior, highest-dependency modules, and shared/common-library foundations
+   before leaf-only rows when the edge has a choice.
+7. Full-breadth retry is a bounded backoff, not a repeat of the same broad
+   prompt. Code-builder/test-builder edges declare a ten-attempt same-edge
+   retry/yield window, and replay-visible prior gaps narrow full-breadth retry
+   to targeted repair before terminal ticket triage.
 
 ## Superseded Truth
 
@@ -225,8 +231,14 @@ sandbox outside the builder lane.
 - Test-run failures are routed to admitted ticket triage/re-entry pressure
   rather than sandbox source patches.
 - Transform and evaluator prompts start with the SPEC_METHOD planning invariant:
-  make a plan from governing authority, order the work by closure priority, and
-  work through that priority order.
+  make a plan from governing authority, rank the work by contextual closure
+  priority, and work through that priority order with critical behavior,
+  highest-dependency modules, and shared/common-library foundations first.
+- ABG attached F_P retry attempts are configured at 10 for installed SDLC
+  starts; SDLC does not run a local retry loop.
+- Replay-visible prior gaps over a full-breadth code/test-builder edge produce
+  a `retry_backoff` strategy decision and targeted repair scope before ticket
+  triage.
 - No fallback graph declaration, overlay edge, worker policy, or target-carrier
   row lets this behavior bypass the single designed code-builder path.
 - Focused tests and `npm run build:semantic` pass.

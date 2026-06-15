@@ -113,22 +113,35 @@ const STEEL_THREAD_AFTER_REQUIREMENTS_EDGE_NAMES = Object.freeze([
   "release_surface"
 ] as const);
 
-const DEEP_FULL_BREADTH_CONTINUATION_CONFIG =
+const CODE_BUILDER_RETRY_YIELD_CONTINUATION_CONFIG =
   Object.freeze({
     sameEdgeUntil: "foldback_closed" as const,
-    maxAttemptsWithoutNewSignal: 8,
+    maxAttemptsWithoutNewSignal: 10,
     maxTotalAttempts: 64
   }) satisfies OddSdlcTraversalContinuationConfig;
 
 const ODD_SDLC_DEFAULT_TRAVERSAL_CONTINUATION_CONFIGS: Readonly<
   Record<string, OddSdlcTraversalContinuationConfig>
 > = Object.freeze({
-  derive_component_code_surface: DEEP_FULL_BREADTH_CONTINUATION_CONFIG,
-  derive_component_test_surface: DEEP_FULL_BREADTH_CONTINUATION_CONFIG,
-  derive_uat_test_source_surface: DEEP_FULL_BREADTH_CONTINUATION_CONFIG,
-  derive_lite_component_code_surface: DEEP_FULL_BREADTH_CONTINUATION_CONFIG,
+  derive_component_code_surface: CODE_BUILDER_RETRY_YIELD_CONTINUATION_CONFIG,
+  qualify_component_realization_surface:
+    CODE_BUILDER_RETRY_YIELD_CONTINUATION_CONFIG,
+  derive_code_surface: CODE_BUILDER_RETRY_YIELD_CONTINUATION_CONFIG,
+  derive_test_design_surface: CODE_BUILDER_RETRY_YIELD_CONTINUATION_CONFIG,
+  derive_component_test_surface: CODE_BUILDER_RETRY_YIELD_CONTINUATION_CONFIG,
+  derive_uat_test_source_surface: CODE_BUILDER_RETRY_YIELD_CONTINUATION_CONFIG,
+  prepare_test_execution_surface: CODE_BUILDER_RETRY_YIELD_CONTINUATION_CONFIG,
+  derive_test_execution_result_surface:
+    CODE_BUILDER_RETRY_YIELD_CONTINUATION_CONFIG,
+  qualify_component_test_execution_surface:
+    CODE_BUILDER_RETRY_YIELD_CONTINUATION_CONFIG,
+  derive_component_repair_schedule_surface:
+    CODE_BUILDER_RETRY_YIELD_CONTINUATION_CONFIG,
+  derive_test_run_archive_surface: CODE_BUILDER_RETRY_YIELD_CONTINUATION_CONFIG,
+  derive_lite_component_code_surface:
+    CODE_BUILDER_RETRY_YIELD_CONTINUATION_CONFIG,
   Fg_materialize_declared_product_asset:
-    DEEP_FULL_BREADTH_CONTINUATION_CONFIG
+    CODE_BUILDER_RETRY_YIELD_CONTINUATION_CONFIG
 });
 
 function steelThreadAfterRequirementsStrategies(): Readonly<

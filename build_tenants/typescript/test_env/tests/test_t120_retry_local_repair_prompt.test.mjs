@@ -1112,6 +1112,10 @@ test("T-164 retry prompt uses review-grade blocked findings as the repair work q
   const files = writeHandoffFiles(manifest);
   const prompt = readFileSync(files.promptPath, "utf8");
   const invocationPackage = JSON.parse(readFileSync(files.invocationPackagePath, "utf8"));
+  assert.match(
+    prompt,
+    /Rank retry work by contextual closure priority before editing: critical behavior, highest-dependency modules, common-library foundations, and repeated\/common failure rows first\./u
+  );
   const workQueue = prompt.match(
     /- blocked requirement obligations:\n(?<rows>(?:  - .+\n)+)- retry coverage contract:/u
   )?.groups?.rows;

@@ -27,7 +27,7 @@ export const SDLC_METHOD_AUTHORITY_COMPRESSION_REFS = Object.freeze([
 ] as const);
 
 const SPEC_METHOD_PROMPT_OPENING_LINE =
-  "Make a plan from governing authority, order the work by closure priority, then work through that priority order.";
+  "Make a plan from governing authority, rank the work by contextual closure priority, then work through that priority order: critical behavior, highest-dependency modules, and shared/common-library foundations first.";
 
 export const SDLC_PROMPT_FAMILIES = Object.freeze([
   "transform",

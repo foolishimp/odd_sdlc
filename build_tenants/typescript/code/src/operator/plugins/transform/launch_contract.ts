@@ -5559,6 +5559,7 @@ function currentEvaluatedGapPromptLines(
     "",
     "Current evaluated gaps:",
     "- These are your current evaluated gaps for this retry. This is your work queue: work through it until the queue is empty or every remaining row is explicitly blocked with evidence.",
+    "- Rank retry work by contextual closure priority before editing: critical behavior, highest-dependency modules, common-library foundations, and repeated/common failure rows first.",
     "- Repair these concrete evaluator blockers before adding new scope.",
     `- gapDossierRef: ${workerFacingRef(manifest, dossier.currentGapDossierRef)}`,
     `- evaluated edge=${dossier.edgeName}; target=${dossier.targetAssetType}; retryEligible=${dossier.retryEligible}; reasonCount=${promptReasons.length}; rawReasonCount=${dossier.reasons.length}`,

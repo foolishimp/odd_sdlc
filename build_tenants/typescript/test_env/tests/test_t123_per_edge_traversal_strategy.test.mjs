@@ -19,6 +19,7 @@ import {
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
   ODD_SDLC_STEEL_THREAD_AFTER_REQUIREMENTS_TRAVERSAL_STRATEGY_PLAN,
+  SDLC_ABG_ATTACHED_FP_MAX_RETRY_ATTEMPTS,
   constructSdlcGtlModule,
   constructSdlcHookContractCatalog,
   deriveSdlcTraversalStrategyDecision,
@@ -364,7 +365,7 @@ test("T-123 steel-thread-after-requirements is a GTL strategy profile", () => {
   assert.equal(designDecision.selectedStrategy, "steel_thread");
 });
 
-test("T-123 deep full-breadth code edges declare a high ABG same-edge continuation budget", () => {
+test("T-123 code-builder edges declare ABG ten-attempt retry/yield tuning", () => {
   const module = constructSdlcGtlModule();
   const liteCodeFunction = module.graphFunctions.find(
     (graphFunction) =>
@@ -386,7 +387,7 @@ test("T-123 deep full-breadth code edges declare a high ABG same-edge continuati
     hookConfigValue(liteCodeHook, "max_attempts_without_new_signal"),
     {
       kind: "scalar",
-      value: 8
+      value: 10
     }
   );
   assert.deepStrictEqual(hookConfigValue(liteCodeHook, "max_total_attempts"), {
@@ -423,8 +424,24 @@ test("T-123 deep full-breadth code edges declare a high ABG same-edge continuati
     })
   });
   assert.equal(profile.continuation.sameEdgeUntil, "foldback_closed");
-  assert.equal(profile.continuation.maxAttemptsWithoutNewSignal, 8);
+  assert.equal(profile.continuation.maxAttemptsWithoutNewSignal, 10);
   assert.equal(profile.continuation.maxTotalAttempts, 64);
+
+  const testRunFunction = module.graphFunctions.find(
+    (graphFunction) => graphFunction.name === "derive_test_execution_result_surface"
+  );
+  assert(testRunFunction);
+  const testRunVector = materializeGraphFunction(testRunFunction).vectors[0];
+  assert(testRunVector);
+  const testRunHook = traversalStrategyHookForVector(testRunVector);
+  assert.deepStrictEqual(
+    hookConfigValue(testRunHook, "max_attempts_without_new_signal"),
+    {
+      kind: "scalar",
+      value: 10
+    }
+  );
+  assert.equal(SDLC_ABG_ATTACHED_FP_MAX_RETRY_ATTEMPTS, 10);
 });
 
 test("T-123 component-code prompt uses UAT build-test loops as depth pressure", () => {
@@ -793,7 +810,7 @@ test("T-123 same-edge retry scope does not widen from evidence refs", () => {
   assert.match(prompt, /Accounting file contains placeholder implementation text/u);
 });
 
-test("T-123 ABG-selected full breadth cannot be overridden by retry context", () => {
+test("T-123 retry backoff narrows ABG-selected full breadth before ticket triage", () => {
   const manifest = manifestFor(
     "derive_test_execution_result_surface",
     {
@@ -821,16 +838,16 @@ test("T-123 ABG-selected full breadth cannot be overridden by retry context", ()
     },
     retryContext()
   );
-  assert.equal(manifest.traversalStrategyDecision.decisionSource, "abg_selected");
+  assert.equal(manifest.traversalStrategyDecision.decisionSource, "retry_backoff");
   assert.equal(
     manifest.traversalStrategyDecision.selectedStrategy,
-    "full_breadth"
+    "targeted_repair"
   );
-  assert.equal(manifest.featureScope.mode, "full_breadth");
+  assert.equal(manifest.featureScope.mode, "targeted_repair");
   assert.deepStrictEqual(
     manifest.productMaterialization.executionShards.map(
       (shard) => shard.moduleName
     ),
-    ["cdme-compiler", "cdme-accounting"]
+    ["cdme-compiler"]
   );
 });

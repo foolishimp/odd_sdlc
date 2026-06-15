@@ -129,6 +129,15 @@ close | yield | retry | repair | re-enter | reprice | block
 remains lawful/open, progress or waiting state is admitted, and resume truth is
 replay-visible. It is not a timeout, retry, block, or local controller pause.
 
+For full-breadth prompt-bearing code-builder/test-builder edges, retry is a
+bounded backoff before ticket triage. The graph declares a ten-attempt
+same-edge retry/yield window through GTL traversal-strategy attrs; once
+replay-visible gap pressure exists, the SDLC strategy projection narrows
+full-breadth retry to targeted repair so the next prompt works a bounded
+window instead of repeating the same broad traversal. ABG still owns the
+attached F_P retry attempts, yield/retry events, continuation, and terminal
+retry-budget exhaustion.
+
 The evaluator defaulting rule is:
 
 ```text

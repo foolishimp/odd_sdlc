@@ -335,6 +335,9 @@ import {
 } from "./component_depth_register.js";
 import { admitTestDesignRegisterFromArtifact } from "./test_design_register.js";
 import { admitTestExecutionSurfaceRegisterFromArtifact } from "./test_execution_surface_register.js";
+
+export const SDLC_ABG_ATTACHED_FP_MAX_RETRY_ATTEMPTS = 10 as const;
+
 const EMPTY_SCOPE_PATH: readonly string[] = Object.freeze([]);
 
 function isConformProjectGraphVectorEdge(edge: string): boolean {
@@ -10337,7 +10340,7 @@ function compactRuntimeEventArchivePayload(
       emitted.push(event);
     },
     plugins: session.plugins,
-    maxAttachedFpAttempts: 3
+    maxAttachedFpAttempts: SDLC_ABG_ATTACHED_FP_MAX_RETRY_ATTEMPTS
   });
   const completedDispatchState = session.dispatchState.current;
   if (completedDispatchState === null) {
