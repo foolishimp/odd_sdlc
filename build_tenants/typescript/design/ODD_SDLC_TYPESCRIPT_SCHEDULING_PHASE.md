@@ -24,11 +24,20 @@ implementation_design_surface
 
 test_design_surface
   -> derive_component_test_surface
+  -> derive_uat_test_source_surface
   -> prepare_test_execution_surface
   -> derive_test_execution_result_surface
   -> derive_test_run_archive_surface
   -> test_run_archive_surface
 ```
+
+`derive_component_code_surface`, `derive_component_test_surface`, and
+`derive_uat_test_source_surface` are sibling `Fg_graph_code_builder`
+materialization targets over common requirement/design authority when admitted
+dependency maps select a parallel traversal. The linear display above is the
+full-breadth fallback/read order; it is not a law that completed component
+source is a blanket precondition for test-source generation. Source/test
+consistency closes at qualification and execution fan-in.
 
 The schedule is graph state. It is not a ticket, not a manual checklist, and
 not an operator-local loop.

@@ -30,7 +30,7 @@ test("T-172 analyze-run JSON includes selected full-graph edge accounting", () =
 
     assert.equal(result.edgeAccounting.kind, "sdlc_executive_edge_accounting_audit");
     assert.equal(result.edgeAccounting.admissionDecision, "admit");
-    assert.equal(result.edgeAccounting.selectedEdgeNames.length, 22);
+    assert.equal(result.edgeAccounting.selectedEdgeNames.length, 23);
     assert.deepEqual(result.edgeAccounting.missingEdgeNames, []);
     assert.deepEqual(result.edgeAccounting.extraEdgeNames, []);
     assert.deepEqual(result.edgeAccounting.projectionNoCloseEdgeNames, [
@@ -59,7 +59,7 @@ test("T-172 analyze-run markdown reports edge accounting disposition", () => {
 
     assert.ok(markdown.includes("## Edge Accounting"));
     assert.ok(markdown.includes("- admission: admit"));
-    assert.ok(markdown.includes("- selected edges: 22"));
+    assert.ok(markdown.includes("- selected edges: 23"));
     assert.ok(
       markdown.includes(
         "- projection/no-close edges: derive_code_surface, derive_test_run_archive_surface, prepare_test_execution_surface"

@@ -160,6 +160,7 @@ function targetIgnoresExecutionByproducts(targetAssetType: string): boolean {
   return (
     targetAssetType === "component_code_surface" ||
     targetAssetType === "component_test_surface" ||
+    targetAssetType === "uat_test_source_surface" ||
     targetAdmitsTestExecutionEvidence(targetAssetType)
   );
 }
@@ -1890,6 +1891,7 @@ function requirementObligationBelongsToDownstreamSurface(input: {
     return (
       lower.includes("adr-003-test-design-surface.md") ||
       lower.includes("/component_test_surface.md") ||
+      lower.includes("/uat_test_source_surface.md") ||
       lower.includes("/component_test_") ||
       lower.includes("test-design-surface")
     );
@@ -1936,6 +1938,7 @@ function productMaterializationRequirementLineageRequired(
     requirementTraceObligationIdsForPrompt(manifest).length > 0 &&
     (manifest.targetAssetType === "component_code_surface" ||
       manifest.targetAssetType === "component_test_surface" ||
+      manifest.targetAssetType === "uat_test_source_surface" ||
       manifest.targetAssetType === "code_surface")
   );
 }

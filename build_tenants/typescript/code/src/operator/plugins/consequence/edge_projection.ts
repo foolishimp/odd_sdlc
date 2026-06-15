@@ -92,6 +92,7 @@ const TENANT_LOCAL_SDLC_SURFACE_OUTPUT_PATHS = Object.freeze({
   code_surface: "design/code_surface.md",
   test_design_surface: "design/adrs/ADR-003-test-design-surface.md",
   component_test_surface: "design/component_test_surface.md",
+  uat_test_source_surface: "design/uat_test_source_surface.md",
   component_test_qualification_surface:
     "design/component_test_qualification_surface.md",
   component_repair_schedule_surface: "design/component_repair_schedule_surface.md",

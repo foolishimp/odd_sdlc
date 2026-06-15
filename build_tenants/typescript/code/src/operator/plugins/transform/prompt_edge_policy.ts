@@ -436,6 +436,15 @@ function compactComponentDepthDirective(
         "On re-entry, existing testcaseIds, requirementIds, source-overlap rows, and test files are monotonic: do not remove or narrow them unless Current evaluated gaps specifically cite that row as wrong_stage, trace_missing, schema_invalid, boundary_collapsed, semantic_not_realized, or test_overlap_missing.",
         "On schema-local re-entry, repair the rejected component_depth_register fields first, then update only the affected test-file tags or register rows named by Current evaluated gaps."
       ].join("\n");
+    case "uat_test_source_surface":
+      return [
+        envelopeDirective,
+        "Emit payload.componentTestRows with row kind `sdlc_component_test_realization_row` for requirement-specific UAT executable tests only.",
+        "UAT test source is requirement/testcase specific: bind every row to testcaseIds and requirementIds, and do not require implementation module-specific source shape as the generation basis.",
+        "Use the admitted test stack profile, testcase authority, UAT testcase rows, and expected-result bindings to create framework-discoverable role=test files.",
+        "Do not copy component source topology rows into this carrier. Component/module consistency is checked later by qualification fan-in.",
+        "Represent unused component-depth fields as payload.componentTopologyRows=[], payload.componentRealizationRows=[], payload.testComponentTopologyRows=[], payload.componentTestQualificationRows=[], payload.componentExecutionFailureRegister=null, payload.componentRepairSchedule=null, and payload.releaseDepthParity=null."
+      ].join("\n");
     case "component_test_qualification_surface":
       return "Qualification edge worker role: read admitted component-test and test-execution evidence and return bounded observations. The installed operator publishes the component_test_qualification_surface carrier.";
     case "component_repair_schedule_surface":

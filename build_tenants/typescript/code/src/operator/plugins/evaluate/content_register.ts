@@ -794,6 +794,61 @@ function emptyDesignDepthRegister(targetAssetType: string): Record<string, unkno
   };
 }
 
+function fileTargetRoleByRelativePath(
+  input: unknown
+): ReadonlyMap<string, string> {
+  const roles = new Map<string, string>();
+  if (!Array.isArray(input)) {
+    return roles;
+  }
+  for (const candidate of input) {
+    const record = objectRecord(candidate);
+    if (record === null) {
+      continue;
+    }
+    const relativePath = record["relativePath"];
+    const role = record["role"];
+    if (typeof relativePath === "string" && typeof role === "string") {
+      roles.set(relativePath, role);
+    }
+  }
+  return roles;
+}
+
+function dropNonSourceFileTargetComponentRows(
+  input: Record<string, unknown>
+): Record<string, unknown> {
+  const nonSourceFileTargets = new Set(
+    [...fileTargetRoleByRelativePath(input["fileTargetRows"]).entries()]
+      .filter(([, role]) => role !== "source")
+      .map(([relativePath]) => relativePath)
+  );
+  if (nonSourceFileTargets.size === 0) {
+    return input;
+  }
+  let changed = false;
+  const normalized: Record<string, unknown> = { ...input };
+  for (const section of ["componentTopologyRows", "componentRealizationRows"]) {
+    const rows = input[section];
+    if (!Array.isArray(rows)) {
+      continue;
+    }
+    const filteredRows = rows.filter((row) => {
+      const record = objectRecord(row);
+      const relativePath = record?.["relativePath"];
+      return (
+        typeof relativePath !== "string" ||
+        !nonSourceFileTargets.has(relativePath)
+      );
+    });
+    if (filteredRows.length !== rows.length) {
+      normalized[section] = Object.freeze(filteredRows);
+      changed = true;
+    }
+  }
+  return changed ? Object.freeze(normalized) : input;
+}
+
 function normalizeDesignDepthContentRegisterPayload(input: unknown): unknown {
   const record = objectRecord(input);
   if (record === null || record["kind"] !== "sdlc_design_depth_register") {
@@ -806,6 +861,10 @@ function normalizeDesignDepthContentRegisterPayload(input: unknown): unknown {
       delete normalized[key];
       changed = true;
     }
+  }
+  const normalizedRows = dropNonSourceFileTargetComponentRows(normalized);
+  if (normalizedRows !== normalized) {
+    return normalizedRows;
   }
   return changed ? Object.freeze(normalized) : input;
 }
@@ -863,7 +922,9 @@ function designDepthRegisterPayloadFromFragments(
     assembled[fragment.section] = fragment.value;
   }
   try {
-    return parseDesignDepthRegisterPayload(assembled);
+    return parseDesignDepthRegisterPayload(
+      dropNonSourceFileTargetComponentRows(assembled)
+    );
   } catch (error) {
     throw new TypeError(
       `evaluate_content_register_design_depth_payload_invalid:${error instanceof Error ? error.message : "unknown"}`

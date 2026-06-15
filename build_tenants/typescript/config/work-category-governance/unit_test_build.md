@@ -7,6 +7,13 @@ Spec method constraints:
 
 Design module method constraints:
 - Build test design, topology, fixtures, schedules, and execution preparation under the selected test ownership boundary.
+- Component test materialization is a `Fg_graph_code_builder` specialization:
+  it builds test code from admitted UAT/testcase authority, selected tenant
+  stack/build authority, test design, and implementation design. Completed
+  component source is consumed by downstream qualification, execution, and
+  repair fan-in rather than acting as a blanket precondition for test-source
+  generation. A command-only `sbt test`/`npm test` pass with no generated
+  source tests is non-closure.
 - Keep one truth: no hidden test surfaces, fallback runner policy, alias carriers, or bridge authority.
 - Do not rewrite product implementation as test work; schedule repair when code/runtime pressure is outside the test contract.
 

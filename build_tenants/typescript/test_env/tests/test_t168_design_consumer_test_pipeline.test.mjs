@@ -26,6 +26,8 @@ import {
   constructSdlcTraversalOverlayCatalog,
   deriveSdlcPostCloseOverlayContinuationActionInput,
   deriveSdlcEdgeClosureDecision,
+  FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+  FG_GRAPH_CODE_BUILDER,
   constructWorkerInvocationPackage,
   deriveWorkerHandoffManifest,
   hookContractByEdgeName,
@@ -186,6 +188,74 @@ test("T-168 graph catalog correlates test execution phases to nodes and edges", 
   assert.equal(catalogEntry(catalog, "derive_test_design_surface").outputs[0], "test_design_surface");
   assert.equal(catalogEntry(catalog, "derive_component_test_surface").outputs[0], "component_test_surface");
   assert.equal(catalogEntry(catalog, "prepare_test_execution_surface").outputs[0], "test_execution_surface");
+});
+
+test("T-203 code-builder graph function owns source unit-test and UAT-test materialization", () => {
+  const catalog = constructSdlcGraphFunctionCatalog();
+  const componentCode = catalogEntry(catalog, "derive_component_code_surface");
+  const componentTest = catalogEntry(catalog, "derive_component_test_surface");
+  const uatTest = catalogEntry(catalog, "derive_uat_test_source_surface");
+
+  assert.equal(componentCode.specializesGraphFunction, FG_GRAPH_CODE_BUILDER);
+  assert.equal(componentTest.specializesGraphFunction, FG_GRAPH_CODE_BUILDER);
+  assert.equal(uatTest.specializesGraphFunction, FG_GRAPH_CODE_BUILDER);
+  assert.deepEqual(componentCode.inputs, ["implementation_design_surface"]);
+  assert.deepEqual(componentTest.inputs, [
+    "requirement_surface",
+    "testcase_authority_surface",
+    "selected_tenant_surface",
+    "test_design_surface",
+    "implementation_design_surface"
+  ]);
+  assert.deepEqual(uatTest.inputs, [
+    "requirement_surface",
+    "uat_testcases_surface",
+    "testcase_authority_surface",
+    "selected_tenant_surface",
+    "test_design_surface"
+  ]);
+});
+
+test("T-203 code-builder paths are explicit profiles without confused fallback routes", () => {
+  const catalog = constructSdlcGraphFunctionCatalog();
+  const builderEdges = catalog.functions.filter(
+    (entry) => entry.specializesGraphFunction === FG_GRAPH_CODE_BUILDER
+  );
+  const builderNames = builderEdges.map((entry) => entry.name).sort();
+
+  assert.deepEqual(builderNames, [
+    "derive_component_code_surface",
+    "derive_component_test_surface",
+    "derive_uat_test_source_surface",
+    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+  ].sort());
+
+  assert.equal(
+    catalogEntry(catalog, FG_DERIVE_LITE_COMPONENT_CODE_SURFACE).graphTrackPublication,
+    "overlay_only"
+  );
+  assert.equal(
+    catalogEntry(catalog, "derive_component_code_surface").graphTrackPublication,
+    "default"
+  );
+  assert.equal(
+    catalogEntry(catalog, "derive_component_test_surface").graphTrackPublication,
+    "default"
+  );
+  assert.equal(
+    builderEdges.filter((entry) => entry.outputs.includes("component_test_surface")).length,
+    1
+  );
+  assert.equal(
+    builderEdges.filter((entry) => entry.outputs.includes("uat_test_source_surface")).length,
+    1
+  );
+  assert.equal(
+    catalogEntry(catalog, "derive_component_test_surface").inputs.includes(
+      "component_code_surface"
+    ),
+    false
+  );
 });
 
 test("T-168 full traversal preserves test and release edges after component code", () => {

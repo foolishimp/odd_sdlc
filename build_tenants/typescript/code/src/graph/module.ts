@@ -331,6 +331,7 @@ const CONSEQUENCE_CODE_TEST_REVIEW_TARGETS = Object.freeze([
   "derive_code_surface",
   "derive_test_design_surface",
   "derive_component_test_surface",
+  "derive_uat_test_source_surface",
   "prepare_test_execution_surface",
   "derive_test_execution_result_surface",
   "qualify_component_test_execution_surface",

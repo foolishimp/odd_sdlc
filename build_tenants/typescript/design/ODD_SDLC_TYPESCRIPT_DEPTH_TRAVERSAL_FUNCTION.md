@@ -30,6 +30,20 @@ The external contract is the named graph function. Its graph vector is an
 internal ABG/GTL execution detail. Product code may cite the graph function and
 typed output carrier; it must not move a vector cursor locally.
 
+T-203 applies this depth mechanism to the reusable code-builder graph
+function. `derive_component_code_surface`, `derive_component_test_surface`,
+and `derive_uat_test_source_surface` are full-traversal
+`Fg_graph_code_builder` specializations, and
+`derive_lite_component_code_surface` is the overlay-scoped lite/smoke source
+profile. Depth traversal may zoom into the full source-code, unit/component
+test, and UAT-test specializations when source, unit/component-test, or UAT-test
+obligations are underdecomposed. Unit/component tests are requirement + design
+and module specific; UAT tests are requirement / UAT-testcase specific and become
+framework-discoverable source through the UAT-test profile. Test-run and
+qualification nodes fan in the generated code and generated tests; failures
+become ticket triage pressure for same-edge code-builder iteration, deeper
+code/test zoom, or upstream design re-entry.
+
 ## IACS
 
 Inputs:
@@ -112,6 +126,8 @@ Parent depth closure is blocked when any of these conditions hold:
 - a requirement-bound child row lacks source test refs or execution shard refs
 - command evidence such as `sbt test` exists without requirement-bound source
   test and admitted execution-shard evidence
+- component-test closure is claimed without generated, framework-discoverable
+  source tests from the `Fg_graph_code_builder` generated-test specialization
 - SDLC product code attempts graph cursor movement, retry, recursion, runtime
   event emission, or closure fold locally
 
@@ -124,4 +140,4 @@ Rejected implementation paths:
 - command-success-only parent closure
 - prompt-only downstream obligation list
 - mutation of `overlay://odd-sdlc/current-full-traversal` to carry depth policy
-
+- separate legacy test-generation path that bypasses `Fg_graph_code_builder`

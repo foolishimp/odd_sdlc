@@ -72,6 +72,7 @@ const DATA_MAPPER_DETAIL_ZOOM_EDGES = Object.freeze([
   "derive_code_surface",
   "derive_test_design_surface",
   "derive_component_test_surface",
+  "derive_uat_test_source_surface",
   "prepare_test_execution_surface",
   "derive_test_execution_result_surface",
   "qualify_component_test_execution_surface",
@@ -593,6 +594,22 @@ function startLabelForTarget(startTarget) {
     : "abg-start-until-converged";
 }
 
+function nextGraphFunctionStartTargetFromStart(start) {
+  const nextActionProjection =
+    start?.traversalConsequence?.nextActionProjection ??
+    start?.start?.executionContract?.nextActionProjection ??
+    start?.nextActionProjection ??
+    null;
+  if (nextActionProjection?.choosesNextTraversal !== true) {
+    return null;
+  }
+  const nextGraphFunctionRef = nextActionProjection.nextGraphFunctionRef;
+  if (typeof nextGraphFunctionRef !== "string" || nextGraphFunctionRef.length === 0) {
+    return null;
+  }
+  return `graph_function:${nextGraphFunctionRef}`;
+}
+
 function unwrapStartPayload(parsed, label) {
   if (parsed?.kind === "odd_sdlc_spec_method_result") {
     if (parsed.status !== "ok") {
@@ -982,12 +999,13 @@ function sdlcOverlayStartLoop(input) {
   let terminalReason = "sdlc_overlay_max_advances_reached";
   let lastGraphFunctionName = null;
   let sameGraphFunctionAfterConverge = 0;
+  let currentStartTarget = input.startTarget;
   for (let step = 0; step < DATA_MAPPER_MAX_ADVANCES; step += 1) {
-    const label = `${startLabelForTarget(input.startTarget)}-${String(step + 1).padStart(3, "0")}`;
+    const label = `odd-sdlc-start-first-traversal-${String(step + 1).padStart(3, "0")}`;
     const start = unwrapStartPayload(runCommand({
       label,
       command: input.installedCommand,
-      args: sdlcStartArgs(input.startTarget),
+      args: sdlcStartArgs(currentStartTarget),
       cwd: input.workspace,
       env: input.env,
       archiveRoot: input.archiveRoot,
@@ -1029,6 +1047,14 @@ function sdlcOverlayStartLoop(input) {
       sameGraphFunctionAfterConverge = 0;
     }
     lastGraphFunctionName = graphFunctionName;
+
+    const nextStartTarget = nextGraphFunctionStartTargetFromStart(start);
+    if (nextStartTarget !== null) {
+      currentStartTarget = nextStartTarget;
+    } else if (isSuccessfulSdlcTraversalStart(start)) {
+      terminalReason = "sdlc_overlay_next_action_missing";
+      break;
+    }
   }
   if (terminalStart === null) {
     throw new Error("overlay start loop produced no starts");
@@ -1156,6 +1182,7 @@ function main() {
     ? sdlcOverlayStartLoop({
         startTarget: START_TARGET,
         installedCommand,
+        genesisCommand,
         workspace,
         env: baseEnv,
         archiveRoot,

@@ -131,12 +131,14 @@ function frontierPayload() {
     selectedMethod: "parallel",
     dependencyMapRef: "dependency-map://odd-sdlc/t175/modules",
     testDependencyMapRef: "dependency-map://odd-sdlc/t175/tests",
+    uatTestDependencyMapRef: null,
     dependencyMapRefs: [
       "dependency-map://odd-sdlc/t175/modules",
       "dependency-map://odd-sdlc/t175/tests"
     ],
     traversalSelectionRef: "selection://odd-sdlc/t175/modules",
     testTraversalSelectionRef: "selection://odd-sdlc/t175/tests",
+    uatTestTraversalSelectionRef: null,
     traversalSelectionRefs: [
       "selection://odd-sdlc/t175/modules",
       "selection://odd-sdlc/t175/tests"
@@ -150,6 +152,8 @@ function frontierPayload() {
     policyRef: "policy://odd-sdlc/t175/live-frontier",
     laneCount: 2,
     devLaneCount: 1,
+    componentTestLaneCount: 1,
+    uatTestLaneCount: 0,
     testLaneCount: 1,
     fanInCount: 1,
     batchCount: 2,
@@ -486,22 +490,47 @@ test("T-175 product graph catalog carries current T-174 graph truth", () => {
   assert(componentCode.requiredArtifactRefs.includes(
     "operator-run-artifact://live-fp-parallel-materialization-frontier"
   ));
+  assert.equal(
+    componentCode.requiredArtifactRefs.includes(
+      "operator-run-artifact://test-dependency-map"
+    ),
+    false
+  );
 
   const componentTest = requireSdlcProductGraphContractRow({
     catalog: productGraph,
     edgeRef: "derive_component_test_surface"
   });
-  assert.equal(componentTest.workerDispatchPolicy, "single_worker_handoff");
+  assert.equal(componentTest.workerDispatchPolicy, "abg_frontier_eligible");
   assert(componentTest.requiredArtifactRefs.includes(
     "operator-run-artifact://test-dependency-map"
   ));
+  assert(componentTest.requiredArtifactRefs.includes(
+    "operator-run-artifact://live-fp-parallel-materialization-frontier"
+  ));
   assert.equal(
     componentTest.requiredArtifactRefs.includes(
-      "operator-run-artifact://live-fp-parallel-materialization-frontier"
+      "operator-run-artifact://module-dependency-map"
+    ),
+    true
+  );
+  const uatTest = requireSdlcProductGraphContractRow({
+    catalog: productGraph,
+    edgeRef: "derive_uat_test_source_surface"
+  });
+  assert.equal(uatTest.workerDispatchPolicy, "abg_frontier_eligible");
+  assert(uatTest.requiredArtifactRefs.includes(
+    "operator-run-artifact://test-dependency-map"
+  ));
+  assert(uatTest.requiredArtifactRefs.includes(
+    "operator-run-artifact://live-fp-parallel-materialization-frontier"
+  ));
+  assert.equal(
+    uatTest.requiredArtifactRefs.includes(
+      "operator-run-artifact://module-dependency-map"
     ),
     false
   );
-
   const featureDecomp = requireSdlcProductGraphContractRow({
     catalog: productGraph,
     edgeRef: "derive_feature_decomp_surface"
@@ -668,7 +697,7 @@ test("T-175 runtime gaps require T-174 frontier artifact when parallel traversal
   }
 });
 
-test("T-175 runtime gaps do not require T-174 frontier outside component-code graph truth", () => {
+test("T-175 runtime gaps require T-174 frontier for parallel component-test graph truth", () => {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t175-frontier-scoped-"));
   try {
     const archiveRoot = path.join(root, "operator-run");
@@ -692,12 +721,13 @@ test("T-175 runtime gaps do not require T-174 frontier outside component-code gr
     );
     const carriers = readOperatorRunCarriers(archiveRoot);
     const result = deriveRuntimeArtifactGaps({ carriers: [carriers] });
-    assert.equal(
+    assert(
       result.gaps.some(
         (gap) =>
-          gap.artifact === "sdlc_live_fp_parallel_materialization_frontier.json"
+          gap.artifact === "sdlc_live_fp_parallel_materialization_frontier.json" &&
+          gap.status === "missing" &&
+          gap.detail?.includes("parallel_dependency_traversal_selected")
       ),
-      false,
       JSON.stringify(result.gaps, null, 2)
     );
   } finally {

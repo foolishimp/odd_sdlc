@@ -44,6 +44,7 @@ const COMPONENT_DEPTH_TARGETS = Object.freeze([
   "component_code_surface",
   "component_realization_qualification_surface",
   "component_test_surface",
+  "uat_test_source_surface",
   "component_test_qualification_surface",
   "component_repair_schedule_surface",
   "release_depth_parity_surface"
@@ -780,6 +781,7 @@ function requiredRowsPresent(input: {
         ? Object.freeze([])
         : Object.freeze(["component_depth_register_component_realization_rows_missing"]);
     case "component_test_surface":
+    case "uat_test_source_surface":
       return input.register.componentTestRows.length > 0
         ? Object.freeze([])
         : Object.freeze(["component_depth_register_component_test_rows_missing"]);
@@ -831,6 +833,7 @@ function targetStageOccupancyReasons(input: {
       ]);
     case "component_realization_qualification_surface":
     case "component_test_surface":
+    case "uat_test_source_surface":
     case "component_test_qualification_surface":
     case "component_repair_schedule_surface":
     case "release_depth_parity_surface":

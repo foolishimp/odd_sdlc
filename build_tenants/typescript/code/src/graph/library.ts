@@ -14,6 +14,8 @@ export const FG_CONFORM_PROJECT = "Fg_conform_project" as const;
 
 export const FG_CONFORM_PROJECT_AUTHORITY = "Fg_conform_project_authority" as const;
 
+export const FG_GRAPH_CODE_BUILDER = "Fg_graph_code_builder" as const;
+
 export const FG_MATERIALIZE_DECLARED_PRODUCT_ASSET =
   "Fg_materialize_declared_product_asset" as const;
 
@@ -46,6 +48,7 @@ export type SdlcReusableGraphFunctionName =
   | typeof FG_INGRESS_PROJECT
   | typeof FG_CONFORM_PROJECT
   | typeof FG_CONFORM_PROJECT_AUTHORITY
+  | typeof FG_GRAPH_CODE_BUILDER
   | typeof FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
   | typeof FG_MATERIALIZATION_ASSURANCE_LEDGER
   | typeof FG_SEMANTIC_CONVERGENCE_ASSURANCE_LEDGER
@@ -229,6 +232,17 @@ export const DECLARED_PRODUCT_MATERIALIZATION_INPUTS = Object.freeze([
 
 export const DECLARED_PRODUCT_MATERIALIZATION_OUTPUTS = Object.freeze([
   "component_code_surface"
+] as const);
+
+export const GRAPH_CODE_BUILDER_INPUTS = Object.freeze([
+  "requirements_or_uat_test_pressure",
+  "selected_tenant_surface",
+  "design_authority_surface",
+  "code_builder_target_contract"
+] as const);
+
+export const GRAPH_CODE_BUILDER_OUTPUTS = Object.freeze([
+  "code_workspace_surface"
 ] as const);
 
 export const MATERIALIZATION_ASSURANCE_INPUTS = Object.freeze([
@@ -421,6 +435,40 @@ export const REUSABLE_GRAPH_FUNCTION_CATALOG: readonly SdlcReusableGraphFunction
         "supportable_authority_surfaces",
         "authority_gap_interpretation",
         "next_action_interpretation"
+      ])
+    }),
+    Object.freeze({
+      kind: "sdlc_reusable_graph_function_catalog_entry",
+      name: FG_GRAPH_CODE_BUILDER,
+      intent:
+        "Reusable code-builder traversal that materializes a target code workspace from admitted requirement or UAT pressure, selected tenant/build authority, design authority, and a target contract.",
+      graphFunctionRole: "reusable_library",
+      inputs: GRAPH_CODE_BUILDER_INPUTS,
+      outputs: GRAPH_CODE_BUILDER_OUTPUTS,
+      stableOuterContract:
+        "RequirementOrUatPressure + SelectedTenantSurface + DesignAuthoritySurface + CodeBuilderTargetContract -> CodeWorkspaceSurface",
+      computeOrder: Object.freeze([
+        "preflight:F_D",
+        "construct:F_P",
+        "admit_evidence:F_D",
+        "evaluate_action:F_P",
+        "postflight:F_D"
+      ]),
+      abgOwnedRuntimeTruth: Object.freeze([
+        "graph_call",
+        "frame",
+        "continuation",
+        "iteration",
+        "retry",
+        "event",
+        "projection"
+      ]),
+      sdlcOwnedDomainTruth: Object.freeze([
+        "code_builder_target_meaning",
+        "tenant_stack_authority",
+        "design_authority_interpretation",
+        "uat_test_authority_interpretation",
+        "source_test_consumption_policy"
       ])
     }),
     Object.freeze({

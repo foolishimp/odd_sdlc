@@ -134,6 +134,21 @@ export const SDLC_PRODUCT_GRAPH_EDGE_POLICY_ROWS = Object.freeze([
       "operator-run-artifact://implementation-decomposition-summary",
       "operator-run-artifact://module-dependency-map",
       "operator-run-artifact://module-dependency-traversal-selection",
+      "operator-run-artifact://live-fp-parallel-materialization-frontier",
+      "operator-run-artifact://review-grade-edge-fulfillment-assessment"
+    ]),
+    proofLaneRefs: Object.freeze([
+      "test://odd-sdlc/t174/feature-dependency-frontier"
+    ])
+  }),
+  Object.freeze({
+    edgeRef: "derive_component_test_surface",
+    workerDispatchPolicy: "abg_frontier_eligible",
+    requiredArtifactRefs: Object.freeze([
+      "operator-run-artifact://implementation-decomposition-summary",
+      "operator-run-artifact://module-dependency-map",
+      "operator-run-artifact://module-dependency-traversal-selection",
+      "operator-run-artifact://test-decomposition-summary",
       "operator-run-artifact://test-dependency-map",
       "operator-run-artifact://test-dependency-traversal-selection",
       "operator-run-artifact://live-fp-parallel-materialization-frontier",
@@ -144,13 +159,18 @@ export const SDLC_PRODUCT_GRAPH_EDGE_POLICY_ROWS = Object.freeze([
     ])
   }),
   Object.freeze({
-    edgeRef: "derive_component_test_surface",
-    workerDispatchPolicy: "single_worker_handoff",
+    edgeRef: "derive_uat_test_source_surface",
+    workerDispatchPolicy: "abg_frontier_eligible",
     requiredArtifactRefs: Object.freeze([
       "operator-run-artifact://test-decomposition-summary",
       "operator-run-artifact://test-dependency-map",
       "operator-run-artifact://test-dependency-traversal-selection",
+      "operator-run-artifact://live-fp-parallel-materialization-frontier",
       "operator-run-artifact://review-grade-edge-fulfillment-assessment"
+    ]),
+    proofLaneRefs: Object.freeze([
+      "test://odd-sdlc/t174/feature-dependency-frontier",
+      "test://odd-sdlc/t203/uat-test-source"
     ])
   }),
   Object.freeze({

@@ -366,6 +366,95 @@ test("T-170 archived next traversal preserves target-next basis identity", () =>
   );
 });
 
+test("T-160 archived overlay replay preserves prior vector replay basis", () => {
+  const workspace = makeConformantWorkspace();
+  writeFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: t160_hello_world_rust_lite",
+      "  overlay_strategy: thread",
+      "  overlay_ref: overlay://odd-sdlc/lite-design-module-implementation",
+      "active_tenant: hello_world_rust",
+      "selected_output_root: build_tenants/hello_world_rust",
+      "ambiguity_risk_appetite: low",
+      "build_tenants:",
+      "  hello_world_rust:",
+      "    output_dir: build_tenants/hello_world_rust",
+      "    language: Rust",
+      "    build_tool: cargo",
+      "    test_runner: cargo",
+      "    module_structure:",
+      "      - hello_world_rust"
+    ].join("\n"),
+    "utf8"
+  );
+
+  const initial = invokeOddSdlcSpecMethodCommandSync([
+    "gaps",
+    "--workspace",
+    workspace,
+    "--target",
+    "overlay:lite-design-module-implementation"
+  ]);
+  assert.equal(initial.status, "ok");
+  const basis = initial.payload.start.executionContract.basis;
+  writeRuntimeEvents(workspace, [
+    constructGraphCallOpenedEvent(basis),
+    constructFrameOpenedEvent(basis),
+    constructVectorTraversalPlannedEvent({ basis, vectorIndex: 0 }),
+    constructVectorClosedEvent({
+      basis,
+      vectorIndex: 0,
+      closureKind: "advanced"
+    })
+  ]);
+  writePostCloseNextActionArchive(workspace, {
+    graphFunctionName: FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
+    nextGraphFunctionRef: FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
+    nextGraphVectorRef: FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+    overlayRef: SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
+  });
+
+  const replay = invokeOddSdlcSpecMethodCommandSync([
+    "gaps",
+    "--workspace",
+    workspace,
+    "--target",
+    "overlay:lite-design-module-implementation"
+  ]);
+
+  assert.equal(replay.status, "ok");
+  assert.equal(
+    replay.payload.start.executionContract.targetGraphFunction,
+    FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE
+  );
+  assert.equal(
+    replay.payload.start.executionContract.nextActionProjection.nextGraphVectorRef,
+    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+  );
+  assert.equal(
+    replay.payload.start.executionContract.basis.id,
+    initial.payload.start.executionContract.basis.id
+  );
+  assert.equal(
+    replay.payload.start.executionContract.overlayBindingRef,
+    initial.payload.start.executionContract.overlayBindingRef
+  );
+  assert.equal(
+    replay.payload.projection.currentEdge,
+    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+  );
+  assert.doesNotMatch(
+    replay.payload.start.executionContract.overlayBindingRef,
+    /public-start%2Fgraph_function/
+  );
+  assert.match(
+    replay.payload.start.executionContract.overlayBindingRef,
+    /public-start%2Foverlay%2Flite-design-module-implementation/
+  );
+});
+
 test("T-160 archived next traversal rejects inconsistent predecessor overlay binding", () => {
   const workspace = makeConformantWorkspace();
   writePostCloseNextActionArchive(workspace, {

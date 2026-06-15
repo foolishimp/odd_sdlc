@@ -287,7 +287,13 @@ test("T-093 publishes schedule graph assets before materialization edges", () =>
   );
   assert.deepStrictEqual(
     hookContractByEdgeName("derive_test_execution_result_surface").sourceAssetTypes,
-    ["test_execution_surface", "test_design_surface"]
+    [
+      "test_execution_surface",
+      "test_design_surface",
+      "component_code_surface",
+      "component_test_surface",
+      "uat_test_source_surface"
+    ]
   );
   assert(
     SDLC_HOOK_TARGET_POLICY.some(

@@ -14,6 +14,7 @@ import type {
 } from "../test_design_register.js";import {
   admitSdlcDependencyTraversalSelectedMethodCarrier,
   deriveSdlcTestDependencyMapFromImplementationDependencyMap,
+  deriveSdlcUatTestDependencyMapFromTestDependencyMap,
   deriveSdlcStagedImplementationTopologyAuthority,
   deriveSdlcStagedTestTopologyAuthority,
   selectSdlcDependencyMapTraversal
@@ -124,6 +125,44 @@ function stagedParallelTraversalSelectedMethodCarrier(
   });
 }
 
+function pushUatTestDependencyCarriers(input: {
+  readonly carriers: SdlcStagedConstructionAuditCarrier[];
+  readonly testDependencyMap: SdlcTestDependencyMap;
+  readonly evidenceRefs: readonly string[];
+}): void {
+  const uatTestDependencyMap =
+    deriveSdlcUatTestDependencyMapFromTestDependencyMap({
+      testDependencyMap: input.testDependencyMap
+    });
+  if (uatTestDependencyMap === null) {
+    return;
+  }
+  input.carriers.push(
+    stagedAuditCarrier(
+      "operator-run-artifact://uat-test-dependency-map",
+      uatTestDependencyMap
+    ),
+    stagedAuditCarrier(
+      "operator-run-artifact://uat-test-dependency-traversal-selection",
+      selectSdlcDependencyMapTraversal({
+        selectionRef: "selection://odd-sdlc/uat-test/staged-topology",
+        dependencyMap: uatTestDependencyMap,
+        selectedMethodCarrier: stagedParallelTraversalSelectedMethodCarrier(
+          Object.freeze([
+            ...input.evidenceRefs,
+            "surface://uat-test-dependency-map"
+          ])
+        ),
+        policy: "parallel_when_partitioned",
+        basisRefs: Object.freeze([
+          ...input.evidenceRefs,
+          "surface://uat-test-dependency-map"
+        ])
+      })
+    )
+  );
+}
+
 export function deriveSdlcStagedConstructionAuditCarriers(
   manifest: SdlcWorkerHandoffManifest,
   fpEvaluatorAdmissionEvidenceRefs: readonly string[] = Object.freeze([])
@@ -206,6 +245,14 @@ export function deriveSdlcStagedConstructionAuditCarriers(
         })
       )
     );
+    pushUatTestDependencyCarriers({
+      carriers,
+      testDependencyMap: authority.dependencyMap,
+      evidenceRefs: Object.freeze([
+        "surface://test-decomposition-summary",
+        "surface://test-dependency-map"
+      ])
+    });
   } else if (implementationDependencyMap !== null) {
     const derivedTestDependencyMap =
       deriveSdlcTestDependencyMapFromImplementationDependencyMap({
@@ -239,6 +286,15 @@ export function deriveSdlcStagedConstructionAuditCarriers(
           })
         )
       );
+      pushUatTestDependencyCarriers({
+        carriers,
+        testDependencyMap: derivedTestDependencyMap,
+        evidenceRefs: Object.freeze([
+          implementationDependencyMap.mapRef,
+          "surface://module-dependency-map",
+          "surface://test-dependency-map"
+        ])
+      });
     }
   }
 

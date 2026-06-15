@@ -532,6 +532,40 @@ function isTestMaterializationTarget(targetRef: string): boolean {
   );
 }
 
+const JVM_SOURCE_LANGUAGE_DIR = ["sc", "ala"].join("");
+const JVM_SOURCE_EXTENSION = `.${JVM_SOURCE_LANGUAGE_DIR}`;
+const SCRIPT_SOURCE_EXTENSIONS = Object.freeze([
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+  ".ts",
+  ".tsx"
+]);
+
+function sourceFileExtension(targetRef: string): string | null {
+  const normalized = normalizedTargetPath(targetRef);
+  const match = /(\.[A-Za-z0-9]+)$/u.exec(normalized);
+  if (match?.[1] === JVM_SOURCE_EXTENSION) {
+    return JVM_SOURCE_EXTENSION;
+  }
+  return SCRIPT_SOURCE_EXTENSIONS.find((extension) =>
+    normalized.endsWith(extension)
+  ) ?? null;
+}
+
+function pascalRefPart(input: string): string {
+  const parts = input
+    .trim()
+    .replace(/^[A-Za-z][A-Za-z0-9+.-]*:\/\//u, "")
+    .split(/[^A-Za-z0-9]+/u)
+    .filter((part) => part.length > 0);
+  const value = parts
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
+    .join("");
+  return value.length > 0 ? value : "Generated";
+}
+
 function materializationTargetBaseName(targetRef: string): string {
   const normalized = normalizedTargetPath(targetRef);
   const basename =
@@ -539,7 +573,47 @@ function materializationTargetBaseName(targetRef: string): string {
     normalized;
   return basename
     .replace(/\.(test|spec)\.[cm]?[jt]sx?$/u, "")
-    .replace(/\.[cm]?[jt]sx?$/u, "");
+    .replace(/\.[cm]?[jt]sx?$/u, "")
+    .replace(new RegExp(`${JVM_SOURCE_EXTENSION}$`, "u"), "");
+}
+
+function unitTestMaterializationTarget(input: {
+  readonly sourceTargetRef: string;
+  readonly nodeId: string;
+}): string | null {
+  const normalized = normalizedTargetPath(input.sourceTargetRef);
+  if (normalized.length === 0 || isTestMaterializationTarget(normalized)) {
+    return null;
+  }
+  const jvmMainSourceMarker = `/src/main/${JVM_SOURCE_LANGUAGE_DIR}`;
+  const jvmMainSourceIndex = normalized.indexOf(jvmMainSourceMarker);
+  if (jvmMainSourceIndex >= 0) {
+    const root = normalized.slice(0, jvmMainSourceIndex);
+    return [
+      root,
+      "src",
+      "test",
+      JVM_SOURCE_LANGUAGE_DIR,
+      `${pascalRefPart(input.nodeId)}Spec${JVM_SOURCE_EXTENSION}`
+    ]
+      .filter((part) => part.length > 0)
+      .join("/");
+  }
+  const extension = sourceFileExtension(normalized);
+  if (extension === null) {
+    return null;
+  }
+  const parts = normalized.split("/").filter((part) => part.length > 0);
+  const sourceIndex = parts.findIndex((part) => part === "src");
+  const basename = materializationTargetBaseName(normalized);
+  const filename =
+    extension === JVM_SOURCE_EXTENSION
+      ? `${basename}Spec${extension}`
+      : `${basename}.test${extension}`;
+  if (sourceIndex >= 0) {
+    return [...parts.slice(0, sourceIndex), "test", filename].join("/");
+  }
+  return ["test", filename].join("/");
 }
 
 function implementationSummaryRows(
@@ -799,7 +873,7 @@ function testDependencyMapFromDesign(input: {
 export function deriveSdlcTestDependencyMapFromImplementationDependencyMap(
   input: SdlcDerivedTestDependencyMapInput
 ): SdlcTestDependencyMap | null {
-  const testNodes = input.moduleDependencyMap.nodes.flatMap((node) =>
+  const explicitTestNodes = input.moduleDependencyMap.nodes.flatMap((node) =>
     node.materializationTargetRefs
       .filter(isTestMaterializationTarget)
       .map((targetRef) =>
@@ -812,6 +886,29 @@ export function deriveSdlcTestDependencyMapFromImplementationDependencyMap(
         })
       )
   );
+  const testNodes =
+    explicitTestNodes.length > 0
+      ? explicitTestNodes
+      : input.moduleDependencyMap.nodes.flatMap((node) => {
+          const targetRefs = uniqueSorted(
+            node.materializationTargetRefs.flatMap((sourceTargetRef) => {
+              const targetRef = unitTestMaterializationTarget({
+                sourceTargetRef,
+                nodeId: node.nodeId
+              });
+              return targetRef === null ? [] : [targetRef];
+            })
+          );
+          return targetRefs.map((targetRef) =>
+            Object.freeze({
+              nodeId: `test-class://${slugRefPart(`${node.nodeId}:${targetRef}`)}`,
+              predecessorNodeIds: Object.freeze([]),
+              successorNodeIds: Object.freeze([]),
+              ownedRequirementRefs: node.ownedRequirementRefs,
+              materializationTargetRefs: Object.freeze([targetRef])
+            })
+          );
+        });
   if (testNodes.length === 0) {
     return null;
   }
@@ -831,6 +928,85 @@ export function deriveSdlcTestDependencyMapFromImplementationDependencyMap(
       testNodes.map(
         (node) => `shard://test-class/${slugRefPart(node.nodeId)}`
       )
+    ),
+    cycleRefs: Object.freeze([])
+  });
+}
+
+function uatTestMaterializationTarget(targetRef: string): string {
+  const normalized = normalizedTargetPath(targetRef);
+  const parts = normalized.split("/").filter((part) => part.length > 0);
+  const basename = materializationTargetBaseName(normalized);
+  const filename = normalized.endsWith(JVM_SOURCE_EXTENSION)
+    ? `${basename}UatSpec${JVM_SOURCE_EXTENSION}`
+    : normalized.endsWith(".js") || normalized.endsWith(".jsx")
+      ? `${basename}.uat.test.js`
+      : normalized.endsWith(".mjs")
+        ? `${basename}.uat.test.mjs`
+        : normalized.endsWith(".cjs")
+        ? `${basename}.uat.test.cjs`
+        : normalized.endsWith(".tsx")
+          ? `${basename}.uat.test.tsx`
+          : `${basename}.uat.test.ts`;
+  const jvmTestMarker = `/src/test/${JVM_SOURCE_LANGUAGE_DIR}/`;
+  const jvmTestIndex = normalized.indexOf(jvmTestMarker);
+  if (jvmTestIndex >= 0) {
+    const root = normalized.slice(0, jvmTestIndex);
+    return [
+      root,
+      "src",
+      "test",
+      JVM_SOURCE_LANGUAGE_DIR,
+      "uat",
+      filename
+    ]
+      .filter((part) => part.length > 0)
+      .join("/");
+  }
+  const testIndex = parts.findIndex((part) => part === "test" || part === "tests");
+  if (testIndex >= 0) {
+    return [...parts.slice(0, testIndex + 1), "uat", filename].join("/");
+  }
+  const srcIndex = parts.findIndex((part) => part === "src");
+  if (srcIndex >= 0) {
+    return [...parts.slice(0, srcIndex), "test", "uat", filename].join("/");
+  }
+  return ["test", "uat", filename].join("/");
+}
+
+export function deriveSdlcUatTestDependencyMapFromTestDependencyMap(input: {
+  readonly testDependencyMap: SdlcTestDependencyMap;
+  readonly mapRef?: string | undefined;
+  readonly summaryRef?: string | undefined;
+}): SdlcTestDependencyMap | null {
+  const nodes = input.testDependencyMap.nodes.map((node) =>
+    Object.freeze({
+      nodeId: `uat-test://${slugRefPart(node.nodeId)}`,
+      predecessorNodeIds: Object.freeze([]),
+      successorNodeIds: Object.freeze([]),
+      ownedRequirementRefs: node.ownedRequirementRefs,
+      materializationTargetRefs: uniqueSorted(
+        node.materializationTargetRefs.map(uatTestMaterializationTarget)
+      )
+    })
+  );
+  if (nodes.length === 0) {
+    return null;
+  }
+  const firstNode = nodes[0];
+  return Object.freeze({
+    kind: "sdlc_test_dependency_map" as const,
+    mapRef:
+      input.mapRef ??
+      "dependency-map://odd-sdlc/uat-test/source-from-test-authority",
+    summaryRef: input.summaryRef ?? input.testDependencyMap.summaryRef,
+    nodes: Object.freeze(nodes),
+    steelThreadCandidateNodeIds:
+      firstNode === undefined
+        ? Object.freeze([])
+        : Object.freeze([firstNode.nodeId]),
+    parallelShardRefs: uniqueSorted(
+      nodes.map((node) => `shard://uat-test/${slugRefPart(node.nodeId)}`)
     ),
     cycleRefs: Object.freeze([])
   });

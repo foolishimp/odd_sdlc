@@ -22,6 +22,7 @@ import {
   deriveSdlcLiveFpParallelMaterializationBranchOverrides,
   deriveSdlcStagedConstructionAuditCarriers,
   deriveSdlcTestDependencyMapFromImplementationDependencyMap,
+  deriveSdlcUatTestDependencyMapFromTestDependencyMap,
   deriveWorkerHandoffManifest,
   hookContractByEdgeName,
   isSdlcLiveFpParallelMaterializationFrontier,
@@ -304,7 +305,11 @@ function branchRowsForSyntheticLiveFrontier({ dag, compilation }) {
         branchRef: branchRef.branchRef,
         branchKey: branchRef.branchKey,
         nodeId: node.nodeRef,
-        laneKind: node.nodeKind === "test_materialization" ? "test" : "dev",
+        laneKind:
+          node.nodeKind === "test_materialization" ||
+          node.nodeKind === "uat_test_materialization"
+            ? "test"
+            : "dev",
         workerProcessRef: `abg-native-branch-task://odd-sdlc/t174/${branchRef.branchKey}`,
         materializationTargetRefs: targetRefsForDagNode(node),
         readRefs: node.readRefs,
@@ -929,6 +934,70 @@ test("T-174 ABG frontier runner consumes compiled SDLC DAG without harness branc
   );
 });
 
+test("T-203 unit and UAT dependency maps derive from source-only module definitions", () => {
+  const testDependencyMap =
+    deriveSdlcTestDependencyMapFromImplementationDependencyMap({
+      moduleDependencyMap: liveRootedDevMap()
+    });
+  assert(testDependencyMap);
+  assert.deepEqual(
+    testDependencyMap.nodes.map((node) => node.materializationTargetRefs[0]).sort(),
+    [
+      "build_tenants/parallel_hello_world/test/hello.test.js",
+      "build_tenants/parallel_hello_world/test/world.test.js"
+    ]
+  );
+  const uatTestDependencyMap =
+    deriveSdlcUatTestDependencyMapFromTestDependencyMap({
+      testDependencyMap
+    });
+  assert(uatTestDependencyMap);
+  assert.deepEqual(
+    uatTestDependencyMap.nodes
+      .map((node) => node.materializationTargetRefs[0])
+      .sort(),
+    [
+      "build_tenants/parallel_hello_world/test/uat/hello.uat.test.js",
+      "build_tenants/parallel_hello_world/test/uat/world.uat.test.js"
+    ]
+  );
+
+  const jvmSourceDirectory = ["sc", "ala"].join("");
+  const jvmModuleMap = moduleMap([
+    Object.freeze({
+      nodeId: "module://core",
+      predecessorNodeIds: Object.freeze([]),
+      successorNodeIds: Object.freeze([]),
+      ownedRequirementRefs: Object.freeze(["REQ-T203-CORE"]),
+      materializationTargetRefs: Object.freeze([
+        `build_tenants/example/core/src/main/${jvmSourceDirectory}`
+      ])
+    })
+  ]);
+  const jvmTestDependencyMap =
+    deriveSdlcTestDependencyMapFromImplementationDependencyMap({
+      moduleDependencyMap: jvmModuleMap
+    });
+  assert(jvmTestDependencyMap);
+  assert.deepEqual(
+    jvmTestDependencyMap.nodes.map((node) => node.materializationTargetRefs[0]),
+    [
+      `build_tenants/example/core/src/test/${jvmSourceDirectory}/CoreSpec.${jvmSourceDirectory}`
+    ]
+  );
+  const jvmUatTestDependencyMap =
+    deriveSdlcUatTestDependencyMapFromTestDependencyMap({
+      testDependencyMap: jvmTestDependencyMap
+    });
+  assert(jvmUatTestDependencyMap);
+  assert.deepEqual(
+    jvmUatTestDependencyMap.nodes.map((node) => node.materializationTargetRefs[0]),
+    [
+      `build_tenants/example/core/src/test/${jvmSourceDirectory}/uat/CoreSpecUatSpec.${jvmSourceDirectory}`
+    ]
+  );
+});
+
 test("T-174 synthetic hello-world multilane proof derives live frontier artifact shape", async () => {
   const implementationMap = rootedHelloWorldImplementationMap();
   const testDependencyMap =
@@ -943,6 +1012,20 @@ test("T-174 synthetic hello-world multilane proof derives live frontier artifact
       "build_tenants/parallel_hello_world/test/world.test.js"
     ]
   );
+  const uatTestDependencyMap =
+    deriveSdlcUatTestDependencyMapFromTestDependencyMap({
+      testDependencyMap
+    });
+  assert(uatTestDependencyMap);
+  assert.deepEqual(
+    uatTestDependencyMap.nodes
+      .map((node) => node.materializationTargetRefs[0])
+      .sort(),
+    [
+      "build_tenants/parallel_hello_world/test/uat/hello.uat.test.js",
+      "build_tenants/parallel_hello_world/test/uat/world.uat.test.js"
+    ]
+  );
   const moduleTraversal = selectSdlcDependencyMapTraversal({
     selectionRef: "selection://odd-sdlc/t174/live-rooted/modules",
     dependencyMap: liveRootedDevMap(),
@@ -953,14 +1036,21 @@ test("T-174 synthetic hello-world multilane proof derives live frontier artifact
     dependencyMap: testDependencyMap,
     policy: "parallel_when_partitioned"
   });
+  const uatTestTraversal = selectSdlcDependencyMapTraversal({
+    selectionRef: "selection://odd-sdlc/t174/live-rooted/uat-tests",
+    dependencyMap: uatTestDependencyMap,
+    policy: "parallel_when_partitioned"
+  });
   assert.equal(moduleTraversal.selectedMethod, "parallel");
   assert.equal(testTraversal.selectedMethod, "parallel");
+  assert.equal(uatTestTraversal.selectedMethod, "parallel");
 
   const dag = deriveSdlcFeatureDependencyDagFromMaps({
     dagRef: "dag://odd-sdlc/live/derive-component-code-surface/parallel-materialization",
     graphFunctionName: "derive_component_code_surface",
     moduleDependencyMap: liveRootedDevMap(),
     testDependencyMap,
+    uatTestDependencyMap,
     traversalSelectionRef: moduleTraversal.selectionRef,
     fanInTargetRefs: Object.freeze([
       "build_tenants/parallel_hello_world/src/index.js"
@@ -968,8 +1058,10 @@ test("T-174 synthetic hello-world multilane proof derives live frontier artifact
     evidenceRefs: Object.freeze([
       implementationMap.mapRef,
       testDependencyMap.mapRef,
+      uatTestDependencyMap.mapRef,
       moduleTraversal.selectionRef,
-      testTraversal.selectionRef
+      testTraversal.selectionRef,
+      uatTestTraversal.selectionRef
     ])
   });
   const branchOverrides =
@@ -994,17 +1086,19 @@ test("T-174 synthetic hello-world multilane proof derives live frontier artifact
   });
 
   const expectedBranchRefs = [
-    "branch://odd-sdlc/live/derive-component-code-surface/dev-src-hello-js",
-    "branch://odd-sdlc/live/derive-component-code-surface/dev-src-world-js",
-    "branch://odd-sdlc/live/derive-component-code-surface/test-test-hello-test-js",
-    "branch://odd-sdlc/live/derive-component-code-surface/test-test-world-test-js"
+    "branch://odd-sdlc/live/derive-component-code-surface/b000-dev-src-hello-js",
+    "branch://odd-sdlc/live/derive-component-code-surface/b001-test-test-hello-test-js",
+    "branch://odd-sdlc/live/derive-component-code-surface/b002-uat-test-test-uat-hello-uat-test-js",
+    "branch://odd-sdlc/live/derive-component-code-surface/b003-dev-src-world-js",
+    "branch://odd-sdlc/live/derive-component-code-surface/b004-test-test-world-test-js",
+    "branch://odd-sdlc/live/derive-component-code-surface/b005-uat-test-test-uat-world-uat-test-js"
   ];
   assert.deepEqual(
     compilation.readyBranchRefs.toSorted(),
     expectedBranchRefs.toSorted()
   );
-  assert.equal(dag.startNodes.length, 4);
-  assert.equal(compilation.declarations.length, 5);
+  assert.equal(dag.startNodes.length, 6);
+  assert.equal(compilation.declarations.length, 7);
   assert.deepEqual(compilation.writeTerritoryConflictRefs, []);
   assert.deepEqual(compilation.outputAllocationConflictRefs, []);
 
@@ -1049,20 +1143,29 @@ test("T-174 synthetic hello-world multilane proof derives live frontier artifact
     selectedMethod: moduleTraversal.selectedMethod,
     dependencyMapRef: implementationMap.mapRef,
     testDependencyMapRef: testDependencyMap.mapRef,
-    dependencyMapRefs: Object.freeze([implementationMap.mapRef, testDependencyMap.mapRef]),
+    uatTestDependencyMapRef: uatTestDependencyMap.mapRef,
+    dependencyMapRefs: Object.freeze([
+      implementationMap.mapRef,
+      testDependencyMap.mapRef,
+      uatTestDependencyMap.mapRef
+    ]),
     traversalSelectionRef: moduleTraversal.selectionRef,
     testTraversalSelectionRef: testTraversal.selectionRef,
+    uatTestTraversalSelectionRef: uatTestTraversal.selectionRef,
     traversalSelectionRefs: Object.freeze([
       moduleTraversal.selectionRef,
-      testTraversal.selectionRef
+      testTraversal.selectionRef,
+      uatTestTraversal.selectionRef
     ]),
     dagRef: dag.dagRef,
     startNodes: dag.startNodes,
     frontierRef: run.frontierRef,
     policyRef: run.policyRef,
-    laneCount: 4,
+    laneCount: 6,
     devLaneCount: 2,
-    testLaneCount: 2,
+    componentTestLaneCount: 2,
+    uatTestLaneCount: 2,
+    testLaneCount: 4,
     fanInCount: 1,
     batchCount: run.batchCount,
     batchSizes: run.batches.map((batch) => batch.selection.selectedBranchRefs.length),
@@ -1096,9 +1199,23 @@ test("T-174 synthetic hello-world multilane proof derives live frontier artifact
     }),
     false
   );
-  assert.equal(frontier.laneCount, 4);
+  const firstBatchBranchRefs =
+    run.batches[0]?.selection.selectedBranchRefs ?? Object.freeze([]);
+  assert.ok(
+    firstBatchBranchRefs.some((branchRef) => branchRef.includes("-dev-")),
+    "first ABG batch must include implementation code work"
+  );
+  assert.ok(
+    firstBatchBranchRefs.some((branchRef) => branchRef.includes("-test-test-")),
+    "first ABG batch must include component/unit test work"
+  );
+  assert.ok(
+    firstBatchBranchRefs.some((branchRef) => branchRef.includes("-uat-test-")),
+    "first ABG batch must include UAT test-source work"
+  );
+  assert.equal(frontier.laneCount, 6);
   assert.equal(frontier.maxActive, 4);
-  assert.deepEqual(frontier.batchSizes, [4, 1]);
+  assert.deepEqual(frontier.batchSizes, [4, 2, 1]);
   assert.deepEqual(
     frontier.branchRows.map((row) => row.branchRef).sort(),
     expectedBranchRefs.toSorted()
@@ -1140,7 +1257,7 @@ test("T-174 ABG live branch refs preserve full target identity for same basename
     });
   assert.deepEqual(
     Object.values(branchOverrides.branchKeyByNodeRef).sort(),
-    ["dev-src-a-index-js", "dev-src-b-index-js"]
+    ["b000-dev-src-a-index-js", "b001-dev-src-b-index-js"]
   );
   const compilation = compileSdlcFeatureDependencyDagToAbgFrontier({
     dag,
@@ -1253,11 +1370,11 @@ test("T-174 data-mapper-style Scala modules form batched independent dev frontie
 
   assert.equal(dag.startNodes.length, 7);
   assert.equal(compilation.readyBranchRefs.length, 7);
-	  assert(
-	    compilation.readyBranchRefs.includes(
-	      "branch://odd-sdlc/live/derive-component-code-surface/dev-cdme-adjoint-src-main-scala"
-	    )
-	  );
+  assert(
+    compilation.readyBranchRefs.some((branchRef) =>
+      branchRef.endsWith("-dev-cdme-adjoint-src-main-scala")
+    )
+  );
   const maxConcurrency = resolveSdlcLiveFpParallelBatchSize({
     laneCount: dag.startNodes.length
   });
@@ -1356,6 +1473,12 @@ test("T-174 synthetic hello-world handoff payload is hygienic and admits derived
     assert(artifactRefs.includes("operator-run-artifact://module-dependency-map"));
     assert(artifactRefs.includes("operator-run-artifact://test-dependency-map"));
     assert(artifactRefs.includes("operator-run-artifact://test-dependency-traversal-selection"));
+    assert(artifactRefs.includes("operator-run-artifact://uat-test-dependency-map"));
+    assert(
+      artifactRefs.includes(
+        "operator-run-artifact://uat-test-dependency-traversal-selection"
+      )
+    );
     const testMap = carriers.find(
       (carrier) => carrier.artifactRef === "operator-run-artifact://test-dependency-map"
     )?.payload;
@@ -1365,6 +1488,18 @@ test("T-174 synthetic hello-world handoff payload is hygienic and admits derived
       [
         "build_tenants/parallel_hello_world/test/hello.test.js",
         "build_tenants/parallel_hello_world/test/world.test.js"
+      ]
+    );
+    const uatTestMap = carriers.find(
+      (carrier) =>
+        carrier.artifactRef === "operator-run-artifact://uat-test-dependency-map"
+    )?.payload;
+    assert.equal(uatTestMap?.kind, "sdlc_test_dependency_map");
+    assert.deepEqual(
+      uatTestMap.nodes.map((node) => node.materializationTargetRefs[0]).sort(),
+      [
+        "build_tenants/parallel_hello_world/test/uat/hello.uat.test.js",
+        "build_tenants/parallel_hello_world/test/uat/world.uat.test.js"
       ]
     );
   } finally {

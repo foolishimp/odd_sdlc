@@ -255,6 +255,15 @@ const FULL_TRAVERSAL_EDGE_ACCOUNTING_SEEDS = Object.freeze([
     rationale: "Owns bounded test materialization from admitted test topology."
   },
   {
+    edgeName: "derive_uat_test_source_surface",
+    disposition: "required",
+    ownedPressureRefs: ["pressure://requirements/uat-test-source"],
+    authorityOutputRefs: ["surface://uat-test-source"],
+    closureEvidenceRefs: ["evidence://uat-test-source-materialization"],
+    workerDispatchAllowed: true,
+    rationale: "Owns requirement-specific UAT executable test-source materialization."
+  },
+  {
     edgeName: "prepare_test_execution_surface",
     disposition: "projection_no_close",
     ownedPressureRefs: ["pressure://test-design/execution-transition"],

@@ -50,6 +50,7 @@ const ODD_SDLC_DEFAULT_TRAVERSAL_EDGE_STRATEGIES: Readonly<
   Fg_materialize_declared_product_asset: "full_breadth",
   derive_test_design_surface: "full_breadth",
   derive_component_test_surface: "full_breadth",
+  derive_uat_test_source_surface: "full_breadth",
   prepare_test_execution_surface: "full_breadth",
   derive_test_execution_result_surface: "full_breadth",
   qualify_component_test_execution_surface: "full_breadth",
@@ -87,6 +88,7 @@ const STEEL_THREAD_AFTER_REQUIREMENTS_EDGE_NAMES = Object.freeze([
   "Fg_materialize_declared_product_asset",
   "derive_test_design_surface",
   "derive_component_test_surface",
+  "derive_uat_test_source_surface",
   "prepare_test_execution_surface",
   "derive_test_execution_result_surface",
   "qualify_component_test_execution_surface",
@@ -122,6 +124,8 @@ const ODD_SDLC_DEFAULT_TRAVERSAL_CONTINUATION_CONFIGS: Readonly<
   Record<string, OddSdlcTraversalContinuationConfig>
 > = Object.freeze({
   derive_component_code_surface: DEEP_FULL_BREADTH_CONTINUATION_CONFIG,
+  derive_component_test_surface: DEEP_FULL_BREADTH_CONTINUATION_CONFIG,
+  derive_uat_test_source_surface: DEEP_FULL_BREADTH_CONTINUATION_CONFIG,
   derive_lite_component_code_surface: DEEP_FULL_BREADTH_CONTINUATION_CONFIG,
   Fg_materialize_declared_product_asset:
     DEEP_FULL_BREADTH_CONTINUATION_CONFIG

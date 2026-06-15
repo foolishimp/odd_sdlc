@@ -46,6 +46,7 @@ import {
   FG_CONFORM_PROJECT_AUTHORITY,
   FG_CAPABILITY_ASSURANCE_LEDGER,
   FG_CONFORM_PROJECT,
+  FG_GRAPH_CODE_BUILDER,
   FG_INGRESS_PROJECT,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
   FG_MATERIALIZATION_ASSURANCE_LEDGER,
@@ -136,6 +137,7 @@ test("T-030 publishes machine-readable function and executive catalogs", () => {
       FG_INGRESS_PROJECT,
       FG_CONFORM_PROJECT,
       FG_CONFORM_PROJECT_AUTHORITY,
+      FG_GRAPH_CODE_BUILDER,
       FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
       FG_MATERIALIZATION_ASSURANCE_LEDGER,
       FG_SEMANTIC_CONVERGENCE_ASSURANCE_LEDGER,
@@ -148,9 +150,31 @@ test("T-030 publishes machine-readable function and executive catalogs", () => {
     ]
   );
   assert(
-    catalog.functions.every(
-      (entry) => entry.specializesGraphFunction === FG_SINGLE_TYPED_TRAVERSAL
+    catalog.functions.every((entry) =>
+      entry.specializesGraphFunction === FG_SINGLE_TYPED_TRAVERSAL ||
+      entry.specializesGraphFunction === FG_GRAPH_CODE_BUILDER
     )
+  );
+  assert.equal(
+    catalog.functions.find((entry) => entry.name === "derive_component_code_surface")
+      ?.specializesGraphFunction,
+    FG_GRAPH_CODE_BUILDER
+  );
+  assert.equal(
+    catalog.functions.find((entry) => entry.name === "derive_component_test_surface")
+      ?.specializesGraphFunction,
+    FG_GRAPH_CODE_BUILDER
+  );
+  assert.deepStrictEqual(
+    catalog.functions.find((entry) => entry.name === "derive_component_test_surface")
+      ?.inputs,
+    [
+      "requirement_surface",
+      "testcase_authority_surface",
+      "selected_tenant_surface",
+      "test_design_surface",
+      "implementation_design_surface"
+    ]
   );
   assert(catalog.functions.some((entry) => entry.name === "observe_gap_pressure"));
   assert(catalog.functions.some((entry) => entry.name === "retire_gap_after_loopback"));
@@ -303,7 +327,7 @@ test("T-030 materializes executive graph functions through ABIogenesis GTL carri
   const authorityConformanceProbe = deriveTraversalStructureProbe(authorityConformanceBasis);
   const operationalProbe = deriveTraversalStructureProbe(operationalBasis);
 
-  assert.equal(bootstrapBasis.graph.vectors.length, 22);
+  assert.equal(bootstrapBasis.graph.vectors.length, 23);
   assert.equal(authorityConformanceBasis.graph.vectors.length, 6);
   assert.deepStrictEqual(
     authorityConformanceBasis.graph.vectors.map((vector) => vector.target.name),

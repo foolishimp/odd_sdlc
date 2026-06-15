@@ -2155,6 +2155,18 @@ function testDependencyMapFromAuditCarriers(
     : null;
 }
 
+function uatTestDependencyMapFromAuditCarriers(
+  carriers: readonly SdlcStagedConstructionAuditCarrier[]
+): SdlcTestDependencyMap | null {
+  const carrier = carriers.find(
+    (candidate) =>
+      candidate.artifactRef === "operator-run-artifact://uat-test-dependency-map"
+  );
+  return carrier?.payload.kind === "sdlc_test_dependency_map"
+    ? carrier.payload
+    : null;
+}
+
 function testTraversalSelectionFromAuditCarriers(
   carriers: readonly SdlcStagedConstructionAuditCarrier[]
 ): SdlcDependencyTraversalSelection | null {
@@ -2162,6 +2174,19 @@ function testTraversalSelectionFromAuditCarriers(
     (candidate) =>
       candidate.artifactRef ===
       "operator-run-artifact://test-dependency-traversal-selection"
+  );
+  return carrier?.payload.kind === "sdlc_dependency_traversal_selection"
+    ? carrier.payload
+    : null;
+}
+
+function uatTestTraversalSelectionFromAuditCarriers(
+  carriers: readonly SdlcStagedConstructionAuditCarrier[]
+): SdlcDependencyTraversalSelection | null {
+  const carrier = carriers.find(
+    (candidate) =>
+      candidate.artifactRef ===
+      "operator-run-artifact://uat-test-dependency-traversal-selection"
   );
   return carrier?.payload.kind === "sdlc_dependency_traversal_selection"
     ? carrier.payload
@@ -2237,7 +2262,10 @@ function liveParallelBranchRowsFromCompilation(input: {
     }
     const targetRefs = liveParallelNodeTargetRefs(node);
     const laneKind: LiveParallelLaneKind =
-      node.nodeKind === "test_materialization" ? "test" : "dev";
+      node.nodeKind === "test_materialization" ||
+      node.nodeKind === "uat_test_materialization"
+        ? "test"
+        : "dev";
     return Object.freeze({
       branchRef: branchRef.branchRef,
       branchKey: branchRef.branchKey,
@@ -2327,6 +2355,9 @@ async function writeLiveFpParallelMaterializationFrontier(input: {
   const traversal = moduleTraversalSelectionFromAuditCarriers(input.carriers);
   const testDependencyMap = testDependencyMapFromAuditCarriers(input.carriers);
   const testTraversal = testTraversalSelectionFromAuditCarriers(input.carriers);
+  const uatTestDependencyMap = uatTestDependencyMapFromAuditCarriers(input.carriers);
+  const uatTestTraversal =
+    uatTestTraversalSelectionFromAuditCarriers(input.carriers);
   if (
     dependencyMap === null ||
     traversal === null ||
@@ -2338,11 +2369,18 @@ async function writeLiveFpParallelMaterializationFrontier(input: {
     testDependencyMap !== null && testTraversal?.selectedMethod === "parallel"
       ? testDependencyMap
       : undefined;
+  const selectedUatTestDependencyMap =
+    uatTestDependencyMap !== null &&
+    uatTestTraversal?.selectedMethod === "parallel"
+      ? uatTestDependencyMap
+      : undefined;
   const lanes = dependencyMap.nodes
     .map((node) => liveParallelLaneForNode({ manifest: input.manifest, node }))
     .filter((lane) => lane !== null);
   const devLaneCount = lanes.length;
-  const testLaneCount = selectedTestDependencyMap?.nodes.length ?? 0;
+  const componentTestLaneCount = selectedTestDependencyMap?.nodes.length ?? 0;
+  const uatTestLaneCount = selectedUatTestDependencyMap?.nodes.length ?? 0;
+  const testLaneCount = componentTestLaneCount + uatTestLaneCount;
   const laneCount = devLaneCount + testLaneCount;
   if (laneCount < 2) {
     return;
@@ -2360,6 +2398,7 @@ async function writeLiveFpParallelMaterializationFrontier(input: {
     graphFunctionName: input.manifest.graphFunctionName,
     moduleDependencyMap: frontierDependencyMap,
     testDependencyMap: selectedTestDependencyMap,
+    uatTestDependencyMap: selectedUatTestDependencyMap,
     traversalSelectionRef: traversal.selectionRef,
     ...(fanInTargetRefs.length === 0 ? {} : { fanInTargetRefs }),
     evidenceRefs: Object.freeze([
@@ -2370,6 +2409,12 @@ async function writeLiveFpParallelMaterializationFrontier(input: {
         : [
             selectedTestDependencyMap.mapRef,
             ...(testTraversal === null ? [] : [testTraversal.selectionRef])
+          ]),
+      ...(selectedUatTestDependencyMap === undefined
+        ? []
+        : [
+            selectedUatTestDependencyMap.mapRef,
+            ...(uatTestTraversal === null ? [] : [uatTestTraversal.selectionRef])
           ])
     ])
   });
@@ -2404,6 +2449,12 @@ async function writeLiveFpParallelMaterializationFrontier(input: {
         : [
             selectedTestDependencyMap.mapRef,
             ...(testTraversal === null ? [] : [testTraversal.selectionRef])
+          ]),
+      ...(selectedUatTestDependencyMap === undefined
+        ? []
+        : [
+            selectedUatTestDependencyMap.mapRef,
+            ...(uatTestTraversal === null ? [] : [uatTestTraversal.selectionRef])
           ])
     ]),
     branchKeyByNodeRef: branchOverrides.branchKeyByNodeRef,
@@ -2474,21 +2525,32 @@ async function writeLiveFpParallelMaterializationFrontier(input: {
       selectedMethod: traversal.selectedMethod,
       dependencyMapRef: dependencyMap.mapRef,
       testDependencyMapRef: selectedTestDependencyMap?.mapRef ?? null,
+      uatTestDependencyMapRef: selectedUatTestDependencyMap?.mapRef ?? null,
       dependencyMapRefs: Object.freeze([
         dependencyMap.mapRef,
         ...(selectedTestDependencyMap === undefined
           ? []
-          : [selectedTestDependencyMap.mapRef])
+          : [selectedTestDependencyMap.mapRef]),
+        ...(selectedUatTestDependencyMap === undefined
+          ? []
+          : [selectedUatTestDependencyMap.mapRef])
       ]),
       traversalSelectionRef: traversal.selectionRef,
       testTraversalSelectionRef:
         selectedTestDependencyMap === undefined
           ? null
           : testTraversal?.selectionRef ?? null,
+      uatTestTraversalSelectionRef:
+        selectedUatTestDependencyMap === undefined
+          ? null
+          : uatTestTraversal?.selectionRef ?? null,
       traversalSelectionRefs: Object.freeze([
         traversal.selectionRef,
         ...(testTraversal?.selectedMethod === "parallel"
           ? [testTraversal.selectionRef]
+          : []),
+        ...(uatTestTraversal?.selectedMethod === "parallel"
+          ? [uatTestTraversal.selectionRef]
           : [])
       ]),
       dagRef: dag.dagRef,
@@ -2497,6 +2559,8 @@ async function writeLiveFpParallelMaterializationFrontier(input: {
       policyRef: run.policyRef,
       laneCount,
       devLaneCount,
+      componentTestLaneCount,
+      uatTestLaneCount,
       testLaneCount,
       fanInCount: fanInRows.length,
       batchCount: run.batchCount,

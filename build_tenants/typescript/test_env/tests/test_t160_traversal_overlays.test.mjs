@@ -149,6 +149,7 @@ test("T-160 publishes governed traversal overlays with boundary refs", () => {
     "derive_code_surface",
     "derive_test_design_surface",
     "derive_component_test_surface",
+    "derive_uat_test_source_surface",
     "prepare_test_execution_surface",
     "derive_test_execution_result_surface",
     "qualify_component_test_execution_surface",
@@ -1321,8 +1322,12 @@ test("T-160 spec-method replay preserves overlay target identity", () => {
     source.indexOf("function replayEventsForBasis")
   );
 
-  assert.match(startOutcomeBody, /request\.target\.kind === "overlay"/);
+  assert.match(startOutcomeBody, /request\.target\.kind === "graph_function"/);
   assert.match(startOutcomeBody, /handle: replayNextAction\.nextGraphFunctionRef/);
+  assert.doesNotMatch(
+    startOutcomeBody,
+    /request\.target\.kind === "graph_function"\s*\|\|\s*request\.target\.kind === "overlay"/
+  );
   assert.match(replayBody, /input\.request\.target\.kind === "overlay"/);
   assert.match(
     replayBody,

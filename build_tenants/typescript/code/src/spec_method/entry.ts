@@ -1709,11 +1709,7 @@ function startOutcomeFor(
   });
   const queryDomain = queryDomainFor(context);
   const target =
-    replayNextAction !== undefined &&
-    (
-      request.target.kind === "graph_function" ||
-      request.target.kind === "overlay"
-    )
+    replayNextAction !== undefined && request.target.kind === "graph_function"
       ? ({
           kind: "graph_function",
           handle: replayNextAction.nextGraphFunctionRef

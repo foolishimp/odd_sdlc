@@ -41,6 +41,7 @@ export interface SdlcFeatureDependencyDagFromMapsInput {
   readonly graphFunctionName: string;
   readonly moduleDependencyMap: SdlcModuleDependencyMap;
   readonly testDependencyMap?: SdlcTestDependencyMap | undefined;
+  readonly uatTestDependencyMap?: SdlcTestDependencyMap | undefined;
   readonly traversalSelectionRef?: string | null | undefined;
   readonly includeFanIn?: boolean | undefined;
   readonly fanInNodeRef?: string | undefined;
@@ -90,14 +91,14 @@ function overrideString(
 }
 
 function sourceNodeRef(input: {
-  readonly nodeKind: "module" | "test";
+  readonly nodeKind: "module" | "test" | "uat-test";
   readonly nodeId: string;
 }): string {
   return `sdlc-dag-node://${input.nodeKind}/${slugRefPart(input.nodeId)}`;
 }
 
 function unknownSourceNodeRef(input: {
-  readonly nodeKind: "module" | "test";
+  readonly nodeKind: "module" | "test" | "uat-test";
   readonly nodeId: string;
 }): string {
   return `unknown-sdlc-dag-node://${input.nodeKind}/${slugRefPart(input.nodeId)}`;
@@ -128,6 +129,7 @@ function authorityReadRefs(input: {
       }
       if (
         input.nodeKind === "test_materialization" ||
+        input.nodeKind === "uat_test_materialization" ||
         ref.startsWith("TESTCASE-")
       ) {
         return `testcase://${ref}`;
@@ -367,10 +369,17 @@ function nodeFromDependencyMap(input: {
   readonly map: SdlcModuleDependencyMap | SdlcTestDependencyMap;
   readonly sourceNodeRefById: ReadonlyMap<string, string>;
   readonly sourceNode: SdlcDependencyMapNode;
-  readonly nodeKind: "module_implementation" | "test_materialization";
+  readonly nodeKind:
+    | "module_implementation"
+    | "test_materialization"
+    | "uat_test_materialization";
 }): SdlcFeatureDependencyDagNode {
   const sourceKind =
-    input.nodeKind === "module_implementation" ? "module" : "test";
+    input.nodeKind === "module_implementation"
+      ? "module"
+      : input.nodeKind === "uat_test_materialization"
+        ? "uat-test"
+        : "test";
   const predecessorNodeRefs = input.sourceNode.predecessorNodeIds.map(
     (nodeId) =>
       input.sourceNodeRefById.get(nodeId) ??
@@ -384,7 +393,9 @@ function nodeFromDependencyMap(input: {
   const edgeName =
     input.nodeKind === "module_implementation"
       ? "derive_component_code_surface"
-      : "derive_component_test_surface";
+      : input.nodeKind === "uat_test_materialization"
+        ? "derive_uat_test_source_surface"
+        : "derive_component_test_surface";
   const nodeRef = input.sourceNodeRefById.get(input.sourceNode.nodeId);
   if (nodeRef === undefined) {
     throw new TypeError(`Dependency map node is missing a DAG ref: ${input.sourceNode.nodeId}`);
@@ -430,9 +441,17 @@ function nodeFromDependencyMap(input: {
 
 function dependencyMapNodes(input: {
   readonly map: SdlcModuleDependencyMap | SdlcTestDependencyMap;
-  readonly nodeKind: "module_implementation" | "test_materialization";
+  readonly nodeKind:
+    | "module_implementation"
+    | "test_materialization"
+    | "uat_test_materialization";
 }): readonly SdlcFeatureDependencyDagNode[] {
-  const sourceKind = input.nodeKind === "module_implementation" ? "module" : "test";
+  const sourceKind =
+    input.nodeKind === "module_implementation"
+      ? "module"
+      : input.nodeKind === "uat_test_materialization"
+        ? "uat-test"
+        : "test";
   const sourceNodeRefById = new Map(
     input.map.nodes.map((node) => [
       node.nodeId,
@@ -492,6 +511,22 @@ function fanInNode(input: {
   } satisfies SdlcFeatureDependencyDagNode);
 }
 
+function interleaveBranchNodes(
+  groups: readonly (readonly SdlcFeatureDependencyDagNode[])[]
+): readonly SdlcFeatureDependencyDagNode[] {
+  const nodes: SdlcFeatureDependencyDagNode[] = [];
+  const maxLength = Math.max(0, ...groups.map((group) => group.length));
+  for (let index = 0; index < maxLength; index += 1) {
+    for (const group of groups) {
+      const node = group[index];
+      if (node !== undefined) {
+        nodes.push(node);
+      }
+    }
+  }
+  return Object.freeze(nodes);
+}
+
 export function deriveSdlcFeatureDependencyDagFromMaps(
   input: SdlcFeatureDependencyDagFromMapsInput
 ): SdlcFeatureDependencyDag {
@@ -506,7 +541,18 @@ export function deriveSdlcFeatureDependencyDagFromMaps(
           map: input.testDependencyMap,
           nodeKind: "test_materialization"
         });
-  const branchNodes = Object.freeze([...moduleNodes, ...testNodes]);
+  const uatTestNodes =
+    input.uatTestDependencyMap === undefined
+      ? EMPTY_DAG_NODE_ARRAY
+      : dependencyMapNodes({
+          map: input.uatTestDependencyMap,
+          nodeKind: "uat_test_materialization"
+        });
+  const branchNodes = interleaveBranchNodes([
+    moduleNodes,
+    testNodes,
+    uatTestNodes
+  ]);
   const targetRefs = uniqueSorted(
     input.fanInTargetRefs ?? ["reports/t174-frontier-fan-in.json"]
   );
@@ -530,7 +576,10 @@ export function deriveSdlcFeatureDependencyDagFromMaps(
     traversalSelectionRef: input.traversalSelectionRef,
     sourceDependencyMapRefs: uniqueSorted([
       input.moduleDependencyMap.mapRef,
-      ...(input.testDependencyMap === undefined ? [] : [input.testDependencyMap.mapRef])
+      ...(input.testDependencyMap === undefined ? [] : [input.testDependencyMap.mapRef]),
+      ...(input.uatTestDependencyMap === undefined
+        ? []
+        : [input.uatTestDependencyMap.mapRef])
     ]),
     nodes,
     evidenceRefs: input.evidenceRefs

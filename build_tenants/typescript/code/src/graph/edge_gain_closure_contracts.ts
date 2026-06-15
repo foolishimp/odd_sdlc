@@ -10,7 +10,8 @@ import {
   FG_BOOTSTRAP_SDLC_ENTRY,
   FG_DECOMPOSE_DEPTH_BETWEEN_NODES,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
-  FG_DERIVE_LITE_DESIGN_ADR_SURFACE
+  FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+  FG_DERIVE_UAT_TEST_SOURCE_SURFACE
 } from "./catalog.js";
 import {
   CONFORM_PROJECT_INPUTS,
@@ -19,6 +20,7 @@ import {
   FG_CAPABILITY_ASSURANCE_LEDGER,
   FG_CONFORM_PROJECT,
   FG_CONFORM_PROJECT_AUTHORITY,
+  FG_GRAPH_CODE_BUILDER,
   FG_INGRESS_PROJECT,
   FG_MATERIALIZATION_ASSURANCE_LEDGER,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
@@ -28,6 +30,7 @@ import {
   FG_SHALLOW_REALIZATION_ASSURANCE_LEDGER,
   FG_SINGLE_TYPED_TRAVERSAL,
   FG_TRAVERSAL_ASSURANCE_FOLD,
+  GRAPH_CODE_BUILDER_INPUTS,
   INGRESS_PROJECT_INPUTS,
   INGRESS_PROJECT_OUTPUTS,
   PROJECT_AUTHORITY_CONFORMANCE_INPUTS,
@@ -518,6 +521,22 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     residualPressureRefs: ["pressure://odd-sdlc/authority"]
   }),
   contract({
+    edgeRef: FG_GRAPH_CODE_BUILDER,
+    category: "implementation_encoding",
+    closureClassification: "library_only",
+    sourceAssetTypes: GRAPH_CODE_BUILDER_INPUTS,
+    targetAssetType: "code_workspace_surface",
+    compositionRole: "library",
+    authorityBasisRefs: [
+      "authority://odd-sdlc/code-builder",
+      "authority://odd-sdlc/tenant-stack",
+      "authority://odd-sdlc/design",
+      "authority://odd-sdlc/testcase"
+    ],
+    proofLaneRefs: ["test://odd-sdlc/t203/code-builder"],
+    residualPressureRefs: ["pressure://odd-sdlc/code-builder"]
+  }),
+  contract({
     edgeRef: FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
     category: "implementation_encoding",
     closureClassification: "close_capable",
@@ -844,12 +863,35 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     edgeRef: "derive_component_test_surface",
     category: "test_encoding_and_execution",
     closureClassification: "close_capable",
-    sourceAssetTypes: ["test_design_surface"],
+    sourceAssetTypes: [
+      "requirement_surface",
+      "testcase_authority_surface",
+      "selected_tenant_surface",
+      "test_design_surface",
+      "implementation_design_surface"
+    ],
     targetAssetType: "component_test_surface",
     compositionRole: "intermediate",
     authorityBasisRefs: TEST_REFS,
     proofLaneRefs: ["test://odd-sdlc/t164/test-execution"],
     residualPressureRefs: ["pressure://odd-sdlc/component-test"]
+  }),
+  contract({
+    edgeRef: FG_DERIVE_UAT_TEST_SOURCE_SURFACE,
+    category: "test_encoding_and_execution",
+    closureClassification: "close_capable",
+    sourceAssetTypes: [
+      "requirement_surface",
+      "uat_testcases_surface",
+      "testcase_authority_surface",
+      "selected_tenant_surface",
+      "test_design_surface"
+    ],
+    targetAssetType: "uat_test_source_surface",
+    compositionRole: "intermediate",
+    authorityBasisRefs: TEST_REFS,
+    proofLaneRefs: ["test://odd-sdlc/t203/uat-test-source"],
+    residualPressureRefs: ["pressure://odd-sdlc/uat-test-source"]
   }),
   contract({
     edgeRef: "prepare_test_execution_surface",
@@ -866,7 +908,13 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     edgeRef: "derive_test_execution_result_surface",
     category: "test_encoding_and_execution",
     closureClassification: "close_capable",
-    sourceAssetTypes: ["test_execution_surface", "test_design_surface"],
+    sourceAssetTypes: [
+      "test_execution_surface",
+      "test_design_surface",
+      "component_code_surface",
+      "component_test_surface",
+      "uat_test_source_surface"
+    ],
     targetAssetType: "test_execution_result_surface",
     compositionRole: "intermediate",
     authorityBasisRefs: TEST_REFS,
@@ -880,6 +928,8 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     sourceAssetTypes: [
       "test_execution_result_surface",
       "test_design_surface",
+      "component_code_surface",
+      "uat_test_source_surface",
       "component_test_surface"
     ],
     targetAssetType: "component_test_qualification_surface",

@@ -52,6 +52,7 @@ export const SOFTWARE_DOMAIN_ASSET_FAMILIES = Object.freeze([
     representativeAssetTypes: [
       "test_design_surface",
       "component_test_surface",
+      "uat_test_source_surface",
       "test_execution_surface",
       "test_execution_result_surface",
       "component_test_qualification_surface",
@@ -276,6 +277,7 @@ export const SOFTWARE_DOMAIN_ASSET_TYPES = Object.freeze(
     "code_surface",
     "test_design_surface",
     "component_test_surface",
+    "uat_test_source_surface",
     "component_test_qualification_surface",
     "component_repair_schedule_surface",
     "test_run_archive_surface",

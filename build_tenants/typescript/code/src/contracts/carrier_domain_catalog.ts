@@ -58,6 +58,7 @@ export type SdlcDependencyTraversalMethod =
 export const SDLC_FEATURE_DEPENDENCY_DAG_NODE_KINDS = Object.freeze([
   "module_implementation",
   "test_materialization",
+  "uat_test_materialization",
   "fan_in"
 ] as const);
 

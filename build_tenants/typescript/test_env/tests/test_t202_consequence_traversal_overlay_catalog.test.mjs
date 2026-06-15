@@ -111,6 +111,11 @@ test("T-202 GTL declarations derive ABG catalog rows on intended code/test edges
     "bootstrap_release_self_test",
     "derive_component_code_surface"
   );
+  const tests = catalogFor(
+    module,
+    "bootstrap_release_self_test",
+    "derive_component_test_surface"
+  );
   const intent = catalogFor(
     module,
     "bootstrap_release_self_test",
@@ -130,6 +135,28 @@ test("T-202 GTL declarations derive ABG catalog rows on intended code/test edges
   assert.deepStrictEqual(depthRow.allowedTraversalTargetRefs, [publishedCodeTarget]);
   assert(depthRow.requiredAuthorityRefs.includes(FG_DECOMPOSE_DEPTH_BETWEEN_NODES));
   assert(depthRow.requiredAuthorityRefs.includes(publishedCodeTarget));
+
+  const publishedTestTarget = sdlcPublishedTraversalTargetRef({
+    graphFunctionRef: tests.graphFunction.name,
+    graphVectorRef: tests.vector.name
+  });
+  const deepTestRows = overlayScopedCatalog(
+    tests.catalog,
+    SDLC_DEEP_SDLC_TRAVERSAL_OVERLAY_REF
+  ).rows;
+  const testDepthRow = deepTestRows.find(
+    (row) => row.traversalFamily === "depth_traversal"
+  );
+  assert.ok(
+    testDepthRow,
+    "deep overlay component-test edge must declare depth traversal"
+  );
+  assert.deepStrictEqual(
+    testDepthRow.allowedTraversalTargetRefs,
+    [publishedTestTarget]
+  );
+  assert(testDepthRow.requiredAuthorityRefs.includes(FG_DECOMPOSE_DEPTH_BETWEEN_NODES));
+  assert(testDepthRow.requiredAuthorityRefs.includes(publishedTestTarget));
 
   const currentFullRows = overlayScopedCatalog(
     code.catalog,

@@ -183,6 +183,7 @@ const TENANT_LOCAL_SDLC_SURFACE_OUTPUT_PATHS = Object.freeze({
   code_surface: "design/code_surface.md",
   test_design_surface: "design/adrs/ADR-003-test-design-surface.md",
   component_test_surface: "design/component_test_surface.md",
+  uat_test_source_surface: "design/uat_test_source_surface.md",
   component_test_qualification_surface:
     "design/component_test_qualification_surface.md",
   component_repair_schedule_surface: "design/component_repair_schedule_surface.md",
@@ -4327,7 +4328,10 @@ function isCurrentEdgeDownstreamTestPressure(input: {
         text.includes("generated test"))
     );
   }
-  if (input.manifest.targetAssetType === "component_test_surface") {
+  if (
+    input.manifest.targetAssetType === "component_test_surface" ||
+    input.manifest.targetAssetType === "uat_test_source_surface"
+  ) {
     return (
       text.includes("execution_environment") &&
       (text.includes("execution evidence") ||
@@ -4347,8 +4351,11 @@ function downstreamStagePressurePromptBoundaryLine(
   if (manifest.targetAssetType === "component_code_surface") {
     return "- Continue with this edge's declared product targets only. Do not materialize downstream test or execution artifacts on component_code_surface.";
   }
-  if (manifest.targetAssetType === "component_test_surface") {
-    return "- Continue with this edge's declared product targets only. Do not materialize downstream execution-result or runtime-execution artifacts on component_test_surface.";
+  if (
+    manifest.targetAssetType === "component_test_surface" ||
+    manifest.targetAssetType === "uat_test_source_surface"
+  ) {
+    return `- Continue with this edge's declared product targets only. Do not materialize downstream execution-result or runtime-execution artifacts on ${manifest.targetAssetType}.`;
   }
   return "- Continue with this edge's declared product targets only. Do not materialize downstream-stage artifacts on this edge.";
 }
@@ -4385,7 +4392,8 @@ function isComponentTestDownstreamExecutionPressure(input: {
   readonly text: string;
 }): boolean {
   return (
-    input.manifest.targetAssetType === "component_test_surface" &&
+    (input.manifest.targetAssetType === "component_test_surface" ||
+      input.manifest.targetAssetType === "uat_test_source_surface") &&
     isCurrentEdgeDownstreamTestPressure(input)
   );
 }
@@ -4395,7 +4403,8 @@ function isComponentTestDownstreamExecutionGapReason(input: {
   readonly reason: SdlcPostflightGapReason;
 }): boolean {
   return (
-    input.manifest.targetAssetType === "component_test_surface" &&
+    (input.manifest.targetAssetType === "component_test_surface" ||
+      input.manifest.targetAssetType === "uat_test_source_surface") &&
     isComponentTestDownstreamExecutionPressure({
       manifest: input.manifest,
       text: [

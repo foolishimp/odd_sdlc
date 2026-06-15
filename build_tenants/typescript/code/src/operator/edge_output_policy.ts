@@ -36,6 +36,7 @@ const WORKER_AUTHORED_TARGET_CARRIER_TARGETS = Object.freeze(
   new Set<string>([
     "component_code_surface",
     "component_test_surface",
+    "uat_test_source_surface",
     "test_design_surface",
     "component_repair_schedule_surface"
   ])
@@ -69,7 +70,8 @@ export function sdlcEdgeOutputPolicyForTargetAssetType(
   const materializationRoles: readonly SdlcMaterializedProductFileRole[] =
     targetAssetType === "component_code_surface"
       ? Object.freeze(["source" as const])
-      : targetAssetType === "component_test_surface"
+      : targetAssetType === "component_test_surface" ||
+          targetAssetType === "uat_test_source_surface"
         ? Object.freeze(["test" as const])
         : Object.freeze([]);
   return Object.freeze({

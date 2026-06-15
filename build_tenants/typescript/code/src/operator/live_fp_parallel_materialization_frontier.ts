@@ -44,9 +44,11 @@ export interface SdlcLiveFpParallelMaterializationFrontier {
   readonly selectedMethod: SdlcDependencyTraversalMethod;
   readonly dependencyMapRef: string;
   readonly testDependencyMapRef: string | null;
+  readonly uatTestDependencyMapRef: string | null;
   readonly dependencyMapRefs: readonly string[];
   readonly traversalSelectionRef: string;
   readonly testTraversalSelectionRef: string | null;
+  readonly uatTestTraversalSelectionRef: string | null;
   readonly traversalSelectionRefs: readonly string[];
   readonly dagRef: string;
   readonly startNodes: readonly string[];
@@ -54,6 +56,8 @@ export interface SdlcLiveFpParallelMaterializationFrontier {
   readonly policyRef: string;
   readonly laneCount: number;
   readonly devLaneCount: number;
+  readonly componentTestLaneCount: number;
+  readonly uatTestLaneCount: number;
   readonly testLaneCount: number;
   readonly fanInCount: number;
   readonly batchCount: number;
@@ -137,9 +141,11 @@ export const isSdlcLiveFpParallelMaterializationFrontier:
       selectedMethod: oneOf(SDLC_DEPENDENCY_TRAVERSAL_METHODS),
       dependencyMapRef: isTrimmedNonEmptyString,
       testDependencyMapRef: nullable(isTrimmedNonEmptyString),
+      uatTestDependencyMapRef: nullable(isTrimmedNonEmptyString),
       dependencyMapRefs: STRING_LIST_GUARD,
       traversalSelectionRef: isTrimmedNonEmptyString,
       testTraversalSelectionRef: nullable(isTrimmedNonEmptyString),
+      uatTestTraversalSelectionRef: nullable(isTrimmedNonEmptyString),
       traversalSelectionRefs: STRING_LIST_GUARD,
       dagRef: isTrimmedNonEmptyString,
       startNodes: STRING_LIST_GUARD,
@@ -147,6 +153,8 @@ export const isSdlcLiveFpParallelMaterializationFrontier:
       policyRef: isTrimmedNonEmptyString,
       laneCount: isNonNegativeFiniteNumber,
       devLaneCount: isNonNegativeFiniteNumber,
+      componentTestLaneCount: isNonNegativeFiniteNumber,
+      uatTestLaneCount: isNonNegativeFiniteNumber,
       testLaneCount: isNonNegativeFiniteNumber,
       fanInCount: isNonNegativeFiniteNumber,
       batchCount: isNonNegativeFiniteNumber,
@@ -249,14 +257,19 @@ function branchKeyForDagNode(input: {
     return "fan-in";
   }
   const laneKind =
-    input.node.nodeKind === "test_materialization" ? "test" : "dev";
+    input.node.nodeKind === "test_materialization" ||
+    input.node.nodeKind === "uat_test_materialization"
+      ? "test"
+      : "dev";
+  const branchPrefix =
+    input.node.nodeKind === "uat_test_materialization" ? "uat-test" : laneKind;
   const targetRef = targetRefsForDagNode(input.node)[0] ?? input.node.nodeRef;
   const normalizedTargetRef = normalizeSdlcLiveFpParallelMaterializationTarget({
     targetRef,
     selectedOutputRoot: input.selectedOutputRoot,
     tenantRoot: input.tenantRoot
   });
-  return `${laneKind}-${sdlcLiveSlug(
+  return `${branchPrefix}-${sdlcLiveSlug(
     sdlcLiveParallelMaterializationTargetKey(normalizedTargetRef)
   )}`;
 }
@@ -280,6 +293,42 @@ function uniqueBranchKey(input: {
   return `${nodeScoped}-${index}`;
 }
 
+function orderedLiveMaterializationNodes(
+  dag: SdlcFeatureDependencyDag
+): readonly SdlcFeatureDependencyDag["nodes"][number][] {
+  const modules = dag.nodes.filter((node) => node.nodeKind === "module_implementation");
+  const componentTests = dag.nodes.filter(
+    (node) => node.nodeKind === "test_materialization"
+  );
+  const uatTests = dag.nodes.filter(
+    (node) => node.nodeKind === "uat_test_materialization"
+  );
+  const ordered: SdlcFeatureDependencyDag["nodes"][number][] = [];
+  const maxLength = Math.max(
+    modules.length,
+    componentTests.length,
+    uatTests.length
+  );
+  for (let index = 0; index < maxLength; index += 1) {
+    const moduleNode = modules[index];
+    const componentTestNode = componentTests[index];
+    const uatTestNode = uatTests[index];
+    if (moduleNode !== undefined) {
+      ordered.push(moduleNode);
+    }
+    if (componentTestNode !== undefined) {
+      ordered.push(componentTestNode);
+    }
+    if (uatTestNode !== undefined) {
+      ordered.push(uatTestNode);
+    }
+  }
+  return Object.freeze([
+    ...ordered,
+    ...dag.nodes.filter((node) => node.nodeKind === "fan_in")
+  ]);
+}
+
 export function deriveSdlcLiveFpParallelMaterializationBranchOverrides(
   input: SdlcLiveFpParallelMaterializationBranchOverrideInput
 ): SdlcLiveFpParallelMaterializationBranchOverrides {
@@ -287,14 +336,21 @@ export function deriveSdlcLiveFpParallelMaterializationBranchOverrides(
   const branchRefByNodeRef: Record<string, string> = {};
   const usedBranchKeys = new Set<string>();
   const liveEdgeSegment = sdlcLiveSlug(input.edgeName);
+  const orderByNodeRef = new Map(
+    orderedLiveMaterializationNodes(input.dag).map((node, index) => [
+      node.nodeRef,
+      index
+    ])
+  );
   for (const node of input.dag.nodes) {
     const baseBranchKey = branchKeyForDagNode({
       selectedOutputRoot: input.selectedOutputRoot,
       tenantRoot: input.tenantRoot,
       node
     });
+    const orderIndex = orderByNodeRef.get(node.nodeRef) ?? 0;
     const branchKey = uniqueBranchKey({
-      baseBranchKey,
+      baseBranchKey: `b${String(orderIndex).padStart(3, "0")}-${baseBranchKey}`,
       nodeRef: node.nodeRef,
       usedBranchKeys
     });

@@ -722,6 +722,27 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     admissionRef: "admission://odd-sdlc/operator-run/test-dependency-traversal-selection"
   }),
   row({
+    artifactRef: "operator-run-artifact://uat-test-dependency-map",
+    relativePath: "sdlc_uat_test_dependency_map.json",
+    carrierKind: "sdlc_test_dependency_map",
+    role: "authority_admission",
+    sourceOwner: "staged_construction_admission",
+    requiredForPresentEdge: false,
+    malformedGapTracked: true,
+    admissionRef: "admission://odd-sdlc/operator-run/uat-test-dependency-map"
+  }),
+  row({
+    artifactRef: "operator-run-artifact://uat-test-dependency-traversal-selection",
+    relativePath: "sdlc_uat_test_dependency_traversal_selection.json",
+    carrierKind: "sdlc_dependency_traversal_selection",
+    role: "authority_admission",
+    sourceOwner: "staged_construction_admission",
+    requiredForPresentEdge: false,
+    malformedGapTracked: true,
+    admissionRef:
+      "admission://odd-sdlc/operator-run/uat-test-dependency-traversal-selection"
+  }),
+  row({
     artifactRef: "operator-run-artifact://live-fp-parallel-materialization-frontier",
     relativePath: "sdlc_live_fp_parallel_materialization_frontier.json",
     carrierKind: "sdlc_live_fp_parallel_materialization_frontier",

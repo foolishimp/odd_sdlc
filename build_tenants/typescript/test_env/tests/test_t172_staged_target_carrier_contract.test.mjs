@@ -598,12 +598,14 @@ test("T-172 implementation-design carrier declares staged implementation authori
   assert.deepEqual(row.requiredStagedAuthorityRefs, []);
 });
 
-test("T-172 component-code materialization requires admitted implementation topology authority", () => {
+test("T-172 component-code materialization requires admitted code-builder authority", () => {
   const row = targetCarrierRow("derive_component_code_surface");
 
   assert.equal(row.constructionDepthRole, "staged_materialization_consumer");
   assert.deepEqual(row.producedStagedAuthorityRefs, []);
   assert.deepEqual(row.requiredStagedAuthorityRefs, [
+    "surface://tenant-stack-authority",
+    "surface://testcase-authority",
     "surface://implementation-decomposition-summary",
     "surface://module-dependency-map"
   ]);
@@ -623,6 +625,7 @@ test("T-181 lite design/code edges carry staged implementation authority", () =>
   assert.equal(componentRow.constructionDepthRole, "staged_materialization_consumer");
   assert.deepEqual(componentRow.producedStagedAuthorityRefs, []);
   assert.deepEqual(componentRow.requiredStagedAuthorityRefs, [
+    "surface://tenant-stack-authority",
     "surface://implementation-decomposition-summary",
     "surface://module-dependency-map"
   ]);
@@ -698,13 +701,16 @@ test("T-172 test-design carrier declares test topology and stack authority outpu
   assert.deepEqual(row.requiredStagedAuthorityRefs, []);
 });
 
-test("T-172 component-test materialization requires testcase, stack, and test topology authority", () => {
+test("T-172 component-test materialization requires full UAT code-builder authority", () => {
   const row = targetCarrierRow("derive_component_test_surface");
 
   assert.equal(row.constructionDepthRole, "staged_materialization_consumer");
   assert.deepEqual(row.producedStagedAuthorityRefs, []);
   assert.deepEqual(row.requiredStagedAuthorityRefs, [
+    "surface://tenant-stack-authority",
     "surface://testcase-authority",
+    "surface://implementation-decomposition-summary",
+    "surface://module-dependency-map",
     "surface://test-stack-profile",
     "surface://test-decomposition-summary",
     "surface://test-dependency-map"
@@ -741,6 +747,8 @@ test("T-172 handoff projection carries staged authority refs into the worker pac
     assert.deepEqual(
       manifest.targetCarrierProjection.requiredStagedAuthorityRefs,
       [
+        "surface://tenant-stack-authority",
+        "surface://testcase-authority",
         "surface://implementation-decomposition-summary",
         "surface://module-dependency-map"
       ]
@@ -759,7 +767,7 @@ test("T-172 handoff projection carries staged authority refs into the worker pac
     );
     assert.match(
       outcomeDirectives,
-      /Required staged authority refs: surface:\/\/implementation-decomposition-summary, surface:\/\/module-dependency-map\./u
+      /Required staged authority refs: surface:\/\/tenant-stack-authority, surface:\/\/testcase-authority, surface:\/\/implementation-decomposition-summary, surface:\/\/module-dependency-map\./u
     );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });

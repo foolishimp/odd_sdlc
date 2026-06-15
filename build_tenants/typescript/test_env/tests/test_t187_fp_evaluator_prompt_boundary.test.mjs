@@ -18,6 +18,7 @@ import {
   SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS,
   admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity,
   constructDesignDepthDraftFragmentContentRegisterUpdate,
+  designDepthRegisterPayloadFromEvaluateContentRegister,
   deriveSdlcConformProjectProfileFromWorkspace,
   deriveWorkerHandoffManifest,
   hookContractByEdgeName,
@@ -288,6 +289,139 @@ test("T-187 design-depth first-update helper is carrier mechanics only", () => {
     computeMeans: "F_P"
   });
   assert.equal(admission.status, "admitted");
+});
+
+test("T-160 design-depth fragments drop non-source file targets from component rows", () => {
+  const draftRegister = designDepthDraftRegister();
+  const sourceRef = draftRegister.sourceBasisRefs[0];
+  const valuesBySection = new Map([
+    [
+      "stackProfileRows",
+      [
+        {
+          kind: "sdlc_stack_profile_row",
+          stackRef: "stack://rust/cargo-binary-crate",
+          language: "Rust",
+          buildTool: "cargo"
+        }
+      ]
+    ],
+    [
+      "implementationModuleRows",
+      [
+        {
+          kind: "sdlc_implementation_module_row",
+          moduleName: "hello_world_rust",
+          moduleRef: "module://hello_world_rust"
+        }
+      ]
+    ],
+    ["aggregateDomainModelRows", []],
+    ["moduleSchemaFragments", []],
+    ["moduleStateDiagramFragments", []],
+    ["aggregateDomainModel", null],
+    ["sunnyDaySequenceRows", []],
+    ["aggregateSunnyDaySequence", null],
+    [
+      "componentTopologyRows",
+      [
+        {
+          kind: "sdlc_component_topology_row",
+          componentId: "cargo_manifest",
+          moduleName: "hello_world_rust",
+          relativePath: "build_tenants/hello_world_rust/Cargo.toml",
+          publicBoundary: null,
+          concernRole: "other",
+          requirementIds: ["REQ-T160-RUST-001"],
+          sourceAssetRefs: [sourceRef]
+        },
+        {
+          kind: "sdlc_component_topology_row",
+          componentId: "main_program",
+          moduleName: "hello_world_rust",
+          relativePath: "build_tenants/hello_world_rust/src/main.rs",
+          publicBoundary: "fn main()",
+          concernRole: "io_adapter",
+          requirementIds: ["REQ-T160-RUST-002", "REQ-T160-RUST-003"],
+          sourceAssetRefs: [sourceRef]
+        }
+      ]
+    ],
+    [
+      "componentRealizationRows",
+      [
+        {
+          kind: "sdlc_component_realization_row",
+          componentId: "cargo_manifest",
+          moduleName: "hello_world_rust",
+          relativePath: "build_tenants/hello_world_rust/Cargo.toml",
+          publicBoundary: null,
+          trancheId: "1",
+          firstProductFileToChange: "build_tenants/hello_world_rust/Cargo.toml",
+          upstreamComponentIds: [],
+          requirementIds: ["REQ-T160-RUST-001"],
+          sourceAssetRefs: [sourceRef]
+        },
+        {
+          kind: "sdlc_component_realization_row",
+          componentId: "main_program",
+          moduleName: "hello_world_rust",
+          relativePath: "build_tenants/hello_world_rust/src/main.rs",
+          publicBoundary: "fn main()",
+          trancheId: "1",
+          firstProductFileToChange: "build_tenants/hello_world_rust/src/main.rs",
+          upstreamComponentIds: [],
+          requirementIds: ["REQ-T160-RUST-002", "REQ-T160-RUST-003"],
+          sourceAssetRefs: [sourceRef]
+        }
+      ]
+    ],
+    [
+      "fileTargetRows",
+      [
+        {
+          kind: "sdlc_file_target_row",
+          relativePath: "build_tenants/hello_world_rust/Cargo.toml",
+          role: "other"
+        },
+        {
+          kind: "sdlc_file_target_row",
+          relativePath: "build_tenants/hello_world_rust/src/main.rs",
+          role: "source"
+        }
+      ]
+    ],
+    ["designCompletenessVerdict", null]
+  ]);
+  const updated = constructDesignDepthDraftFragmentContentRegisterUpdate({
+    draftRegister,
+    targetAssetType: "implementation_design_surface",
+    updates: SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.map((section) => ({
+      section,
+      value: valuesBySection.get(section),
+      sourceBasisRefs: [sourceRef],
+      evidenceRefs: [sourceRef]
+    }))
+  });
+
+  const register = designDepthRegisterPayloadFromEvaluateContentRegister(updated);
+
+  assert(register);
+  assert.deepEqual(
+    register.componentTopologyRows.map((row) => row.componentId),
+    ["main_program"]
+  );
+  assert.deepEqual(
+    register.componentRealizationRows.map((row) => row.componentId),
+    ["main_program"]
+  );
+  assert.deepEqual(
+    register.fileTargetRows.map((row) => [row.relativePath, row.role]),
+    [
+      ["build_tenants/hello_world_rust/Cargo.toml", "other"],
+      ["build_tenants/hello_world_rust/src/main.rs", "source"]
+    ]
+  );
 });
 
 test("T-187 broad Markdown surfaces group obligation pressure instead of listing every id", () => {
@@ -790,7 +924,7 @@ test("T-188 retry prompt filters downstream test and execution pressure", () => 
   );
   assert.match(
     launchContractSource,
-    /Do not materialize downstream execution-result or runtime-execution artifacts on component_test_surface/u
+    /Do not materialize downstream execution-result or runtime-execution artifacts on \$\{manifest\.targetAssetType\}/u
   );
   assert.match(
     launchContractSource,

@@ -94,7 +94,8 @@ test-pipeline pass:
 | --- | --- | --- |
 | design obligations | `requirement_surface`, `design_surface`, `scenario_surface`, `implementation_design_surface` | existing upstream authority edges |
 | test plan, UAT testcase rows, testcase authority rows, module/allocation rows, topology rows, data bindings, expected-result bindings, and execution schedule rows | `test_design_surface` | `derive_test_design_surface` |
-| component test source | `component_test_surface` | `derive_component_test_surface` |
+| module/unit component test source | `component_test_surface` | `derive_component_test_surface` |
+| requirement-specific UAT test source | `uat_test_source_surface` | `derive_uat_test_source_surface` |
 | declared framework / command execution | `test_execution_surface` | `prepare_test_execution_surface` |
 | observed test result | `test_execution_result_surface` | `derive_test_execution_result_surface` |
 | verification rows | `component_test_qualification_surface` | `qualify_component_test_execution_surface` |
@@ -180,13 +181,100 @@ prompt may request materialized test files for bounded rows, but it must not
 ask the worker to choose the testcase authority, invent the test dependency
 map, or default the test stack outside admitted profile evidence.
 
+## T-203 Code-Builder Graph Function Refinement
+
+Component source generation, unit/component test generation, and UAT-oriented
+test generation are target profiles of the same reusable code-builder graph
+function:
+
+```text
+Fg_graph_code_builder(
+  requirements_or_uat_test_pressure,
+  selected_tenant_surface,
+  design_authority_surface,
+  code_builder_target_contract
+) -> code_workspace_surface
+```
+
+`derive_component_code_surface` specializes the builder for source code. It
+keeps the established implementation-design source edge and materializes
+source-role product files. Requirement/UAT pressure, testcase authority when
+present, and selected tenant/build authority are carried as staged authority or
+repair pressure, not by widening this existing source edge into a second graph
+shape.
+
+`derive_component_test_surface` specializes the builder for generated test
+source. It covers unit/component tests, which are requirement + design + module
+specific. It consumes requirement/testcase authority, selected tenant/build
+authority, test design, and implementation design. It does not require
+completed `component_code_surface` as a blanket precondition.
+When explicit test topology is not yet admitted, source-bearing module
+definitions still derive unit/component-test dependency nodes; test source is
+not discovered from already-generated implementation byproducts.
+
+`derive_uat_test_source_surface` specializes the builder for
+requirement-specific UAT executable tests. It consumes requirements,
+UAT testcase authority, testcase authority, selected tenant/build authority,
+and test design. It does not consume implementation module definitions as a
+blanket precondition; generated UAT tests are the requirement-side peer of
+generated implementation source and generated unit/component tests.
+When UAT targets are derived from unit/component test authority, they preserve
+the tenant's declared test source root so downstream framework discovery can
+see them.
+
+The test-run and qualification nodes are the fan-in. They consume generated
+source and generated tests together. They do not substitute for missing test
+source generation. A command result with zero generated source tests is
+non-closure and must create residual pressure for ticket triage or lawful
+re-entry.
+
+Ticket triage is the consequence path after test-run failure. It may select
+same-edge code-builder iteration for code/test/environment defects, deep
+code/test zoom for underdecomposed obligations, or upstream design re-entry
+when the failing test proves the design/test authority is wrong. The triage
+selection is product meaning only; ABG remains the sole runtime authority for
+the selected traversal, zoom, events, replay, and continuation.
+
+This refines the prior test-pipeline graph by removing the confused split where
+source code generation followed one depth-capable materialization path while
+UAT-derived test code behaved like a later command/proof side effect. The
+single designed path is:
+
+```text
+requirements + design + tenant authority
+  -> [
+       Fg_graph_code_builder(source-code target),
+       Fg_graph_code_builder(unit/component-test target),
+       Fg_graph_code_builder(UAT-test target)
+     ]
+  -> test-run / qualification fan-in
+  -> ticket triage / lawful ABG re-entry
+```
+
+When admitted dependency maps select `parallel`, source-code, unit/component
+test, and UAT-test specializations are ABG-frontier eligible sibling branches.
+This is not a product-local scheduler; the branch/frontier artifact is ABG
+runtime truth, and downstream qualification still verifies source/test
+consistency before closure.
+The frontier artifact must carry distinct staged authority for the UAT branch:
+`operator-run-artifact://uat-test-dependency-map`,
+`operator-run-artifact://uat-test-dependency-traversal-selection`, and a
+nonzero `uatTestLaneCount` on `sdlc_live_fp_parallel_materialization_frontier`
+whenever admitted UAT test-source work exists.
+
+No legacy graph declaration, overlay edge, target-carrier row, or worker policy
+may preserve a second route for this behavior.
+
 `prepare_test_execution_surface` is a projection/no-close transition. It writes
 the deterministic execution register from admitted test schedule and product
 constraints. It does not dispatch `F_P.transform` and does not own observed
 test results.
 
 `derive_test_execution_result_surface` owns execution observation and scoped
-repair pressure. `qualify_component_test_execution_surface`,
+repair pressure. `qualify_component_test_execution_surface` is the first
+source/test fan-in closure edge: it verifies observed results against admitted
+test design, generated component tests, generated UAT tests, and generated
+component code.
 `derive_test_run_archive_surface`, `derive_release_depth_parity_surface`, and
 `prepare_release_surface` are evaluator/projection surfaces over admitted code,
 test, execution, and ledger truth; when their edge-accounting rows declare
@@ -235,6 +323,7 @@ qualify_component_realization_surface
 derive_code_surface
 derive_test_design_surface
 derive_component_test_surface
+derive_uat_test_source_surface
 prepare_test_execution_surface
 derive_test_execution_result_surface
 qualify_component_test_execution_surface

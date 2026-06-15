@@ -6,6 +6,7 @@
 // Implements: REQ-F-ODDSDLC-057
 
 import {
+  FG_GRAPH_CODE_BUILDER,
   FG_SINGLE_TYPED_TRAVERSAL,
   REUSABLE_GRAPH_FUNCTION_CATALOG,
   type SdlcReusableGraphFunctionCatalogEntry
@@ -21,7 +22,9 @@ export interface SdlcFunctionCatalogEntry {
   readonly inputs: readonly string[];
   readonly outputs: readonly string[];
   readonly backingGraphFunction: string;
-  readonly specializesGraphFunction: typeof FG_SINGLE_TYPED_TRAVERSAL;
+  readonly specializesGraphFunction:
+    | typeof FG_SINGLE_TYPED_TRAVERSAL
+    | typeof FG_GRAPH_CODE_BUILDER;
   readonly transformContractRef: string;
   readonly evaluationContractRef: string;
 }
@@ -65,6 +68,8 @@ export const FG_PREPARE_TEST_EXECUTION_SURFACE =
   "prepare_test_execution_surface" as const;
 export const FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE =
   "derive_test_execution_result_surface" as const;
+export const FG_DERIVE_UAT_TEST_SOURCE_SURFACE =
+  "derive_uat_test_source_surface" as const;
 export const FG_BOOTSTRAP_SDLC_ENTRY =
   "Fg_bootstrap_sdlc_entry" as const;
 export const FG_DECOMPOSE_DEPTH_BETWEEN_NODES =
@@ -134,6 +139,7 @@ function entry(input: {
   readonly outputs: readonly string[];
   readonly workCategoryGovernanceCategory: SdlcWorkCategoryGovernanceCategory;
   readonly graphTrackPublication?: SdlcFunctionCatalogEntry["graphTrackPublication"];
+  readonly specializesGraphFunction?: SdlcFunctionCatalogEntry["specializesGraphFunction"];
 }): SdlcFunctionCatalogEntry {
   return Object.freeze({
     kind: "sdlc_function_catalog_entry",
@@ -145,7 +151,7 @@ function entry(input: {
     inputs: Object.freeze([...input.inputs]),
     outputs: Object.freeze([...input.outputs]),
     backingGraphFunction: input.name,
-    specializesGraphFunction: FG_SINGLE_TYPED_TRAVERSAL,
+    specializesGraphFunction: input.specializesGraphFunction ?? FG_SINGLE_TYPED_TRAVERSAL,
     transformContractRef: `transform://odd_sdlc/${input.name}`,
     evaluationContractRef: `evaluation://odd_sdlc/${input.name}`
   });
@@ -170,6 +176,7 @@ export const OPTIMIZED_FULL_TRAVERSAL_EXECUTIVE_STEPS = Object.freeze([
   "derive_code_surface",
   "derive_test_design_surface",
   "derive_component_test_surface",
+  FG_DERIVE_UAT_TEST_SOURCE_SURFACE,
   "prepare_test_execution_surface",
   "derive_test_execution_result_surface",
   "qualify_component_test_execution_surface",
@@ -243,7 +250,7 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
   }),
   entry({
     name: "derive_scenario_surface",
-    intent: "Derive scenario bundles from requirements and design.",
+    intent: "Derive UAT-bound scenario bundles from requirements, testcase authority, UAT pressure, and design.",
     inputs: [
       "requirement_surface",
       "uat_testcases_surface",
@@ -262,10 +269,11 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
   }),
   entry({
     name: "derive_component_code_surface",
-    intent: "Materialize or repair component-shaped implementation code from the composite implementation plan carrier and any admitted component repair schedule.",
+    intent: "Materialize or repair component-shaped implementation source code through the graph-code-builder contract from the composite implementation plan carrier and any admitted component repair schedule.",
     inputs: ["implementation_design_surface"],
     outputs: ["component_code_surface"],
-    workCategoryGovernanceCategory: "coding_build"
+    workCategoryGovernanceCategory: "coding_build",
+    specializesGraphFunction: FG_GRAPH_CODE_BUILDER
   }),
   entry({
     name: "qualify_component_realization_surface",
@@ -303,12 +311,31 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
   }),
   entry({
     name: "derive_component_test_surface",
-    intent: "Materialize component-shaped test code from admitted testcase and test-topology authority; code-dependent adaptation is downstream fan-in or repair pressure.",
+    intent: "Materialize module-definition-dependent unit and component test source through the graph-code-builder contract from requirement/testcase authority, selected tenant/build authority, test design, and implementation design; component code is consumed by downstream qualification rather than as a blanket generation precondition.",
     inputs: [
-      "test_design_surface"
+      "requirement_surface",
+      "testcase_authority_surface",
+      "selected_tenant_surface",
+      "test_design_surface",
+      "implementation_design_surface"
     ],
     outputs: ["component_test_surface"],
-    workCategoryGovernanceCategory: "unit_test_build"
+    workCategoryGovernanceCategory: "unit_test_build",
+    specializesGraphFunction: FG_GRAPH_CODE_BUILDER
+  }),
+  entry({
+    name: FG_DERIVE_UAT_TEST_SOURCE_SURFACE,
+    intent: "Materialize requirement-specific UAT executable test source through the graph-code-builder contract from requirements, UAT testcase authority, selected tenant/build authority, and test design; implementation module definitions are not a blanket precondition for UAT test-source generation.",
+    inputs: [
+      "requirement_surface",
+      "uat_testcases_surface",
+      "testcase_authority_surface",
+      "selected_tenant_surface",
+      "test_design_surface"
+    ],
+    outputs: ["uat_test_source_surface"],
+    workCategoryGovernanceCategory: "unit_test_build",
+    specializesGraphFunction: FG_GRAPH_CODE_BUILDER
   }),
   entry({
     name: "prepare_test_execution_surface",
@@ -319,17 +346,25 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
   }),
   entry({
     name: "derive_test_execution_result_surface",
-    intent: "Admit governed framework execution evidence and observed test results before archive publication.",
-    inputs: ["test_execution_surface", "test_design_surface"],
+    intent: "Admit governed framework execution evidence and observed test results over generated implementation source, unit/component tests, and UAT test source before archive publication.",
+    inputs: [
+      "test_execution_surface",
+      "test_design_surface",
+      "component_code_surface",
+      "component_test_surface",
+      "uat_test_source_surface"
+    ],
     outputs: ["test_execution_result_surface"],
     workCategoryGovernanceCategory: "unit_test_build"
   }),
   entry({
     name: "qualify_component_test_execution_surface",
-    intent: "Verify observed test results against expected results in the composite test plan and materialized component tests.",
+    intent: "Verify observed test results against expected results in the composite test plan, materialized component tests, UAT test source, and generated implementation source.",
     inputs: [
       "test_execution_result_surface",
       "test_design_surface",
+      "component_code_surface",
+      "uat_test_source_surface",
       "component_test_surface"
     ],
     outputs: ["component_test_qualification_surface"],
@@ -503,7 +538,8 @@ export const LITE_FUNCTION_CATALOG = Object.freeze([
     inputs: ["implementation_design_surface"],
     outputs: ["component_code_surface"],
     workCategoryGovernanceCategory: "coding_build",
-    graphTrackPublication: "overlay_only"
+    graphTrackPublication: "overlay_only",
+    specializesGraphFunction: FG_GRAPH_CODE_BUILDER
   })
 ]);
 

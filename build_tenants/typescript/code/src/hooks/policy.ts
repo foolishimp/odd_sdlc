@@ -102,6 +102,10 @@ export const SDLC_HOOK_TARGET_POLICY = Object.freeze([
     edgeClass: "qualification"
   }),
   policyEntry({
+    targetAssetType: "uat_test_source_surface",
+    edgeClass: "qualification"
+  }),
+  policyEntry({
     targetAssetType: "test_run_archive_surface",
     edgeClass: "qualification",
     defaultOperation: "qualify"

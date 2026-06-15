@@ -517,6 +517,7 @@ export {
   deriveSdlcStagedImplementationTopologyAuthority,
   deriveSdlcStagedTestTopologyAuthority,
   deriveSdlcTestDependencyMapFromImplementationDependencyMap,
+  deriveSdlcUatTestDependencyMapFromTestDependencyMap,
   SDLC_DEFAULT_DECOMPOSITION_SUMMARY_THRESHOLDS,
   selectSdlcDependencyMapTraversal
 } from "./decomposition_admission.js";

@@ -188,6 +188,28 @@ test("T-188 data_mapper live harness worker binding comes from runtime policy", 
   assert.match(resumeSource, /ODD_SDLC_TEST_ONLY_MINIMUM_OPERATOR_TIMEOUT_MS/u);
 });
 
+test("T-203 data_mapper detail live harness consumes admitted next actions and UAT detail edge", () => {
+  const runnerSource = readFileSync(
+    path.join(PACKAGE_ROOT, "test_env/live/run_full_external_data_mapper_sandbox.mjs"),
+    "utf8"
+  );
+  assert.match(runnerSource, /function nextGraphFunctionStartTargetFromStart/u);
+  assert.match(runnerSource, /nextActionProjection\.nextGraphFunctionRef/u);
+  assert.match(runnerSource, /currentStartTarget = nextStartTarget/u);
+  assert.match(runnerSource, /command: input\.installedCommand/u);
+  assert.match(runnerSource, /args: sdlcStartArgs\(currentStartTarget\)/u);
+  assert.match(runnerSource, /sdlc_overlay_next_action_missing/u);
+  assert.match(runnerSource, /derive_uat_test_source_surface/u);
+  assert.doesNotMatch(
+    runnerSource,
+    /args: sdlcStartArgs\(input\.startTarget\)/u
+  );
+  assert.doesNotMatch(
+    runnerSource,
+    /command: startCommandForTarget\(\{\s*startTarget: currentStartTarget/u
+  );
+});
+
 test("T-188 data_mapper release proof installs the release snapshot package", () => {
   const runnerSource = readFileSync(
     path.join(PACKAGE_ROOT, "test_env/live/run_full_external_data_mapper_sandbox.mjs"),
