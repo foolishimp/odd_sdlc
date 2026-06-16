@@ -279,10 +279,9 @@ export function sdlcOperatorRuntimePolicy(): SdlcOperatorRuntimePolicy {
       "ODD_SDLC_WORKER_TERMINATION_GRACE_MS",
       config.worker.terminationGraceMs
     ),
-    designDepthFpEvaluatorTimeoutMs: configuredTimeoutMs(
+    designDepthFpEvaluatorTimeoutMs: configuredPositiveInteger(
       "ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_TIMEOUT_MS",
-      config.designDepthFpEvaluator.timeoutMs,
-      minimumOperatorTimeoutMs
+      config.designDepthFpEvaluator.timeoutMs
     ),
     designDepthFpEvaluatorStdoutBudgetBytes: configuredPositiveInteger(
       "ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_STDOUT_BUDGET_BYTES",

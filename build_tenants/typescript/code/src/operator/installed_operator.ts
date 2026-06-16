@@ -4254,6 +4254,9 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
     archiveRoot: input.manifest.archiveRoot,
     contentRegisterPath
   });
+  const firstUpdateObservation = observeDesignDepthContentRegisterFirstUpdate({
+    registerPath: contentRegisterPath
+  });
   const stdoutByteCount = fileByteCount(stdoutPath);
   const stderrByteCount = fileByteCount(stderrPath);
   const runRef = pathToFileURL(
@@ -4288,13 +4291,32 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
       traceResultRef: fileRef(traceResultPath(traceRoot))
     })
   });
+  const evaluatorTraceProjection = traceProjectionFor(traceRoot);
+  const traceResultRef = fileRef(traceResultPath(traceRoot));
+  const evaluatorTraceEvidenceRefs = uniqueSorted([
+    traceResultRef,
+    ...(evaluatorTraceProjection.finalOutputRef === null
+      ? []
+      : [evaluatorTraceProjection.finalOutputRef]),
+    ...(evaluatorTraceProjection.terminalTranscriptRef === null
+      ? []
+      : [evaluatorTraceProjection.terminalTranscriptRef])
+  ]);
+  const evaluatorProcessText = [
+    readOptionalWorkerTextRef(evaluatorTraceProjection.finalOutputRef),
+    readOptionalWorkerTextRef(evaluatorTraceProjection.terminalTranscriptRef),
+    readOptionalWorkerTextRef(traceResultRef),
+    readOptionalWorkerTextPath(stdoutPath),
+    readOptionalWorkerTextPath(stderrPath)
+  ].join("\n");
   const evidenceRefs = uniqueSorted([
     pathToFileURL(promptPath).href,
     pathToFileURL(input.manifest.outputFile).href,
     pathToFileURL(stdoutPath).href,
     pathToFileURL(stderrPath).href,
     pathToFileURL(processEventsPath).href,
-    runRef
+    runRef,
+    ...evaluatorTraceEvidenceRefs
   ]);
   if (processResult.status !== 0) {
     return constructEvaluationRuleOutcome({
@@ -4312,7 +4334,14 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
       compositionContributionRef:
         input.pluginInput.selectedRegimeBindingRef ??
         input.pluginInput.selectedCompositionRef,
-      reason: "design_depth_fp_evaluator_process_failed"
+      reason:
+        workerProcessTextLooksRetryableProviderFailure(evaluatorProcessText)
+          ? "worker_connection_failed"
+          : processResult.timedOut && firstUpdateObservation.status === "pending"
+            ? "design_depth_fp_evaluator_first_update_timeout"
+            : processResult.timedOut
+              ? "design_depth_fp_evaluator_progress_timeout"
+              : "design_depth_fp_evaluator_process_failed"
     });
   }
   const contentRegisterAdmission = admitSdlcEvaluateContentRegisterArtifact({
@@ -4493,6 +4522,15 @@ function writeReviewGradeEdgeFulfillmentRuleOutcomeProof(input: {
 function designDepthFpEvaluatorBlockingReasonCode(
   outcome: EvaluationRuleOutcome
 ): SdlcBlockingReasonCode {
+  if (outcome.reason === "worker_connection_failed") {
+    return "worker_connection_failed";
+  }
+  if (outcome.reason === "design_depth_fp_evaluator_first_update_timeout") {
+    return "design_depth_fp_evaluator_first_update_timeout";
+  }
+  if (outcome.reason === "design_depth_fp_evaluator_progress_timeout") {
+    return "design_depth_fp_evaluator_progress_timeout";
+  }
   return outcome.reason === "design_depth_fp_evaluator_process_failed"
     ? "design_depth_fp_evaluator_process_failed"
     : "design_depth_fp_evaluator_rule_blocked";
@@ -8646,6 +8684,12 @@ function workerRunOutputLimitExceeded(workerRun: SdlcWorkerRunResult): boolean {
   );
 }
 
+function workerProcessTextLooksRetryableProviderFailure(text: string): boolean {
+  return /ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|EPIPE|socket connection was closed|socket hang up|Unable to connect to API|network error|fetch failed|API Error:\s*5\d\d\b|Internal server error|server-side issue/u.test(
+    text
+  );
+}
+
 function workerRunConnectionFailed(workerRun: SdlcWorkerRunResult): boolean {
   const text = [
     readOptionalWorkerTextRef(workerRun.finalOutputRef),
@@ -8653,9 +8697,7 @@ function workerRunConnectionFailed(workerRun: SdlcWorkerRunResult): boolean {
     readOptionalWorkerTextPath(workerRun.stdoutPath),
     readOptionalWorkerTextPath(workerRun.stderrPath)
   ].join("\n");
-  return /ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|EPIPE|socket connection was closed|socket hang up|Unable to connect to API|network error|fetch failed/u.test(
-    text
-  );
+  return workerProcessTextLooksRetryableProviderFailure(text);
 }
 
 function workerFailureCode(input: {

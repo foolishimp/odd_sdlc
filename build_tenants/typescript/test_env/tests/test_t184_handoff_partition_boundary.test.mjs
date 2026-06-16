@@ -539,7 +539,11 @@ test("T-184 operator timeout policy is tenant configuration, not handoff glue", 
   );
   assert.equal(
     runtimePolicy.designDepthFpEvaluator.timeoutMs,
-    runtimePolicy.minimumOperatorTimeoutMs
+    600000
+  );
+  assert.ok(
+    runtimePolicy.designDepthFpEvaluator.timeoutMs <
+      runtimePolicy.minimumOperatorTimeoutMs
   );
   assert.equal(
     runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.timeoutMs,
@@ -656,6 +660,9 @@ test("T-184 F_P evaluator prompt uses incremental content register writes", () =
   const contentRegisterSource = readRepoFile(
     "build_tenants/typescript/code/src/operator/plugins/evaluate/content_register.ts"
   );
+  const blockingReasonSource = readRepoFile(
+    "build_tenants/typescript/code/src/shared/blocking_reason.ts"
+  );
 
   assert.match(
     evaluatorPromptSource,
@@ -676,6 +683,38 @@ test("T-184 F_P evaluator prompt uses incremental content register writes", () =
   assert.match(installedOperatorSource, /writeDesignDepthFirstUpdateObservation/u);
   assert.match(installedOperatorSource, /design_depth_fp_evaluator_first_update\.json/u);
   assert.match(contentRegisterSource, /observeDesignDepthContentRegisterFirstUpdate/u);
+  assert.match(
+    installedOperatorSource,
+    /function workerProcessTextLooksRetryableProviderFailure/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /reason:\s*workerProcessTextLooksRetryableProviderFailure\(evaluatorProcessText\)[\s\S]*\?\s*"worker_connection_failed"[\s\S]*:\s*processResult\.timedOut[\s\S]*\?\s*"design_depth_fp_evaluator_progress_timeout"[\s\S]*:\s*"design_depth_fp_evaluator_process_failed"/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /processResult\.timedOut && firstUpdateObservation\.status === "pending"[\s\S]*\?\s*"design_depth_fp_evaluator_first_update_timeout"/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /outcome\.reason === "worker_connection_failed"[\s\S]*return "worker_connection_failed"/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /outcome\.reason === "design_depth_fp_evaluator_first_update_timeout"[\s\S]*return "design_depth_fp_evaluator_first_update_timeout"/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /outcome\.reason === "design_depth_fp_evaluator_progress_timeout"[\s\S]*return "design_depth_fp_evaluator_progress_timeout"/u
+  );
+  assert.match(
+    blockingReasonSource,
+    /code === "design_depth_fp_evaluator_first_update_timeout"[\s\S]*lawfulReentryPoint: "same_edge_retry"/u
+  );
+  assert.match(
+    blockingReasonSource,
+    /code === "design_depth_fp_evaluator_progress_timeout"[\s\S]*lawfulReentryPoint: "same_edge_retry"/u
+  );
   assert.match(
     evaluatorPromptSource,
     /SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND/u
@@ -1000,6 +1039,63 @@ test("T-184 retryable provider connection failures remain same-edge retry", () =
       elapsedMs: 425253,
       timedOut: false,
       stdoutByteCount: 128,
+      stderrByteCount: 0,
+      stdoutPath,
+      stderrPath,
+      outputLastMessagePath: null,
+      error: null
+    }
+  });
+  const dossier = constructPostflightGapDossier({ manifest, postflight });
+
+  assert.equal(postflight.blockingReasonCarriers[0].code, "worker_connection_failed");
+  assert.equal(
+    postflight.blockingReasonCarriers[0].lawfulReentryPoint,
+    "same_edge_retry"
+  );
+  assert.equal(dossier.retryEligible, true);
+  assert.deepEqual(dossier.nextLawfulActions, ["retry_same_edge"]);
+});
+
+test("T-184 retryable provider server errors remain same-edge retry", () => {
+  const workspace = makeWorkspace();
+  const contract = hookContractByEdgeName("derive_intent_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 0,
+    contract,
+    runId: "t184-provider-server-error"
+  });
+  mkdirSync(manifest.archiveRoot, { recursive: true });
+  const stdoutPath = path.join(manifest.archiveRoot, "worker_stdout.log");
+  const stderrPath = path.join(manifest.archiveRoot, "worker_stderr.log");
+  const finalOutputPath = path.join(manifest.archiveRoot, "final_output.txt");
+  writeFileSync(stdoutPath, "", "utf8");
+  writeFileSync(stderrPath, "", "utf8");
+  writeFileSync(
+    finalOutputPath,
+    "API Error: 500 Internal server error. This is a server-side issue, usually temporary — try again in a moment.\n",
+    "utf8"
+  );
+
+  const postflight = constructWorkerProcessFailurePostflight({
+    manifest,
+    workerRun: {
+      kind: "sdlc_worker_run_result",
+      command: "claude",
+      args: [],
+      cwd: workspace,
+      outcome: { kind: "exited", status: 1 },
+      executorProfile: "pty-terminal",
+      streamModel: "terminal-transcript",
+      finalOutputRef: pathToFileURL(finalOutputPath).href,
+      status: 1,
+      signal: null,
+      elapsedMs: 107423,
+      timedOut: false,
+      stdoutByteCount: 0,
       stderrByteCount: 0,
       stdoutPath,
       stderrPath,

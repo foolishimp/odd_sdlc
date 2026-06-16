@@ -952,6 +952,18 @@ function maybeRunTerminalGapTicketWorkflow(input) {
   if (operatorRunRoot === null || !shouldRunTerminalGapTicketWorkflow(input.start)) {
     return null;
   }
+  const requiredTicketIntakeFiles = [
+    "operator_summary.json",
+    "review_grade_edge_fulfillment_assessment.json",
+    "sdlc_edge_closure_decision.json"
+  ];
+  if (
+    requiredTicketIntakeFiles.some(
+      (relativePath) => !existsSync(path.join(operatorRunRoot, relativePath))
+    )
+  ) {
+    return null;
+  }
   const intake = specPayload(
     runCommand({
       label: "ticket-intake-terminal-gap",

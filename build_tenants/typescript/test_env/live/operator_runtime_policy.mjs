@@ -161,10 +161,9 @@ export function liveOperatorRuntimePolicy() {
       config.workerInactivityTimeoutMs,
       minimumOperatorTimeoutMs
     ),
-    designDepthFpEvaluatorTimeoutMs: timeoutMs(
+    designDepthFpEvaluatorTimeoutMs: positiveInteger(
       "ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_TIMEOUT_MS",
-      config.designDepthFpEvaluatorTimeoutMs,
-      minimumOperatorTimeoutMs
+      config.designDepthFpEvaluatorTimeoutMs
     ),
     reviewGradeEdgeFulfillmentEvaluatorTimeoutMs: timeoutMs(
       "ODD_SDLC_REVIEW_GRADE_EDGE_FULFILLMENT_EVALUATOR_TIMEOUT_MS",

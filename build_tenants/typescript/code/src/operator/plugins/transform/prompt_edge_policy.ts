@@ -906,7 +906,7 @@ export function outcomeDirectivesForWorker(
       "If accepted authority says a source target is an executable, script, program, CLI, service entrypoint, or must print/emit/respond when run, connect the product behavior to that source file's runtime entrypoint. An exported helper that only works when called by a test does not satisfy executable product materialization.",
       "Before writing or repairing source/build_config files, read the tenant stack authority surface, accepted design/ADR refs, declared product file targets, and declared execution contracts. If those inputs conflict, use the stack reconciliation protocol; do not change tenant-stack authority from an untested local assumption.",
       "Tenant stack authority must match the product files actually emitted. If source syntax, module/runtime system, or build tool differs from the seeded stack authority, repair the tenant stack authority or product files instead of documenting a local override in prose.",
-      "Pre-return syntax check: every emitted source and build/config product file must use the language, module/import system, file extension, and command shape declared by tenant stack authority. Do not write test files from component_code_surface.",
+      "Pre-return syntax check: every emitted source, test, and build/config product file must use the language, module/import system, file extension, test framework, and command shape declared by tenant stack authority. Do not write test files from component_code_surface.",
       "Do not satisfy multiple accepted component rows by collapsing them back into one coarse facade unless the admitted register gives that shared-component rationale."
     );
   }

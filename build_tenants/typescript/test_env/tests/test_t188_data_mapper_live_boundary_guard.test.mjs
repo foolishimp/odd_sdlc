@@ -135,7 +135,7 @@ test("T-188 data_mapper live harness worker binding comes from runtime policy", 
   );
   assert.equal(
     runtimePolicy.liveHarness.dataMapperWorkerTransport,
-    "process://claude?model=claude-sonnet-4-7&effort=max"
+    "process://claude?model=claude-sonnet-4-6&effort=max"
   );
 
   const runnerSource = readFileSync(
@@ -250,6 +250,12 @@ test("T-203 data_mapper detail live harness consumes admitted next actions and U
   assert.match(runnerSource, /reason\?\.lawfulReentryPoint === "same_edge_retry"/u);
   assert.match(runnerSource, /DATA_MAPPER_RETRY_YIELD_ATTEMPT_WINDOW/u);
   assert.match(runnerSource, /const retryContinuation = shouldContinueSameEdgeRetry\(start\);/u);
+  assert.match(runnerSource, /const requiredTicketIntakeFiles = \[/u);
+  assert.match(runnerSource, /"review_grade_edge_fulfillment_assessment\.json"/u);
+  assert.match(
+    runnerSource,
+    /requiredTicketIntakeFiles\.some\([\s\S]*return null;[\s\S]*ticket-intake-terminal-gap/u
+  );
   assert.match(
     runnerSource,
     /const nextStartTarget = retryContinuation\s*\?\s*null\s*:\s*nextGraphFunctionStartTargetFromStart/su

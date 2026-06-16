@@ -162,7 +162,11 @@ test("T-181 common config carries one compressed governance doc per work categor
   );
   assert.equal(
     runtimePolicy.designDepthFpEvaluator.timeoutMs,
-    runtimePolicy.minimumOperatorTimeoutMs
+    600000
+  );
+  assert.ok(
+    runtimePolicy.designDepthFpEvaluator.timeoutMs <
+      runtimePolicy.minimumOperatorTimeoutMs
   );
   assert.equal(
     runtimePolicy.executionShard.timeoutMs,

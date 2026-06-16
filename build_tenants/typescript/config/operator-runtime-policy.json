@@ -10,7 +10,7 @@
     "terminationGraceMs": 10000
   },
   "designDepthFpEvaluator": {
-    "timeoutMs": 3600000,
+    "timeoutMs": 600000,
     "stdoutBudgetBytes": 1048576
   },
   "reviewGradeEdgeFulfillmentEvaluator": {
@@ -26,6 +26,6 @@
     "commandTimeoutMs": 3600000,
     "fullCapabilityCommandTimeoutMs": 43200000,
     "lifecycleCommandTimeoutMs": 21600000,
-    "dataMapperWorkerTransport": "process://claude?model=claude-sonnet-4-7&effort=max"
+    "dataMapperWorkerTransport": "process://claude?model=claude-sonnet-4-6&effort=max"
   }
 }

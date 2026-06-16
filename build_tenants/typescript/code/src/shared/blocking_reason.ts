@@ -66,6 +66,8 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "review_grade_assessment_missing",
   "review_grade_assessment_invalid",
   "review_grade_edge_fulfillment_blocked",
+  "design_depth_fp_evaluator_first_update_timeout",
+  "design_depth_fp_evaluator_progress_timeout",
   "design_depth_fp_evaluator_process_failed",
   "design_depth_fp_evaluator_rule_blocked",
   "review_grade_evaluator_process_failed",
@@ -210,6 +212,8 @@ const DETAIL_PRESERVING_LEGACY_REASON_CODES = Object.freeze([
   "review_grade_assessment_missing",
   "review_grade_assessment_invalid",
   "review_grade_edge_fulfillment_blocked",
+  "design_depth_fp_evaluator_first_update_timeout",
+  "design_depth_fp_evaluator_progress_timeout",
   "design_depth_fp_evaluator_process_failed",
   "design_depth_fp_evaluator_rule_blocked",
   "review_grade_evaluator_process_failed",
@@ -353,6 +357,22 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       lawfulReentryPoint: "same_edge_retry",
       message:
         "Worker consumed installed runtime source instead of project authority surfaces."
+    });
+  }
+  if (code === "design_depth_fp_evaluator_first_update_timeout") {
+    return Object.freeze({
+      reasonClass: "assurance",
+      lawfulReentryPoint: "same_edge_retry",
+      message:
+        "F_P design-depth evaluator timed out before publishing a first semantic content-register update."
+    });
+  }
+  if (code === "design_depth_fp_evaluator_progress_timeout") {
+    return Object.freeze({
+      reasonClass: "assurance",
+      lawfulReentryPoint: "same_edge_retry",
+      message:
+        "F_P design-depth evaluator timed out after publishing semantic content-register progress."
     });
   }
   if (
