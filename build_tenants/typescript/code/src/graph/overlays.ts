@@ -14,7 +14,10 @@ import {
   FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
   FG_DERIVE_UAT_TEST_SOURCE_SURFACE,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+  FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+  FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+  FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
   FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
   FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
   FG_PREPARE_TEST_EXECUTION_SURFACE,
@@ -426,6 +429,9 @@ function overlayDefinitions(): readonly OverlayDefinition[] {
     FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
     FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
     FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+    FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+    FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
+    FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
     FG_PREPARE_TEST_EXECUTION_SURFACE,
     FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
   ]);
@@ -433,6 +439,9 @@ function overlayDefinitions(): readonly OverlayDefinition[] {
     FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
     FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
     FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+    FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+    FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
+    FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
     FG_PREPARE_TEST_EXECUTION_SURFACE,
     FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
   ]);
@@ -603,6 +612,24 @@ function overlayDefinitions(): readonly OverlayDefinition[] {
           terminalRole: "supporting_asset"
         },
         {
+          assetType: "test_design_surface",
+          defaultPath: "design/adrs/ADR-003-test-design-surface.md",
+          producerGraphFunctionName: FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+          terminalRole: "supporting_asset"
+        },
+        {
+          assetType: "component_test_surface",
+          defaultPath: "design/component_test_surface.md",
+          producerGraphFunctionName: FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
+          terminalRole: "supporting_asset"
+        },
+        {
+          assetType: "uat_test_source_surface",
+          defaultPath: "design/uat_test_source_surface.md",
+          producerGraphFunctionName: FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
+          terminalRole: "supporting_asset"
+        },
+        {
           assetType: "test_execution_surface",
           defaultPath: "design/test_execution_surface.md",
           producerGraphFunctionName: FG_PREPARE_TEST_EXECUTION_SURFACE,
@@ -654,6 +681,24 @@ function overlayDefinitions(): readonly OverlayDefinition[] {
           assetType: "implementation_design_surface",
           defaultPath: "design/adrs/ADR-002-implementation-design-surface.md",
           producerGraphFunctionName: FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+          terminalRole: "supporting_asset"
+        },
+        {
+          assetType: "test_design_surface",
+          defaultPath: "design/adrs/ADR-003-test-design-surface.md",
+          producerGraphFunctionName: FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+          terminalRole: "supporting_asset"
+        },
+        {
+          assetType: "component_test_surface",
+          defaultPath: "design/component_test_surface.md",
+          producerGraphFunctionName: FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
+          terminalRole: "supporting_asset"
+        },
+        {
+          assetType: "uat_test_source_surface",
+          defaultPath: "design/uat_test_source_surface.md",
+          producerGraphFunctionName: FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
           terminalRole: "supporting_asset"
         },
         {

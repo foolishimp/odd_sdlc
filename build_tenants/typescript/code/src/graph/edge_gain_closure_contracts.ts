@@ -10,7 +10,10 @@ import {
   FG_BOOTSTRAP_SDLC_ENTRY,
   FG_DECOMPOSE_DEPTH_BETWEEN_NODES,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+  FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+  FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+  FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
   FG_DERIVE_UAT_TEST_SOURCE_SURFACE
 } from "./catalog.js";
 import {
@@ -1108,6 +1111,54 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     proofLaneRefs: ["test://odd-sdlc/t164/lite-overlay"],
     residualPressureRefs: [
       "pressure://odd-sdlc/lite-component-code",
+      "pressure://odd-sdlc/current-full-traversal-refinement"
+    ]
+  }),
+  contract({
+    edgeRef: FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+    category: "test_formalisation_and_planning",
+    closureClassification: "close_capable",
+    sourceAssetTypes: ["implementation_design_surface"],
+    targetAssetType: "test_design_surface",
+    compositionRole: "intermediate",
+    authorityBasisRefs: TEST_REFS,
+    proofLaneRefs: ["test://odd-sdlc/t203/lite-test-design"],
+    residualPressureRefs: [
+      "pressure://odd-sdlc/lite-test-design",
+      "pressure://odd-sdlc/current-full-traversal-refinement"
+    ]
+  }),
+  contract({
+    edgeRef: FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
+    category: "test_encoding_and_execution",
+    closureClassification: "close_capable",
+    sourceAssetTypes: [
+      "implementation_design_surface",
+      "test_design_surface"
+    ],
+    targetAssetType: "component_test_surface",
+    compositionRole: "intermediate",
+    authorityBasisRefs: TEST_REFS,
+    proofLaneRefs: ["test://odd-sdlc/t203/lite-component-test"],
+    residualPressureRefs: [
+      "pressure://odd-sdlc/lite-component-test",
+      "pressure://odd-sdlc/current-full-traversal-refinement"
+    ]
+  }),
+  contract({
+    edgeRef: FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
+    category: "test_encoding_and_execution",
+    closureClassification: "close_capable",
+    sourceAssetTypes: [
+      "implementation_design_surface",
+      "test_design_surface"
+    ],
+    targetAssetType: "uat_test_source_surface",
+    compositionRole: "intermediate",
+    authorityBasisRefs: TEST_REFS,
+    proofLaneRefs: ["test://odd-sdlc/t203/lite-uat-test-source"],
+    residualPressureRefs: [
+      "pressure://odd-sdlc/lite-uat-test-source",
       "pressure://odd-sdlc/current-full-traversal-refinement"
     ]
   }),

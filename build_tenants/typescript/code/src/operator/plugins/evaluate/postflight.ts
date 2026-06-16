@@ -61,7 +61,8 @@ function activeComputeStageBlockingReasonCarriers(input: {
         (reason) =>
           reason.code === "code_builder_parallel_frontier_missing" ||
           reason.code === "code_builder_parallel_test_lanes_missing" ||
-          reason.code === "code_builder_validation_command_failed"
+          reason.code === "code_builder_validation_command_failed" ||
+          reason.code === "materialized_product_role_policy_mismatch"
       )
     );
   }

@@ -65,17 +65,23 @@ sandbox outside the builder lane.
    debt. The release line has one designed solution path for code-builder
    source/test materialization, test-run validation, ticket triage, and lawful
    re-entry.
-6. Prompt-bearing code-builder and evaluator turns begin with the SPEC_METHOD
+6. Proportionality is expressed by matching graph functions, not by skipping
+   a facet. Lite/smoke overlays use overlay-only proportional graph functions
+   for lite test design, lite unit/component test source, and lite UAT test
+   source before test execution. A profile that does not generate tests must
+   publish preserved test pressure as no-close/projection truth rather than
+   claiming command execution proof.
+7. Prompt-bearing code-builder and evaluator turns begin with the SPEC_METHOD
    planning invariant: make a plan from governing authority, rank work by
    contextual closure priority, and work through that priority order before
    returning or yielding residual pressure. Contextual priority means critical
    behavior, highest-dependency modules, and shared/common-library foundations
    before leaf-only rows when the edge has a choice.
-7. Full-breadth retry is a bounded backoff, not a repeat of the same broad
+8. Full-breadth retry is a bounded backoff, not a repeat of the same broad
    prompt. Code-builder/test-builder edges declare a ten-attempt same-edge
    retry/yield window, and replay-visible prior gaps narrow full-breadth retry
    to targeted repair before terminal ticket triage.
-8. Steel-thread is a runtime traversal strategy, not a static GTL/module
+9. Steel-thread is a runtime traversal strategy, not a static GTL/module
    rebuild profile. SDLC chooses the dependency window from admitted
    requirement/module/test dependency maps, for example `req-04` plus the
    dependent requirement rows needed for an MVP thread, and passes those
@@ -83,7 +89,7 @@ sandbox outside the builder lane.
    runtime envelope, traversal facts, replay, retry, yield, and continuation.
    Full breadth still means fan out over the admitted frontier; steel thread
    means run the coherent bounded dependency slice selected at start time.
-9. The SDLC steel-thread dependency window is predecessor-closed. A selected
+10. The SDLC steel-thread dependency window is predecessor-closed. A selected
    requirement or dependency node resolves through admitted module, unit-test,
    and UAT dependency maps to the dependency nodes, requirement refs, ordering
    refs, and required progress artifacts that must run together. That selected
@@ -149,6 +155,9 @@ sandbox outside the builder lane.
       for that branch.
 - [x] Update depth/overlay design text so deep annotations apply equally to the
       source-code, unit/component-test, and UAT-test-code specializations.
+- [x] Add matching overlay-only proportional lite graph functions for
+      lite/smoke test design, unit/component-test source, and UAT-test source
+      so Min(F_P) profiles do not jump directly from source code to execution.
 - [x] Remove or retire confused legacy graph declarations that let test
       generation bypass the designed code-builder path.
 - [x] Reconcile the STDO tech-debt review: `derive_lite_component_code_surface`
@@ -340,6 +349,9 @@ SDLC consumes that admitted envelope or fails closed.
   source root for the selected implementation stack.
 - Deep overlay declarations expose depth traversal for all three full
   code-builder specializations.
+- Lite and framework-smoke overlays expose matching proportional graph
+  functions for lite test design, lite unit/component-test source, and lite UAT
+  test source before test execution.
 - `component_test_surface` closure remains blocked when generated source tests
   are missing, even if a test command ran or returned success.
 - Test-run failures are routed to admitted ticket triage/re-entry pressure
@@ -383,6 +395,9 @@ SDLC consumes that admitted envelope or fails closed.
 - Any direct generated data-mapper patch used as proof for this ticket.
 - Any SDLC path where code generation gets depth annotations but UAT-derived
   test code generation does not.
+- Any lite/smoke profile that jumps from lite component code directly to test
+  execution without either generated test-source branches or admitted
+  preserved no-close test pressure.
 - Any prompt-bearing transform/evaluate path whose rendered prompt does not
   start with the SPEC_METHOD planning invariant.
 - Any steel-thread run that depends on static GTL/module regeneration instead
@@ -411,6 +426,10 @@ truth paths:
   traversals. It may produce `component_code_surface` for that bounded overlay,
   but it is not eligible as a fallback route for current-full or deep
   source/test materialization.
+- `derive_lite_test_design_surface`, `derive_lite_component_test_surface`, and
+  `derive_lite_uat_test_source_surface` are overlay-only proportional lite
+  profiles. They output the same typed test carriers as the full path while
+  consuming the bounded lite design authority available to smoke profiles.
 
 `derive_scenario_surface` is UAT-bound scenario authority derived from
 requirements, UAT testcase pressure, testcase authority, and design. It is not

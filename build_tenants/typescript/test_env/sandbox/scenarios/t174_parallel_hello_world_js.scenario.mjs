@@ -55,7 +55,10 @@ export const T174_PARALLEL_HELLO_WORLD_FOUR_LANE_FILES = Object.freeze([
 export const T174_PARALLEL_HELLO_WORLD_LITE_EDGES = Object.freeze([
   "derive_intent_surface",
   "derive_lite_design_adr_surface",
-  "derive_lite_component_code_surface"
+  "derive_lite_component_code_surface",
+  "derive_lite_test_design_surface",
+  "derive_lite_component_test_surface",
+  "derive_lite_uat_test_source_surface"
 ]);
 
 export const t174ParallelHelloWorldJsScenario = Object.freeze({

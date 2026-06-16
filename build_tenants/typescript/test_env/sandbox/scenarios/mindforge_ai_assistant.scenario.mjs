@@ -171,7 +171,7 @@ export const mindforgeAiAssistantScenarioFamily = Object.freeze([
 export function mindforgeAiAssistantLiveScenario({
   worker,
   variant = "third_party_model_variant",
-  maxAdvances = 4,
+  maxAdvances = 8,
   startUntil = "first_traversal"
 }) {
   if (typeof worker !== "string" || worker.length === 0) {
@@ -200,11 +200,17 @@ export function mindforgeAiAssistantLiveScenario({
       handoffEdgeSequencePrefix: [
         "derive_lite_design_adr_surface",
         "derive_lite_component_code_surface",
+        "derive_lite_test_design_surface",
+        "derive_lite_component_test_surface",
+        "derive_lite_uat_test_source_surface",
         "prepare_test_execution_surface",
         "derive_test_execution_result_surface"
       ],
       requiredHandoffEdges: [
         "derive_lite_component_code_surface",
+        "derive_lite_test_design_surface",
+        "derive_lite_component_test_surface",
+        "derive_lite_uat_test_source_surface",
         "prepare_test_execution_surface",
         "derive_test_execution_result_surface"
       ],

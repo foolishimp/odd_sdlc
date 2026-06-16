@@ -590,6 +590,12 @@ evidence. `single_hop`, `dual_hop`, `staged`, `zoom_required`, and `blocked`
 are selected hop classes, not prompt instructions. Any Min(F_P) reduction must
 preserve skipped pressure through a typed template, replay-visible projection,
 bundled F_P output, or outcome-class graph variant.
+When a smaller traversal still claims executable product proof, proportionality
+is expressed by matching graph functions for the retained source, test-design,
+generated-test-source, and execution facets. A reduced profile may collapse
+scope, but it must not skip generated test-source construction and then treat a
+test command as closure unless the skipped test pressure is preserved as
+no-close/projection truth.
 
 The proportionality and Min(F_P) decisions are auditable product facts. The
 operator-run archive carries the full decomposition summary and traversal-hop

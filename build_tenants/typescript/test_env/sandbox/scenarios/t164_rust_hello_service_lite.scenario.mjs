@@ -81,11 +81,17 @@ export function t164RustHelloServiceLiteLiveScenario({
         "derive_intent_surface",
         "derive_lite_design_adr_surface",
         "derive_lite_component_code_surface",
+        "derive_lite_test_design_surface",
+        "derive_lite_component_test_surface",
+        "derive_lite_uat_test_source_surface",
         "prepare_test_execution_surface",
         "derive_test_execution_result_surface"
       ],
       requiredHandoffEdges: [
         "derive_lite_component_code_surface",
+        "derive_lite_test_design_surface",
+        "derive_lite_component_test_surface",
+        "derive_lite_uat_test_source_surface",
         "prepare_test_execution_surface",
         "derive_test_execution_result_surface"
       ],
@@ -93,6 +99,9 @@ export function t164RustHelloServiceLiteLiveScenario({
         "derive_intent_surface",
         "derive_lite_design_adr_surface",
         "derive_lite_component_code_surface",
+        "derive_lite_test_design_surface",
+        "derive_lite_component_test_surface",
+        "derive_lite_uat_test_source_surface",
         "prepare_test_execution_surface",
         "derive_test_execution_result_surface"
       ],

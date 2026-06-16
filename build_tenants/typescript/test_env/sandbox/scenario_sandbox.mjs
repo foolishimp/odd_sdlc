@@ -104,6 +104,14 @@ export function scenarioStartTargetForStep(scenario, step) {
   if (Array.isArray(scenario.startTargetSequence) && step < scenario.startTargetSequence.length) {
     return scenario.startTargetSequence[step];
   }
+  if (
+    step > 0 &&
+    scenario.continueOnEdgeConverge === true &&
+    typeof scenario.startTarget === "string" &&
+    scenario.startTarget.startsWith("overlay:")
+  ) {
+    return "next";
+  }
   return scenario.startTarget;
 }
 

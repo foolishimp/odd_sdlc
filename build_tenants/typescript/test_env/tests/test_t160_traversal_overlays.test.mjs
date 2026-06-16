@@ -26,7 +26,10 @@ import {
   FG_DECOMPOSE_DEPTH_BETWEEN_NODES,
   FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+  FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+  FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+  FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
   FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
   FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
   FG_PREPARE_TEST_EXECUTION_SURFACE,
@@ -254,6 +257,9 @@ test("T-160 lite overlay terminates on a bounded implementation edge", () => {
     [
       FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
       FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+      FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+      FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
+      FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
       FG_PREPARE_TEST_EXECUTION_SURFACE,
       FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
     ]
@@ -291,9 +297,12 @@ test("T-160 reduced implementation overlays publish tenant-neutral code and test
       [...templates.keys()].sort(),
       [
         "component_code_surface",
+        "component_test_surface",
         "implementation_design_surface",
+        "test_design_surface",
         "test_execution_result_surface",
-        "test_execution_surface"
+        "test_execution_surface",
+        "uat_test_source_surface"
       ].sort(),
       overlayRef
     );
@@ -305,6 +314,21 @@ test("T-160 reduced implementation overlays publish tenant-neutral code and test
     assert.equal(
       templates.get("implementation_design_surface")?.producerGraphFunctionRef,
       FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+      overlayRef
+    );
+    assert.equal(
+      templates.get("test_design_surface")?.producerGraphFunctionRef,
+      FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+      overlayRef
+    );
+    assert.equal(
+      templates.get("component_test_surface")?.producerGraphFunctionRef,
+      FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
+      overlayRef
+    );
+    assert.equal(
+      templates.get("uat_test_source_surface")?.producerGraphFunctionRef,
+      FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
       overlayRef
     );
     assert.equal(
@@ -365,12 +389,23 @@ test("T-160 framework-smoke Min(F_P) overlay terminates on test execution proof"
     [
       FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
       FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+      FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+      FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
+      FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
       FG_PREPARE_TEST_EXECUTION_SURFACE,
       FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
     ]
   );
   assert.equal(finalVector.name, FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE);
   assert.equal(finalVector.target.name, "test_execution_result_surface");
+  assert(
+    graph.vectors.findIndex((vector) => vector.name === FG_DERIVE_LITE_COMPONENT_TEST_SURFACE) <
+      graph.vectors.findIndex((vector) => vector.name === FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE)
+  );
+  assert(
+    graph.vectors.findIndex((vector) => vector.name === FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE) <
+      graph.vectors.findIndex((vector) => vector.name === FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE)
+  );
 
   const catalog = constructSdlcTraversalOverlayCatalog({ module });
   const overlay = catalog.overlays.find(

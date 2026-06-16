@@ -12,7 +12,6 @@ import path, {
   SdlcWorkerHandoffManifest
 } from "../carriers.js";import {
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
-  FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
 } from "../../graph/index.js";import {
   admitComponentDepthRegisterFromArtifact
@@ -143,8 +142,7 @@ function productMaterializationHasExecutionRepairScope(input: {
     return true;
   }
   return (
-    (input.edgeName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET ||
-      input.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE) &&
+    input.edgeName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET &&
     input.targetAssetType === "component_code_surface" &&
     input.productMaterialization.required &&
     declaredExecutionContract(input.productMaterialization.testExecutionContract)
@@ -1833,10 +1831,7 @@ function componentCodeSurfaceConsumesDesignFileTargetRole(input: {
   if (normalizedRole === "source" || normalizedRole === "build_config") {
     return true;
   }
-  return (
-    input.manifest.graphFunctionName === FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE &&
-    normalizedRole === "test"
-  );
+  return false;
 }
 
 function designAssetAuthorityTargetsFor(
@@ -2043,6 +2038,8 @@ function targetsForCurrentMaterializationEdge(input: {
           manifest: input.manifest,
           target
         }) &&
+        (input.manifest.targetAssetType !== "component_code_surface" ||
+          target.requiredRole !== "test") &&
         (input.manifest.targetAssetType !== "component_test_surface" ||
           target.requiredRole === "test" ||
           target.requiredRole === "build_config")

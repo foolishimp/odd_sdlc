@@ -13,7 +13,6 @@ import {
   fileURLToPath,
   pathToFileURL
 } from "node:url";import {
-  FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_CONFORM_PROJECT_AUTHORITY,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
 } from "../../../graph/index.js";import {
@@ -214,8 +213,7 @@ function productMaterializationHasExecutionRepairScope(input: {
     return true;
   }
   return (
-    (input.edgeName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET ||
-      input.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE) &&
+    input.edgeName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET &&
     input.targetAssetType === "component_code_surface" &&
     input.productMaterialization.required &&
     declaredExecutionContract(input.productMaterialization.testExecutionContract)

@@ -128,8 +128,7 @@ function productMaterializationHasExecutionRepairScope(input: {
     return true;
   }
   return (
-    (input.edgeName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET ||
-      input.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE) &&
+    input.edgeName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET &&
     input.targetAssetType === "component_code_surface" &&
     input.productMaterialization.required &&
     declaredExecutionContract(input.productMaterialization.testExecutionContract)
@@ -892,7 +891,7 @@ export function outcomeDirectivesForWorker(
           : "For component_code_surface, materialize implementation/source files for each source-role declared component and record Component Realization Register evidence. Do not create test files, test component rows, repair schedules, or execution evidence on this edge."
       );
       directives.push(
-        "For component_code_surface, force depth by iterating between the smallest admitted UAT/scenario probe, the declared build/test command or execution shard, and source repair. Capture command logs under allowed write roots, repair source/build_config from observed failures, and rerun until the probe passes or the remaining blocker is an external tool/cache/environment failure.",
+        "For component_code_surface, force depth by iterating between admitted source/design authority, source/build_config repair, and source-local syntax or build probes. Do not create, modify, or execute test files on this edge; generated tests and test execution are owned by downstream test graph functions.",
         "Do not report a requirement as behavior-fulfilled merely because it is mapped to a component_depth_register row, lineage tag, manifest entry, or worker obligation assessment. Public behavior must be accountable to a source boundary plus scenario/build-test/evaluator evidence, or else be carried as explicit downstream pressure."
       );
       if (
@@ -903,12 +902,11 @@ export function outcomeDirectivesForWorker(
           "Treat the admitted design-depth evaluator register as the highest implementation-design semantic pressure; read construction_brief.stagePressure.designDepthEvaluatorRegisterRefs before source edits.",
           "Use its source-role fileTargetRows/componentRealizationRows as source targets; if absent, report missing admitted design pressure.",
           "For each source-role realization, materialize or repair the named source file and carry componentId, publicBoundary, requirementIds, source tags, and target-carrier component trace rows.",
-      "For each supporting build_config or test product target declared by admitted design authority, embed or mirror the same active requirement ids in file-native comments when legal and target-carrier rows when that supporting file participates in the proof contract.",
+      "For each supporting build_config product target declared by admitted design authority, embed or mirror the same active requirement ids in file-native comments when legal and target-carrier rows when that supporting file participates in the proof contract. Role=test targets are downstream component_test_surface authority, not component_code_surface materialization.",
       "If accepted authority says a source target is an executable, script, program, CLI, service entrypoint, or must print/emit/respond when run, connect the product behavior to that source file's runtime entrypoint. An exported helper that only works when called by a test does not satisfy executable product materialization.",
-      "Before writing or repairing source/test files, read the tenant stack authority surface, accepted design/ADR refs, declared product file targets, and declared execution contracts. If those inputs conflict, use the stack reconciliation protocol; do not change tenant-stack authority from an untested local assumption.",
-      "Tenant stack authority must match the product files actually emitted. If source syntax, test syntax, module/runtime system, build tool, or test runner differs from the seeded stack authority, repair the tenant stack authority or product files instead of documenting a local override in prose.",
-      "Pre-return syntax check: every emitted source, test, and build/config product file must use the language, module/import system, file extension, test framework, and command shape declared by tenant stack authority. Do not mix incompatible source/test module syntaxes inside one tenant.",
-      "When admitted design authority puts role=test product targets in this component-code materialization edge, treat those tests as proof materialization for this edge: run the declared test execution contract from the tenant root before returning, and repair any syntax/runtime mismatch first.",
+      "Before writing or repairing source/build_config files, read the tenant stack authority surface, accepted design/ADR refs, declared product file targets, and declared execution contracts. If those inputs conflict, use the stack reconciliation protocol; do not change tenant-stack authority from an untested local assumption.",
+      "Tenant stack authority must match the product files actually emitted. If source syntax, module/runtime system, or build tool differs from the seeded stack authority, repair the tenant stack authority or product files instead of documenting a local override in prose.",
+      "Pre-return syntax check: every emitted source and build/config product file must use the language, module/import system, file extension, and command shape declared by tenant stack authority. Do not write test files from component_code_surface.",
       "Do not satisfy multiple accepted component rows by collapsing them back into one coarse facade unless the admitted register gives that shared-component rationale."
     );
   }
@@ -925,8 +923,8 @@ export function outcomeDirectivesForWorker(
       }
       if (manifest.graphFunctionName !== FG_MATERIALIZE_DECLARED_PRODUCT_ASSET) {
         directives.push(
-          "For product files under an admitted runtime/module-system authority, emit source and test syntax that conforms to that authority or repair the authority before materialization. Do not create a language-specific compatibility exception inside component code.",
-          "If the declared test command fails because emitted test files use a different module/import/test syntax than tenant stack authority, repair the product files before returning instead of leaving the mismatch for evaluator discovery."
+          "For product files under an admitted runtime/module-system authority, emit source/build_config syntax that conforms to that authority or repair the authority before materialization. Do not create a language-specific compatibility exception inside component code.",
+          "If test command or generated-test syntax pressure is visible while authoring component_code_surface, carry it as downstream test/build pressure unless the source or build_config authority itself must change."
         );
       }
     }

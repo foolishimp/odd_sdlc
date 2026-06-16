@@ -28,6 +28,8 @@ import {
   deriveSdlcPostCloseOverlayContinuationActionInput,
   deriveSdlcEdgeClosureDecision,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+  FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
+  FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
   FG_GRAPH_CODE_BUILDER,
   constructWorkerInvocationPackage,
   deriveWorkerHandoffManifest,
@@ -228,13 +230,21 @@ test("T-203 code-builder paths are explicit profiles without confused fallback r
     "derive_component_code_surface",
     "derive_component_test_surface",
     "derive_uat_test_source_surface",
-    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+    FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
+    FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE
   ].sort());
 
-  assert.equal(
-    catalogEntry(catalog, FG_DERIVE_LITE_COMPONENT_CODE_SURFACE).graphTrackPublication,
-    "overlay_only"
-  );
+  for (const liteBuilderName of [
+    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+    FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
+    FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE
+  ]) {
+    assert.equal(
+      catalogEntry(catalog, liteBuilderName).graphTrackPublication,
+      "overlay_only"
+    );
+  }
   assert.equal(
     catalogEntry(catalog, "derive_component_code_surface").graphTrackPublication,
     "default"
@@ -244,11 +254,31 @@ test("T-203 code-builder paths are explicit profiles without confused fallback r
     "default"
   );
   assert.equal(
-    builderEdges.filter((entry) => entry.outputs.includes("component_test_surface")).length,
+    builderEdges.filter((entry) =>
+      entry.outputs.includes("component_test_surface") &&
+      entry.graphTrackPublication === "default"
+    ).length,
     1
   );
   assert.equal(
-    builderEdges.filter((entry) => entry.outputs.includes("uat_test_source_surface")).length,
+    builderEdges.filter((entry) =>
+      entry.outputs.includes("uat_test_source_surface") &&
+      entry.graphTrackPublication === "default"
+    ).length,
+    1
+  );
+  assert.equal(
+    builderEdges.filter((entry) =>
+      entry.outputs.includes("component_test_surface") &&
+      entry.graphTrackPublication === "overlay_only"
+    ).length,
+    1
+  );
+  assert.equal(
+    builderEdges.filter((entry) =>
+      entry.outputs.includes("uat_test_source_surface") &&
+      entry.graphTrackPublication === "overlay_only"
+    ).length,
     1
   );
   assert.equal(

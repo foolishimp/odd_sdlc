@@ -1213,6 +1213,51 @@ export function observeProductMaterializationDeltaWithDiagnostics(
     ) {
       continue;
     }
+    const changed = beforeByPath.get(file.relativePath)?.digest !== file.digest;
+    const requiredRoles = deps.effectiveProductMaterializationRequiredRoles(
+      input.manifest
+    );
+    const unexpectedChangedRole = (() => {
+      if (!input.manifest.productMaterialization.required || !changed) {
+        return null;
+      }
+      const looksLikeTest = relativePathLooksLikeTestMaterialization(normalized);
+      if (
+        looksLikeTest &&
+        !requiredRoles.includes("test")
+      ) {
+        return "test";
+      }
+      if (
+        !looksLikeTest &&
+        relativePathLooksLikeSourceMaterialization(normalized) &&
+        !requiredRoles.includes("source")
+      ) {
+        return "source";
+      }
+      return null;
+    })();
+    if (unexpectedChangedRole !== null) {
+      addDiagnostics(diagnosticsByKey, [
+        Object.freeze({
+          kind: "sdlc_worker_result_materialization_diagnostic" as const,
+          code: "materialized_product_role_policy_mismatch" as const,
+          detail:
+            `Changed product file ${file.relativePath} looks like role ${unexpectedChangedRole}, ` +
+            `but edge ${input.manifest.edgeName} requires roles ` +
+            `${requiredRoles.join(",") || "<none>"}.`,
+          evidenceRefs: Object.freeze([pathToFileURL(file.absolutePath).href])
+        })
+      ]);
+      continue;
+    }
+    const changedFileMatchesRequiredMaterializationRole =
+      input.manifest.productMaterialization.required &&
+      changed &&
+      ((relativePathLooksLikeTestMaterialization(normalized) &&
+        requiredRoles.includes("test")) ||
+        (relativePathLooksLikeSourceMaterialization(normalized) &&
+          requiredRoles.includes("source")));
     const declaredProductRole =
       deps.declaredProductAuthorityRoleForObservedFile({
         manifest: input.manifest,
@@ -1227,7 +1272,8 @@ export function observeProductMaterializationDeltaWithDiagnostics(
       deps.isTenantDeclaredToolByproductRelativePath({
         manifest: input.manifest,
         normalizedRelativePath: normalized
-      })
+      }) &&
+      !changedFileMatchesRequiredMaterializationRole
     ) {
       continue;
     }
@@ -1243,7 +1289,6 @@ export function observeProductMaterializationDeltaWithDiagnostics(
     ) {
       continue;
     }
-    const changed = beforeByPath.get(file.relativePath)?.digest !== file.digest;
     const priorAdmitted =
       input.manifest.productMaterialization.required && !changed
         ? priorAdmittedMaterializedFileForObservedFile({
@@ -1320,12 +1365,6 @@ export function observeProductMaterializationDeltaWithDiagnostics(
       file,
       deps
     });
-    if (!changed && !input.manifest.productMaterialization.required) {
-      continue;
-    }
-    if (!changed && !satisfiesRequiredRole) {
-      continue;
-    }
     const materialized = materializedFileWithTargetCarrierAnnotation({
       file: materializedFileFromObservedFile({
         manifest: input.manifest,
@@ -1335,6 +1374,30 @@ export function observeProductMaterializationDeltaWithDiagnostics(
       annotations: targetCarrierAnnotations,
       deps
     });
+    if (
+      input.manifest.productMaterialization.required &&
+      changed &&
+      !satisfiesRequiredRole
+    ) {
+      addDiagnostics(diagnosticsByKey, [
+        Object.freeze({
+          kind: "sdlc_worker_result_materialization_diagnostic" as const,
+          code: "materialized_product_role_policy_mismatch" as const,
+          detail:
+            `Changed product file ${file.relativePath} has role ${materialized.role}, ` +
+            `but edge ${input.manifest.edgeName} requires roles ` +
+            `${deps.effectiveProductMaterializationRequiredRoles(input.manifest).join(",") || "<none>"}.`,
+          evidenceRefs: Object.freeze([pathToFileURL(file.absolutePath).href])
+        })
+      ]);
+      continue;
+    }
+    if (!changed && !input.manifest.productMaterialization.required) {
+      continue;
+    }
+    if (!changed && !satisfiesRequiredRole) {
+      continue;
+    }
     if (
       changed ||
       deps.effectiveProductMaterializationRequiredRoles(input.manifest).includes(

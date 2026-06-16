@@ -142,8 +142,8 @@ The first implementation targets these overlay edges:
 | `overlay://odd-sdlc/current-full-traversal` | every selected full traversal graph function | `same_edge_retry`, `gap_stop`, `non_admit` | generic baseline; no depth declaration |
 | `overlay://odd-sdlc/current-full-traversal` | `derive_component_code_surface`, `qualify_component_realization_surface`, `derive_code_surface`, `derive_test_design_surface`, `derive_component_test_surface`, `derive_uat_test_source_surface`, `prepare_test_execution_surface`, `derive_test_execution_result_surface`, `qualify_component_test_execution_surface`, `derive_component_repair_schedule_surface`, `derive_test_run_archive_surface` | `ticket_traversal` | route only through `asset:ticket/...`, `ticket-route:...`, `graph-function:route_ticket_work_item`, or `published-traversal-target:...`; never direct `.ai-workspace/tickets` storage |
 | `overlay://odd-sdlc/deep-sdlc-traversal` | the same code/test/review pressure functions | `depth_traversal`, `ticket_traversal`, `same_edge_retry`, `gap_stop`, `non_admit` | depth requires `Fg_decompose_depth_between_nodes`, the deep overlay annotation ref, selected graph-function/vector refs, and refinement/candidate/published traversal-target authority |
-| `overlay://odd-sdlc/lite-design-module-implementation` | `lite_design_module_implementation`, `derive_lite_design_adr_surface`, `derive_lite_component_code_surface`, `prepare_test_execution_surface`, `derive_test_execution_result_surface` | `same_edge_retry`, `graph_span_reentry`, `public_start_reentry`, `ticket_traversal`, `gap_stop`, `non_admit` | repair re-entry is limited to declared test-execution-failed routes; public-start re-entry is limited to declared continuation into current-full |
-| `overlay://odd-sdlc/framework-smoke-min-fp` | `framework_smoke_min_fp`, `derive_lite_design_adr_surface`, `derive_lite_component_code_surface`, `prepare_test_execution_surface`, `derive_test_execution_result_surface` | `same_edge_retry`, `graph_span_reentry`, `gap_stop`, `non_admit` | repair re-entry is limited to the declared test-execution-failed route; no depth declaration |
+| `overlay://odd-sdlc/lite-design-module-implementation` | `lite_design_module_implementation`, `derive_lite_design_adr_surface`, `derive_lite_component_code_surface`, `derive_lite_test_design_surface`, `derive_lite_component_test_surface`, `derive_lite_uat_test_source_surface`, `prepare_test_execution_surface`, `derive_test_execution_result_surface` | `same_edge_retry`, `graph_span_reentry`, `public_start_reentry`, `ticket_traversal`, `gap_stop`, `non_admit` | repair re-entry is limited to declared test-execution-failed routes; public-start re-entry is limited to declared continuation into current-full |
+| `overlay://odd-sdlc/framework-smoke-min-fp` | `framework_smoke_min_fp`, `derive_lite_design_adr_surface`, `derive_lite_component_code_surface`, `derive_lite_test_design_surface`, `derive_lite_component_test_surface`, `derive_lite_uat_test_source_surface`, `prepare_test_execution_surface`, `derive_test_execution_result_surface` | `same_edge_retry`, `graph_span_reentry`, `gap_stop`, `non_admit` | repair re-entry is limited to the declared test-execution-failed route; no depth declaration |
 | `overlay://odd-sdlc/ticket-workflow` | `route_ticket_work_item` | `same_edge_retry`, `public_start_reentry`, `gap_stop`, `non_admit` | this is the product route after ticket traversal selection; it does not recursively create tickets |
 | `overlay://odd-sdlc/bootstrap-requirements` | `Fg_conform_project`, `bootstrap_requirements` | `same_edge_retry`, `public_start_reentry`, `gap_stop`, `non_admit` | public-start re-entry is limited to declared next-eligible overlays |
 | `overlay://odd-sdlc/solution-architecture` | `solution_architecture` | `same_edge_retry`, `public_start_reentry`, `gap_stop`, `non_admit` | public-start re-entry is limited to declared next-eligible overlays |
@@ -157,10 +157,12 @@ identity or as part of an admitted graph-function/re-entry/zoom authority.
 T-203 narrows the code/test section of the overlay to one solution path.
 `derive_component_code_surface`, `derive_component_test_surface`,
 `derive_uat_test_source_surface`, and the overlay-scoped
-`derive_lite_component_code_surface` are target profiles of
-`Fg_graph_code_builder`. The lite profile is allowed only on the lite/smoke
-overlays named below; it is not a fallback path for full-traversal source or
-test materialization.
+`derive_lite_component_code_surface`, `derive_lite_component_test_surface`,
+and `derive_lite_uat_test_source_surface` are target profiles of
+`Fg_graph_code_builder`. `derive_lite_test_design_surface` is the proportional
+lite test-authority producer that feeds those lite test-builder profiles. The
+lite profile is allowed only on the lite/smoke overlays named below; it is not
+a fallback path for full-traversal source or test materialization.
 
 ```text
 requirements + design + tenant authority
@@ -196,6 +198,24 @@ non-closure because downstream test execution would not consume it.
 Existing confused paths that treat component tests as a later proof side effect
 are retired. Any implementation that preserves a parallel source/test
 materialization route outside `Fg_graph_code_builder` is non-closure.
+
+Proportionality is expressed by matching graph functions, not by skipping the
+facet. A lite/smoke traversal may use overlay-only lite graph functions, but it
+still carries the same semantic facets before execution fan-in:
+
+```text
+derive_lite_design_adr_surface
+  -> derive_lite_component_code_surface
+  -> derive_lite_test_design_surface
+  -> derive_lite_component_test_surface
+  -> derive_lite_uat_test_source_surface
+  -> prepare_test_execution_surface
+  -> derive_test_execution_result_surface
+```
+
+If a future profile does not materialize generated tests, it must publish
+preserved test pressure as a no-close/projection outcome. It must not claim
+test execution proof by jumping from source code directly to command execution.
 
 ### Runtime Steel-Thread Dependency Window
 

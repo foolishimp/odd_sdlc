@@ -64,6 +64,12 @@ export const FG_DERIVE_LITE_DESIGN_ADR_SURFACE =
   "derive_lite_design_adr_surface" as const;
 export const FG_DERIVE_LITE_COMPONENT_CODE_SURFACE =
   "derive_lite_component_code_surface" as const;
+export const FG_DERIVE_LITE_TEST_DESIGN_SURFACE =
+  "derive_lite_test_design_surface" as const;
+export const FG_DERIVE_LITE_COMPONENT_TEST_SURFACE =
+  "derive_lite_component_test_surface" as const;
+export const FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE =
+  "derive_lite_uat_test_source_surface" as const;
 export const FG_PREPARE_TEST_EXECUTION_SURFACE =
   "prepare_test_execution_surface" as const;
 export const FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE =
@@ -94,6 +100,9 @@ export const SOLUTION_ARCHITECTURE_EXECUTIVE_STEPS = Object.freeze([
 export const LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE_STEPS = Object.freeze([
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+  FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+  FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
+  FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
   FG_PREPARE_TEST_EXECUTION_SURFACE,
   FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
 ] as const);
@@ -101,6 +110,9 @@ export const LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE_STEPS = Object.freeze([
 export const FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE_STEPS = Object.freeze([
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+  FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+  FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
+  FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
   FG_PREPARE_TEST_EXECUTION_SURFACE,
   FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
 ] as const);
@@ -538,6 +550,32 @@ export const LITE_FUNCTION_CATALOG = Object.freeze([
     inputs: ["implementation_design_surface"],
     outputs: ["component_code_surface"],
     workCategoryGovernanceCategory: "coding_build",
+    graphTrackPublication: "overlay_only",
+    specializesGraphFunction: FG_GRAPH_CODE_BUILDER
+  }),
+  entry({
+    name: FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+    intent: "Derive proportional test-design authority for a bounded lite/smoke slice from the lite implementation design carrier before generated tests or execution proof.",
+    inputs: ["implementation_design_surface"],
+    outputs: ["test_design_surface"],
+    workCategoryGovernanceCategory: "unit_test_build",
+    graphTrackPublication: "overlay_only"
+  }),
+  entry({
+    name: FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
+    intent: "Materialize proportional unit/component test source through the graph-code-builder contract for a bounded lite/smoke implementation slice.",
+    inputs: ["implementation_design_surface", "test_design_surface"],
+    outputs: ["component_test_surface"],
+    workCategoryGovernanceCategory: "unit_test_build",
+    graphTrackPublication: "overlay_only",
+    specializesGraphFunction: FG_GRAPH_CODE_BUILDER
+  }),
+  entry({
+    name: FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
+    intent: "Materialize proportional UAT executable test source through the graph-code-builder contract for a bounded lite/smoke implementation slice.",
+    inputs: ["implementation_design_surface", "test_design_surface"],
+    outputs: ["uat_test_source_surface"],
+    workCategoryGovernanceCategory: "unit_test_build",
     graphTrackPublication: "overlay_only",
     specializesGraphFunction: FG_GRAPH_CODE_BUILDER
   })

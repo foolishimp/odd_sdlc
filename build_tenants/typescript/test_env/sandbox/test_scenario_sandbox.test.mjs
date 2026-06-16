@@ -285,19 +285,20 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
   );
   assert.deepEqual(
     jsZoom.expectations.firstHandoffOverlayRef,
-    "overlay://odd-sdlc/deep-sdlc-traversal"
+    "overlay://odd-sdlc/framework-smoke-min-fp"
   );
   assert.deepEqual(jsZoom.expectations.handoffEdgeSequencePrefix, [
-    ...T132_HELLO_WORLD_JS_DEEP_CODE_TEST_EDGES
+    ...T132_HELLO_WORLD_JS_MIN_FP_EDGES
   ]);
   assert.deepEqual(
     jsZoom.expectations.latestArchiveJsonAssertions[0].equals
       .overlayZoomGraphFunctionRefs,
-    ["Fg_decompose_depth_between_nodes"]
+    []
   );
-  assert(
+  assert.deepEqual(
     jsZoom.expectations.latestArchiveJsonAssertions[0].equals
-      .overlayZoomTargetGraphFunctionRefs.includes("derive_component_code_surface")
+      .overlayZoomTargetGraphFunctionRefs,
+    []
   );
   assert(
     jsZoom.expectations.latestArchiveJsonAssertions[0].equals
@@ -306,9 +307,12 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
   assert(t133HelloWorldRustLiveScenario({ worker }).maxAdvances >= 16);
   const jsLite = t160HelloWorldJsLiteLiveScenario({ worker });
   assert.deepEqual(jsLite.startTarget, "overlay:lite-design-module-implementation");
-  assert(jsLite.maxAdvances <= 4);
+  assert(jsLite.maxAdvances >= 7);
   assert.deepEqual(jsLite.expectations.requiredHandoffEdges, [
     "derive_lite_component_code_surface",
+    "derive_lite_test_design_surface",
+    "derive_lite_component_test_surface",
+    "derive_lite_uat_test_source_surface",
     "prepare_test_execution_surface",
     "derive_test_execution_result_surface"
   ]);
@@ -334,6 +338,9 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
   );
   assert.deepEqual(rustServiceLive.expectations.requiredHandoffEdges, [
     "derive_lite_component_code_surface",
+    "derive_lite_test_design_surface",
+    "derive_lite_component_test_surface",
+    "derive_lite_uat_test_source_surface",
     "prepare_test_execution_surface",
     "derive_test_execution_result_surface"
   ]);
@@ -367,7 +374,7 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
   );
   assert.deepEqual(
     scenarioStartTargetForStep(parallelHelloLive, 2),
-    "overlay:lite-design-module-implementation"
+    "next"
   );
   assert(parallelHelloLive.maxAdvances >= 16);
   assert.deepEqual(
@@ -411,18 +418,24 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
     variant: "third_party_model_variant"
   });
   assert.deepEqual(mindforgeLive.startTarget, "overlay:lite-design-module-implementation");
-  assert(mindforgeLive.maxAdvances <= 4);
+  assert(mindforgeLive.maxAdvances >= 7);
   assert.deepEqual(
     mindforgeLive.expectations.handoffEdgeSequencePrefix,
     [
       "derive_lite_design_adr_surface",
       "derive_lite_component_code_surface",
+      "derive_lite_test_design_surface",
+      "derive_lite_component_test_surface",
+      "derive_lite_uat_test_source_surface",
       "prepare_test_execution_surface",
       "derive_test_execution_result_surface"
     ]
   );
   assert.deepEqual(mindforgeLive.expectations.requiredHandoffEdges, [
     "derive_lite_component_code_surface",
+    "derive_lite_test_design_surface",
+    "derive_lite_component_test_surface",
+    "derive_lite_uat_test_source_surface",
     "prepare_test_execution_surface",
     "derive_test_execution_result_surface"
   ]);
@@ -814,6 +827,30 @@ test("scenario sandbox: graph close stop requires no selected next action", () =
   });
 
   assert.equal(scenarioGraphCloseStopSatisfied(workspace), true);
+});
+
+test("scenario sandbox: overlay continuation uses admitted next target after public start", () => {
+  const scenario = {
+    startTarget: "overlay:deep-sdlc-traversal",
+    continueOnEdgeConverge: true
+  };
+
+  assert.equal(
+    scenarioStartTargetForStep(scenario, 0),
+    "overlay:deep-sdlc-traversal"
+  );
+  assert.equal(scenarioStartTargetForStep(scenario, 1), "next");
+  assert.equal(scenarioStartTargetForStep(scenario, 2), "next");
+  assert.equal(
+    scenarioStartTargetForStep(
+      {
+        ...scenario,
+        startTargetSequence: ["overlay:deep-sdlc-traversal", "graph_function:manual"]
+      },
+      1
+    ),
+    "graph_function:manual"
+  );
 });
 
 test("scenario sandbox: latest archive JSON assertions audit runtime decisions", () => {

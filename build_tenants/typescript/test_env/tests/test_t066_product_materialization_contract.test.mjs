@@ -5517,7 +5517,7 @@ test("T-164 lite component-code edge keeps multi-module product targets full-bre
   ]);
 });
 
-test("T-187 declared product targets outrank tenant tool-local directory rules", () => {
+test("T-187 component-code materialization excludes downstream test targets", () => {
   const workspace = makeWorkspace();
   writeFileSync(
     path.join(workspace, "specification/PRODUCT.md"),
@@ -5589,8 +5589,7 @@ test("T-187 declared product targets outrank tenant tool-local directory rules",
     runId: "t187-product-targets-outrank-tool-local-dirs"
   });
   assert.deepStrictEqual(declaredProductFileTargets(manifest), [
-    "build_tenants/hello_world_javascript/src/hello.js",
-    "build_tenants/hello_world_javascript/test/hello.test.js"
+    "build_tenants/hello_world_javascript/src/hello.js"
   ]);
   const before = snapshotProductMaterializationRoot(
     manifest.productMaterialization
@@ -5631,10 +5630,21 @@ test("T-187 declared product targets outrank tenant tool-local directory rules",
 
   assert.deepStrictEqual(
     report.materializedFiles.map((file) => [file.relativePath, file.role]),
-    [
-      ["src/hello.js", "source"],
-      ["test/hello.test.js", "test"]
-    ]
+    [["src/hello.js", "source"]]
+  );
+  assert.deepStrictEqual(
+    report.materializationDiagnostics.map((diagnostic) => diagnostic.code),
+    ["materialized_product_role_policy_mismatch"]
+  );
+  assert.match(
+    report.materializationDiagnostics[0].detail,
+    /test\/hello\.test\.js/u
+  );
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
+  assert.equal(postflight.status, "blocked");
+  assert(
+    postflight.blockingReasons.includes("materialized_product_role_policy_mismatch"),
+    JSON.stringify(postflight.blockingReasons)
   );
   assert.equal(
     report.obligationAssessments.find(

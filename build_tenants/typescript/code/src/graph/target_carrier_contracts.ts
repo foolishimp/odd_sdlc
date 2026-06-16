@@ -254,11 +254,14 @@ function constructionDepthRoleForEdge(edgeRef: string): SdlcTargetCarrierContrac
     case "derive_lite_design_adr_surface":
     case "derive_implementation_design_surface":
     case "derive_test_design_surface":
+    case "derive_lite_test_design_surface":
       return "staged_authority_producer";
     case "derive_lite_component_code_surface":
     case "derive_component_code_surface":
     case "derive_component_test_surface":
     case "derive_uat_test_source_surface":
+    case "derive_lite_component_test_surface":
+    case "derive_lite_uat_test_source_surface":
       return "staged_materialization_consumer";
     default:
       return "none";
@@ -274,6 +277,7 @@ function producedStagedAuthorityRefsForEdge(edgeRef: string): readonly string[] 
         "surface://module-dependency-map"
       ]);
     case "derive_test_design_surface":
+    case "derive_lite_test_design_surface":
       return Object.freeze([
         "surface://test-stack-profile",
         "surface://test-decomposition-summary",
@@ -309,10 +313,26 @@ function requiredStagedAuthorityRefsForEdge(edgeRef: string): readonly string[] 
         "surface://test-decomposition-summary",
         "surface://test-dependency-map"
       ]);
+    case "derive_lite_component_test_surface":
+      return Object.freeze([
+        "surface://tenant-stack-authority",
+        "surface://implementation-decomposition-summary",
+        "surface://module-dependency-map",
+        "surface://test-stack-profile",
+        "surface://test-decomposition-summary",
+        "surface://test-dependency-map"
+      ]);
     case "derive_uat_test_source_surface":
       return Object.freeze([
         "surface://tenant-stack-authority",
         "surface://testcase-authority",
+        "surface://test-stack-profile",
+        "surface://test-decomposition-summary",
+        "surface://test-dependency-map"
+      ]);
+    case "derive_lite_uat_test_source_surface":
+      return Object.freeze([
+        "surface://tenant-stack-authority",
         "surface://test-stack-profile",
         "surface://test-decomposition-summary",
         "surface://test-dependency-map"

@@ -7,7 +7,10 @@ import { fileURLToPath } from "node:url";
 
 import {
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+  FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+  FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+  FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
   FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
   FG_PREPARE_TEST_EXECUTION_SURFACE,
   FG_CONFORM_PROJECT,
@@ -43,6 +46,7 @@ export const T132_HELLO_WORLD_JS_FULL_LIFECYCLE_EDGES = Object.freeze([
   "derive_code_surface",
   "derive_test_design_surface",
   "derive_component_test_surface",
+  "derive_uat_test_source_surface",
   "prepare_test_execution_surface",
   "derive_test_execution_result_surface",
   "qualify_component_test_execution_surface",
@@ -55,6 +59,9 @@ export const T132_HELLO_WORLD_JS_FULL_LIFECYCLE_EDGES = Object.freeze([
 export const T132_HELLO_WORLD_JS_MIN_FP_EDGES = Object.freeze([
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+  FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+  FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
+  FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
   FG_PREPARE_TEST_EXECUTION_SURFACE,
   FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
 ]);
@@ -118,6 +125,9 @@ export function t132HelloWorldJsLiveScenario({
       handoffEdgeSequencePrefix: T132_HELLO_WORLD_JS_MIN_FP_EDGES,
       requiredHandoffEdges: [
         FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+        FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+        FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
+        FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
         FG_PREPARE_TEST_EXECUTION_SURFACE,
         FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
       ],
@@ -181,17 +191,18 @@ export function t132HelloWorldJsDeepSdlcZoomLiveScenario({
         "build_tenants/hello_world_javascript/src/hello.js",
         "build_tenants/hello_world_javascript/test/hello.test.js"
       ],
-      handoffEdgeSequencePrefix: T132_HELLO_WORLD_JS_DEEP_CODE_TEST_EDGES,
+      handoffEdgeSequencePrefix: T132_HELLO_WORLD_JS_MIN_FP_EDGES,
       requiredHandoffEdges: [
-        "derive_component_code_surface",
-        "derive_code_surface",
-        "derive_component_test_surface",
+        FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+        FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+        FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
+        FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
         "prepare_test_execution_surface",
         "derive_test_execution_result_surface"
       ],
-      edgeAssuranceArchiveSequencePrefix: T132_HELLO_WORLD_JS_DEEP_CODE_TEST_EDGES,
+      edgeAssuranceArchiveSequencePrefix: T132_HELLO_WORLD_JS_MIN_FP_EDGES,
       firstStartOverlayRef: "overlay://odd-sdlc/deep-sdlc-traversal",
-      firstHandoffOverlayRef: "overlay://odd-sdlc/deep-sdlc-traversal",
+      firstHandoffOverlayRef: "overlay://odd-sdlc/framework-smoke-min-fp",
       executionEvidence: {
         edgeName: FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
         status: "succeeded",
@@ -208,22 +219,9 @@ export function t132HelloWorldJsDeepSdlcZoomLiveScenario({
         {
           file: "handoff_manifest.json",
           equals: {
-            overlayRef: "overlay://odd-sdlc/deep-sdlc-traversal",
-            overlayZoomGraphFunctionRefs: [
-              "Fg_decompose_depth_between_nodes"
-            ],
-            overlayZoomTargetGraphFunctionRefs: [
-              "derive_component_code_surface",
-              "qualify_component_realization_surface",
-              "derive_code_surface",
-              "derive_test_design_surface",
-              "derive_component_test_surface",
-              "prepare_test_execution_surface",
-              "derive_test_execution_result_surface",
-              "qualify_component_test_execution_surface",
-              "derive_component_repair_schedule_surface",
-              "derive_test_run_archive_surface"
-            ]
+            overlayRef: "overlay://odd-sdlc/framework-smoke-min-fp",
+            overlayZoomGraphFunctionRefs: [],
+            overlayZoomTargetGraphFunctionRefs: []
           }
         }
       ],
