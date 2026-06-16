@@ -103,6 +103,9 @@ function selectedDependencyTraversalMethods(
       : []),
     ...(carriers.testDependencyTraversalSelection.status === "present"
       ? [carriers.testDependencyTraversalSelection.data.selectedMethod]
+      : []),
+    ...(carriers.uatTestDependencyTraversalSelection.status === "present"
+      ? [carriers.uatTestDependencyTraversalSelection.data.selectedMethod]
       : [])
   ]);
 }

@@ -40,7 +40,6 @@ import {
   materializeGraphFunction,
   runEngineIterateAsync,
   runtimeEventsForBasis,
-  runtimeEventsForFpTransformResult,
   type ActorInvocation,
   type CanonicalRuntimeEvent,
   type EnginePluginInput,
@@ -149,6 +148,9 @@ import {
   appendOddSdlcRuntimeEvents,
   oddSdlcRuntimeEventsPath
 } from "./event_store.js";
+import {
+  assertCurrentSdlcGtlProgramConformance
+} from "../gtl_conformance/program.js";
 import {
   deriveSdlcClosureStateTransition,
   makeSdlcClosureResidualPressureCarrier,
@@ -2352,6 +2354,13 @@ async function writeLiveFpParallelMaterializationFrontier(input: {
   readonly eventSink: (event: RuntimeEvent) => void;
 }): Promise<void> {
   if (input.manifest.edgeName !== "derive_component_code_surface") {
+    return;
+  }
+  if (
+    existsSync(
+      join(input.manifest.archiveRoot, "sdlc_live_fp_parallel_materialization_frontier.json")
+    )
+  ) {
     return;
   }
   const dependencyMap = moduleDependencyMapFromAuditCarriers(input.carriers);
@@ -5767,6 +5776,17 @@ async function runSdlcPostTransformDiagnosticFlow(input: {
       report: input.state.workerReport
     });
   }
+  if (input.state.manifest.edgeName === "derive_component_code_surface") {
+    await writeLiveFpParallelMaterializationFrontier({
+      basis: input.basis,
+      manifest: input.state.manifest,
+      carriers: deriveSdlcStagedConstructionAuditCarriers(
+        input.state.manifest,
+        input.fpEvaluatorAdmissionEvidenceRefs ?? Object.freeze([])
+      ),
+      eventSink: input.eventSink
+    });
+  }
   const postflight = evaluateSdlcComputeStage({
     manifest: input.state.manifest,
     report: input.state.workerReport,
@@ -6764,6 +6784,112 @@ export function deriveSdlcPostCloseOverlayContinuationActionInput(input: {
   });
 }
 
+export function deriveSdlcPostCloseNextEligibleOverlayActionInput(input: {
+  readonly module: Module;
+  readonly overlayRef: string | null;
+  readonly completedGraphFunctionRef: string;
+  readonly runRef: string;
+}): OddSdlcEvaluateNextActionInput | null {
+  if (input.overlayRef === null) {
+    return null;
+  }
+  const catalog = constructSdlcTraversalOverlayCatalog({
+    module: input.module
+  });
+  const overlay = resolveSdlcTraversalOverlay({
+    catalog,
+    overlayRef: input.overlayRef
+  });
+  if (overlay === null || overlay.termination.nextEligibleOverlayRefs.length === 0) {
+    return null;
+  }
+  const graphFunctionByNameLocal = (name: string) =>
+    input.module.graphFunctions.find((graphFunction) => graphFunction.name === name);
+  let completedTerminalVector:
+    | ReturnType<typeof materializeGraphFunction>["vectors"][number]
+    | undefined;
+  for (const terminalGraphFunctionRef of
+    overlay.termination.terminalGraphFunctionRefs) {
+    const graphFunction = graphFunctionByNameLocal(terminalGraphFunctionRef);
+    if (graphFunction === undefined) {
+      continue;
+    }
+    const vectors = materializeGraphFunction(graphFunction).vectors;
+    const terminalVector = vectors[vectors.length - 1];
+    if (
+      terminalVector !== undefined &&
+      (terminalVector.name === input.completedGraphFunctionRef ||
+        sdlcGraphVectorBoundaryRef(terminalVector) ===
+          input.completedGraphFunctionRef)
+    ) {
+      completedTerminalVector = terminalVector;
+      break;
+    }
+  }
+  if (completedTerminalVector === undefined) {
+    return null;
+  }
+  const nextOverlayRef = overlay.termination.nextEligibleOverlayRefs[0];
+  if (nextOverlayRef === undefined) {
+    return null;
+  }
+  const nextOverlay = resolveSdlcTraversalOverlay({
+    catalog,
+    overlayRef: nextOverlayRef
+  });
+  if (nextOverlay === null) {
+    return null;
+  }
+  const nextGraphFunction = graphFunctionByNameLocal(nextOverlay.defaultStartTarget);
+  if (nextGraphFunction === undefined) {
+    return null;
+  }
+  const nextGraphFunctionRef = sdlcGraphFunctionBoundaryRef(nextGraphFunction);
+  const nextGraph = materializeGraphFunction(nextGraphFunction);
+  const nextGraphVector = nextGraph.vectors[0];
+  if (nextGraphVector === undefined) {
+    return null;
+  }
+  const nextGraphVectorRef = sdlcGraphVectorBoundaryRef(nextGraphVector);
+  const publishedTraversalTargetRef = sdlcPublishedTraversalTargetRef({
+    graphFunctionRef: nextGraphFunctionRef,
+    graphVectorRef: nextGraphVectorRef
+  });
+  const targetOutcomeRef = sdlcTargetOutcomeRef({
+    graphFunctionRef: nextGraphFunctionRef,
+    targetNodeRef: nextGraphVector.target.id
+  });
+  return Object.freeze({
+    actionRef: [
+      "construction-action://odd-sdlc/post-action",
+      nextGraphFunctionRef,
+      "post_close_next_eligible_overlay",
+      encodeURIComponent(nextOverlay.overlayRef),
+      nextGraphVectorRef,
+      encodeURIComponent(input.runRef)
+    ].join("/"),
+    actionKind: "invoke_graph_function" as const,
+    graphFunctionRef: nextGraphFunctionRef,
+    graphVectorRef: nextGraphVectorRef,
+    publishedTraversalTargetRef,
+    targetOutcomeRef,
+    inputAssetRefs: Object.freeze([]),
+    expectedOutputAssetRefs: Object.freeze([targetOutcomeRef]),
+    requiredAuthorityRefs: Object.freeze([
+      publishedTraversalTargetRef,
+      nextOverlay.overlayRef
+    ]),
+    eligibleReasonRefs: Object.freeze([
+      "evaluate_next_post_close_next_eligible_overlay",
+      `overlay:${overlay.overlayRef}`,
+      `completed_vector:${sdlcGraphVectorBoundaryRef(completedTerminalVector)}`,
+      `next_overlay:${nextOverlay.overlayRef}`,
+      `next_graph:${nextGraphFunctionRef}`,
+      `next_vector:${nextGraphVectorRef}`
+    ])
+  });
+}
+
 export function deriveSdlcPostActionOverlayReentryActionInput(input: {
   readonly basis: ExecutionBasis;
   readonly module: Module;
@@ -7110,10 +7236,21 @@ function postActionCandidates(input: {
         completedGraphFunctionRef: input.completedGraphFunctionRef,
         runRef: input.runRef
       });
-    return Object.freeze(
+    const nextEligibleOverlayCandidate =
       overlayContinuationCandidate === null
-        ? []
-        : [overlayContinuationCandidate]
+        ? deriveSdlcPostCloseNextEligibleOverlayActionInput({
+            module: input.module,
+            overlayRef: input.activeOverlayRef,
+            completedGraphFunctionRef: input.completedGraphFunctionRef,
+            runRef: input.runRef
+          })
+        : null;
+    return Object.freeze(
+      overlayContinuationCandidate !== null
+        ? [overlayContinuationCandidate]
+        : nextEligibleOverlayCandidate === null
+          ? []
+          : [nextEligibleOverlayCandidate]
     );
   }
   if (
@@ -8046,9 +8183,7 @@ function deriveInstalledTraversalConsequence(input: {
   const overlayCatalog = constructSdlcTraversalOverlayCatalog({ module });
   const activeOverlayRef =
     input.start.executionContract?.overlayRef ?? input.state.manifest.overlayRef;
-  const completedGraphFunctionRef =
-    input.start.executionContract?.targetGraphFunction ??
-    input.state.manifest.edgeName;
+  const completedGraphFunctionRef = input.state.manifest.edgeName;
   const normalizedPostCloseVectorIndex = normalizePostCloseContinuationVectorIndex({
     closureDecisionDisposition: closureDecision.disposition,
     currentVectorIndex: input.state.manifest.vectorIndex,
@@ -8774,11 +8909,6 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
     emitted.push(event);
     input.eventSink?.(event);
   };
-  const emitRuntimeEvents = (events: readonly RuntimeEvent[]): void => {
-    for (const event of events) {
-      emitRuntimeEvent(event);
-    }
-  };
   const transport =
     input.workerTransport === null ? null : admitWorkerTransport(input.workerTransport);
   const executionContract = input.start.executionContract;
@@ -9307,17 +9437,10 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
         relativePath: "worker_result_report.json",
         payload: workerReport
       });
-      const fpTransformResult = writeWorkerFpTransformResult({
+      writeWorkerFpTransformResult({
         manifest,
         report: workerReport
       });
-      if (fpTransformResult !== null && manifest.fpTransformRequest !== null) {
-        emitRuntimeEvents(runtimeEventsForFpTransformResult({
-            basis,
-            request: manifest.fpTransformRequest,
-            result: fpTransformResult
-          }));
-      }
       return completeReportDispatch({
         workerRun,
         workerReport,
@@ -9932,6 +10055,58 @@ function runtimeEventArchiveScalar(
       return "resultRef" in event
         ? compactRuntimeEventScalar(event.resultRef)
         : undefined;
+    case "payloadRef":
+      return "payloadRef" in event
+        ? compactRuntimeEventScalar(event.payloadRef)
+        : undefined;
+    case "payloadClass":
+      return "payloadClass" in event
+        ? compactRuntimeEventScalar(event.payloadClass)
+        : undefined;
+    case "schemaRef":
+      return "schemaRef" in event
+        ? compactRuntimeEventScalar(event.schemaRef)
+        : undefined;
+    case "contractRef":
+      return "contractRef" in event
+        ? compactRuntimeEventScalar(event.contractRef)
+        : undefined;
+    case "contractDigest":
+      return "contractDigest" in event
+        ? compactRuntimeEventScalar(event.contractDigest)
+        : undefined;
+    case "digest":
+      return "digest" in event
+        ? compactRuntimeEventScalar(event.digest)
+        : undefined;
+    case "producerRef":
+      return "producerRef" in event
+        ? compactRuntimeEventScalar(event.producerRef)
+        : undefined;
+    case "sourceEventRef":
+      return "sourceEventRef" in event
+        ? compactRuntimeEventScalar(event.sourceEventRef)
+        : undefined;
+    case "actorInvocationId":
+      return "actorInvocationId" in event
+        ? compactRuntimeEventScalar(event.actorInvocationId)
+        : undefined;
+    case "authorityRef":
+      return "authorityRef" in event
+        ? compactRuntimeEventScalar(event.authorityRef)
+        : undefined;
+    case "inputDigest":
+      return "inputDigest" in event
+        ? compactRuntimeEventScalar(event.inputDigest)
+        : undefined;
+    case "validationRef":
+      return "validationRef" in event
+        ? compactRuntimeEventScalar(event.validationRef)
+        : undefined;
+    case "evidenceRef":
+      return "evidenceRef" in event
+        ? compactRuntimeEventScalar(event.evidenceRef)
+        : undefined;
     case "frameId":
       return "frameId" in event
         ? compactRuntimeEventScalar(event.frameId)
@@ -10020,12 +10195,25 @@ function compactRuntimeEventStringArray(
 function compactRuntimeEventArchivePayload(
   events: readonly RuntimeEvent[]
 ): Record<string, unknown> {
-  const projectedKeys = [
+    const projectedKeys = [
     "eventRef",
     "eventId",
     "basisRef",
     "decisionRef",
     "resultRef",
+    "payloadRef",
+    "payloadClass",
+    "schemaRef",
+    "contractRef",
+    "contractDigest",
+    "digest",
+    "producerRef",
+    "sourceEventRef",
+    "actorInvocationId",
+    "authorityRef",
+    "inputDigest",
+    "validationRef",
+    "evidenceRef",
     "frameId",
     "vectorIndex",
     "edgeName",
@@ -10340,7 +10528,12 @@ function compactRuntimeEventArchivePayload(
       emitted.push(event);
     },
     plugins: session.plugins,
-    maxAttachedFpAttempts: SDLC_ABG_ATTACHED_FP_MAX_RETRY_ATTEMPTS
+    maxAttachedFpAttempts:
+      input.start.executionContract.requestedUntil === "first_traversal"
+        ? 1
+        : SDLC_ABG_ATTACHED_FP_MAX_RETRY_ATTEMPTS,
+    pluginResultInterfaceCatalog:
+      assertCurrentSdlcGtlProgramConformance().pluginResultInterfaceCatalog
   });
   const completedDispatchState = session.dispatchState.current;
   if (completedDispatchState === null) {

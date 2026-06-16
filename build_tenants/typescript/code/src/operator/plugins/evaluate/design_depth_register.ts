@@ -14,6 +14,9 @@ import {
   admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity
 } from "./content_register.js";
 import { uniqueLocaleSorted as uniqueSorted } from "../../../shared/collections.js";
+import {
+  assertCurrentSdlcGtlProgramConformance
+} from "../../../gtl_conformance/program.js";
 
 export const DESIGN_DEPTH_FP_EVALUATOR_RULE_REF =
   "evaluation-rule://odd-sdlc/design-depth-register/fp" as const;
@@ -131,6 +134,129 @@ function contentRegisterExistsForRegisterPath(registerPath: string): boolean {
     dirname(registerPath)
   );
   return existsSync(contentRegisterPath) && statSync(contentRegisterPath).isFile();
+}
+
+function runtimeEventsPathForRegisterPath(registerPath: string): string {
+  return join(dirname(registerPath), "runtime_events.json");
+}
+
+function runtimeEventRecordsForRegisterPath(
+  registerPath: string
+): readonly Record<string, unknown>[] {
+  const runtimeEventsPath = runtimeEventsPathForRegisterPath(registerPath);
+  if (!existsSync(runtimeEventsPath) || !statSync(runtimeEventsPath).isFile()) {
+    return Object.freeze([]);
+  }
+  const raw: unknown = JSON.parse(readFileSync(runtimeEventsPath, "utf8"));
+  if (Array.isArray(raw)) {
+    return Object.freeze(raw.flatMap((event) => {
+      const record = objectRecord(event);
+      return record === null ? [] : [record];
+    }));
+  }
+  const archive = objectRecord(raw);
+  if (archive === null) {
+    return Object.freeze([]);
+  }
+  const events = archive["events"];
+  if (!Array.isArray(events)) {
+    return Object.freeze([]);
+  }
+  return Object.freeze(events.flatMap((event) => {
+    const record = objectRecord(event);
+    return record === null ? [] : [record];
+  }));
+}
+
+function designDepthPluginResultInterfaceContract(input: {
+  readonly compositionRef: string;
+  readonly compositionDigest: string;
+}): {
+  readonly resultInterfaceRef: string;
+  readonly resultEnvelopeContractRef: string;
+  readonly resultInterfaceContractDigest: string;
+} | null {
+  const report = assertCurrentSdlcGtlProgramConformance();
+  return report.pluginResultInterfaceCatalog.interfaces.find(
+    (contract) =>
+      contract.compositionRef === input.compositionRef &&
+      contract.compositionDigest === input.compositionDigest &&
+      contract.stageRole === "evaluate" &&
+      contract.computeMeans === "F_P" &&
+      contract.outputCarrierRefs.includes("SdlcDesignDepthRegister")
+  ) ?? null;
+}
+
+function admittedPluginResultEnvelopeEvidenceRefsForRegisterPath(input: {
+  readonly registerPath: string;
+  readonly compositionRef: string;
+  readonly compositionDigest: string;
+}): readonly string[] {
+  const runtimeEventsPath = runtimeEventsPathForRegisterPath(input.registerPath);
+  const runtimeEventsRef = pathToFileURL(runtimeEventsPath).href;
+  const contentRegisterRef = contentRegisterRefForRegisterPath(input.registerPath);
+  const ruleOutcomeRef = pathToFileURL(
+    join(dirname(input.registerPath), DESIGN_DEPTH_FP_EVALUATOR_RULE_OUTCOME_FILE)
+  ).href;
+  const registerRef = pathToFileURL(input.registerPath).href;
+  const events = runtimeEventRecordsForRegisterPath(input.registerPath);
+  const expectedInterface = designDepthPluginResultInterfaceContract({
+    compositionRef: input.compositionRef,
+    compositionDigest: input.compositionDigest
+  });
+  if (expectedInterface === null) {
+    return Object.freeze([]);
+  }
+  const envelopePayloads = events.filter(
+    (event) =>
+      event["kind"] === "payload_observed" &&
+      event["payloadClass"] === "admitted_plugin_result_envelope" &&
+      typeof event["payloadRef"] === "string" &&
+      event["authorityRef"] === expectedInterface.resultInterfaceRef &&
+      event["contractRef"] === expectedInterface.resultEnvelopeContractRef
+  );
+  for (const envelope of envelopePayloads) {
+    const payloadRef = envelope["payloadRef"];
+    if (typeof payloadRef !== "string") {
+      continue;
+    }
+    const validated = events.some(
+      (event) =>
+        event["kind"] === "payload_validated" &&
+        event["payloadRef"] === payloadRef &&
+        event["contractRef"] === expectedInterface.resultEnvelopeContractRef &&
+        event["contractDigest"] ===
+          expectedInterface.resultInterfaceContractDigest
+    );
+    if (!validated) {
+      continue;
+    }
+    const envelopeEvidenceRefs = uniqueSorted(
+      events
+        .filter(
+          (event) =>
+            event["kind"] === "evidence_admitted" &&
+            event["payloadRef"] === payloadRef
+        )
+        .map((event) => event["evidenceRef"])
+        .filter((ref): ref is string => typeof ref === "string")
+    );
+    if (
+      !envelopeEvidenceRefs.includes(contentRegisterRef) ||
+      !envelopeEvidenceRefs.includes(ruleOutcomeRef)
+    ) {
+      continue;
+    }
+    return uniqueSorted([
+      runtimeEventsRef,
+      payloadRef,
+      contentRegisterRef,
+      registerRef,
+      ruleOutcomeRef,
+      ...envelopeEvidenceRefs
+    ]);
+  }
+  return Object.freeze([]);
 }
 
 function admitContentRegisterForRegisterPath(input: {
@@ -254,32 +380,30 @@ function selectedFpEvaluateResultEvidenceRefs(input: {
   if (!contentRegisterExistsForRegisterPath(input.registerPath)) {
     return Object.freeze([]);
   }
-  const fpEvaluateResultPath = join(dirname(input.registerPath), "fp_evaluate_result.json");
-  if (!existsSync(fpEvaluateResultPath) || !statSync(fpEvaluateResultPath).isFile()) {
-    return Object.freeze([]);
-  }
   try {
-    const record = parseOpenRecord(
-      JSON.parse(readFileSync(fpEvaluateResultPath, "utf8")),
-      "SdlcFpEvaluateResult"
+    const ruleOutcomeRecord = parseOpenRecord(
+      JSON.parse(
+        readFileSync(
+          join(
+            dirname(input.registerPath),
+            DESIGN_DEPTH_FP_EVALUATOR_RULE_OUTCOME_FILE
+          ),
+          "utf8"
+        )
+      ),
+      "DesignDepthFpEvaluatorRuleOutcome"
     );
-    if (
-      record["kind"] !== "sdlc_fp_evaluate_result" ||
-      record["stage"] !== "F_P.evaluate" ||
-      record["computeNotationStage"] !== "evaluate.C" ||
-      record["stageAuthority"] !== "typed_fp_stage_carriers" ||
-      record["postflightStatus"] !== "passed" ||
-      record["status"] === "blocked"
-    ) {
-      return Object.freeze([]);
-    }
-    const compositionRef = nonEmptyStringValue(record["compositionRef"]);
-    const compositionDigest = nonEmptyStringValue(record["compositionDigest"]);
+    const compositionRef = nonEmptyStringValue(
+      ruleOutcomeRecord["selectedCompositionRef"]
+    );
+    const compositionDigest = nonEmptyStringValue(
+      ruleOutcomeRecord["selectedCompositionDigest"]
+    );
     const compositionSelectionRef = nonEmptyStringValue(
-      record["compositionSelectionRef"]
+      ruleOutcomeRecord["selectedCompositionSelectionRef"]
     );
     const selectedRegimeBindingRef = nullableStringValue(
-      record["selectedRegimeBindingRef"]
+      ruleOutcomeRecord["selectedRegimeBindingRef"]
     );
     if (
       compositionRef === null ||
@@ -288,25 +412,13 @@ function selectedFpEvaluateResultEvidenceRefs(input: {
     ) {
       return Object.freeze([]);
     }
-    const selectedComposition = objectRecord(record["selectedComposition"]);
-    if (
-      selectedComposition === null ||
-      selectedComposition["compositionRef"] !== compositionRef ||
-      selectedComposition["compositionDigest"] !== compositionDigest ||
-      selectedComposition["compositionSelectionRef"] !== compositionSelectionRef ||
-      (selectedComposition["selectedRegimeBindingRef"] ?? null) !==
-        selectedRegimeBindingRef
-    ) {
-      return Object.freeze([]);
-    }
-    const findings = Array.isArray(record["findings"])
-      ? record["findings"]
-      : Object.freeze([]);
-    const topLevelEvidenceRefs = stringListFromUnknown(record["evidenceRefs"]);
-    if (!topLevelEvidenceRefs.includes(contentRegisterRef)) {
-      return Object.freeze([]);
-    }
-    if (!topLevelEvidenceRefs.includes(ruleOutcomeRef)) {
+    const admittedEnvelopeEvidenceRefs =
+      admittedPluginResultEnvelopeEvidenceRefsForRegisterPath({
+        registerPath: input.registerPath,
+        compositionRef,
+        compositionDigest
+      });
+    if (admittedEnvelopeEvidenceRefs.length === 0) {
       return Object.freeze([]);
     }
     const evaluationRuleOutcomeEvidenceRefs =
@@ -324,67 +436,19 @@ function selectedFpEvaluateResultEvidenceRefs(input: {
       selectedCompositionRef: compositionRef,
       selectedCompositionDigest: compositionDigest,
       selectedCompositionSelectionRef: compositionSelectionRef,
-      selectedRegimeBindingRef: nullableStringValue(
-        parseOpenRecord(
-          JSON.parse(
-            readFileSync(
-              join(
-                dirname(input.registerPath),
-                DESIGN_DEPTH_FP_EVALUATOR_RULE_OUTCOME_FILE
-              ),
-              "utf8"
-            )
-          ),
-          "DesignDepthFpEvaluatorRuleOutcome"
-        )["selectedRegimeBindingRef"]
-      )
+      selectedRegimeBindingRef
     });
     if (admittedContentRegisterEvidenceRefs.length === 0) {
       return Object.freeze([]);
     }
-    const matchingFindingRefs: string[] = [];
-    for (const finding of findings) {
-      const findingRecord = objectRecord(finding);
-      if (findingRecord === null) {
-        continue;
-      }
-      if (
-        findingRecord["compositionRef"] !== compositionRef ||
-        findingRecord["compositionDigest"] !== compositionDigest
-      ) {
-        continue;
-      }
-      const authorityRefs = stringListFromUnknown(findingRecord["authorityRefs"]);
-      const evidenceRefs = stringListFromUnknown(findingRecord["evidenceRefs"]);
-      const selectedEvidenceRefs = [
-        ...authorityRefs,
-        ...evidenceRefs,
-        ...topLevelEvidenceRefs
-      ];
-      if (
-        !selectedEvidenceRefs.includes(registerRef) ||
-        !selectedEvidenceRefs.includes(contentRegisterRef)
-      ) {
-        continue;
-      }
-      const findingRef = nonEmptyStringValue(findingRecord["findingRef"]);
-      if (findingRef !== null) {
-        matchingFindingRefs.push(findingRef);
-      }
-      matchingFindingRefs.push(...authorityRefs, ...evidenceRefs);
-    }
-    if (matchingFindingRefs.length === 0) {
-      return Object.freeze([]);
-    }
     return uniqueSorted([
-      pathToFileURL(fpEvaluateResultPath).href,
       contentRegisterRef,
       registerRef,
+      ruleOutcomeRef,
+      ...admittedEnvelopeEvidenceRefs,
       ...evaluationRuleOutcomeEvidenceRefs,
       ...admittedContentRegisterEvidenceRefs,
-      ...contentRegisterEvidenceRefs,
-      ...topLevelEvidenceRefs,
-      ...matchingFindingRefs
+      ...contentRegisterEvidenceRefs
     ]);
   } catch {
     return Object.freeze([]);

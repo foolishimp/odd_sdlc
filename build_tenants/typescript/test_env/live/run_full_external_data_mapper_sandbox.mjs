@@ -41,7 +41,8 @@ const DATA_MAPPER_RELEASE_SNAPSHOT_ROOT =
   process.env["ODD_SDLC_TS_DATA_MAPPER_RELEASE_SNAPSHOT_ROOT"] ?? "";
 const DATA_MAPPER_PACKAGE_SOURCE_ROOT =
   process.env["ODD_SDLC_TS_DATA_MAPPER_PACKAGE_SOURCE_ROOT"] ?? "";
-const WORKER_TRANSPORT = RUNTIME_POLICY.liveHarnessDataMapperWorkerTransport;
+const WORKER_TRANSPORT =
+  cliStringFlag("--worker") ?? RUNTIME_POLICY.liveHarnessDataMapperWorkerTransport;
 const DATA_MAPPER_WORKER_MINIMUM_OPERATOR_TIMEOUT_MS =
   process.env["ODD_SDLC_TS_DATA_MAPPER_WORKER_MINIMUM_OPERATOR_TIMEOUT_MS"] ??
   "60000";
@@ -62,10 +63,26 @@ const DATA_MAPPER_MAX_ADVANCES = Number.parseInt(
   process.env["ODD_SDLC_TS_DATA_MAPPER_MAX_ADVANCES"] ?? "80",
   10
 );
+const DATA_MAPPER_RETRY_YIELD_ATTEMPT_WINDOW = Number.parseInt(
+  process.env["ODD_SDLC_TS_DATA_MAPPER_RETRY_YIELD_ATTEMPT_WINDOW"] ?? "10",
+  10
+);
 const DATA_MAPPER_STOP_AFTER_DETAIL_ZOOM =
   process.env["ODD_SDLC_TS_DATA_MAPPER_STOP_AFTER_DETAIL_ZOOM"] !== "false";
 const DATA_MAPPER_EXERCISE_TERMINAL_GAP_TICKETS =
   process.env["ODD_SDLC_TS_DATA_MAPPER_EXERCISE_TERMINAL_GAP_TICKETS"] === "true";
+const DATA_MAPPER_RUNTIME_TRAVERSAL_STRATEGY =
+  process.env["ODD_SDLC_TS_DATA_MAPPER_RUNTIME_TRAVERSAL_STRATEGY"] ?? "";
+const DATA_MAPPER_RUNTIME_SELECTED_REFS =
+  process.env["ODD_SDLC_TS_DATA_MAPPER_RUNTIME_SELECTED_REFS"] ?? "";
+const DATA_MAPPER_RUNTIME_EDGE_REFS =
+  process.env["ODD_SDLC_TS_DATA_MAPPER_RUNTIME_EDGE_REFS"] ?? "";
+const DEFAULT_DATA_MAPPER_STEEL_THREAD_REQUIREMENT_REFS = Object.freeze([
+  "requirement://data-mapper/REQ-LDM-01",
+  "requirement://data-mapper/REQ-LDM-02",
+  "requirement://data-mapper/REQ-LDM-03",
+  "requirement://data-mapper/REQ-TYP-06"
+]);
 const DATA_MAPPER_DETAIL_ZOOM_EDGES = Object.freeze([
   "derive_component_code_surface",
   "qualify_component_realization_surface",
@@ -80,6 +97,28 @@ const DATA_MAPPER_DETAIL_ZOOM_EDGES = Object.freeze([
   "derive_test_run_archive_surface"
 ]);
 
+function cliStringFlag(flagName) {
+  const equalsPrefix = `${flagName}=`;
+  for (let index = 2; index < process.argv.length; index += 1) {
+    const arg = process.argv[index];
+    if (arg === flagName) {
+      const value = process.argv[index + 1];
+      if (value === undefined || value.startsWith("--")) {
+        throw new Error(`${flagName}: expected value`);
+      }
+      return value;
+    }
+    if (arg.startsWith(equalsPrefix)) {
+      const value = arg.slice(equalsPrefix.length);
+      if (value.length === 0) {
+        throw new Error(`${flagName}: expected value`);
+      }
+      return value;
+    }
+  }
+  return null;
+}
+
 function archiveTimestamp() {
   return new Date().toISOString().replaceAll("-", "").replaceAll(":", "").replace(".", "");
 }
@@ -87,6 +126,64 @@ function archiveTimestamp() {
 function writeJson(filePath, payload) {
   mkdirSync(dirname(filePath), { recursive: true });
   writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+}
+
+function commaSeparatedRefs(value) {
+  return Object.freeze(
+    value
+      .split(",")
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0)
+  );
+}
+
+function runtimeTraversalSelectionArgs(startTarget) {
+  if (DATA_MAPPER_RUNTIME_TRAVERSAL_STRATEGY.length === 0) {
+    return Object.freeze([]);
+  }
+  if (DATA_MAPPER_RUNTIME_TRAVERSAL_STRATEGY !== "steel_thread") {
+    throw new Error(
+      `unsupported ODD_SDLC_TS_DATA_MAPPER_RUNTIME_TRAVERSAL_STRATEGY=${DATA_MAPPER_RUNTIME_TRAVERSAL_STRATEGY}`
+    );
+  }
+  const selectedScheduleItemRefs =
+    DATA_MAPPER_RUNTIME_SELECTED_REFS.length === 0
+      ? DEFAULT_DATA_MAPPER_STEEL_THREAD_REQUIREMENT_REFS
+      : commaSeparatedRefs(DATA_MAPPER_RUNTIME_SELECTED_REFS);
+  if (selectedScheduleItemRefs.length === 0) {
+    throw new Error("runtime steel_thread selection requires selected refs");
+  }
+  const edgeRefs = commaSeparatedRefs(DATA_MAPPER_RUNTIME_EDGE_REFS);
+  const selection = {
+    kind: "start_runtime_traversal_strategy_selection",
+    selectionRef:
+      `selection://odd-sdlc/data-mapper/runtime-steel-thread/${encodeURIComponent(startTarget)}`,
+    strategyOwnerRef: "policy://odd-sdlc/runtime/steel-thread",
+    strategyLabel: "steel_thread",
+    enforcementPrimitives: [
+      "bounded_batch",
+      "ordered_schedule_prefix"
+    ],
+    selectedScheduleItemRefs,
+    basisRefs: [
+      "ticket://odd-sdlc/T-203",
+      startTarget
+    ],
+    ...(edgeRefs.length === 0 ? {} : { edgeRefs }),
+    batch: {
+      targetItemCount: selectedScheduleItemRefs.length,
+      maxItemCount: selectedScheduleItemRefs.length
+    },
+    continuation: {
+      sameEdgeUntil: "foldback_closed",
+      maxAttemptsWithoutNewSignal: 10,
+      maxTotalAttempts: 64
+    }
+  };
+  return Object.freeze([
+    "--runtime-traversal-selection",
+    JSON.stringify(selection)
+  ]);
 }
 
 function readJsonFile(filePath) {
@@ -548,6 +645,34 @@ function isOverlayStartTarget(startTarget) {
   return startTarget.startsWith("overlay:");
 }
 
+function graphFunctionStartTargetFromPostCloseOverlayActionRef(actionRef) {
+  if (typeof actionRef !== "string" || actionRef.length === 0) {
+    return null;
+  }
+  const marker = "/post_close_overlay_continuation/";
+  const markerIndex = actionRef.indexOf(marker);
+  if (markerIndex < 0) {
+    return null;
+  }
+  const remainder = actionRef.slice(markerIndex + marker.length);
+  const nextGraphFunctionRef = remainder.split("/")[0] ?? "";
+  if (nextGraphFunctionRef.length === 0) {
+    return null;
+  }
+  if (nextGraphFunctionRef.startsWith("graph_function:")) {
+    return nextGraphFunctionRef;
+  }
+  return `graph_function:${nextGraphFunctionRef}`;
+}
+
+function startNextLawfulAction(start) {
+  return start?.summary?.nextLawfulAction ?? start?.nextLawfulAction ?? null;
+}
+
+function runtimeTraversalSelectionEnabled() {
+  return DATA_MAPPER_RUNTIME_TRAVERSAL_STRATEGY.length > 0;
+}
+
 function abgStartArgs(startTarget) {
   return [
     "start",
@@ -572,42 +697,87 @@ function sdlcStartArgs(startTarget) {
     "--until",
     "first_traversal",
     "--worker",
-    WORKER_TRANSPORT
+    WORKER_TRANSPORT,
+    ...runtimeTraversalSelectionArgs(startTarget)
   ];
 }
 
 function startCommandForTarget(input) {
-  return isOverlayStartTarget(input.startTarget)
+  return isOverlayStartTarget(input.startTarget) ||
+    runtimeTraversalSelectionEnabled()
     ? input.installedCommand
     : input.genesisCommand;
 }
 
 function startArgsForTarget(startTarget) {
-  return isOverlayStartTarget(startTarget)
+  return isOverlayStartTarget(startTarget) ||
+    runtimeTraversalSelectionEnabled()
     ? sdlcStartArgs(startTarget)
     : abgStartArgs(startTarget);
 }
 
 function startLabelForTarget(startTarget) {
-  return isOverlayStartTarget(startTarget)
+  return isOverlayStartTarget(startTarget) ||
+    runtimeTraversalSelectionEnabled()
     ? "odd-sdlc-start-first-traversal"
     : "abg-start-until-converged";
 }
 
-function nextGraphFunctionStartTargetFromStart(start) {
+function nextGraphFunctionStartTargetFromStart(start, currentStartTarget) {
+  const postCloseOverlayActionStartTarget =
+    graphFunctionStartTargetFromPostCloseOverlayActionRef(startNextLawfulAction(start));
   const nextActionProjection =
     start?.traversalConsequence?.nextActionProjection ??
-    start?.start?.executionContract?.nextActionProjection ??
     start?.nextActionProjection ??
+    start?.start?.executionContract?.nextActionProjection ??
     null;
   if (nextActionProjection?.choosesNextTraversal !== true) {
-    return null;
+    return postCloseOverlayActionStartTarget;
+  }
+  const selectedPostCloseOverlayStartTarget =
+    graphFunctionStartTargetFromPostCloseOverlayActionRef(
+      nextActionProjection.selectedActionRef
+    );
+  if (
+    nextActionProjection.overlayStopDisposition === "overlay_segment_complete" &&
+    typeof nextActionProjection.selectedActionRef === "string" &&
+    nextActionProjection.selectedActionRef.includes(
+      "post_close_next_eligible_overlay"
+    ) &&
+    Array.isArray(nextActionProjection.nextEligibleOverlayRefs)
+  ) {
+    const nextEligibleOverlayRef = nextActionProjection.nextEligibleOverlayRefs
+      .find((ref) => typeof ref === "string" && ref.startsWith("overlay://"));
+    if (nextEligibleOverlayRef !== undefined) {
+      return nextEligibleOverlayRef;
+    }
   }
   const nextGraphFunctionRef = nextActionProjection.nextGraphFunctionRef;
   if (typeof nextGraphFunctionRef !== "string" || nextGraphFunctionRef.length === 0) {
-    return null;
+    return selectedPostCloseOverlayStartTarget ?? postCloseOverlayActionStartTarget;
   }
-  return `graph_function:${nextGraphFunctionRef}`;
+  if (
+    nextGraphFunctionRef.startsWith("graph_function:") ||
+    nextGraphFunctionRef.startsWith("overlay:") ||
+    nextGraphFunctionRef.startsWith("asset:")
+  ) {
+    return nextGraphFunctionRef;
+  }
+  if (
+    typeof nextActionProjection.selectedActionRef === "string" &&
+    nextActionProjection.selectedActionRef.includes(
+      "post_close_overlay_continuation"
+    )
+  ) {
+    return selectedPostCloseOverlayStartTarget ?? `graph_function:${nextGraphFunctionRef}`;
+  }
+  if (
+    isOverlayStartTarget(currentStartTarget) ||
+    graphFunctionFromStartTarget(currentStartTarget) !== null
+  ) {
+    return currentStartTarget;
+  }
+  return null;
 }
 
 function unwrapStartPayload(parsed, label) {
@@ -722,6 +892,32 @@ function startBlockingReasons(start) {
   return Array.isArray(directReasons) ? directReasons : [];
 }
 
+function startClosureDisposition(start) {
+  return (
+    start?.summary?.admittedSemantic?.closureDisposition ??
+    start?.traversalConsequence?.edgeClosureDecision?.disposition ??
+    start?.edgeClosureDecision?.disposition ??
+    null
+  );
+}
+
+function isSameEdgeRetryStart(start) {
+  const closureDisposition = startClosureDisposition(start);
+  if (closureDisposition !== null) {
+    return closureDisposition === "retry";
+  }
+  return startBlockingReasons(start).some(
+    (reason) => reason?.lawfulReentryPoint === "same_edge_retry"
+  );
+}
+
+function shouldContinueSameEdgeRetry(start) {
+  return (
+    startBlockingReason(start) !== "retry_budget_exhausted" &&
+    isSameEdgeRetryStart(start)
+  );
+}
+
 function shouldRunTerminalGapTicketWorkflow(start) {
   const blockingReason = startBlockingReason(start);
   if (blockingReason === "retry_budget_exhausted") {
@@ -729,6 +925,9 @@ function shouldRunTerminalGapTicketWorkflow(start) {
   }
   const status = start?.status ?? start?.summary?.status ?? null;
   if (status !== "blocked") {
+    return false;
+  }
+  if (isSameEdgeRetryStart(start)) {
     return false;
   }
   if (
@@ -743,8 +942,7 @@ function shouldRunTerminalGapTicketWorkflow(start) {
     const code = reason?.code ?? null;
     return (
       reason?.lawfulReentryPoint === "triage_gap" ||
-      code === "review_grade_assessment_invalid" ||
-      code === "review_grade_edge_fulfillment_blocked"
+      code === "review_grade_assessment_invalid"
     );
   });
 }
@@ -994,11 +1192,19 @@ function sdlcOverlayStartLoop(input) {
   if (!Number.isInteger(DATA_MAPPER_MAX_ADVANCES) || DATA_MAPPER_MAX_ADVANCES < 1) {
     throw new TypeError("ODD_SDLC_TS_DATA_MAPPER_MAX_ADVANCES must be a positive integer");
   }
+  if (
+    !Number.isInteger(DATA_MAPPER_RETRY_YIELD_ATTEMPT_WINDOW) ||
+    DATA_MAPPER_RETRY_YIELD_ATTEMPT_WINDOW < 1
+  ) {
+    throw new TypeError(
+      "ODD_SDLC_TS_DATA_MAPPER_RETRY_YIELD_ATTEMPT_WINDOW must be a positive integer"
+    );
+  }
   const starts = [];
   let terminalStart = null;
   let terminalReason = "sdlc_overlay_max_advances_reached";
-  let lastGraphFunctionName = null;
-  let sameGraphFunctionAfterConverge = 0;
+  let lastTraversalProgressKey = null;
+  let sameTraversalProgressKeyAfterClose = 0;
   let currentStartTarget = input.startTarget;
   for (let step = 0; step < DATA_MAPPER_MAX_ADVANCES; step += 1) {
     const label = `odd-sdlc-start-first-traversal-${String(step + 1).padStart(3, "0")}`;
@@ -1018,12 +1224,21 @@ function sdlcOverlayStartLoop(input) {
     writeJson(path.join(input.archiveRoot, "run_summary.json"), input.summary);
     terminalStart = start;
 
+    const retryContinuation = shouldContinueSameEdgeRetry(start);
+    const nextStartTarget = retryContinuation
+      ? null
+      : nextGraphFunctionStartTargetFromStart(start, currentStartTarget);
+
     if (detailZoomStopSatisfied(input.workspace)) {
       terminalReason = "sdlc_reported_detail_zoom_edges";
       break;
     }
 
-    if (!isSuccessfulSdlcTraversalStart(start)) {
+    if (
+      !isSuccessfulSdlcTraversalStart(start) &&
+      !retryContinuation &&
+      nextStartTarget === null
+    ) {
       terminalReason = terminalReasonFromStart(start);
       break;
     }
@@ -1037,18 +1252,34 @@ function sdlcOverlayStartLoop(input) {
       start?.summary?.graphFunctionName ??
       start?.start?.executionContract?.targetGraphFunction ??
       null;
-    if (graphFunctionName !== null && graphFunctionName === lastGraphFunctionName) {
-      sameGraphFunctionAfterConverge += 1;
-      if (sameGraphFunctionAfterConverge >= 2) {
-        terminalReason = `sdlc_overlay_no_progress:${graphFunctionName}`;
+    const traversalProgressKey = [
+      graphFunctionName,
+      start?.summary?.currentEdge ?? start?.edge ?? null,
+      start?.summary?.nextLawfulAction ?? null
+    ]
+      .filter((value) => typeof value === "string" && value.length > 0)
+      .join(":");
+    if (
+      traversalProgressKey.length > 0 &&
+      traversalProgressKey === lastTraversalProgressKey
+    ) {
+      sameTraversalProgressKeyAfterClose += 1;
+      if (
+        sameTraversalProgressKeyAfterClose >=
+        DATA_MAPPER_RETRY_YIELD_ATTEMPT_WINDOW
+      ) {
+        terminalReason = `sdlc_retry_yield_window_exhausted:${traversalProgressKey}`;
         break;
       }
     } else {
-      sameGraphFunctionAfterConverge = 0;
+      sameTraversalProgressKeyAfterClose = 0;
     }
-    lastGraphFunctionName = graphFunctionName;
+    lastTraversalProgressKey = traversalProgressKey;
 
-    const nextStartTarget = nextGraphFunctionStartTargetFromStart(start);
+    if (retryContinuation) {
+      continue;
+    }
+
     if (nextStartTarget !== null) {
       currentStartTarget = nextStartTarget;
     } else if (isSuccessfulSdlcTraversalStart(start)) {
@@ -1095,7 +1326,8 @@ function main() {
   };
   const summary = {
     kind: "odd_sdlc_full_external_data_mapper_sandbox_run",
-    commandBinding: isOverlayStartTarget(START_TARGET)
+    commandBinding: isOverlayStartTarget(START_TARGET) ||
+      runtimeTraversalSelectionEnabled()
       ? "odd_sdlc_cli_overlay_start_first_traversal"
       : "abg_cli_start_until_converged",
     archiveRoot,
@@ -1116,6 +1348,7 @@ function main() {
     startTarget: START_TARGET,
     targetGraphFunction: TARGET_GRAPH_FUNCTION,
     maxAdvances: DATA_MAPPER_MAX_ADVANCES,
+    retryYieldAttemptWindow: DATA_MAPPER_RETRY_YIELD_ATTEMPT_WINDOW,
     stopAfterDetailZoomEdges: DATA_MAPPER_STOP_AFTER_DETAIL_ZOOM,
     exerciseTerminalGapTickets: DATA_MAPPER_EXERCISE_TERMINAL_GAP_TICKETS,
     requiredDetailZoomEdges: DATA_MAPPER_DETAIL_ZOOM_EDGES,
@@ -1178,7 +1411,8 @@ function main() {
   summary.abgConformProject = conformStart;
   writeJson(path.join(archiveRoot, "run_summary.json"), summary);
 
-  const startResult = isOverlayStartTarget(START_TARGET)
+  const startResult = isOverlayStartTarget(START_TARGET) ||
+    runtimeTraversalSelectionEnabled()
     ? sdlcOverlayStartLoop({
         startTarget: START_TARGET,
         installedCommand,

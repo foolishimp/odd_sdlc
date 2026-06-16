@@ -197,6 +197,33 @@ Existing confused paths that treat component tests as a later proof side effect
 are retired. Any implementation that preserves a parallel source/test
 materialization route outside `Fg_graph_code_builder` is non-closure.
 
+### Runtime Steel-Thread Dependency Window
+
+Steel-thread is a runtime traversal strategy over admitted SDLC dependency
+assets, not a static overlay or GTL module rebuild profile.
+
+The SDLC side resolves the product meaning:
+
+```text
+starting requirement or dependency node
+  -> admitted module/test/UAT dependency maps
+  -> predecessor-closed dependency window
+  -> requirement refs + dependency-node refs + required progress artifacts
+  -> StartIntent.runtimeTraversalSelections[]
+```
+
+The selected window answers "implement req-04 with the prerequisite rows needed
+for the coherent MVP thread." Full breadth remains the graph-frontier fanout
+over all admitted ready rows. Steel-thread does not mean a second graph, a
+local controller, or an overlay-specific runtime loop.
+
+The ABG side owns the admitted runtime envelope. Once SDLC supplies the
+runtime start selection, ABG owns traversal facts, retry/yield/backoff,
+replay-visible continuation, and any later consequence-selected traversal.
+SDLC may interpret dependency maps and choose the selected refs; it must not
+move graph cursors, emit runtime events, or continue locally from the selected
+window.
+
 ### Consequence.C Contract
 
 The SDLC consequence plugin is the product policy selector. It is not route
@@ -230,7 +257,7 @@ write ledgers, close work, or fall back to a local family switch.
 
 ### T-202 Implementation State
 
-The substrate pin is resolved by ABG `4.0.0-rc.21`, which carries T-156 and
+The substrate pin is resolved by ABG `4.0.0-rc.29`, which carries T-156 and
 static GTL annotation validation.
 
 The TypeScript tenant now lowers SDLC overlay policy into ABG T-156 GTL

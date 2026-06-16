@@ -86,6 +86,9 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "staged_decomposition_rejected",
   "staged_dependency_map_missing",
   "staged_dependency_traversal_blocked",
+  "code_builder_parallel_frontier_missing",
+  "code_builder_parallel_test_lanes_missing",
+  "code_builder_validation_command_failed",
   "next_action_projection_graph_vector_missing",
   "legacy_graph_function_boundary_ref",
   "unknown_graph_function_boundary_ref",
@@ -446,6 +449,16 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       lawfulReentryPoint: "reprice_requirement_or_design",
       message:
         "Staged construction authority does not admit the downstream materialization edge."
+    });
+  }
+  if (code.startsWith("code_builder_")) {
+    return Object.freeze({
+      reasonClass: code === "code_builder_validation_command_failed"
+        ? "code_to_test"
+        : "topology",
+      lawfulReentryPoint: "same_edge_retry",
+      message:
+        "Code-builder source/test frontier evidence is incomplete for the selected traversal."
     });
   }
   if (

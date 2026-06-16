@@ -2,6 +2,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import {
   mkdirSync,
   mkdtempSync,
@@ -51,6 +52,7 @@ import {
   admitImplementationDesignRegisterForManifest,
   designDepthFpEvaluatorRegisterPath
 } from "../../build/semantic/code/src/operator/plugins/evaluate/design_depth_register.js";
+import { evaluateSdlcComputeStage } from "../../build/semantic/code/src/operator/plugins/evaluate/postflight.js";
 
 const PACKAGE_ROOT = process.cwd();
 const REPO_ROOT = path.resolve(PACKAGE_ROOT, "../..");
@@ -114,7 +116,7 @@ test("T-200 compact review-grade prompt forbids null fulfillment binding fields"
   );
 });
 
-function manifestForEdge(workspaceRoot, edgeName, runId) {
+function manifestForEdge(workspaceRoot, edgeName, runId, overrides = {}) {
   const contract = hookContractByEdgeName(edgeName);
   return deriveWorkerHandoffManifest({
     workspaceRoot,
@@ -148,7 +150,8 @@ function manifestForEdge(workspaceRoot, edgeName, runId) {
       defaultsBundleRef: null,
       defaultsBundleDigest: null
     },
-    runId
+    runId,
+    ...overrides
   });
 }
 
@@ -215,6 +218,207 @@ function writeAssessment(manifest, assessment) {
   );
   writeFileSync(outputFile, `${JSON.stringify(assessment, null, 2)}\n`, "utf8");
   return outputFile;
+}
+
+function digest(text) {
+  return `sha256:${createHash("sha256").update(text).digest("hex")}`;
+}
+
+function componentCodeReport(manifest, options = {}) {
+  const outputContent = options.outputContent ?? "# Component Code Surface\n";
+  mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+  writeFileSync(manifest.outputFile, outputContent, "utf8");
+  const sourceRelativePath =
+    options.sourceRelativePath ?? "src/main/scala/example/Component.scala";
+  const sourcePath = path.join(
+    manifest.productMaterialization.tenantRoot,
+    sourceRelativePath
+  );
+  const sourceContent =
+    options.sourceContent ??
+    [
+      "// requirement: data_mapper.stage_10_generated_bootstrap.req_ldm_001",
+      "object Component { def run: String = \"ok\" }",
+      ""
+    ].join("\n");
+  mkdirSync(path.dirname(sourcePath), { recursive: true });
+  writeFileSync(sourcePath, sourceContent, "utf8");
+  const evidenceRefs = [
+    pathToFileURL(manifest.outputFile).href,
+    pathToFileURL(sourcePath).href
+  ];
+  return {
+    kind: "odd_sdlc.worker_result_report",
+    projectionRole: "typed_fp_stage_projection",
+    authoritativeStageResultRef: pathToFileURL(manifest.outputFile).href,
+    graphFunctionName: manifest.graphFunctionName,
+    edgeName: manifest.edgeName,
+    targetAssetType: manifest.targetAssetType,
+    outputFile: manifest.outputFile,
+    digest: digest(outputContent),
+    summary: "synthetic fulfilled component-code report",
+    unresolvedReasons: [],
+    materializedFiles: [
+      {
+        kind: "sdlc_materialized_product_file",
+        role: "source",
+        relativePath: sourceRelativePath,
+        absolutePath: sourcePath,
+        digest: digest(sourceContent),
+        byteCount: Buffer.byteLength(sourceContent, "utf8"),
+        materializationSource: "current_attempt"
+      }
+    ],
+    materializationDiagnostics: [],
+    executionEvidence: null,
+    executionEvidenceErrors: [],
+    obligationAssessments: manifest.traversalObligationContext.obligations.map(
+      (obligation) => ({
+        kind: "sdlc_worker_obligation_assessment",
+        obligationId: obligation.obligationId,
+        fulfillmentStatus: "fulfilled",
+        evidenceRefs,
+        blockingReasons: []
+      })
+    )
+  };
+}
+
+function writeInvocationPackageScope(manifest, inlineObligationIds) {
+  mkdirSync(manifest.archiveRoot, { recursive: true });
+  writeFileSync(
+    path.join(manifest.archiveRoot, "worker_invocation_package.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_worker_invocation_package",
+        inlineObligationIds
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+}
+
+function writeValidCodeBuilderFrontier(manifest) {
+  mkdirSync(manifest.archiveRoot, { recursive: true });
+  writeFileSync(
+    path.join(
+      manifest.archiveRoot,
+      "sdlc_live_fp_parallel_materialization_frontier.json"
+    ),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_live_fp_parallel_materialization_frontier",
+        edgeName: "derive_component_code_surface",
+        executionAuthority: "abg_evented_saga_frontier",
+        parallelismControl: "abg_branch_execution_policy",
+        graphTruthSource: "sdlc_feature_dependency_dag",
+        selectedMethod: "parallel",
+        dependencyMapRef: "dependency-map://t182/dev",
+        testDependencyMapRef: "dependency-map://t182/component-test",
+        uatTestDependencyMapRef: "dependency-map://t182/uat-test",
+        dependencyMapRefs: [
+          "dependency-map://t182/dev",
+          "dependency-map://t182/component-test",
+          "dependency-map://t182/uat-test"
+        ],
+        traversalSelectionRef: "traversal-selection://t182/dev",
+        testTraversalSelectionRef: "traversal-selection://t182/component-test",
+        uatTestTraversalSelectionRef: "traversal-selection://t182/uat-test",
+        traversalSelectionRefs: [
+          "traversal-selection://t182/dev",
+          "traversal-selection://t182/component-test",
+          "traversal-selection://t182/uat-test"
+        ],
+        dagRef: "dag://t182/code-builder",
+        startNodes: ["node://t182/app"],
+        frontierRef: "frontier://t182/code-builder",
+        policyRef: "policy://t182/parallel-code-builder",
+        laneCount: 3,
+        devLaneCount: 1,
+        componentTestLaneCount: 1,
+        uatTestLaneCount: 1,
+        testLaneCount: 2,
+        fanInCount: 1,
+        batchCount: 1,
+        batchSizes: [3],
+        maxActive: 3,
+        readyBranchRefs: [
+          "branch://t182/dev",
+          "branch://t182/component-test",
+          "branch://t182/uat-test"
+        ],
+        compiledReadyBranchRefs: [
+          "branch://t182/dev",
+          "branch://t182/component-test",
+          "branch://t182/uat-test"
+        ],
+        completedBranchRefs: [
+          "branch://t182/dev",
+          "branch://t182/component-test",
+          "branch://t182/uat-test"
+        ],
+        failedBranchRefs: [],
+        writeTerritoryConflictRefs: [],
+        outputAllocationConflictRefs: [],
+        branchRows: [
+          {
+            branchRef: "branch://t182/dev",
+            branchKey: "dev",
+            nodeId: "node://t182/app",
+            laneKind: "dev",
+            workerProcessRef: "worker://t182/dev",
+            materializationTargetRefs: ["workspace://src/main/app"],
+            readRefs: ["workspace://requirements.md"],
+            writeTerritoryRefs: ["workspace://src/main/app"],
+            outputAllocationRefs: ["workspace://src/main/app"]
+          },
+          {
+            branchRef: "branch://t182/component-test",
+            branchKey: "component-test",
+            nodeId: "node://t182/app",
+            laneKind: "test",
+            workerProcessRef: "worker://t182/component-test",
+            materializationTargetRefs: ["workspace://src/test/app"],
+            readRefs: ["workspace://requirements.md"],
+            writeTerritoryRefs: ["workspace://src/test/app"],
+            outputAllocationRefs: ["workspace://src/test/app"]
+          },
+          {
+            branchRef: "branch://t182/uat-test",
+            branchKey: "uat-test",
+            nodeId: "node://t182/app",
+            laneKind: "test",
+            workerProcessRef: "worker://t182/uat-test",
+            materializationTargetRefs: ["workspace://src/uat/app"],
+            readRefs: ["workspace://requirements.md"],
+            writeTerritoryRefs: ["workspace://src/uat/app"],
+            outputAllocationRefs: ["workspace://src/uat/app"]
+          }
+        ],
+        fanInRows: [
+          {
+            branchRef: "branch://t182/fan-in",
+            nodeId: "node://t182/app",
+            predecessorBranchRefs: [
+              "branch://t182/dev",
+              "branch://t182/component-test",
+              "branch://t182/uat-test"
+            ],
+            materializationTargetRefs: ["workspace://src/main/app"],
+            payloadDigest: "sha256:t182-frontier"
+          }
+        ],
+        emittedEventKinds: ["branch_started", "branch_completed"],
+        emittedEventCount: 6,
+        replayEventCount: 6
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
 }
 
 function shallowImplementationDesignRegister(manifest) {
@@ -567,6 +771,7 @@ test("T-182 admits full review-grade findings and rejects missing or weak assess
       "export function main() { return 'hello'; }\n",
       "utf8"
     );
+    writeValidCodeBuilderFrontier(manifest);
 
     const acceptedPath = writeAssessment(manifest, reviewGradeAssessment(manifest));
     const accepted = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
@@ -579,6 +784,47 @@ test("T-182 admits full review-grade findings and rejects missing or weak assess
     assert.equal(
       accepted.assessment.findings[0].fulfillmentBinding.functionOrEntrypointRef,
       "entrypoint://t182/app-main"
+    );
+
+    const assessmentWithNullEvidencePlaceholders = reviewGradeAssessment(manifest);
+    const nullEvidencePath = writeAssessment(manifest, {
+      ...assessmentWithNullEvidencePlaceholders,
+      findings: assessmentWithNullEvidencePlaceholders.findings.map((finding, index) =>
+        index === 0
+          ? {
+              ...finding,
+              evidenceRefs: [null, ...finding.evidenceRefs, undefined],
+              acceptedAuthorityRefs: [null, ...finding.acceptedAuthorityRefs],
+              fulfillmentBinding: {
+                ...finding.fulfillmentBinding,
+                realizationEvidenceRefs: [
+                  null,
+                  ...finding.fulfillmentBinding.realizationEvidenceRefs
+                ],
+                testOrExecutionEvidenceRefs: [
+                  undefined,
+                  ...finding.fulfillmentBinding.testOrExecutionEvidenceRefs
+                ],
+                evidenceRefs: [null, ...finding.fulfillmentBinding.evidenceRefs]
+              }
+            }
+          : finding
+      ),
+      evidenceRefs: [null, ...assessmentWithNullEvidencePlaceholders.evidenceRefs]
+    });
+    const nullEvidenceAdmission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest,
+      outputFile: nullEvidencePath
+    });
+    assert.equal(nullEvidenceAdmission.status, "admitted");
+    assert.deepEqual(
+      nullEvidenceAdmission.assessment.findings[0].evidenceRefs,
+      accepted.assessment.findings[0].evidenceRefs
+    );
+    assert.deepEqual(
+      nullEvidenceAdmission.assessment.findings[0].fulfillmentBinding
+        .realizationEvidenceRefs,
+      accepted.assessment.findings[0].fulfillmentBinding.realizationEvidenceRefs
     );
 
     const dimensionPath = writeAssessment(
@@ -824,6 +1070,7 @@ test("T-182 admits full review-grade findings and rejects missing or weak assess
       "derive_component_code_surface",
       "t182-live-file-target-null-binding"
     );
+    writeValidCodeBuilderFrontier(rawFileTargetManifest);
     const rawBase = reviewGradeAssessment(rawFileTargetManifest);
     const rawRequirementFinding = rawBase.findings.find((finding) =>
       finding.obligationId.startsWith("requirement:")
@@ -1091,6 +1338,7 @@ test("T-150 derives review-grade fulfillment bindings from admitted GTL target c
       "t150-gtl-binding-derivation"
     );
     writeComponentCodeDepthTargetCarrier(manifest);
+    writeValidCodeBuilderFrontier(manifest);
 
     const base = reviewGradeAssessment(manifest);
     const assessmentWithoutPromptBindings = {
@@ -1152,6 +1400,7 @@ test("T-182 synthesizes missing fulfilled module review from component-depth chi
       "t182-module-coverage-synthesis"
     );
     writeComponentCodeDepthTargetCarrier(manifest);
+    writeValidCodeBuilderFrontier(manifest);
 
     const base = reviewGradeAssessment(manifest);
     const moduleObligationId = "module:app-core";
@@ -1206,6 +1455,7 @@ test("T-150 canonicalizes prompt-shaped review-grade bindings through admitted G
       "t150-gtl-binding-canonicalization"
     );
     writeComponentCodeDepthTargetCarrier(manifest);
+    writeValidCodeBuilderFrontier(manifest);
 
     const declaredRequirementRefs = new Set(
       manifest.traversalObligationContext.obligations
@@ -1333,6 +1583,10 @@ test("T-197 review-grade binding canonicalizes duplicate prompt evidence refs be
                   ...finding.fulfillmentBinding.realizationEvidenceRefs,
                   duplicateRef
                 ],
+                testOrExecutionEvidenceRefs: [
+                  ...finding.fulfillmentBinding.testOrExecutionEvidenceRefs,
+                  duplicateRef
+                ],
                 evidenceRefs: [
                   ...finding.fulfillmentBinding.evidenceRefs,
                   duplicateRef
@@ -1367,6 +1621,10 @@ test("T-197 review-grade binding canonicalizes duplicate prompt evidence refs be
     assert.equal(
       targetFinding.fulfillmentBinding.realizationEvidenceRefs.length,
       new Set(targetFinding.fulfillmentBinding.realizationEvidenceRefs).size
+    );
+    assert.equal(
+      targetFinding.fulfillmentBinding.testOrExecutionEvidenceRefs.length,
+      new Set(targetFinding.fulfillmentBinding.testOrExecutionEvidenceRefs).size
     );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
@@ -1524,6 +1782,93 @@ test("T-194 rejects SDLC-local review-grade fulfillment binding lookalikes", () 
   }
 });
 
+test("T-203 scoped review-grade admission uses invocation package inline obligations", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_code_surface",
+      "t203-scoped-review-grade"
+    );
+    const scopedManifest = {
+      ...manifest,
+      featureScope: {
+        kind: "sdlc_feature_scope",
+        scopeVersion: "ts-scope-v1",
+        mode: "steel_thread",
+        scopeRef: "scope://odd_sdlc/t203/review-grade-inline",
+        basisRefs: ["selection://odd-sdlc/t203/review-grade-inline"],
+        includedRequirementRefs: [],
+        includedModuleNames: [],
+        includedEntityIds: [],
+        includedOperationIds: [],
+        deferredModuleNames: []
+      }
+    };
+    const allObligationIds =
+      scopedManifest.traversalObligationContext.obligations.map(
+        (obligation) => obligation.obligationId
+      );
+    assert.ok(allObligationIds.length > 2);
+    const inlineObligationIds = allObligationIds.slice(0, 2);
+    writeInvocationPackageScope(scopedManifest, inlineObligationIds);
+    writeValidCodeBuilderFrontier(scopedManifest);
+
+    const base = reviewGradeAssessment(scopedManifest);
+    const scopedAssessment = {
+      ...base,
+      reviewedObligationIds: inlineObligationIds,
+      findings: base.findings.filter((finding) =>
+        inlineObligationIds.includes(finding.obligationId)
+      ),
+      summary:
+        "Only the invocation-package inline obligations are active for this scoped steel-thread review."
+    };
+    const outputFile = writeAssessment(scopedManifest, scopedAssessment);
+    const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest: scopedManifest,
+      outputFile
+    });
+
+    assert.equal(admission.status, "admitted");
+    assert.deepStrictEqual(
+      admission.assessment.reviewedObligationIds,
+      inlineObligationIds
+    );
+    assert.equal(
+      admission.blockingReasons.some((reason) =>
+        reason.includes("review_grade_obligation_unreviewed")
+      ),
+      false
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-203 scoped review-grade prompt makes inline obligations the only review scope", () => {
+  const source = readRepoFile(
+    "build_tenants/typescript/code/src/operator/plugins/evaluate/prompts.ts"
+  );
+
+  assert.match(
+    source,
+    /exactly invocationPackage\.inlineObligationIds and no worker aliases/u
+  );
+  assert.match(
+    source,
+    /active review scope is invocationPackage\.inlineObligationIds/u
+  );
+  assert.doesNotMatch(
+    source,
+    /It must include every obligationRef in the admitted edge packet above/u
+  );
+  assert.doesNotMatch(
+    source,
+    /reviewedObligationIds: every obligation id from worker_result_report\.obligationAssessments and invocation package inline obligations/u
+  );
+});
+
 test("T-182 admits blocked semantic review as retry pressure with required action", () => {
   const workspaceRoot = makeWorkspace();
   try {
@@ -1572,6 +1917,7 @@ test("T-182 component-code semantic depth is F_P review pressure, not F_D postfl
       "derive_component_code_surface",
       "t182-component-code-shallow-review"
     );
+    writeValidCodeBuilderFrontier(manifest);
     const base = reviewGradeAssessment(manifest);
     const blockedAssessment = {
       ...base,
@@ -2084,6 +2430,149 @@ test("T-188 component-code execution proof pressure is downstream, not retry chu
       }),
       []
     );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-203 component-code postflight blocks missing code/test frontier and failed validation log", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_code_surface",
+      "t203-code-builder-missing-frontier"
+    );
+    mkdirSync(manifest.archiveRoot, { recursive: true });
+    writeFileSync(
+      path.join(manifest.archiveRoot, "validation-test-component-code.log"),
+      "[error] Compilation failed\n",
+      "utf8"
+    );
+    const postflight = evaluateSdlcComputeStage({
+      manifest,
+      report: componentCodeReport(manifest)
+    });
+    const codes = postflight.blockingReasonCarriers.map((reason) => reason.code);
+
+    assert.equal(postflight.status, "blocked");
+    assert(codes.includes("code_builder_parallel_frontier_missing"));
+    assert(codes.includes("code_builder_validation_command_failed"));
+    assert(codes.includes("staged_authority_missing"));
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-203 review-grade blocks source-only component-code pass without frontier", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_code_surface",
+      "t203-review-grade-source-only-code"
+    );
+    mkdirSync(manifest.archiveRoot, { recursive: true });
+    writeComponentCodeDepthTargetCarrier(manifest);
+    const outputFile = writeAssessment(manifest, reviewGradeAssessment(manifest));
+
+    const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest,
+      outputFile
+    });
+
+    assert.equal(admission.status, "admitted");
+    assert.equal(admission.assessment.status, "blocked");
+    const targetFinding = admission.assessment.findings.find(
+      (finding) => finding.obligationId === "target_asset:component_code_surface"
+    );
+    assert.notEqual(targetFinding, undefined);
+    assert.equal(targetFinding.fulfillmentStatus, "blocked");
+    assert.equal(targetFinding.failureClass, "test_overlap_missing");
+    assert.match(targetFinding.requiredAction, /component-test, and UAT-test lanes/u);
+    assert.equal(
+      targetFinding.repairSurfaceTriage?.disposition,
+      "current_edge_repair"
+    );
+    assert(
+      reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+        runRef: "run://t203/review-grade-source-only-code",
+        targetAssetType: "component_code_surface",
+        assessment: admission.assessment
+      }).some((ref) => ref.includes("target_asset%3Acomponent_code_surface"))
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-203 review-grade frontier gate runs before component-depth admission", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_code_surface",
+      "t203-review-grade-frontier-before-depth-admission"
+    );
+    mkdirSync(manifest.archiveRoot, { recursive: true });
+    const outputFile = writeAssessment(manifest, reviewGradeAssessment(manifest));
+
+    const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest,
+      outputFile
+    });
+
+    assert.equal(admission.status, "admitted");
+    assert.equal(admission.assessment.status, "blocked");
+    const targetFinding = admission.assessment.findings.find(
+      (finding) => finding.obligationId === "target_asset:component_code_surface"
+    );
+    assert.notEqual(targetFinding, undefined);
+    assert.equal(targetFinding.fulfillmentStatus, "blocked");
+    assert.equal(targetFinding.failureClass, "test_overlap_missing");
+    assert.match(
+      targetFinding.rationale,
+      /code_builder_parallel_frontier_missing/u
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-203 component-code postflight requires source, component-test, and UAT frontier lanes", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_code_surface",
+      "t203-code-builder-empty-test-lanes"
+    );
+    mkdirSync(manifest.archiveRoot, { recursive: true });
+    writeFileSync(
+      path.join(
+        manifest.archiveRoot,
+        "sdlc_live_fp_parallel_materialization_frontier.json"
+      ),
+      `${JSON.stringify(
+        {
+          kind: "sdlc_live_fp_parallel_materialization_frontier",
+          devLaneCount: 2,
+          componentTestLaneCount: 0,
+          uatTestLaneCount: 0
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+    const postflight = evaluateSdlcComputeStage({
+      manifest,
+      report: componentCodeReport(manifest)
+    });
+    const codes = postflight.blockingReasonCarriers.map((reason) => reason.code);
+
+    assert.equal(postflight.status, "blocked");
+    assert(codes.includes("code_builder_parallel_test_lanes_missing"));
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
   }

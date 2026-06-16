@@ -36,7 +36,7 @@ test("T-194 typechecks the current production SDLC GTL inventory", () => {
     input.expectedCoverage.edgeClosureContractCount
   );
   assert.equal(input.expectedCoverage.promptAssetCount, 3);
-  assert.equal(input.expectedCoverage.pluginContractCount, 5);
+  assert.equal(input.expectedCoverage.pluginContractCount, 6);
   assert.ok(input.expectedCoverage.sourceIdentitySurfaceCount > 0);
   assert.ok(input.featureCoverageManifest.rows.length >= 26);
 });

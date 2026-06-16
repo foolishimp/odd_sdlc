@@ -513,6 +513,7 @@ export type {
 } from "./edge_gain_closure.js";
 
 export {
+  constructRuntimeSteelThreadSelectionFromDependencyWindow,
   deriveSdlcDecompositionSummary,
   deriveSdlcStagedImplementationTopologyAuthority,
   deriveSdlcStagedTestTopologyAuthority,
@@ -527,6 +528,7 @@ export type {
   SdlcDependencyTraversalSelectionInput,
   SdlcDependencyTraversalSelectionPolicy,
   SdlcDerivedTestDependencyMapInput,
+  SdlcRuntimeSteelThreadDependencyWindowInput,
   SdlcStagedImplementationTopologyAuthority,
   SdlcStagedTestTopologyAuthority
 } from "./decomposition_admission.js";
@@ -635,6 +637,7 @@ export {
 export {
   compactSdlcPriorGapDossiersForRetryContext,
   constructWorkerProcessFailurePostflight,
+  deriveSdlcPostCloseNextEligibleOverlayActionInput,
   deriveSdlcPostCloseOverlayContinuationActionInput,
   deriveSdlcPostActionOverlayReentryActionInput,
   deriveSdlcPostProductMaterializationActionInput,

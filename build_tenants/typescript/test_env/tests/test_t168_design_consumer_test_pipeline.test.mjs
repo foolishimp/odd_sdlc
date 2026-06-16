@@ -24,6 +24,7 @@ import {
   constructSdlcOverlaySegmentCompletion,
   constructSdlcTestPipelineCoAffirmationLedger,
   constructSdlcTraversalOverlayCatalog,
+  deriveSdlcPostCloseNextEligibleOverlayActionInput,
   deriveSdlcPostCloseOverlayContinuationActionInput,
   deriveSdlcEdgeClosureDecision,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
@@ -457,6 +458,33 @@ test("T-168 post-close overlay continuation carries full traversal into test lif
   assert.equal(
     testDesignAction.publishedTraversalTargetRef,
     "published-traversal-target://odd-sdlc/derive_test_design_surface/derive_test_design_surface"
+  );
+});
+
+test("T-168 lite segment close selects next eligible current-full overlay", () => {
+  const action = deriveSdlcPostCloseNextEligibleOverlayActionInput({
+    module: constructSdlcGtlModule(),
+    overlayRef: "overlay://odd-sdlc/lite-design-module-implementation",
+    completedGraphFunctionRef: "derive_test_execution_result_surface",
+    runRef: "file:///t168-lite-segment-complete"
+  });
+
+  assert(action);
+  assert.equal(action.actionKind, "invoke_graph_function");
+  assert.equal(action.graphFunctionRef, "derive_intent_surface");
+  assert(action.graphVectorRef);
+  assert(action.requiredAuthorityRefs.includes(
+    "overlay://odd-sdlc/current-full-traversal"
+  ));
+  assert(action.eligibleReasonRefs.includes(
+    "evaluate_next_post_close_next_eligible_overlay"
+  ));
+  assert(action.eligibleReasonRefs.includes(
+    "next_overlay:overlay://odd-sdlc/current-full-traversal"
+  ));
+  assert.match(
+    action.actionRef,
+    /post_close_next_eligible_overlay/u
   );
 });
 

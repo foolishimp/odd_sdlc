@@ -18,7 +18,8 @@ import {
 import type {
   ConstructionPriorityScheme,
   ExecutionBasis,
-  RuntimeEvent
+  RuntimeEvent,
+  StartRuntimeTraversalStrategySelection
 } from "@abiogenesis/typescript-tenant";
 import {
   admitSdlcGraphFunctionBoundaryRef,
@@ -71,6 +72,7 @@ import {
 } from "../operator/index.js";
 import {
   SDLC_PUBLIC_START_UNTIL_VALUES,
+  admitSdlcRuntimeTraversalSelections,
   projectSdlcWorkerAttachment,
   publicStartOnce,
   type SdlcPublicStartTargetKind,
@@ -157,6 +159,7 @@ export interface OddSdlcSpecMethodTraversalRequest {
   readonly until: SdlcPublicStartUntil;
   readonly workerTransport: string | null;
   readonly evaluatorPriorityEdge: string | null;
+  readonly runtimeTraversalSelections?: readonly StartRuntimeTraversalStrategySelection[];
 }
 
 export interface OddSdlcSpecMethodInstallRequest {
@@ -244,6 +247,7 @@ interface SpecMethodOptionReadModel {
   readonly until: SdlcPublicStartUntil;
   readonly workerTransport: string | null;
   readonly evaluatorPriorityEdge: string | null;
+  readonly runtimeTraversalSelections?: readonly StartRuntimeTraversalStrategySelection[];
 }
 
 interface SpecMethodInstallOptionReadModel {
@@ -492,6 +496,22 @@ function parseNonEmptyOptionValue(
   return value;
 }
 
+function parseJsonOptionValue(
+  argv: readonly string[],
+  index: number,
+  option: string
+): unknown {
+  const value = requireOptionValue(argv, index, option);
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed;
+  } catch (error: unknown) {
+    throw new TypeError(
+      `${option} requires valid JSON: ${error instanceof Error ? error.message : "parse failed"}`
+    );
+  }
+}
+
 function parseOptions(
   command: OddSdlcSpecMethodCommand,
   argv: readonly string[]
@@ -502,6 +522,7 @@ function parseOptions(
   let until: SdlcPublicStartUntil = "blocked";
   let workerTransport: string | null = null;
   let evaluatorPriorityEdge: string | null = null;
+  const runtimeTraversalSelectionInputs: unknown[] = [];
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--workspace") {
@@ -535,17 +556,40 @@ function parseOptions(
         "--evaluator-priority-edge"
       );
       index += 1;
+    } else if (token === "--runtime-traversal-selection") {
+      runtimeTraversalSelectionInputs.push(
+        parseJsonOptionValue(argv, index, token)
+      );
+      index += 1;
+    } else if (token === "--runtime-traversal-selections") {
+      const value = parseJsonOptionValue(argv, index, token);
+      if (!isUnknownArray(value)) {
+        throw new TypeError("--runtime-traversal-selections requires a JSON array");
+      }
+      for (const item of value) {
+        runtimeTraversalSelectionInputs.push(item);
+      }
+      index += 1;
     } else {
       throw new TypeError(`unknown option: ${token ?? ""}`);
     }
   }
+  const runtimeTraversalSelections = admitSdlcRuntimeTraversalSelections(
+    runtimeTraversalSelectionInputs.length === 0
+      ? undefined
+      : runtimeTraversalSelectionInputs,
+    "SpecMethod.runtimeTraversalSelections"
+  );
   return Object.freeze({
     workspaceRoot,
     outputWorkspaceRoot,
     target,
     until,
     workerTransport,
-    evaluatorPriorityEdge
+    evaluatorPriorityEdge,
+    ...(runtimeTraversalSelections === undefined
+      ? {}
+      : { runtimeTraversalSelections })
   });
 }
 
@@ -806,6 +850,12 @@ function parseTarget(rawTarget: string): OddSdlcSpecMethodTraversalRequest["targ
       handle: rawTarget.slice("asset:".length)
     });
   }
+  if (rawTarget.startsWith("overlay://")) {
+    return Object.freeze({
+      kind: "overlay",
+      handle: rawTarget
+    });
+  }
   if (rawTarget.startsWith("overlay:")) {
     return Object.freeze({
       kind: "overlay",
@@ -907,7 +957,10 @@ export function admitOddSdlcSpecMethodRequest(argv: readonly string[]): OddSdlcS
     target: parseTarget(options.target),
     until: options.until,
     workerTransport: options.workerTransport,
-    evaluatorPriorityEdge: options.evaluatorPriorityEdge
+    evaluatorPriorityEdge: options.evaluatorPriorityEdge,
+    ...(options.runtimeTraversalSelections === undefined
+      ? {}
+      : { runtimeTraversalSelections: options.runtimeTraversalSelections })
   });
 }
 
@@ -1726,6 +1779,9 @@ function startOutcomeFor(
       target,
       until: request.until,
       defaultRegime: defaultRegimeFor({ request, queryDomain }),
+      ...(request.runtimeTraversalSelections === undefined
+        ? {}
+        : { runtimeTraversalSelections: request.runtimeTraversalSelections }),
       ...(replayNextAction === undefined
         ? {}
         : {

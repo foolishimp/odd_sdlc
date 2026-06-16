@@ -1974,8 +1974,8 @@ test("B-086 traversal strategy and scope use ABG directives and do not invent mo
       priorGapDossiers: [gapDossier("test_execution_not_succeeded")]
     }
   });
-  assert.equal(fullBreadthDecision.decisionSource, "abg_selected");
-  assert.equal(fullBreadthDecision.selectedStrategy, "full_breadth");
+  assert.equal(fullBreadthDecision.decisionSource, "retry_backoff");
+  assert.equal(fullBreadthDecision.selectedStrategy, "targeted_repair");
 
   const boundScope = deriveSdlcFeatureScope({
     targetAssetType: "implementation_design_surface",

@@ -23,6 +23,8 @@ import {
 import {
   evaluateAdrOutputArtifact,
   evaluateExecutionEvidence,
+  evaluateCodeBuilderSourceTestFrontier,
+  evaluateCodeBuilderValidationLogs,
   evaluateMaterializedProductFiles,
   evaluateObligationAssessments,
   evaluateStagedConstructionAuthority,
@@ -53,6 +55,16 @@ function activeComputeStageBlockingReasonCarriers(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly blockingReasonCarriers: readonly SdlcBlockingReason[];
 }): readonly SdlcBlockingReason[] {
+  if (input.manifest.targetAssetType === "component_code_surface") {
+    return Object.freeze(
+      input.blockingReasonCarriers.filter(
+        (reason) =>
+          reason.code === "code_builder_parallel_frontier_missing" ||
+          reason.code === "code_builder_parallel_test_lanes_missing" ||
+          reason.code === "code_builder_validation_command_failed"
+      )
+    );
+  }
   if (input.manifest.targetAssetType !== "test_execution_result_surface") {
     return Object.freeze([]);
   }
@@ -177,6 +189,14 @@ export function evaluateSdlcComputeStage(input: {
   evaluateMaterializedProductFiles({
     manifest: input.manifest,
     report,
+    blockingReasonCarriers
+  });
+  evaluateCodeBuilderSourceTestFrontier({
+    manifest: input.manifest,
+    blockingReasonCarriers
+  });
+  evaluateCodeBuilderValidationLogs({
+    manifest: input.manifest,
     blockingReasonCarriers
   });
   const evidenceRefs = [

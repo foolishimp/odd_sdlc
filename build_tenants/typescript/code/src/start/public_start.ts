@@ -18,12 +18,16 @@ import {
   type ExecutionBasis,
   type Module,
   type RuntimeEvent,
-  type RuntimeRegime
+  type RuntimeRegime,
+  type StartIntent,
+  type StartRuntimeTraversalStrategySelection
 } from "@abiogenesis/typescript-tenant";
 import {
+  parseArray,
   parseClosedRecord,
   parseEnumValue,
-  parseNonEmptyString
+  parseNonEmptyString,
+  parseStringList
 } from "../shared/validation.js";
 import {
   deriveSdlcTargetObligationBinding,
@@ -118,6 +122,7 @@ export interface SdlcPublicStartRequest {
   readonly replayClosureDecisionRef?: string | null;
   readonly replayOverlayRef?: string | null;
   readonly replayOverlayBindingRef?: string | null;
+  readonly runtimeTraversalSelections?: readonly StartRuntimeTraversalStrategySelection[];
 }
 
 export interface SdlcWorkerAttachment {
@@ -143,6 +148,7 @@ export interface SdlcExecutionContract {
   readonly traversalDecompositionSummary: SdlcDecompositionSummary | null;
   readonly traversalHopSelection: SdlcTraversalHopSelection | null;
   readonly bootstrapOptimization: SdlcBootstrapPublicStartOptimization;
+  readonly runtimeTraversalSelections?: readonly StartRuntimeTraversalStrategySelection[];
 }
 
 export type SdlcPublicStartOutcome =
@@ -183,12 +189,17 @@ export function admitSdlcPublicStartRequest(
     "replayNextGraphVectorRef",
     "replayClosureDecisionRef",
     "replayOverlayRef",
-    "replayOverlayBindingRef"
+    "replayOverlayBindingRef",
+    "runtimeTraversalSelections"
   ]);
   const target = parseClosedRecord(record["target"], `${label}.target`, [
     "kind",
     "handle"
   ]);
+  const runtimeTraversalSelections = admitSdlcRuntimeTraversalSelections(
+    record["runtimeTraversalSelections"],
+    `${label}.runtimeTraversalSelections`
+  );
   return Object.freeze({
     kind: "sdlc_public_start_request",
     workspaceRoot: parseNonEmptyString(record["workspaceRoot"], `${label}.workspaceRoot`),
@@ -268,8 +279,216 @@ export function admitSdlcPublicStartRequest(
         : parseNonEmptyString(
             record["replayOverlayBindingRef"],
             `${label}.replayOverlayBindingRef`
-          )
+          ),
+    ...(runtimeTraversalSelections === undefined
+      ? {}
+      : { runtimeTraversalSelections })
   });
+}
+
+function parseOptionalNumber(
+  input: unknown,
+  label: string
+): number | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+  if (typeof input !== "number" || !Number.isFinite(input)) {
+    throw new TypeError(`${label}: expected finite number`);
+  }
+  return input;
+}
+
+function parseOptionalStringList(
+  input: unknown,
+  label: string
+): readonly string[] | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+  return parseStringList(input, label);
+}
+
+function parseOptionalNumberList(
+  input: unknown,
+  label: string
+): readonly number[] | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+  return parseArray(input, label, (item, itemLabel) => {
+    if (typeof item !== "number" || !Number.isInteger(item) || item < 0) {
+      throw new TypeError(`${itemLabel}: expected non-negative integer`);
+    }
+    return item;
+  });
+}
+
+function parseRuntimeTraversalBatch(
+  input: unknown,
+  label: string
+): StartRuntimeTraversalStrategySelection["batch"] | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+  const record = parseClosedRecord(input, label, [
+    "targetItemCount",
+    "maxItemCount",
+    "maxTokenPressure"
+  ]);
+  const targetItemCount = parseOptionalNumber(
+    record["targetItemCount"],
+    `${label}.targetItemCount`
+  );
+  const maxItemCount = parseOptionalNumber(
+    record["maxItemCount"],
+    `${label}.maxItemCount`
+  );
+  const maxTokenPressure = parseOptionalNumber(
+    record["maxTokenPressure"],
+    `${label}.maxTokenPressure`
+  );
+  return Object.freeze({
+    ...(targetItemCount === undefined ? {} : { targetItemCount }),
+    ...(maxItemCount === undefined ? {} : { maxItemCount }),
+    ...(maxTokenPressure === undefined ? {} : { maxTokenPressure })
+  });
+}
+
+function parseRuntimeTraversalContinuation(
+  input: unknown,
+  label: string
+): StartRuntimeTraversalStrategySelection["continuation"] | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+  const record = parseClosedRecord(input, label, [
+    "sameEdgeUntil",
+    "maxAttemptsWithoutNewSignal",
+    "maxTotalAttempts"
+  ]);
+  const sameEdgeUntil =
+    record["sameEdgeUntil"] === undefined
+      ? undefined
+      : parseEnumValue(
+          record["sameEdgeUntil"],
+          `${label}.sameEdgeUntil`,
+          ["foldback_closed", "retry_budget_exhausted"]
+        );
+  const maxAttemptsWithoutNewSignal = parseOptionalNumber(
+    record["maxAttemptsWithoutNewSignal"],
+    `${label}.maxAttemptsWithoutNewSignal`
+  );
+  const maxTotalAttempts = parseOptionalNumber(
+    record["maxTotalAttempts"],
+    `${label}.maxTotalAttempts`
+  );
+  return Object.freeze({
+    ...(sameEdgeUntil === undefined ? {} : { sameEdgeUntil }),
+    ...(maxAttemptsWithoutNewSignal === undefined
+      ? {}
+      : { maxAttemptsWithoutNewSignal }),
+    ...(maxTotalAttempts === undefined ? {} : { maxTotalAttempts })
+  });
+}
+
+function parseRuntimeTraversalSelection(
+  input: unknown,
+  label: string
+): StartRuntimeTraversalStrategySelection {
+  const record = parseClosedRecord(input, label, [
+    "kind",
+    "selectionRef",
+    "strategyOwnerRef",
+    "strategyLabel",
+    "enforcementPrimitives",
+    "selectedScheduleItemRefs",
+    "requiredProgressArtifactRefs",
+    "orderingConstraintRefs",
+    "phaseGateRefs",
+    "basisRefs",
+    "vectorIndexes",
+    "edgeRefs",
+    "batch",
+    "continuation"
+  ]);
+  const batch = parseRuntimeTraversalBatch(record["batch"], `${label}.batch`);
+  const continuation = parseRuntimeTraversalContinuation(
+    record["continuation"],
+    `${label}.continuation`
+  );
+  const requiredProgressArtifactRefs = parseOptionalStringList(
+    record["requiredProgressArtifactRefs"],
+    `${label}.requiredProgressArtifactRefs`
+  );
+  const orderingConstraintRefs = parseOptionalStringList(
+    record["orderingConstraintRefs"],
+    `${label}.orderingConstraintRefs`
+  );
+  const phaseGateRefs = parseOptionalStringList(
+    record["phaseGateRefs"],
+    `${label}.phaseGateRefs`
+  );
+  const basisRefs = parseOptionalStringList(
+    record["basisRefs"],
+    `${label}.basisRefs`
+  );
+  const vectorIndexes = parseOptionalNumberList(
+    record["vectorIndexes"],
+    `${label}.vectorIndexes`
+  );
+  const edgeRefs = parseOptionalStringList(
+    record["edgeRefs"],
+    `${label}.edgeRefs`
+  );
+  return Object.freeze({
+    kind: parseEnumValue(
+      record["kind"],
+      `${label}.kind`,
+      ["start_runtime_traversal_strategy_selection"]
+    ),
+    selectionRef: parseNonEmptyString(
+      record["selectionRef"],
+      `${label}.selectionRef`
+    ),
+    strategyOwnerRef: parseNonEmptyString(
+      record["strategyOwnerRef"],
+      `${label}.strategyOwnerRef`
+    ),
+    strategyLabel: parseNonEmptyString(
+      record["strategyLabel"],
+      `${label}.strategyLabel`
+    ),
+    enforcementPrimitives: parseStringList(
+      record["enforcementPrimitives"],
+      `${label}.enforcementPrimitives`
+    ),
+    selectedScheduleItemRefs: parseStringList(
+      record["selectedScheduleItemRefs"],
+      `${label}.selectedScheduleItemRefs`
+    ),
+    ...(requiredProgressArtifactRefs === undefined
+      ? {}
+      : { requiredProgressArtifactRefs }),
+    ...(orderingConstraintRefs === undefined ? {} : { orderingConstraintRefs }),
+    ...(phaseGateRefs === undefined ? {} : { phaseGateRefs }),
+    ...(basisRefs === undefined ? {} : { basisRefs }),
+    ...(vectorIndexes === undefined ? {} : { vectorIndexes }),
+    ...(edgeRefs === undefined ? {} : { edgeRefs }),
+    ...(batch === undefined ? {} : { batch }),
+    ...(continuation === undefined ? {} : { continuation })
+  });
+}
+
+export function admitSdlcRuntimeTraversalSelections(
+  input: unknown,
+  label = "SdlcRuntimeTraversalSelections"
+): readonly StartRuntimeTraversalStrategySelection[] | undefined {
+  if (input === undefined || input === null) {
+    return undefined;
+  }
+  const selections = parseArray(input, label, parseRuntimeTraversalSelection);
+  return selections.length === 0 ? undefined : selections;
 }
 
 export function projectSdlcWorkerAttachment(input: {
@@ -759,6 +978,16 @@ function workspaceIdentityRefFor(request: SdlcPublicStartRequest): string {
   ].join("/");
 }
 
+function runtimeTraversalSelectionsForStartIntent(
+  request: SdlcPublicStartRequest
+): Partial<Pick<StartIntent, "runtimeTraversalSelections">> {
+  return request.runtimeTraversalSelections === undefined
+    ? Object.freeze({})
+    : Object.freeze({
+        runtimeTraversalSelections: request.runtimeTraversalSelections
+      });
+}
+
 function workspaceFingerprintRefFor(input: {
   readonly request: SdlcPublicStartRequest;
   readonly observationRef: string;
@@ -1091,7 +1320,8 @@ function evaluateInitialPublicStartAction(input: {
           kind: "graph_function",
           handle: candidates[0]?.graphFunctionName ?? ""
         },
-        until: input.request.until
+        until: input.request.until,
+        ...runtimeTraversalSelectionsForStartIntent(input.request)
       }),
       module: input.module,
       runtimeIdentity: admitResolvedRuntimeIdentity({
@@ -1416,6 +1646,7 @@ function constructExecutionContract(input: {
         handle: input.targetGraphFunction
       },
       until: input.request.until,
+      ...runtimeTraversalSelectionsForStartIntent(input.request),
       ...(requestedOutputs === undefined ? {} : { requestedOutputs })
     }),
     module: input.module,
@@ -1457,7 +1688,10 @@ function constructExecutionContract(input: {
     constructionIntent: input.constructionIntent,
     traversalDecompositionSummary: input.traversalDecompositionSummary,
     traversalHopSelection: input.traversalHopSelection,
-    bootstrapOptimization: input.bootstrapOptimization
+    bootstrapOptimization: input.bootstrapOptimization,
+    ...(input.request.runtimeTraversalSelections === undefined
+      ? {}
+      : { runtimeTraversalSelections: input.request.runtimeTraversalSelections })
   });
 }
 

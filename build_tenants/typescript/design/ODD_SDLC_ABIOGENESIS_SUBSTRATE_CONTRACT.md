@@ -16,7 +16,7 @@ structure probes.
 | Surface | Binding |
 | --- | --- |
 | Package | `@abiogenesis/typescript-tenant` |
-| Version | `4.0.0-rc.21` |
+| Version | `4.0.0-rc.29` |
 | Dependency form | release snapshot package dependency |
 | odd_sdlc role | domain product over ABIogenesis substrate |
 | ABIogenesis role | GTL/ABG carrier and runtime truth authority |
@@ -62,12 +62,16 @@ The adapter relies on ABIogenesis TypeScript evidence:
 - `T-066`: ABG internal control loop owns iteration sufficiency
 - `T-156`: consequence traversal eligibility is catalog-admitted from GTL
   declarations and statically validated by `typecheckGtlProgram(...)`
+- `T-158`: plugin result-interface declarations are statically validated by
+  `typecheckGtlProgram(...)`; the compiler-admitted result-interface catalog
+  is the runtime handoff, and runtime plugin result envelopes are admitted and
+  replay-visible through ABIogenesis rather than reimplemented in SDLC
 
 These assumptions are dependencies, not copied law.
 
 ## ABIogenesis Runtime, Temporal, Process Callout, Defaults, Evaluator, And Liveness Substrate
 
-As of ABIogenesis `4.0.0-rc.21`, worker process execution remains substrate-owned, the
+As of ABIogenesis `4.0.0-rc.29`, worker process execution remains substrate-owned, the
 first ABG defaults bundle slice remains visible installed configuration, and
 temporal/time-related runtime truth is ABG-owned event and replay projection
 truth. ABIogenesis publishes the T-127 F_P construction evaluator substrate:
@@ -160,15 +164,17 @@ it does not itself start work, append runtime events, dispatch workers, or own
 retry iteration. odd_sdlc installed runner bridges that remain before ABG T-128
 must be treated as temporary invocation adapters, not ranking truth.
 
-The consumed ABIogenesis substrate does not make all ABG defaults configurable, and it does not
-ship an odd_sdlc-specific per-edge traversal strategy carrier. odd_sdlc keeps an
-explicit fallback traversal strategy plan until that policy is repriced into
-ABG-visible evaluator input.
+The consumed ABIogenesis substrate now admits runtime start traversal selections
+through `StartIntent.runtimeTraversalSelections`. `odd_sdlc.TS` may derive a
+steel-thread or bounded dependency window from SDLC requirement/module/test
+dependency maps, but it must pass the selected schedule refs to ABG as
+run-scoped start truth. It must not rebuild GTL module declarations, duplicate
+edge-name lists, or hide a strategy switch inside the consequence plugin to
+choose the runtime slice.
 
-The fallback plan is still a carrier boundary. It must be one resolved plan
-surface consumed by both GTL/vector modulation and installed-operator handoff.
-It must not become duplicated edge-name lists in graph construction and operator
-runtime code. When ABG supplies an edge strategy directive, that directive is
-authoritative over the odd_sdlc fallback. Targeted repair enters as ABG-visible
-repair/reentry truth, not as an adapter-local override of an explicit ABG
-selection.
+The static fallback plan remains a default declaration surface only. It is used
+when no matching runtime start selection and no ABG edge directive exists. When
+ABG supplies a runtime start envelope or edge strategy directive, that ABG
+selection is authoritative over the odd_sdlc fallback. Targeted repair enters
+as ABG-visible repair/reentry truth, not as an adapter-local override of an
+explicit ABG selection.

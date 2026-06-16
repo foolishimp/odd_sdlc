@@ -1,6 +1,9 @@
 // Implements: T-172
 
 import type {
+  StartRuntimeTraversalStrategySelection
+} from "@abiogenesis/typescript-tenant";
+import type {
   SdlcDependencyTraversalMethod,
   SdlcDependencyTraversalSelection,
   SdlcDecompositionAdmissionDecision,
@@ -10,6 +13,7 @@ import type {
   SdlcDecompositionSummaryThresholds,
   SdlcDecompositionUpstreamKind,
   SdlcDesignDepthRegister,
+  SdlcDependencyMapNode,
   SdlcModuleDependencyMap,
   SdlcTestDependencyMap,
   SdlcTestDesignRegister
@@ -70,6 +74,19 @@ export interface SdlcDerivedTestDependencyMapInput {
   readonly moduleDependencyMap: SdlcModuleDependencyMap;
   readonly mapRef?: string | undefined;
   readonly summaryRef?: string | undefined;
+}
+
+export interface SdlcRuntimeSteelThreadDependencyWindowInput {
+  readonly selectionRef: string;
+  readonly dependencyMaps: readonly (SdlcModuleDependencyMap | SdlcTestDependencyMap)[];
+  readonly traversalSelections?: readonly SdlcDependencyTraversalSelection[] | undefined;
+  readonly startingRequirementRefs?: readonly string[] | undefined;
+  readonly startingNodeIds?: readonly string[] | undefined;
+  readonly requirementRefNamespace?: string | undefined;
+  readonly strategyOwnerRef?: string | undefined;
+  readonly edgeRefs?: readonly string[] | undefined;
+  readonly basisRefs?: readonly string[] | undefined;
+  readonly maxItemCount?: number | undefined;
 }
 
 // The default 8:1 limits are the initial substantive-product guardrail. The
@@ -337,6 +354,219 @@ function selectedNodeIds(input: {
       throw new TypeError(`Unsupported dependency traversal method ${exhaustive}`);
     }
   }
+}
+
+function normalizeRequirementRef(input: {
+  readonly value: string;
+  readonly namespace: string;
+}): string {
+  const trimmed = input.value.trim();
+  if (trimmed.startsWith("requirement://")) {
+    return trimmed;
+  }
+  if (trimmed.startsWith("requirement:")) {
+    return `requirement://${input.namespace}/${trimmed.slice("requirement:".length)}`;
+  }
+  return `requirement://${input.namespace}/${trimmed}`;
+}
+
+function requirementRefsMatch(left: string, right: string): boolean {
+  const normalizedLeft = left.toLowerCase();
+  const normalizedRight = right.toLowerCase();
+  if (normalizedLeft === normalizedRight) {
+    return true;
+  }
+  const leftTail = normalizedLeft.split("/").filter(Boolean).at(-1) ?? normalizedLeft;
+  const rightTail = normalizedRight.split("/").filter(Boolean).at(-1) ?? normalizedRight;
+  return leftTail === rightTail;
+}
+
+function nodesById(
+  dependencyMaps: readonly (SdlcModuleDependencyMap | SdlcTestDependencyMap)[]
+): ReadonlyMap<string, SdlcDependencyMapNode> {
+  const nodes = new Map<string, SdlcDependencyMapNode>();
+  for (const dependencyMap of dependencyMaps) {
+    for (const node of dependencyMap.nodes) {
+      nodes.set(node.nodeId, node);
+    }
+  }
+  return nodes;
+}
+
+function selectedSeedNodeIds(input: {
+  readonly dependencyMaps: readonly (SdlcModuleDependencyMap | SdlcTestDependencyMap)[];
+  readonly traversalSelections: readonly SdlcDependencyTraversalSelection[];
+  readonly startingRequirementRefs: readonly string[];
+  readonly startingNodeIds: readonly string[];
+  readonly requirementRefNamespace: string;
+}): readonly string[] {
+  const requestedRequirementRefs = input.startingRequirementRefs.map((ref) =>
+    normalizeRequirementRef({
+      value: ref,
+      namespace: input.requirementRefNamespace
+    })
+  );
+  const seeds = new Set<string>(input.startingNodeIds);
+  if (requestedRequirementRefs.length > 0) {
+    for (const dependencyMap of input.dependencyMaps) {
+      for (const node of dependencyMap.nodes) {
+        const ownedRequirementRefs = node.ownedRequirementRefs.map((ref) =>
+          normalizeRequirementRef({
+            value: ref,
+            namespace: input.requirementRefNamespace
+          })
+        );
+        if (
+          requestedRequirementRefs.some((requestedRef) =>
+            ownedRequirementRefs.some((ownedRef) =>
+              requirementRefsMatch(requestedRef, ownedRef)
+            )
+          )
+        ) {
+          seeds.add(node.nodeId);
+        }
+      }
+    }
+  }
+  if (seeds.size === 0) {
+    for (const selection of input.traversalSelections) {
+      if (selection.selectedMethod === "steel_thread") {
+        for (const nodeId of selection.selectedNodeIds) {
+          seeds.add(nodeId);
+        }
+      }
+    }
+  }
+  if (seeds.size === 0) {
+    for (const dependencyMap of input.dependencyMaps) {
+      for (const nodeId of dependencyMap.steelThreadCandidateNodeIds) {
+        seeds.add(nodeId);
+      }
+    }
+  }
+  return uniqueSorted([...seeds]);
+}
+
+function predecessorClosedNodeIds(input: {
+  readonly seeds: readonly string[];
+  readonly nodes: ReadonlyMap<string, SdlcDependencyMapNode>;
+}): readonly string[] {
+  const visited = new Set<string>();
+  const ordered: string[] = [];
+  const visit = (nodeId: string): void => {
+    if (visited.has(nodeId)) {
+      return;
+    }
+    const node = input.nodes.get(nodeId);
+    if (node === undefined) {
+      return;
+    }
+    visited.add(nodeId);
+    for (const predecessorNodeId of node.predecessorNodeIds) {
+      visit(predecessorNodeId);
+    }
+    ordered.push(nodeId);
+  };
+  for (const seed of input.seeds) {
+    visit(seed);
+  }
+  return Object.freeze(ordered);
+}
+
+export function constructRuntimeSteelThreadSelectionFromDependencyWindow(
+  input: SdlcRuntimeSteelThreadDependencyWindowInput
+): StartRuntimeTraversalStrategySelection {
+  const dependencyMaps = Object.freeze([...input.dependencyMaps]);
+  if (dependencyMaps.length === 0) {
+    throw new TypeError("runtime steel-thread dependency window requires dependency maps");
+  }
+  const requirementRefNamespace = input.requirementRefNamespace ?? "odd-sdlc";
+  const nodeMap = nodesById(dependencyMaps);
+  const seeds = selectedSeedNodeIds({
+    dependencyMaps,
+    traversalSelections: input.traversalSelections ?? Object.freeze([]),
+    startingRequirementRefs: input.startingRequirementRefs ?? Object.freeze([]),
+    startingNodeIds: input.startingNodeIds ?? Object.freeze([]),
+    requirementRefNamespace
+  });
+  const selectedNodeIds = predecessorClosedNodeIds({ seeds, nodes: nodeMap });
+  if (selectedNodeIds.length === 0) {
+    throw new TypeError("runtime steel-thread dependency window resolved no nodes");
+  }
+  const selectedNodes = selectedNodeIds.flatMap((nodeId) => {
+    const node = nodeMap.get(nodeId);
+    return node === undefined ? [] : [node];
+  });
+  const selectedRequirementRefs = uniqueSorted(
+    selectedNodes.flatMap((node) =>
+      node.ownedRequirementRefs.map((ref) =>
+        normalizeRequirementRef({
+          value: ref,
+          namespace: requirementRefNamespace
+        })
+      )
+    )
+  );
+  if (selectedRequirementRefs.length === 0) {
+    throw new TypeError(
+      "runtime steel-thread dependency window requires requirement refs"
+    );
+  }
+  const selectedScheduleItemRefs = uniqueSorted([
+    ...selectedNodeIds,
+    ...selectedRequirementRefs
+  ]);
+  const requiredProgressArtifactRefs = uniqueSorted(
+    selectedNodes.flatMap((node) => node.materializationTargetRefs)
+  );
+  const dependencyMapRefs = uniqueSorted(dependencyMaps.map((map) => map.mapRef));
+  return Object.freeze({
+    kind: "start_runtime_traversal_strategy_selection" as const,
+    selectionRef: input.selectionRef,
+    strategyOwnerRef:
+      input.strategyOwnerRef ?? "policy://odd-sdlc/runtime/steel-thread",
+    strategyLabel: "steel_thread",
+    enforcementPrimitives: Object.freeze([
+      "dependency_predecessor_closure",
+      "bounded_batch",
+      "ordered_schedule_prefix"
+    ]),
+    selectedScheduleItemRefs,
+    requiredProgressArtifactRefs,
+    orderingConstraintRefs: uniqueSorted(
+      selectedNodes.flatMap((node) =>
+        node.predecessorNodeIds.map(
+          (predecessorNodeId) =>
+            `dependency-order://${encodeURIComponent(predecessorNodeId)}/${encodeURIComponent(node.nodeId)}`
+        )
+      )
+    ),
+    phaseGateRefs: dependencyMapRefs,
+    basisRefs: uniqueSorted([
+      ...dependencyMapRefs,
+      ...(input.traversalSelections ?? Object.freeze([])).map(
+        (selection) => selection.selectionRef
+      ),
+      ...(input.startingRequirementRefs ?? Object.freeze([])),
+      ...(input.startingNodeIds ?? Object.freeze([])),
+      ...(input.basisRefs ?? Object.freeze([]))
+    ]),
+    ...(input.edgeRefs === undefined
+      ? {}
+      : { edgeRefs: uniqueSorted(input.edgeRefs) }),
+    batch: Object.freeze({
+      targetItemCount: selectedScheduleItemRefs.length,
+      maxItemCount: Math.max(
+        selectedScheduleItemRefs.length,
+        Math.floor(input.maxItemCount ?? selectedScheduleItemRefs.length)
+      )
+    }),
+    continuation: Object.freeze({
+      sameEdgeUntil: "foldback_closed" as const,
+      maxAttemptsWithoutNewSignal: 10,
+      maxTotalAttempts: 64
+    })
+  });
 }
 
 function blockingReasons(input: {

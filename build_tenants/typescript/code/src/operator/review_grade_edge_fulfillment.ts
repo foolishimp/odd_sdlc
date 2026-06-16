@@ -1,7 +1,7 @@
 // Implements: T-182
 
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { relative, resolve, sep } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   admitGtlContractFulfillmentBinding,
@@ -33,6 +33,9 @@ import {
   type SdlcWorkerHandoffManifest
 } from "./carriers.js";
 import {
+  isSdlcLiveFpParallelMaterializationFrontier
+} from "./live_fp_parallel_materialization_frontier.js";
+import {
   sdlcReviewGradeEdgeFulfillmentAssessmentRequired
 } from "./edge_output_policy.js";
 import { sha256Text } from "../shared/digest.js";
@@ -49,6 +52,9 @@ export const REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF =
 
 const REVIEW_GRADE_PROMPT_NULL_BINDING_REF_PREFIX =
   "prompt-null://odd-sdlc/review-grade/fulfillment-binding";
+
+const LIVE_FP_PARALLEL_MATERIALIZATION_FRONTIER_FILE =
+  "sdlc_live_fp_parallel_materialization_frontier.json";
 
 export interface SdlcReviewGradeReadOnlyInputFileState {
   readonly path: string;
@@ -118,6 +124,13 @@ export function snapshotReviewGradeReadOnlyInputFiles(input: {
     kind: "sdlc_review_grade_read_only_input_snapshot" as const,
     files: Object.freeze(paths.map(readOnlyInputFileState))
   });
+}
+
+function objectRecord(input: unknown): Record<string, unknown> | null {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    return null;
+  }
+  return Object.fromEntries(Object.entries(input));
 }
 
 function readOnlyInputFileStateChanged(input: {
@@ -422,6 +435,16 @@ function parseNullableRequiredAction(
   return parseNonEmptyString(input, label);
 }
 
+function parseReviewRefList(input: unknown, label: string): readonly string[] {
+  if (!Array.isArray(input)) {
+    return parseStringList(input, label);
+  }
+  return parseStringList(
+    input.filter((item) => item !== null && item !== undefined),
+    label
+  );
+}
+
 function parseNullableRepairSurfaceTriage(
   input: unknown,
   label: string
@@ -459,7 +482,7 @@ function parseNullableRepairSurfaceTriage(
     record["repairAssetRef"],
     `${label}.repairAssetRef`
   );
-  const evidenceRefs = parseStringList(record["evidenceRefs"], `${label}.evidenceRefs`);
+  const evidenceRefs = parseReviewRefList(record["evidenceRefs"], `${label}.evidenceRefs`);
   if (evidenceRefs.length === 0) {
     throw new TypeError(`${label}.evidenceRefs: expected non-empty array`);
   }
@@ -562,7 +585,7 @@ function parseFulfillmentBinding(
     if (value === null) {
       return Object.freeze([nullSentinel(fieldName)]);
     }
-    return uniqueSorted(parseStringList(value, fieldLabel));
+    return uniqueSorted(parseReviewRefList(value, fieldLabel));
   };
   const productTargetRef = parseBindingString(
     record["productTargetRef"],
@@ -699,8 +722,8 @@ function parseReviewFinding(
     ),
     failureClass: parseNullableFailureClass(record["failureClass"], `${label}.failureClass`),
     requiredAction: parseNullableRequiredAction(record["requiredAction"], `${label}.requiredAction`),
-    evidenceRefs: parseStringList(record["evidenceRefs"], `${label}.evidenceRefs`),
-    acceptedAuthorityRefs: parseStringList(
+    evidenceRefs: parseReviewRefList(record["evidenceRefs"], `${label}.evidenceRefs`),
+    acceptedAuthorityRefs: parseReviewRefList(
       record["acceptedAuthorityRefs"],
       `${label}.acceptedAuthorityRefs`
     ),
@@ -815,7 +838,7 @@ function parseReviewAssessment(
       "passed",
       "blocked"
     ] as const),
-    reviewedObligationIds: parseStringList(
+    reviewedObligationIds: parseReviewRefList(
       record["reviewedObligationIds"],
       `${label}.reviewedObligationIds`
     ),
@@ -832,7 +855,7 @@ function parseReviewAssessment(
       record["obligationCoverageFold"],
       `${label}.obligationCoverageFold`
     ),
-    evidenceRefs: parseStringList(record["evidenceRefs"], `${label}.evidenceRefs`),
+    evidenceRefs: parseReviewRefList(record["evidenceRefs"], `${label}.evidenceRefs`),
     summary: parseNonEmptyString(record["summary"], `${label}.summary`)
   });
 }
@@ -998,11 +1021,13 @@ function deriveFulfillmentBindingForFinding(input: {
     workspaceRoot: input.manifest.workspaceRoot,
     absolutePath: input.manifest.outputFile
   });
+  const findingEvidenceRefs = uniqueSorted(input.finding.evidenceRefs);
+  const acceptedAuthorityRefs = uniqueSorted(input.finding.acceptedAuthorityRefs);
   if (input.finding.obligationId.startsWith("source_asset:")) {
     const sourceRef =
-      input.finding.acceptedAuthorityRefs[0] ??
-      input.finding.evidenceRefs.find((ref) => ref !== outputSurfaceRef) ??
-      input.finding.evidenceRefs[0] ??
+      acceptedAuthorityRefs[0] ??
+      findingEvidenceRefs.find((ref) => ref !== outputSurfaceRef) ??
+      findingEvidenceRefs[0] ??
       outputSurfaceRef;
     const binding = constructGtlContractFulfillmentBinding({
       obligationRef: input.finding.obligationId,
@@ -1014,13 +1039,13 @@ function deriveFulfillmentBindingForFinding(input: {
       outputSurfaceRef,
       functionOrEntrypointRef: `${sourceRef}#source-asset`,
       realizationEvidenceRefs: uniqueSorted([sourceRef, outputSurfaceRef]),
-      testOrExecutionEvidenceRefs: input.finding.evidenceRefs,
+      testOrExecutionEvidenceRefs: findingEvidenceRefs,
       evaluatorFindingRef: `evaluation-finding://odd-sdlc/review-grade/${encodeURIComponent(input.finding.obligationId)}`,
       authorityRefs:
-        input.finding.acceptedAuthorityRefs.length > 0
-          ? input.finding.acceptedAuthorityRefs
+        acceptedAuthorityRefs.length > 0
+          ? acceptedAuthorityRefs
           : Object.freeze([sourceRef]),
-      evidenceRefs: input.finding.evidenceRefs
+      evidenceRefs: findingEvidenceRefs
     });
     return admitGtlContractFulfillmentBinding(binding);
   }
@@ -1044,8 +1069,8 @@ function deriveFulfillmentBindingForFinding(input: {
   });
   const designObligationRef =
     row.sourceAssetRefs[0] ??
-    input.finding.acceptedAuthorityRefs[0] ??
-    input.finding.evidenceRefs[0] ??
+    acceptedAuthorityRefs[0] ??
+    findingEvidenceRefs[0] ??
     null;
   if (requirementRef === null || designObligationRef === null) {
     return null;
@@ -1064,10 +1089,10 @@ function deriveFulfillmentBindingForFinding(input: {
     outputSurfaceRef,
     functionOrEntrypointRef: `${productTargetRef}#component:${row.componentId}`,
     realizationEvidenceRefs: Object.freeze([productTargetRef, outputSurfaceRef]),
-    testOrExecutionEvidenceRefs: input.finding.evidenceRefs,
+    testOrExecutionEvidenceRefs: findingEvidenceRefs,
     evaluatorFindingRef: `evaluation-finding://odd-sdlc/review-grade/${encodeURIComponent(input.finding.obligationId)}`,
-    authorityRefs: input.finding.acceptedAuthorityRefs,
-    evidenceRefs: input.finding.evidenceRefs
+    authorityRefs: acceptedAuthorityRefs,
+    evidenceRefs: findingEvidenceRefs
   });
   return admitGtlContractFulfillmentBinding(gtlBinding);
 }
@@ -1300,19 +1325,176 @@ function canonicalizeReviewAssessmentModuleCoverage(input: {
   });
 }
 
+function fullComponentCodeBuilderReviewEdge(
+  manifest: SdlcWorkerHandoffManifest
+): boolean {
+  return (
+    manifest.graphFunctionName === "derive_component_code_surface" &&
+    manifest.edgeName === "derive_component_code_surface" &&
+    manifest.targetAssetType === "component_code_surface" &&
+    manifest.productMaterialization.required
+  );
+}
+
+function codeBuilderFrontierReviewGap(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+}): {
+  readonly code:
+    | "code_builder_parallel_frontier_missing"
+    | "code_builder_parallel_test_lanes_missing";
+  readonly detail: string;
+  readonly evidenceRefs: readonly string[];
+} | null {
+  if (!fullComponentCodeBuilderReviewEdge(input.manifest)) {
+    return null;
+  }
+  const frontierPath = join(
+    input.manifest.archiveRoot,
+    LIVE_FP_PARALLEL_MATERIALIZATION_FRONTIER_FILE
+  );
+  const frontierRef = pathToFileURL(frontierPath).href;
+  if (!existsSync(frontierPath) || !statSync(frontierPath).isFile()) {
+    return Object.freeze({
+      code: "code_builder_parallel_frontier_missing" as const,
+      detail: LIVE_FP_PARALLEL_MATERIALIZATION_FRONTIER_FILE,
+      evidenceRefs: Object.freeze([frontierRef])
+    });
+  }
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(frontierPath, "utf8"));
+    if (!isSdlcLiveFpParallelMaterializationFrontier(parsed)) {
+      throw new TypeError("frontier carrier shape invalid");
+    }
+    if (
+      parsed.devLaneCount <= 0 ||
+      parsed.componentTestLaneCount <= 0 ||
+      parsed.uatTestLaneCount <= 0
+    ) {
+      return Object.freeze({
+        code: "code_builder_parallel_test_lanes_missing" as const,
+        detail:
+          `dev=${parsed.devLaneCount}; componentTest=${parsed.componentTestLaneCount}; uatTest=${parsed.uatTestLaneCount}`,
+        evidenceRefs: Object.freeze([frontierRef])
+      });
+    }
+  } catch (error) {
+    return Object.freeze({
+      code: "code_builder_parallel_frontier_missing" as const,
+      detail: error instanceof Error ? error.message : "frontier_parse_failed",
+      evidenceRefs: Object.freeze([frontierRef])
+    });
+  }
+  return null;
+}
+
+function canonicalizeReviewAssessmentCodeBuilderFrontier(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly assessment: SdlcReviewGradeEdgeFulfillmentAssessment;
+}): SdlcReviewGradeEdgeFulfillmentAssessment {
+  const gap = codeBuilderFrontierReviewGap({ manifest: input.manifest });
+  if (gap === null) {
+    return input.assessment;
+  }
+  const fallbackObligationId =
+    input.assessment.reviewedObligationIds.find((obligationId) =>
+      obligationId.startsWith("target_asset:")
+    ) ??
+    input.assessment.reviewedObligationIds[0] ??
+    input.manifest.traversalObligationContext.obligations[0]?.obligationId ??
+    "target_asset:component_code_surface";
+  const existingFinding = input.assessment.findings.find(
+    (finding) => finding.obligationId === fallbackObligationId
+  );
+  const outputRef = pathToFileURL(input.manifest.outputFile).href;
+  const evidenceRefs = uniqueSorted([
+    ...(existingFinding?.evidenceRefs ?? []),
+    outputRef,
+    ...gap.evidenceRefs
+  ]);
+  const acceptedAuthorityRefs = uniqueSorted([
+    ...(existingFinding?.acceptedAuthorityRefs ?? []),
+    outputRef
+  ]);
+  const blockedFinding: SdlcReviewGradeObligationFinding = Object.freeze({
+    kind: "sdlc_review_grade_obligation_finding" as const,
+    obligationId: fallbackObligationId,
+    fulfillmentStatus: "blocked" as const,
+    failureClass: "test_overlap_missing" as const,
+    requiredAction:
+      "Materialize the code-builder frontier with nonzero source, component-test, and UAT-test lanes, then retry derive_component_code_surface.",
+    evidenceRefs,
+    acceptedAuthorityRefs,
+    fulfillmentBinding: existingFinding?.fulfillmentBinding ?? null,
+    repairSurfaceTriage: Object.freeze({
+      kind: "sdlc_repair_surface_triage" as const,
+      disposition: "current_edge_repair" as const,
+      repairGraphFunctionRef: null,
+      repairGraphVectorRef: null,
+      repairAssetRef: null,
+      evidenceRefs,
+      rationale:
+        "Full component-code review cannot pass without the source/component-test/UAT frontier; retry the current code-builder edge."
+    }),
+    rationale:
+      `Deterministic code-builder review failed: ${gap.code} (${gap.detail}).`
+  });
+  const findings = Object.freeze(
+    existingFinding === undefined
+      ? [...input.assessment.findings, blockedFinding]
+      : input.assessment.findings.map((finding) =>
+          finding.obligationId === fallbackObligationId ? blockedFinding : finding
+        )
+  );
+  const fulfilledCount = findings.filter(
+    (finding) => finding.fulfillmentStatus === "fulfilled"
+  ).length;
+  const reviewedObligationIds = uniqueSorted([
+    ...input.assessment.reviewedObligationIds,
+    fallbackObligationId
+  ]);
+  return Object.freeze({
+    ...input.assessment,
+    status: "blocked" as const,
+    reviewedObligationIds,
+    findings,
+    obligationCoverageFold:
+      input.assessment.obligationCoverageFold === null
+        ? null
+        : Object.freeze({
+            ...input.assessment.obligationCoverageFold,
+            coveredCount: fulfilledCount,
+            totalCount: findings.length,
+            status: "blocked",
+            rationale:
+              `${input.assessment.obligationCoverageFold.rationale} Deterministic code-builder frontier validation blocked source-only closure.`
+          }),
+    evidenceRefs: uniqueSorted([
+      ...input.assessment.evidenceRefs,
+      outputRef,
+      ...gap.evidenceRefs
+    ]),
+    summary:
+      `${input.assessment.summary} Deterministic code-builder frontier validation blocked source-only closure: ${gap.code}.`
+  });
+}
+
 function canonicalizeReviewAssessmentFulfillmentBindings(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly assessment: SdlcReviewGradeEdgeFulfillmentAssessment;
 }): SdlcReviewGradeEdgeFulfillmentAssessment {
+  const frontierAssessment = canonicalizeReviewAssessmentCodeBuilderFrontier({
+    manifest: input.manifest,
+    assessment: input.assessment
+  });
   if (input.manifest.targetAssetType !== "component_code_surface") {
-    return input.assessment;
+    return frontierAssessment;
   }
   const admission = admitComponentDepthRegisterFromArtifact({
     targetAssetType: input.manifest.targetAssetType,
     outputFile: input.manifest.outputFile
   });
   if (admission.status !== "admitted" || admission.register === null) {
-    return input.assessment;
+    return frontierAssessment;
   }
   const register = admission.register;
   const declaredRequirementRefs = input.manifest.traversalObligationContext.obligations
@@ -1323,9 +1505,9 @@ function canonicalizeReviewAssessmentFulfillmentBindings(input: {
       )
       .map((obligation) => obligation.obligationId);
   const boundAssessment = Object.freeze({
-    ...input.assessment,
+    ...frontierAssessment,
     findings: Object.freeze(
-      input.assessment.findings.map((finding) => {
+      frontierAssessment.findings.map((finding) => {
         if (finding.fulfillmentStatus !== "fulfilled") {
           return finding;
         }
@@ -1352,6 +1534,47 @@ function canonicalizeReviewAssessmentFulfillmentBindings(input: {
   });
 }
 
+function expectedReviewObligationIdsForManifest(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  const fallback = manifest.traversalObligationContext.obligations.map(
+    (obligation) => obligation.obligationId
+  );
+  if (manifest.featureScope.mode === "full_breadth") {
+    return Object.freeze(fallback);
+  }
+  const invocationPackagePath = join(
+    manifest.archiveRoot,
+    "worker_invocation_package.json"
+  );
+  if (!existsSync(invocationPackagePath) || !statSync(invocationPackagePath).isFile()) {
+    return Object.freeze(fallback);
+  }
+  try {
+    const candidate: unknown = JSON.parse(readFileSync(invocationPackagePath, "utf8"));
+    const record = objectRecord(candidate);
+    if (record === null) {
+      return Object.freeze(fallback);
+    }
+    const kind = parseNonEmptyString(
+      record["kind"],
+      "ReviewGrade.workerInvocationPackage.kind"
+    );
+    if (kind !== "sdlc_worker_invocation_package") {
+      return Object.freeze(fallback);
+    }
+    const inlineObligationIds = parseStringList(
+      record["inlineObligationIds"],
+      "ReviewGrade.workerInvocationPackage.inlineObligationIds"
+    );
+    return inlineObligationIds.length === 0
+      ? Object.freeze(fallback)
+      : uniqueSorted(inlineObligationIds);
+  } catch {
+    return Object.freeze(fallback);
+  }
+}
+
 function assessmentValidationErrors(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly assessment: SdlcReviewGradeEdgeFulfillmentAssessment;
@@ -1367,11 +1590,9 @@ function assessmentValidationErrors(input: {
   if (assessment.targetAssetType !== manifest.targetAssetType) {
     errors.push("review_grade_target_asset_mismatch");
   }
-  const declared = new Set(
-    manifest.traversalObligationContext.obligations.map(
-      (obligation) => obligation.obligationId
-    )
-  );
+  const expectedReviewObligationIds =
+    expectedReviewObligationIdsForManifest(manifest);
+  const declared = new Set(expectedReviewObligationIds);
   const declaredRequirementRefs = new Set(
     manifest.traversalObligationContext.obligations
       .filter(
@@ -1397,6 +1618,9 @@ function assessmentValidationErrors(input: {
   const sparseRequirementCarryoverAllowed =
     reviewGradeTargetAllowsRequirementCarryover(manifest.targetAssetType);
   for (const obligation of manifest.traversalObligationContext.obligations) {
+    if (!declared.has(obligation.obligationId)) {
+      continue;
+    }
     const requirementObligation =
       obligation.obligationKind === "requirement" ||
       obligation.obligationId.startsWith("requirement:");

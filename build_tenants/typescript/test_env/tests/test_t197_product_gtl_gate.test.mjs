@@ -122,7 +122,7 @@ test("T-197 product gate typechecks the live SDLC graph inventory", () => {
     input.expectedCoverage.edgeClosureContractCount
   );
   assert.equal(input.expectedCoverage.promptAssetCount, 3);
-  assert.equal(input.expectedCoverage.pluginContractCount, 5);
+  assert.equal(input.expectedCoverage.pluginContractCount, 6);
   assert.ok(input.expectedCoverage.overlayCount > 0);
   assert.ok(input.expectedCoverage.publicStartTargetCount > 0);
   assert.ok(input.expectedCoverage.sourceIdentitySurfaceCount > 0);
@@ -211,7 +211,7 @@ test("T-197 design ratifies owner partition assets before Wave 1 code", () => {
     "### Decommission Register",
     "### W-105 Construct-Site Sufficiency Inventory",
     "ABG route / dependency",
-    "ABI 4.0.0-rc.21",
+    "ABI 4.0.0-rc.29",
     "runtime continuation transition projection refs",
     "22/22 edge-contract tests and 1/1 Rust-service sandbox proof",
     "must-not-name-governed-target",
@@ -1083,5 +1083,80 @@ test("T-197 H8-H12 keep low-priority horizontal literals neutral", () => {
   assert.doesNotMatch(
     projectProfileSource,
     /morphisms\?|error domain|fidelity/u
+  );
+});
+
+test("T-158/T-203 keep plugin result interfaces under GTL/ABG authority", () => {
+  const product = repoFile("specification/PRODUCT.md");
+  const ticket = repoFile(
+    ".ai-workspace/tickets/active/T-203-factor-code-builder-graph-function-for-uat-test-generation-and-ticket-reentry.md"
+  );
+  const designDepthSource = repoFile(
+    "build_tenants/typescript/code/src/operator/plugins/evaluate/design_depth_register.ts"
+  );
+  const installedOperatorSource = repoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+  const input = constructCurrentSdlcGtlProgramConformanceInput();
+  const report = typecheckCurrentSdlcGtlProgram();
+
+  assert.match(
+    product,
+    /compiler-admitted plugin result-interface catalog/u
+  );
+  assert.match(
+    product,
+    /runner\/replay-visible result-envelope ingress for compute-stage outputs/u
+  );
+  assert.match(
+    product,
+    /Static `pluginResultInterfaces` conformance rows supplied by `odd_sdlc\.TS` are\s+GTL program declarations for ABG to check; they are not a runtime selector/u
+  );
+  assert.match(product, /pluginResultInterfaceCatalog/u);
+  assert.match(
+    ticket,
+    /Static `pluginResultInterfaces` rows supplied to\s+`typecheckGtlProgram\(\.\.\.\)` are GTL program declarations only/u
+  );
+  assert.match(
+    ticket,
+    /Static `pluginResultInterfaces` conformance rows alone are not enough to\s+close this criterion/u
+  );
+
+  assert.ok(input.pluginResultInterfaces.length > 0);
+  assert.ok(report.pluginResultInterfaceCatalog.interfaces.length > 0);
+  for (const row of input.pluginResultInterfaces) {
+    assert.equal(row.mayEmitRuntimeEvents, false);
+    assert.equal(row.mayOwnIterationLoop, false);
+    assert.equal(row.maySelectTraversal, false);
+    assert.equal(row.mayCloseTraversal, false);
+    assert.ok(row.selectorAuthorityRefs.length > 0);
+    assert.equal(
+      row.selectorAuthorityRefs.some((ref) =>
+        /(?:file:\/\/|fp_evaluate_result\.json|fp_transform_result\.json)/u.test(ref)
+      ),
+      false
+    );
+  }
+
+  assert.match(designDepthSource, /admittedPluginResultEnvelopeEvidenceRefsForRegisterPath/u);
+  assert.match(designDepthSource, /runtime_events\.json/u);
+  assert.match(designDepthSource, /admitted_plugin_result_envelope/u);
+  assert.match(designDepthSource, /resultInterfaceContractDigest/u);
+  assert.match(designDepthSource, /authorityRef/u);
+  assert.match(installedOperatorSource, /pluginResultInterfaceCatalog/u);
+  assert.doesNotMatch(
+    installedOperatorSource,
+    /pluginResultInterfaces:\s*constructCurrentSdlcGtlProgramConformanceInput/u
+  );
+  assert.doesNotMatch(designDepthSource, /admitPluginResultEnvelope/u);
+  assert.doesNotMatch(
+    designDepthSource,
+    /currentSdlcPluginResultInterfaceForSelection/u
+  );
+  assert.doesNotMatch(designDepthSource, /latest[-_ ]?run wins/u);
+  assert.doesNotMatch(designDepthSource, /compatibility alias/u);
+  assert.doesNotMatch(
+    designDepthSource,
+    /fallback(?:.|\n){0,120}selectedComposition/u
   );
 });

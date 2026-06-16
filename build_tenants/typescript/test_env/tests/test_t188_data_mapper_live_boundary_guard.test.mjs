@@ -135,7 +135,7 @@ test("T-188 data_mapper live harness worker binding comes from runtime policy", 
   );
   assert.equal(
     runtimePolicy.liveHarness.dataMapperWorkerTransport,
-    "process://codex?model=gpt-5.5&effort=high&sandbox=danger-full-access"
+    "process://claude?model=claude-sonnet-4-7&effort=max"
   );
 
   const runnerSource = readFileSync(
@@ -144,11 +144,12 @@ test("T-188 data_mapper live harness worker binding comes from runtime policy", 
   );
   assert.match(
     runnerSource,
-    /const WORKER_TRANSPORT = RUNTIME_POLICY\.liveHarnessDataMapperWorkerTransport/u
+    /const WORKER_TRANSPORT =\s+cliStringFlag\("--worker"\) \?\? RUNTIME_POLICY\.liveHarnessDataMapperWorkerTransport/u
   );
+  assert.match(runnerSource, /cliStringFlag\("--worker"\)/u);
   assert.doesNotMatch(
     runnerSource,
-    /process:\/\/claude\?model=sonnet&effort=xhigh/u
+    /process:\/\/codex(?:[?#/]|$)/u
   );
   assert.match(
     runnerSource,
@@ -170,10 +171,20 @@ test("T-188 data_mapper live harness worker binding comes from runtime policy", 
       /RUNTIME_POLICY\.liveHarnessDataMapperWorkerTransport/u,
       `${relativePath} must consume the configured data_mapper worker transport`
     );
+    if (
+      relativePath === "test_env/live/run_full_external_data_mapper_sandbox.mjs" ||
+      relativePath === "test_env/live/run_t199_data_mapper_code_depth_resume.mjs"
+    ) {
+      assert.match(
+        source,
+        /cliStringFlag\("--worker"\)/u,
+        `${relativePath} must expose CLI worker transport override`
+      );
+    }
     assert.doesNotMatch(
       source,
-      /process:\/\/claude(?:[?#/]|$)/u,
-      `${relativePath} must not carry a hard-coded Claude data_mapper worker fallback`
+      /process:\/\/codex(?:[?#/]|$)/u,
+      `${relativePath} must not carry a hard-coded Codex data_mapper worker fallback`
     );
   }
   const resumeSource = readFileSync(
@@ -194,12 +205,62 @@ test("T-203 data_mapper detail live harness consumes admitted next actions and U
     "utf8"
   );
   assert.match(runnerSource, /function nextGraphFunctionStartTargetFromStart/u);
+  assert.match(runnerSource, /function runtimeTraversalSelectionEnabled/u);
+  assert.match(runnerSource, /function startClosureDisposition/u);
+  assert.match(runnerSource, /function isSameEdgeRetryStart/u);
+  assert.match(runnerSource, /function shouldContinueSameEdgeRetry/u);
+  assert.match(
+    runnerSource,
+    /function graphFunctionStartTargetFromPostCloseOverlayActionRef/u
+  );
+  assert.match(runnerSource, /const marker = "\/post_close_overlay_continuation\/"/u);
+  assert.match(runnerSource, /startNextLawfulAction\(start\)/u);
   assert.match(runnerSource, /nextActionProjection\.nextGraphFunctionRef/u);
+  assert.match(runnerSource, /nextGraphFunctionStartTargetFromStart\(\s*start,\s*currentStartTarget\s*\)/u);
+  assert.match(runnerSource, /overlayStopDisposition === "overlay_segment_complete"/u);
+  assert.match(runnerSource, /post_close_next_eligible_overlay/u);
+  assert.match(runnerSource, /post_close_overlay_continuation/u);
+  assert.match(runnerSource, /nextActionProjection\.nextEligibleOverlayRefs/u);
+  assert.match(
+    runnerSource,
+    /return `graph_function:\$\{nextGraphFunctionRef\}`/u
+  );
+  assert.match(
+    runnerSource,
+    /return `graph_function:\$\{nextGraphFunctionRef\}`;/
+  );
+  assert.match(
+    runnerSource,
+    /selectedPostCloseOverlayStartTarget \?\? `graph_function:\$\{nextGraphFunctionRef\}`/u
+  );
+  assert.match(runnerSource, /return currentStartTarget;/u);
   assert.match(runnerSource, /currentStartTarget = nextStartTarget/u);
   assert.match(runnerSource, /command: input\.installedCommand/u);
   assert.match(runnerSource, /args: sdlcStartArgs\(currentStartTarget\)/u);
+  assert.match(
+    runnerSource,
+    /isOverlayStartTarget\(START_TARGET\) \|\|\s*runtimeTraversalSelectionEnabled\(\)/u
+  );
+  assert.match(
+    runnerSource,
+    /isOverlayStartTarget\(input\.startTarget\) \|\|\s*runtimeTraversalSelectionEnabled\(\)/u
+  );
+  assert.match(runnerSource, /blockingReason === "retry_budget_exhausted"/u);
+  assert.match(runnerSource, /return closureDisposition === "retry";/u);
+  assert.match(runnerSource, /reason\?\.lawfulReentryPoint === "same_edge_retry"/u);
+  assert.match(runnerSource, /DATA_MAPPER_RETRY_YIELD_ATTEMPT_WINDOW/u);
+  assert.match(runnerSource, /const retryContinuation = shouldContinueSameEdgeRetry\(start\);/u);
+  assert.match(
+    runnerSource,
+    /const nextStartTarget = retryContinuation\s*\?\s*null\s*:\s*nextGraphFunctionStartTargetFromStart/su
+  );
+  assert.match(runnerSource, /if \(retryContinuation\) \{\s*continue;\s*\}/u);
   assert.match(runnerSource, /sdlc_overlay_next_action_missing/u);
   assert.match(runnerSource, /derive_uat_test_source_surface/u);
+  assert.doesNotMatch(
+    runnerSource,
+    /code === "review_grade_edge_fulfillment_blocked"/u
+  );
   assert.doesNotMatch(
     runnerSource,
     /args: sdlcStartArgs\(input\.startTarget\)/u
@@ -255,7 +316,9 @@ test("T-188 data_mapper release proof completion is not reported as overlay no-p
   assert.match(runnerSource, /summary\.releaseProofConverged = releaseProofStopSatisfied\(workspace\)/u);
 
   const releaseStopCheck = runnerSource.indexOf("releaseProofStopSatisfied(input.workspace)");
-  const noProgressCheck = runnerSource.indexOf("sameGraphFunctionAfterConverge >= 2");
+  const noProgressCheck = runnerSource.indexOf(
+    "sameTraversalProgressKeyAfterClose >=\n        DATA_MAPPER_RETRY_YIELD_ATTEMPT_WINDOW"
+  );
   assert.notEqual(releaseStopCheck, -1);
   assert.notEqual(noProgressCheck, -1);
   assert.ok(

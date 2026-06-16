@@ -173,8 +173,9 @@
     "test:t200:rust-detailed-live": "npm run test:t133:rust-live",
     "test:t200:data-mapper-detailed-live": "npm run build:semantic && npm run guard:data-mapper-boundary && ODD_SDLC_TS_DATA_MAPPER_LANE_NAME=data_mapper_deep_sdlc_detail_sandbox ODD_SDLC_TS_DATA_MAPPER_START_TARGET=overlay:deep-sdlc-traversal node test_env/live/run_full_external_data_mapper_sandbox.mjs",
     "test:t202": "npm run build:semantic && node --test test_env/tests/test_t202_consequence_traversal_overlay_catalog.test.mjs",
+    "test:t203": "npm run build:semantic && node --test test_env/tests/test_t203_runtime_start_steel_thread.test.mjs",
     "live:data-mapper-sandbox": "npm run build:semantic && npm run guard:data-mapper-boundary && node test_env/live/run_full_external_data_mapper_sandbox.mjs",
-    "live:data-mapper-steel-thread-sandbox": "ODD_SDLC_TS_DATA_MAPPER_LANE_NAME=data_mapper_steel_thread_sandbox ODD_SDLC_TS_TRAVERSAL_STRATEGY_PROFILE=steel_thread_after_requirements npm run live:data-mapper-sandbox",
+    "live:data-mapper-steel-thread-sandbox": "ODD_SDLC_TS_DATA_MAPPER_LANE_NAME=data_mapper_steel_thread_sandbox ODD_SDLC_TS_DATA_MAPPER_RUNTIME_TRAVERSAL_STRATEGY=steel_thread npm run live:data-mapper-sandbox",
     "test:scenario-sandbox": "npm run build:semantic && node --test test_env/sandbox/test_scenario_sandbox.test.mjs",
     "test:scenario:t131-odd-chat-live": "ODD_SDLC_TS_T131_ODD_CHAT_SCENARIO_LIVE=1 npm run test:scenario-sandbox",
     "test:scenario:hello-world-rust-minimum-live": "npm run build:semantic && ODD_SDLC_TS_HELLO_WORLD_RUST_MINIMUM_INDUCTION_SCENARIO_LIVE=1 node --test --test-name-pattern \"minimum Rust hello-world live build loop\" test_env/sandbox/test_scenario_sandbox.test.mjs",
@@ -198,6 +199,6 @@
     "typescript": "6.0.3"
   },
   "dependencies": {
-    "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.0.0-rc.21/abiogenesis-typescript-tenant-4.0.0-rc.21.tgz"
+    "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.0.0-rc.29/abiogenesis-typescript-tenant-4.0.0-rc.29.tgz"
   }
 }

@@ -888,6 +888,7 @@ function defaultFullBreadthScope(targetAssetType: string): SdlcFeatureScope {
     mode: "full_breadth" as const,
     scopeRef: `scope://odd_sdlc/${targetAssetType}/legacy-full-breadth`,
     basisRefs: Object.freeze([]),
+    includedRequirementRefs: Object.freeze([]),
     includedModuleNames: Object.freeze([]),
     includedEntityIds: Object.freeze([]),
     includedOperationIds: Object.freeze([]),

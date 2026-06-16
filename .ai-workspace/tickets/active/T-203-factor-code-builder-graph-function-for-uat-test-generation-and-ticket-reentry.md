@@ -12,6 +12,7 @@ related_tickets:
   - .ai-workspace/tickets/completed/T-172-realize-staged-disambiguation-graph-and-decomposition-admission.md
   - .ai-workspace/tickets/completed/T-200-implement-depth-traversal-function-and-decomposition-trace-foldback.md
   - .ai-workspace/tickets/completed/T-202-project-abg-consequence-traversal-catalog-onto-sdlc-overlays.md
+  - /Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/active/T-158-admit-gtl-plugin-result-interface-contracts.md
 governance_scope: STDO Method, ODD_METHOD, DESIGN_MODULE_METHOD
 ---
 
@@ -74,6 +75,20 @@ sandbox outside the builder lane.
    prompt. Code-builder/test-builder edges declare a ten-attempt same-edge
    retry/yield window, and replay-visible prior gaps narrow full-breadth retry
    to targeted repair before terminal ticket triage.
+8. Steel-thread is a runtime traversal strategy, not a static GTL/module
+   rebuild profile. SDLC chooses the dependency window from admitted
+   requirement/module/test dependency maps, for example `req-04` plus the
+   dependent requirement rows needed for an MVP thread, and passes those
+   selected refs through `StartIntent.runtimeTraversalSelections`. ABG owns the
+   runtime envelope, traversal facts, replay, retry, yield, and continuation.
+   Full breadth still means fan out over the admitted frontier; steel thread
+   means run the coherent bounded dependency slice selected at start time.
+9. The SDLC steel-thread dependency window is predecessor-closed. A selected
+   requirement or dependency node resolves through admitted module, unit-test,
+   and UAT dependency maps to the dependency nodes, requirement refs, ordering
+   refs, and required progress artifacts that must run together. That selected
+   window is carried only as ABG `StartIntent.runtimeTraversalSelections`;
+   SDLC does not continue the traversal locally.
 
 ## Superseded Truth
 
@@ -86,6 +101,8 @@ sandbox outside the builder lane.
   designed code-builder graph path exists.
 - Patching generated data-mapper code outside the SDLC builder lane to make the
   proof pass.
+- Treating `ODD_SDLC_TS_TRAVERSAL_STRATEGY_PROFILE` as the steel-thread runtime
+  mechanism by rebuilding GTL vector declarations for a run.
 
 ## Design Commitments
 
@@ -97,6 +114,19 @@ sandbox outside the builder lane.
 - Consequence plugins may select only from allowed GTL/ABG traversal catalog
   rows; they do not create route authority, move cursors, write tickets
   directly, or close work.
+- Runtime strategy selection is admitted by ABG through start intent. SDLC may
+  compute selected dependency refs from product maps; it must not own the
+  runtime traversal envelope or continue work with a local loop.
+- Plugin result identity, output-carrier selection, and stage-interface
+  conformance must be GTL-declared and ABG-admitted. SDLC may consume admitted
+  result envelopes and fail closed when they are missing, but it must not
+  reconstruct `F_P`/evaluator plugin APIs from local result-file shapes,
+  sidecar filenames, or archive scans.
+- Static `pluginResultInterfaces` rows supplied to
+  `typecheckGtlProgram(...)` are GTL program declarations only. They prove that
+  the current SDLC graph program declares its plugin result interfaces; they do
+  not prove runtime plugin output admission and must not be used as a local
+  selector, compatibility layer, or "latest run wins" archive rule.
 
 ## Implementation Checklist
 
@@ -152,6 +182,23 @@ sandbox outside the builder lane.
       source generation inputs, deep overlay depth eligibility, and command-only
       non-closure shape.
 - [x] Run semantic verification.
+- [x] Consume ABIogenesis `4.0.0-rc.23` runtime start traversal selection.
+- [x] Thread public-start/CLI runtime traversal selection into ABG
+      `StartIntent.runtimeTraversalSelections`.
+- [x] Replace the data-mapper steel-thread live script's static
+      `ODD_SDLC_TS_TRAVERSAL_STRATEGY_PROFILE` path with a runtime start
+      selection over real requirement refs.
+- [x] Add focused tests proving runtime steel-thread selected requirement refs
+      are admitted at public start, appear in ABG-derived attempt envelopes, and
+      remain SDLC feature-scope refs without falling back to full breadth.
+- [x] Add an SDLC dependency-window resolver that turns a selected requirement
+      or dependency node into a predecessor-closed runtime steel-thread
+      selection with requirement refs, node refs, ordering constraints, progress
+      artifacts, and the ten-attempt retry/yield continuation policy.
+- [x] Preserve concrete requirement lineage during targeted repair retry
+      backoff when no explicit requirement window is present, so retry
+      narrowing cannot erase the product-materialization requirement authority
+      needed for closure.
 
 ## Proof
 
@@ -173,8 +220,28 @@ sandbox outside the builder lane.
   test_env/tests/test_t188_data_mapper_live_boundary_guard.test.mjs` passed
   36/36 after adding the UAT ABG-frontier branch and source-only module
   dependency regression.
-- `npm run test:semantic` passed 1048/1048 after the UAT frontier hardening
-  and source-only module dependency regression.
+- `npm run test:semantic` passed 1051/1051 after the UAT frontier hardening,
+  source-only module dependency regression, runtime steel-thread
+  dependency-window resolver, rc.23 prompt expectation, and targeted-repair
+  requirement-lineage preservation.
+- `npm run test:t203` passed, proving CLI admission of
+  `--runtime-traversal-selection`, public-start threading into ABG
+  `StartIntent.runtimeTraversalSelections`, ABG-derived
+  `TraversalAttemptEnvelope.strategySelectionSource = runtime_start`, and SDLC
+  feature scope preserving runtime-selected requirement refs without
+  broadening to full breadth.
+- `node --test test_env/tests/test_t122_feature_scope_closure.test.mjs
+  test_env/tests/test_t203_runtime_start_steel_thread.test.mjs
+  test_env/tests/test_b086_fd_disambiguation_sweep.test.mjs
+  test_env/tests/test_t191_typed_prompt_assets.test.mjs
+  test_env/tests/test_t151_runner_evaluator_sovereignty.test.mjs
+  test_env/tests/test_t158_consequence_admission_regression.test.mjs` passed
+  68/68 after adding the predecessor-closed runtime dependency-window proof,
+  the rc.23 prompt asset expectation, retry-backoff expectation, and targeted
+  repair requirement-lineage preservation.
+- ABIogenesis `4.0.0-rc.23` is consumed from the clean immutable release
+  snapshot with `sourceDirty: false`; SDLC substrate identity and release
+  adapter tests passed against the rc.23 tarball and checksum.
 - `test_t174_feature_dependency_dag_frontier` now includes the live failure
   regression where source-only module dependency maps derive unit/component
   test lanes and UAT test-source lanes without requiring pre-existing test
@@ -200,6 +267,53 @@ sandbox outside the builder lane.
   terminal review-grade gap, admitted ticket execution contracts for both, and
   started `asset:ticket/T-001` through `route_ticket_work_item` on
   `overlay://odd-sdlc/ticket-workflow` to a converged ticket-route result.
+- 2026-06-16 steel-thread live follow-up exposed an SDLC admission hygiene bug:
+  `GtlContractFulfillmentBinding.testOrExecutionEvidenceRefs` could carry
+  duplicate refs from review-grade evidence and make an otherwise admitted
+  review-grade assessment invalid. Source fix deduplices review-grade
+  fulfillment-binding evidence refs before ABG admission. Verification:
+  `npm run build:semantic && node --test
+  test_env/tests/test_t182_fp_review_grade_edge_fulfillment.test.mjs
+  test_env/tests/test_t188_data_mapper_live_boundary_guard.test.mjs
+  test_env/tests/test_t203_runtime_start_steel_thread.test.mjs` passed 46/46.
+- 2026-06-16 ABIogenesis `4.0.0-rc.29` is consumed for the T-158 compiler and
+  result-envelope ingress slice. SDLC supplies `pluginResultInterfaces` only as
+  GTL program conformance declarations, consumes the compiler-returned
+  `pluginResultInterfaceCatalog` at runtime, and accepts persisted F_P
+  evaluator output only when ABG replay exposes an admitted result-envelope
+  event whose authority and contract digest match the admitted interface
+  contract.
+- 2026-06-16 Product drift guard added: the GTL/product gate now asserts that
+  Product.md and this ticket keep runtime plugin result envelope admission
+  ABG-owned/open and that SDLC does not introduce local `fp_evaluate_result`
+  compatibility selectors such as latest-run or alias fallback logic.
+
+## Current Substrate Drift Finding
+
+The 2026-06-16 data-mapper steel-thread live run exposed a real boundary defect:
+component-code frontier derivation can see multiple predecessor design-depth
+`F_P.evaluate` registers through SDLC artifact lineage, while the accepted rule
+outcome that should identify the selected register is not carried as a single
+GTL-declared, ABG-admitted plugin result envelope.
+
+The local source paths involved are:
+
+- `build_tenants/typescript/code/src/operator/plugins/transform/launch_contract.ts`
+  source-asset authority discovery, which can add prior operator-run artifacts
+  from archive scans.
+- `build_tenants/typescript/code/src/operator/plugins/evaluate/design_depth_register.ts`
+  design-depth evaluator register admission, which currently reasons over local
+  result files and rule-outcome sidecars.
+- `build_tenants/typescript/code/src/operator/product_materialization/staged_authority.ts`
+  frontier carrier derivation, which correctly fails to produce module/test/UAT
+  dependency carriers when implementation-design register admission is
+  ambiguous or unadmitted.
+
+This is not a data-mapper product bug and not a prompt-tuning issue. It is also
+not a license to add "latest run wins", tolerate old result shapes, or make SDLC
+the compiler for `F_P` plugin output APIs. The lawful path is abiogenesis T-158:
+GTL declares the plugin result interface, ABG admits one result envelope, and
+SDLC consumes that admitted envelope or fails closed.
 
 ## Closure Criteria
 
@@ -236,9 +350,27 @@ sandbox outside the builder lane.
   highest-dependency modules, and shared/common-library foundations first.
 - ABG attached F_P retry attempts are configured at 10 for installed SDLC
   starts; SDLC does not run a local retry loop.
+- Steel-thread live starts use `StartIntent.runtimeTraversalSelections` and do
+  not rebuild the GTL module with a steel-thread profile.
+- Runtime-selected requirement refs are visible in the ABG attempt envelope and
+  SDLC handoff feature scope.
+- A runtime steel-thread selected from a requirement closes over predecessor
+  dependency nodes and carries both selected dependency-node refs and
+  normalized `requirement://...` refs rather than broadening to unrelated
+  branches.
 - Replay-visible prior gaps over a full-breadth code/test-builder edge produce
   a `retry_backoff` strategy decision and targeted repair scope before ticket
   triage.
+- Design/evaluator plugin output consumed by code/test-builder frontier
+  derivation is selected from GTL-declared, ABG-admitted result-interface truth.
+  If SDLC must identify the current register by local archive scan, raw
+  `fp_evaluate_result.json` shape probing, sidecar filename convention, or
+  compatibility alias, this ticket remains open and the substrate gap is tracked
+  by abiogenesis T-158.
+- Static `pluginResultInterfaces` conformance rows alone are not enough to
+  close this criterion. SDLC must consume the ABG-admitted
+  `pluginResultInterfaceCatalog` plus replay-visible result-envelope events for
+  persisted evaluator output.
 - No fallback graph declaration, overlay edge, worker policy, or target-carrier
   row lets this behavior bypass the single designed code-builder path.
 - Focused tests and `npm run build:semantic` pass.
@@ -253,6 +385,13 @@ sandbox outside the builder lane.
   test code generation does not.
 - Any prompt-bearing transform/evaluate path whose rendered prompt does not
   start with the SPEC_METHOD planning invariant.
+- Any steel-thread run that depends on static GTL/module regeneration instead
+  of runtime start traversal selection.
+- Any runtime-selected requirement dependency window that is broadened back to
+  full breadth before the worker handoff.
+- Any SDLC code path that treats local result-file shape probing, sidecar
+  filename conventions, or archive scans as the authoritative plugin result
+  interface instead of consuming GTL-declared, ABG-admitted result truth.
 - Any unresolved duplicate/confused graph path for source/test materialization,
   test-run validation, ticket triage, or re-entry.
 

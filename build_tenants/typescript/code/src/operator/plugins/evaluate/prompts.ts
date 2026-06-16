@@ -86,7 +86,7 @@ function edgeAuthorityCompressionPromptLines(): readonly string[] {
 }
 
 const ABG_ITERATION_OUTCOME_FOLD_REF =
-  "package:@abiogenesis/typescript-tenant@4.0.0-rc.21#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows";
+  "package:@abiogenesis/typescript-tenant@4.0.0-rc.29#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows";
 
 interface EvaluatePromptLineGroups {
   readonly preAuthorityLines: readonly string[];
@@ -410,7 +410,7 @@ function compactReviewGradePromptLineGroups(input: {
       `- edgeName: ${JSON.stringify(input.manifest.edgeName)}`,
       `- targetAssetType: ${JSON.stringify(input.manifest.targetAssetType)}`,
       "- status: \"passed\" or \"blocked\"",
-      "- reviewedObligationIds: every admitted obligation id from worker_result_report obligation assessments or invocation package inline obligations. It must include every obligationRef in the admitted edge packet above.",
+      "- reviewedObligationIds: for scoped runs where invocationPackage.featureScope.mode is steel_thread or targeted_repair, exactly invocationPackage.inlineObligationIds and no worker aliases; otherwise every admitted obligation id from worker_result_report obligation assessments or invocation package inline obligations.",
       "- findings[]: one finding per reviewed obligation id.",
       "- evidenceRefs: refs for assessment, generated assets, accepted authority, and review evidence.",
       "- summary: one compact sentence.",
@@ -1025,8 +1025,9 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     `- edgeName: ${JSON.stringify(input.manifest.edgeName)}`,
     `- targetAssetType: ${JSON.stringify(input.manifest.targetAssetType)}`,
     "- status: \"passed\" or \"blocked\"",
-    "- reviewedObligationIds: every obligation id from worker_result_report.obligationAssessments and invocation package inline obligations",
+    "- reviewedObligationIds: for scoped runs where invocationPackage.featureScope.mode is steel_thread or targeted_repair, exactly invocationPackage.inlineObligationIds and no worker aliases; otherwise every obligation id from worker_result_report.obligationAssessments and invocation package inline obligations.",
     "- reviewedObligationIds must contain only admitted obligation ids from worker_result_report.obligationAssessments[].obligationId, worker_result_report.obligationAssessments[].id, invocationPackage.inlineObligationIds[], invocationPackage.obligationIds[], or invocationPackage.inlineObligations[].obligationId.",
+    "- For scoped runs where invocationPackage.featureScope.mode is steel_thread or targeted_repair, the active review scope is invocationPackage.inlineObligationIds. Treat invocationPackage.requirementTraceObligationIds, traversalIntentPackage.obligationIds, retrieval hint obligation ids, and omitted obligation ids as lineage/evidence context only unless the id is also present in invocationPackage.inlineObligationIds.",
     "- Do not build reviewedObligationIds by recursively collecting every string in JSON. Authority and evidence refs such as workspace://..., file://..., config://..., schema://..., gtl://..., handoff-projection://..., source-digest://..., and review-evidence://... are evidenceRefs or acceptedAuthorityRefs, not obligations and must not become findings.",
     "- findings[]: one sdlc_review_grade_obligation_finding per reviewed obligation id",
     "- evidenceRefs: refs for the assessment, generated assets, accepted authority, and review evidence",

@@ -30,8 +30,8 @@ for the TypeScript line.
 
 The ABIogenesis TypeScript tenant is substrate evidence consumed through
 explicit release snapshots. The current TypeScript line consumes
-`@abiogenesis/typescript-tenant@4.0.0-rc.21` from the immutable
-`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.0.0-rc.21/`
+`@abiogenesis/typescript-tenant@4.0.0-rc.29` from the immutable
+`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.0.0-rc.29/`
 release snapshot.
 That cut proves GTL/ABG carriers, graph-function iteration, traversal probes,
 evented saga-frontier execution, no-compute-basis failure taxonomy,
@@ -54,7 +54,7 @@ SDLC prompt authority policy remains product overlay data. It also proves
 segment-scoped evaluation redispatch metadata, so downstream SDLC evaluation
 can preserve segment, dimension-cell, fold, and relation scope across ABG-owned
 redispatch instead of collapsing deep evaluation coverage back to edge-granular
-fallbacks. It also carries the clean ABG 4.0.0-rc.21 consolidation of the
+fallbacks. It also carries the clean ABG 4.0.0-rc.29 consolidation of the
 defaults/lever registry, temporal runtime-scope consolidation, iteration
 state-action algebra, prompt asset interface, and contract-fulfillment binding
 API that `odd_sdlc.TS` consumes. It also carries the ABG-owned
@@ -65,6 +65,17 @@ before runtime execution. It also
 carries ABG-owned runtime authorship routes for explicit graph-vector resume
 cursor and graph-span reentry consumption, so SDLC can consume runtime-owned
 continuation/reentry facts instead of assembling those runtime facts locally.
+It also carries static GTL plugin result-interface validation, the
+compiler-admitted plugin result-interface catalog, and ABG-owned
+runner/replay-visible result-envelope ingress for compute-stage outputs. SDLC
+must fail closed when the ABG-admitted envelope event or admitted interface
+contract digest is absent rather than treating local result files, archive
+scans, or compatibility aliases as contract law.
+Static `pluginResultInterfaces` conformance rows supplied by `odd_sdlc.TS` are
+GTL program declarations for ABG to check; they are not a runtime selector and
+do not authorize SDLC to infer the current plugin output from local filesystem
+shape. Runtime execution consumes the `pluginResultInterfaceCatalog` returned by
+ABG `typecheckGtlProgram(...)`.
 It also carries ABG-owned same-edge assurance retry over accepted F_P artifacts,
 so incomplete or partial semantic realization redispatches inside M03 until the
 admitted retry boundary closes or exhausts instead of returning control to an
@@ -80,6 +91,13 @@ It also carries the ABG-owned consequence allowed traversal catalog and static
 GTL annotation validation for the traversal-family declaration keys consumed by
 SDLC overlays, so consequence plugins select only from ABG-provided catalog
 rows instead of from product-local switches.
+It also carries ABG-owned runtime start traversal selection, so an SDLC public
+start can supply a run-scoped steel-thread or bounded dependency window as
+admitted `StartIntent.runtimeTraversalSelections` rather than rebuilding GTL
+module declarations or hiding selection in product-local loops. SDLC owns the
+domain dependency-map interpretation that chooses requirement/module/test
+schedule refs; ABG owns the runtime envelope, traversal facts, replay, and
+continuation truth for those refs.
 It is not
 itself `odd_sdlc.TS`, and it does not complete the SDLC product behavior.
 

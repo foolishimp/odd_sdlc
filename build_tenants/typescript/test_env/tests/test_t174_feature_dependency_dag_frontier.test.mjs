@@ -31,6 +31,7 @@ import {
   resolveSdlcLiveFpParallelBatchSize,
   selectSdlcDependencyMapTraversal,
   sdlcLiveParallelMaterializationTargetKey,
+  typecheckCurrentSdlcGtlProgram,
   writeHandoffFiles
 } from "../../build/semantic/code/src/index.js";
 import {
@@ -53,6 +54,35 @@ const EMPTY_GRAPH = Object.freeze({
   tags: Object.freeze([]),
   id: "graph://odd-sdlc/t174/feature-dependency-dag"
 });
+
+function designDepthGtlSelectedComposition() {
+  const resultInterface = typecheckCurrentSdlcGtlProgram()
+    .pluginResultInterfaceCatalog.interfaces.find(
+      (contract) =>
+        contract.compositionRef ===
+          "abg.fn_composition://odd-sdlc/derive_implementation_design_surface" &&
+        contract.stageRole === "evaluate" &&
+        contract.computeMeans === "F_P" &&
+        contract.outputCarrierRefs.includes("SdlcDesignDepthRegister")
+    );
+  assert.ok(resultInterface, "admitted design-depth GTL result interface exists");
+  return {
+    kind: "sdlc_selected_abg_fn_composition_identity",
+    compositionRef: resultInterface.compositionRef,
+    compositionDigest: resultInterface.compositionDigest,
+    resultInterfaceRef: resultInterface.resultInterfaceRef,
+    resultEnvelopeContractRef: resultInterface.resultEnvelopeContractRef,
+    resultInterfaceContractDigest:
+      resultInterface.resultInterfaceContractDigest,
+    compositionSelectionRef:
+      "abg.fn_composition_selection://odd-sdlc/derive_implementation_design_surface/t174",
+    selectedRegimeBindingRef:
+      "abg.fn_composition.regime_binding://odd-sdlc/derive_implementation_design_surface/evaluate/F_P",
+    graphFunctionRef: "derive_implementation_design_surface",
+    graphVectorRef: "derive_implementation_design_surface",
+    basisRef: "basis://t174/implementation-design"
+  };
+}
 
 function executionBasis() {
   return Object.freeze({
@@ -525,18 +555,7 @@ function writeT174AdmittedImplementationDesignArchive(root, manifest) {
   const registerRef = pathToFileURL(registerPath).href;
   const contentRegisterRef = pathToFileURL(contentRegisterPath).href;
   const ruleOutcomeRef = pathToFileURL(ruleOutcomePath).href;
-  const composition = {
-    kind: "sdlc_selected_abg_fn_composition_identity",
-    compositionRef: "abg.fn_composition://t174/implementation-design",
-    compositionDigest: "digest://t174/implementation-design",
-    compositionSelectionRef:
-      "abg.fn_composition_selection://t174/implementation-design",
-    selectedRegimeBindingRef:
-      "abg.fn_composition.regime_binding://t174/implementation-design/evaluate/fp",
-    graphFunctionRef: "derive_implementation_design_surface",
-    graphVectorRef: "derive_implementation_design_surface",
-    basisRef: "basis://t174/implementation-design"
-  };
+  const composition = designDepthGtlSelectedComposition();
   const componentRows = [
     {
       componentId: "package_metadata",
@@ -801,6 +820,45 @@ function writeT174AdmittedImplementationDesignArchive(root, manifest) {
         compositionContributionRef: composition.selectedRegimeBindingRef,
         reason: null
       },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  const envelopeRef = "plugin-result-envelope:t174:implementation-design";
+  writeFileSync(
+    path.join(archiveRoot, "runtime_events.json"),
+    `${JSON.stringify(
+      [
+        {
+          kind: "payload_observed",
+          payloadClass: "admitted_plugin_result_envelope",
+          payloadRef: envelopeRef,
+          authorityRef: composition.resultInterfaceRef,
+          contractRef: composition.resultEnvelopeContractRef
+        },
+        {
+          kind: "payload_validated",
+          payloadRef: envelopeRef,
+          contractRef: composition.resultEnvelopeContractRef,
+          contractDigest: composition.resultInterfaceContractDigest
+        },
+        {
+          kind: "evidence_admitted",
+          payloadRef: envelopeRef,
+          evidenceRef: contentRegisterRef
+        },
+        {
+          kind: "evidence_admitted",
+          payloadRef: envelopeRef,
+          evidenceRef: registerRef
+        },
+        {
+          kind: "evidence_admitted",
+          payloadRef: envelopeRef,
+          evidenceRef: ruleOutcomeRef
+        }
+      ],
       null,
       2
     )}\n`,

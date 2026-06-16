@@ -64,7 +64,7 @@ export function ticketWorkflowFdRuleContract(): EnginePluginContract {
     pluginKind: "fd_evaluator",
     authority: "effect_plugin",
     inputCarrier: "EnginePluginInput",
-    outputCarrier: "SdlcTicketExecutionContractAdmission",
+    outputCarrier: "SdlcTicketExecutionContract",
     computeStageRole: "evaluate",
     computeMeans: "F_D",
     computeStagePurpose: "candidate_evaluation"

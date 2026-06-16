@@ -44,7 +44,8 @@ const SEED_ARCHIVE_ROOT = resolve(
 const LANE_NAME =
   process.env["ODD_SDLC_TS_DATA_MAPPER_LANE_NAME"] ??
   "t199_data_mapper_code_depth_resume_live";
-const WORKER_TRANSPORT = RUNTIME_POLICY.liveHarnessDataMapperWorkerTransport;
+const WORKER_TRANSPORT =
+  cliStringFlag("--worker") ?? RUNTIME_POLICY.liveHarnessDataMapperWorkerTransport;
 const DATA_MAPPER_WORKER_MINIMUM_OPERATOR_TIMEOUT_MS =
   process.env["ODD_SDLC_TS_DATA_MAPPER_WORKER_MINIMUM_OPERATOR_TIMEOUT_MS"] ??
   "60000";
@@ -79,6 +80,28 @@ const SANDBOX_NOISE_DIR_NAMES = Object.freeze(
     "target"
   ])
 );
+
+function cliStringFlag(flagName) {
+  const equalsPrefix = `${flagName}=`;
+  for (let index = 2; index < process.argv.length; index += 1) {
+    const arg = process.argv[index];
+    if (arg === flagName) {
+      const value = process.argv[index + 1];
+      if (value === undefined || value.startsWith("--")) {
+        throw new Error(`${flagName}: expected value`);
+      }
+      return value;
+    }
+    if (arg.startsWith(equalsPrefix)) {
+      const value = arg.slice(equalsPrefix.length);
+      if (value.length === 0) {
+        throw new Error(`${flagName}: expected value`);
+      }
+      return value;
+    }
+  }
+  return null;
+}
 
 function archiveTimestamp() {
   return new Date().toISOString().replaceAll("-", "").replaceAll(":", "").replace(".", "");

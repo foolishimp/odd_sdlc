@@ -1439,6 +1439,7 @@ export interface SdlcFeatureScope {
   readonly mode: SdlcFeatureScopeMode;
   readonly scopeRef: string;
   readonly basisRefs: readonly string[];
+  readonly includedRequirementRefs: readonly string[];
   readonly includedModuleNames: readonly string[];
   readonly includedEntityIds: readonly string[];
   readonly includedOperationIds: readonly string[];

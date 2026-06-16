@@ -27,6 +27,7 @@ import {
   hookContractByEdgeName,
   materializeSdlcProjectConformance,
   promptForHandoff,
+  typecheckCurrentSdlcGtlProgram,
   SDLC_FUNCTION_CATALOG,
   SDLC_OPERATOR_RUN_ARTIFACT_CATALOG,
   sha256Text,
@@ -37,6 +38,7 @@ import {
 import {
   admitImplementationDesignRegisterCandidateForManifest,
   admitImplementationDesignRegisterForManifest,
+  admitImplementationDesignRegisterForRuntimeEvaluation,
   designDepthFpEvaluatorRegisterPath
 } from "../../build/semantic/code/src/operator/plugins/evaluate/design_depth_register.js";
 import { readOperatorRunCarriers } from "../../build/semantic/code/src/analysis/carrier_loaders.js";
@@ -414,8 +416,40 @@ function selectedComposition() {
   };
 }
 
+function designDepthGtlSelectedComposition() {
+  const resultInterface = typecheckCurrentSdlcGtlProgram()
+    .pluginResultInterfaceCatalog.interfaces.find(
+      (contract) =>
+        contract.compositionRef ===
+          "abg.fn_composition://odd-sdlc/derive_implementation_design_surface" &&
+        contract.stageRole === "evaluate" &&
+        contract.computeMeans === "F_P" &&
+        contract.outputCarrierRefs.includes("SdlcDesignDepthRegister")
+    );
+  assert.ok(
+    resultInterface,
+    "admitted design-depth GTL result interface exists"
+  );
+  return {
+    kind: "sdlc_selected_abg_fn_composition_identity",
+    compositionRef: resultInterface.compositionRef,
+    compositionDigest: resultInterface.compositionDigest,
+    resultInterfaceRef: resultInterface.resultInterfaceRef,
+    resultEnvelopeContractRef: resultInterface.resultEnvelopeContractRef,
+    resultInterfaceContractDigest:
+      resultInterface.resultInterfaceContractDigest,
+    compositionSelectionRef:
+      "abg.fn_composition_selection://odd-sdlc/derive_implementation_design_surface/t181",
+    selectedRegimeBindingRef:
+      "abg.fn_composition.regime_binding://odd-sdlc/derive_implementation_design_surface/evaluate/F_P",
+    graphFunctionRef: "derive_implementation_design_surface",
+    graphVectorRef: "derive_implementation_design_surface",
+    basisRef: "basis://t181/design-depth-gtl"
+  };
+}
+
 function writeDesignDepthFpEvaluatorRuleOutcomeProof({ manifest, registerPath }) {
-  const composition = selectedComposition();
+  const composition = designDepthGtlSelectedComposition();
   const registerRef = pathToFileURL(registerPath).href;
   const contentRegisterRef = pathToFileURL(
     designDepthFpEvaluatorContentRegisterPath({ archiveRoot: manifest.archiveRoot })
@@ -454,11 +488,51 @@ function writeDesignDepthFpEvaluatorRuleOutcomeProof({ manifest, registerPath })
     )}\n`,
     "utf8"
   );
-  return pathToFileURL(proofPath).href;
+  const proofRef = pathToFileURL(proofPath).href;
+  const envelopeRef = `plugin-result-envelope:t181:${manifest.runId}`;
+  writeFileSync(
+    path.join(manifest.archiveRoot, "runtime_events.json"),
+    `${JSON.stringify(
+      [
+        {
+          kind: "payload_observed",
+          payloadClass: "admitted_plugin_result_envelope",
+          payloadRef: envelopeRef,
+          authorityRef: composition.resultInterfaceRef,
+          contractRef: composition.resultEnvelopeContractRef
+        },
+        {
+          kind: "payload_validated",
+          payloadRef: envelopeRef,
+          contractRef: composition.resultEnvelopeContractRef,
+          contractDigest: composition.resultInterfaceContractDigest
+        },
+        {
+          kind: "evidence_admitted",
+          payloadRef: envelopeRef,
+          evidenceRef: contentRegisterRef
+        },
+        {
+          kind: "evidence_admitted",
+          payloadRef: envelopeRef,
+          evidenceRef: registerRef
+        },
+        {
+          kind: "evidence_admitted",
+          payloadRef: envelopeRef,
+          evidenceRef: proofRef
+        }
+      ],
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  return proofRef;
 }
 
 function fpEvaluateResultPayloadForRegister(registerPath, options = {}) {
-  const composition = selectedComposition();
+  const composition = designDepthGtlSelectedComposition();
   const scalarSelectedRegimeBindingRef =
     options.selectedRegimeBindingRef ?? composition.selectedRegimeBindingRef;
   const scalarComposition = {
@@ -505,7 +579,7 @@ function fpEvaluateResultPayloadForRegister(registerPath, options = {}) {
 }
 
 function writeDesignDepthFpEvaluatorContentRegister({ manifest, registerPath }) {
-  const composition = selectedComposition();
+  const composition = designDepthGtlSelectedComposition();
   const register = JSON.parse(readFileSync(registerPath, "utf8"));
   const contentRegisterPath = designDepthFpEvaluatorContentRegisterPath({
     archiveRoot: manifest.archiveRoot
@@ -569,7 +643,7 @@ test("T-181 design-depth content register normalizes root version aliases during
     const contentRegisterPath = designDepthFpEvaluatorContentRegisterPath({
       archiveRoot: manifest.archiveRoot
     });
-    const composition = selectedComposition();
+    const composition = designDepthGtlSelectedComposition();
     const evidenceRef = pathToFileURL(manifest.outputFile).href;
     const axisVerdict = (axis) => ({
       kind: "sdlc_design_completeness_axis_verdict",
@@ -713,7 +787,7 @@ test("T-181 design-depth content register supports incremental fragment projecti
     const contentRegisterPath = designDepthFpEvaluatorContentRegisterPath({
       archiveRoot: manifest.archiveRoot
     });
-    const composition = selectedComposition();
+    const composition = designDepthGtlSelectedComposition();
     const evidenceRef = pathToFileURL(manifest.outputFile).href;
     const register = implementationDesignRegister(
       "incremental-component",
@@ -1165,7 +1239,7 @@ test("T-183 evaluate content register rejects bridge-shaped extra semantic surfa
     const contentRegisterPath = designDepthFpEvaluatorContentRegisterPath({
       archiveRoot: manifest.archiveRoot
     });
-    const composition = selectedComposition();
+    const composition = designDepthGtlSelectedComposition();
     const selectedIdentity = {
       selectedCompositionRef: composition.compositionRef,
       selectedCompositionDigest: composition.compositionDigest,
@@ -1414,6 +1488,57 @@ test("T-183 evaluator sidecar admission is structural and does not replace F_P s
   }
 });
 
+test("T-158 design-depth evaluator result admission uses ABG envelope instead of nested selectedComposition", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForImplementationDesign(
+      workspaceRoot,
+      "t181-abg-plugin-result-envelope"
+    );
+    mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+    writeFileSync(
+      manifest.outputFile,
+      implementationDesignAdr("abg-result-envelope"),
+      "utf8"
+    );
+    const registerPath = designDepthFpEvaluatorRegisterPath(manifest);
+    mkdirSync(path.dirname(registerPath), { recursive: true });
+    writeFileSync(
+      registerPath,
+      `${JSON.stringify(
+        implementationDesignRegister(
+          "abg-result-envelope",
+          pathToFileURL(manifest.outputFile).href
+        ),
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+    writeDesignDepthFpEvaluatorContentRegister({ manifest, registerPath });
+    writeDesignDepthFpEvaluatorRuleOutcomeProof({ manifest, registerPath });
+    const fpEvaluateResult = { ...fpEvaluateResultPayloadForRegister(registerPath) };
+    delete fpEvaluateResult.selectedComposition;
+    writeFileSync(
+      path.join(manifest.archiveRoot, "fp_evaluate_result.json"),
+      `${JSON.stringify(fpEvaluateResult, null, 2)}\n`,
+      "utf8"
+    );
+
+    const admission = admitImplementationDesignRegisterForManifest({
+      manifest
+    });
+
+    assert.equal(admission.status, "admitted");
+    assert.ok(
+      admission.evidenceRefs.some((ref) => ref.startsWith("plugin-result-envelope:")),
+      JSON.stringify(admission.evidenceRefs, null, 2)
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
 test("T-181 F_P evaluator register truth defers transform postflight and validates after sidecar", () => {
   const workspaceRoot = makeWorkspace();
   try {
@@ -1480,6 +1605,13 @@ test("T-181 F_P evaluator register truth defers transform postflight and validat
       JSON.stringify(filesystemOnly.blockingReasonCarriers),
       /design_depth_fp_evaluator_register_unadmitted/u
     );
+    const filesystemOnlyAdmission = admitImplementationDesignRegisterForManifest({
+      manifest
+    });
+    assert.equal(filesystemOnlyAdmission.status, "rejected");
+    assert.deepEqual(filesystemOnlyAdmission.blockingReasons, [
+      "design_depth_fp_evaluator_register_unadmitted"
+    ]);
 
     const fpEvaluatorAdmissionEvidenceRefs = Object.freeze([
       writeDesignDepthFpEvaluatorRuleOutcomeProof({ manifest, registerPath })
@@ -1495,6 +1627,15 @@ test("T-181 F_P evaluator register truth defers transform postflight and validat
       JSON.stringify(missingContentRegister.blockingReasonCarriers),
       /design_depth_fp_evaluator_register_unadmitted/u
     );
+    const missingContentRegisterAdmission =
+      admitImplementationDesignRegisterForRuntimeEvaluation({
+        manifest,
+        fpEvaluatorAdmissionEvidenceRefs
+      });
+    assert.equal(missingContentRegisterAdmission.status, "rejected");
+    assert.deepEqual(missingContentRegisterAdmission.blockingReasons, [
+      "design_depth_fp_evaluator_register_unadmitted"
+    ]);
 
     writeDesignDepthFpEvaluatorContentRegister({ manifest, registerPath });
     const after = evaluateSdlcComputeStage({

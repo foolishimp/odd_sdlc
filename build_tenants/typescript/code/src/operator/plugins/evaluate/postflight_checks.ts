@@ -139,6 +139,15 @@ const REQUIREMENT_MARKER_EXPRESSION =
 
 const MAX_INVOCATION_PACKAGE_REQUIREMENT_TRACE_IDS = 80;
 
+const LIVE_FP_PARALLEL_MATERIALIZATION_FRONTIER_FILE =
+  "sdlc_live_fp_parallel_materialization_frontier.json";
+
+const CODE_BUILDER_VALIDATION_LOG_NAME_PATTERN =
+  /(?:^|[-_])(?:test|validation|verify|check)(?:[-_]|$).*\.log$/iu;
+
+const CODE_BUILDER_VALIDATION_FAILURE_PATTERN =
+  /(?:^|\n)\[error\]|\b(?:compilation failed|build failed|command failed|tests unsuccessful)\b|(?:exit(?:ed)?(?:\s+with)?\s+code\s+[1-9][0-9]*)/iu;
+
 
 
 function tenantLocalSdlcSurfaceRelativePath(targetAssetType: string): string | null {
@@ -2637,6 +2646,126 @@ function materializedProductFileSatisfiesDeclaredTarget(input: {
     })
   );
 }
+
+function fullComponentCodeBuilderEdge(
+  manifest: SdlcWorkerHandoffManifest
+): boolean {
+  return (
+    manifest.graphFunctionName === "derive_component_code_surface" &&
+    manifest.edgeName === "derive_component_code_surface" &&
+    manifest.targetAssetType === "component_code_surface" &&
+    manifest.productMaterialization.required
+  );
+}
+
+
+
+function frontierNumber(record: Record<string, unknown>, key: string): number | null {
+  const value = record[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+
+
+export function evaluateCodeBuilderSourceTestFrontier(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly blockingReasonCarriers: SdlcBlockingReason[];
+}): void {
+  if (!fullComponentCodeBuilderEdge(input.manifest)) {
+    return;
+  }
+  const frontierPath = join(
+    input.manifest.archiveRoot,
+    LIVE_FP_PARALLEL_MATERIALIZATION_FRONTIER_FILE
+  );
+  const frontierRef = pathToFileURL(frontierPath).href;
+  if (!existsSync(frontierPath) || !statSync(frontierPath).isFile()) {
+    input.blockingReasonCarriers.push(
+      makeSdlcBlockingReason({
+        code: "code_builder_parallel_frontier_missing",
+        detail: LIVE_FP_PARALLEL_MATERIALIZATION_FRONTIER_FILE,
+        evidenceRefs: [frontierRef]
+      })
+    );
+    return;
+  }
+  let record: Record<string, unknown>;
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(frontierPath, "utf8"));
+    const parsedRecord = objectRecord(parsed);
+    if (parsedRecord === null) {
+      throw new TypeError("frontier is not an object");
+    }
+    record = parsedRecord;
+  } catch (error) {
+    input.blockingReasonCarriers.push(
+      makeSdlcBlockingReason({
+        code: "code_builder_parallel_frontier_missing",
+        detail: error instanceof Error ? error.message : "frontier_parse_failed",
+        evidenceRefs: [frontierRef]
+      })
+    );
+    return;
+  }
+  const devLaneCount = frontierNumber(record, "devLaneCount") ?? 0;
+  const componentTestLaneCount =
+    frontierNumber(record, "componentTestLaneCount") ?? 0;
+  const uatTestLaneCount = frontierNumber(record, "uatTestLaneCount") ?? 0;
+  if (
+    devLaneCount <= 0 ||
+    componentTestLaneCount <= 0 ||
+    uatTestLaneCount <= 0
+  ) {
+    input.blockingReasonCarriers.push(
+      makeSdlcBlockingReason({
+        code: "code_builder_parallel_test_lanes_missing",
+        detail:
+          `dev=${devLaneCount}; componentTest=${componentTestLaneCount}; uatTest=${uatTestLaneCount}`,
+        evidenceRefs: [frontierRef]
+      })
+    );
+  }
+}
+
+
+
+export function evaluateCodeBuilderValidationLogs(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly blockingReasonCarriers: SdlcBlockingReason[];
+}): void {
+  if (!fullComponentCodeBuilderEdge(input.manifest)) {
+    return;
+  }
+  let logNames: readonly string[] = Object.freeze([]);
+  try {
+    logNames = Object.freeze(
+      readdirSync(input.manifest.archiveRoot).filter((name) =>
+        CODE_BUILDER_VALIDATION_LOG_NAME_PATTERN.test(name)
+      )
+    );
+  } catch {
+    return;
+  }
+  for (const logName of logNames) {
+    const logPath = join(input.manifest.archiveRoot, logName);
+    if (!statSync(logPath).isFile()) {
+      continue;
+    }
+    const content = readFileSync(logPath, "utf8");
+    if (!CODE_BUILDER_VALIDATION_FAILURE_PATTERN.test(content)) {
+      continue;
+    }
+    input.blockingReasonCarriers.push(
+      makeSdlcBlockingReason({
+        code: "code_builder_validation_command_failed",
+        detail: logName,
+        evidenceRefs: [pathToFileURL(logPath).href]
+      })
+    );
+  }
+}
+
+
 
 export function evaluateMaterializedProductFiles(input: {
   readonly manifest: SdlcWorkerHandoffManifest;

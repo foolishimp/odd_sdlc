@@ -160,6 +160,81 @@ function makeExecutionWorkspace() {
   return root;
 }
 
+function writeValidCodeBuilderFrontier(manifest) {
+  mkdirSync(manifest.archiveRoot, { recursive: true });
+  writeFileSync(
+    path.join(
+      manifest.archiveRoot,
+      "sdlc_live_fp_parallel_materialization_frontier.json"
+    ),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_live_fp_parallel_materialization_frontier",
+        edgeName: "derive_component_code_surface",
+        executionAuthority: "abg_evented_saga_frontier",
+        parallelismControl: "abg_branch_execution_policy",
+        graphTruthSource: "sdlc_feature_dependency_dag",
+        selectedMethod: "parallel",
+        dependencyMapRef: "dependency-map://t066/dev",
+        testDependencyMapRef: "dependency-map://t066/component-test",
+        uatTestDependencyMapRef: "dependency-map://t066/uat-test",
+        dependencyMapRefs: [
+          "dependency-map://t066/dev",
+          "dependency-map://t066/component-test",
+          "dependency-map://t066/uat-test"
+        ],
+        traversalSelectionRef: "traversal-selection://t066/dev",
+        testTraversalSelectionRef: "traversal-selection://t066/component-test",
+        uatTestTraversalSelectionRef: "traversal-selection://t066/uat-test",
+        traversalSelectionRefs: [
+          "traversal-selection://t066/dev",
+          "traversal-selection://t066/component-test",
+          "traversal-selection://t066/uat-test"
+        ],
+        dagRef: "dag://t066/code-builder",
+        startNodes: ["node://t066/app"],
+        frontierRef: "frontier://t066/code-builder",
+        policyRef: "policy://t066/parallel-code-builder",
+        laneCount: 3,
+        devLaneCount: 1,
+        componentTestLaneCount: 1,
+        uatTestLaneCount: 1,
+        testLaneCount: 2,
+        fanInCount: 1,
+        batchCount: 1,
+        batchSizes: [3],
+        maxActive: 3,
+        readyBranchRefs: [
+          "branch://t066/dev",
+          "branch://t066/component-test",
+          "branch://t066/uat-test"
+        ],
+        compiledReadyBranchRefs: [
+          "branch://t066/dev",
+          "branch://t066/component-test",
+          "branch://t066/uat-test"
+        ],
+        completedBranchRefs: [
+          "branch://t066/dev",
+          "branch://t066/component-test",
+          "branch://t066/uat-test"
+        ],
+        failedBranchRefs: [],
+        writeTerritoryConflictRefs: [],
+        outputAllocationConflictRefs: [],
+        branchRows: [],
+        fanInRows: [],
+        emittedEventKinds: ["branch_started", "branch_completed"],
+        emittedEventCount: 6,
+        replayEventCount: 6
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+}
+
 function selectedCompositionForManifest(manifest) {
   return deriveSdlcSelectedAbgFnCompositionIdentity({
     graphFunctionRef: manifest.graphFunctionName,
@@ -6312,6 +6387,7 @@ test("T-171 full component-code defers execution evidence to graph test-executio
 
   const report = readWorkerResultReport(manifest);
   writeProductMaterializationManifest({ manifest, report });
+  writeValidCodeBuilderFrontier(manifest);
   const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(postflight.status, "passed");

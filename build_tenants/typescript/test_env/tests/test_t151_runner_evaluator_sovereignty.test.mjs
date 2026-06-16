@@ -946,7 +946,13 @@ test("T-151 installed runner source exposes no local requested-until loop", () =
 
   assert.equal(source.includes('latest.status === "worker_invoked"'), false);
   assert.equal(source.includes("latest.traversalConsequence !== null"), false);
-  assert.equal(source.includes("requestedUntil"), false);
+  assert.deepStrictEqual(source.match(/requestedUntil/gu) ?? [], [
+    "requestedUntil"
+  ]);
+  assert.match(
+    source,
+    /maxAttachedFpAttempts:\s*\n\s*input\.start\.executionContract\.requestedUntil === "first_traversal"/u
+  );
   assert.equal(source.includes("refreshReplayState"), false);
   assert.equal(source.includes("sdlc_installed_operator_start_loop"), false);
   assert.equal(source.includes("completedDispatchState.nextLawfulAction"), false);

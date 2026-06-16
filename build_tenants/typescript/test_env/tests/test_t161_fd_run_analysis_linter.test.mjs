@@ -28,7 +28,8 @@ import {
 } from "../../build/semantic/code/src/analysis/index.js";
 import {
   invokeOddSdlcSpecMethodCommandSync,
-  serializeOddSdlcSpecMethodResult
+  serializeOddSdlcSpecMethodResult,
+  typecheckCurrentSdlcGtlProgram
 } from "../../build/semantic/code/src/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
@@ -109,6 +110,35 @@ const T132_LINEAGE_REFS = Object.freeze([
   "requirement:t132_hello_world_single_tenant.stage_01_t132_requirements.req_t132_004",
   "requirement:t132_hello_world_single_tenant.stage_01_t132_requirements.req_t132_005"
 ]);
+
+function designDepthGtlSelectedComposition() {
+  const resultInterface = typecheckCurrentSdlcGtlProgram()
+    .pluginResultInterfaceCatalog.interfaces.find(
+      (contract) =>
+        contract.compositionRef ===
+          "abg.fn_composition://odd-sdlc/derive_implementation_design_surface" &&
+        contract.stageRole === "evaluate" &&
+        contract.computeMeans === "F_P" &&
+        contract.outputCarrierRefs.includes("SdlcDesignDepthRegister")
+    );
+  assert.ok(resultInterface, "admitted design-depth GTL result interface exists");
+  return {
+    kind: "sdlc_selected_abg_fn_composition_identity",
+    compositionRef: resultInterface.compositionRef,
+    compositionDigest: resultInterface.compositionDigest,
+    resultInterfaceRef: resultInterface.resultInterfaceRef,
+    resultEnvelopeContractRef: resultInterface.resultEnvelopeContractRef,
+    resultInterfaceContractDigest:
+      resultInterface.resultInterfaceContractDigest,
+    compositionSelectionRef:
+      "abg.fn_composition_selection://odd-sdlc/derive_implementation_design_surface/t161",
+    selectedRegimeBindingRef:
+      "abg.fn_composition.regime_binding://odd-sdlc/derive_implementation_design_surface/evaluate/F_P",
+    graphFunctionRef: "derive_implementation_design_surface",
+    graphVectorRef: "derive_implementation_design_surface",
+    basisRef: "basis://t161/design-depth-gtl"
+  };
+}
 
 function archiveExists(archiveRoot) {
   return existsSync(archiveRoot);
@@ -212,22 +242,26 @@ function buildSyntheticT132Archive(opts) {
     const postflightStatus = override.postflightStatus ?? "passed";
     const blockingReasonCodes = override.blockingReasonCodes ?? [];
     const residualPressureRefs = override.residualPressureRefs ?? [];
-    const compositionRef = `abg.fn_composition://synthetic/${edge.name}/${index}`;
-    const compositionDigest = `digest://synthetic/${edge.name}/${index}`;
-    const compositionSelectionRef =
-      `abg.fn_composition_selection://synthetic/${edge.name}/${index}`;
-    const selectedRegimeBindingRef =
-      `abg.fn_composition.regime_binding://synthetic/${edge.name}/${index}/evaluate/fp`;
-    const selectedComposition = {
-      kind: "sdlc_selected_abg_fn_composition_identity",
-      compositionRef,
-      compositionDigest,
-      compositionSelectionRef,
-      selectedRegimeBindingRef,
-      graphFunctionRef: `graph-function://synthetic/${edge.name}`,
-      graphVectorRef: edge.name,
-      basisRef: "basis://synthetic/t161"
-    };
+    const isImplementationDesignEdge =
+      edge.target === "implementation_design_surface";
+    const selectedComposition = isImplementationDesignEdge
+      ? designDepthGtlSelectedComposition()
+      : {
+          kind: "sdlc_selected_abg_fn_composition_identity",
+          compositionRef: `abg.fn_composition://synthetic/${edge.name}/${index}`,
+          compositionDigest: `digest://synthetic/${edge.name}/${index}`,
+          compositionSelectionRef:
+            `abg.fn_composition_selection://synthetic/${edge.name}/${index}`,
+          selectedRegimeBindingRef:
+            `abg.fn_composition.regime_binding://synthetic/${edge.name}/${index}/evaluate/fp`,
+          graphFunctionRef: `graph-function://synthetic/${edge.name}`,
+          graphVectorRef: edge.name,
+          basisRef: "basis://synthetic/t161"
+        };
+    const compositionRef = selectedComposition.compositionRef;
+    const compositionDigest = selectedComposition.compositionDigest;
+    const compositionSelectionRef = selectedComposition.compositionSelectionRef;
+    const selectedRegimeBindingRef = selectedComposition.selectedRegimeBindingRef;
     const designDepthRegisterPath = path.join(
       operatorRunRoot,
       "design_depth_fp_evaluator_register.json"
@@ -453,7 +487,7 @@ function buildSyntheticT132Archive(opts) {
           compositionSelectionRef,
           selectedRegimeBindingRef,
           evaluationRef: `evaluation://synthetic/${edge.name}/${index}`,
-          findings: edge.target === "implementation_design_surface"
+          findings: isImplementationDesignEdge
             ? [
                 {
                   findingRef:
@@ -474,7 +508,7 @@ function buildSyntheticT132Archive(opts) {
           evaluation: {
             evaluationRef: `evaluation://synthetic/${edge.name}/${index}`,
             status: postflightStatus,
-            findingRefs: edge.target === "implementation_design_surface"
+              findingRefs: isImplementationDesignEdge
               ? [
                   `finding://synthetic/${edge.name}/${index}/design-depth-register`
                 ]
@@ -483,7 +517,7 @@ function buildSyntheticT132Archive(opts) {
           status: postflightStatus,
           postflightStatus,
           blockingReasons: blockingReasonCodes,
-          evidenceRefs: edge.target === "implementation_design_surface"
+          evidenceRefs: isImplementationDesignEdge
             ? [
                 designDepthRuleOutcomeRef,
                 designDepthContentRegisterRef,
@@ -497,7 +531,7 @@ function buildSyntheticT132Archive(opts) {
         { length: 22 },
         (_, i) => `target_asset:${edge.target}/${i}`
       );
-      if (edge.target === "implementation_design_surface") {
+      if (isImplementationDesignEdge) {
         const designDepthRegisterPayload = {
             kind: "sdlc_design_depth_register",
             registerVersion: "ts-design-depth-v1",
@@ -889,17 +923,51 @@ function buildSyntheticT132Archive(opts) {
         ].join("\n") + "\n",
         dirMtimeMs
       );
+      const runtimeEvents = [
+        { index: 0, kind: "actor_process_started" },
+        { index: 1, kind: "actor_process_exited" }
+      ];
+      if (isImplementationDesignEdge) {
+        const envelopeRef = `plugin-result-envelope:t161:${edge.name}:${index}`;
+        runtimeEvents.push(
+          {
+            kind: "payload_observed",
+            payloadClass: "admitted_plugin_result_envelope",
+            payloadRef: envelopeRef,
+            authorityRef: selectedComposition.resultInterfaceRef,
+            contractRef: selectedComposition.resultEnvelopeContractRef
+          },
+          {
+            kind: "payload_validated",
+            payloadRef: envelopeRef,
+            contractRef: selectedComposition.resultEnvelopeContractRef,
+            contractDigest: selectedComposition.resultInterfaceContractDigest
+          },
+          {
+            kind: "evidence_admitted",
+            payloadRef: envelopeRef,
+            evidenceRef: designDepthContentRegisterRef
+          },
+          {
+            kind: "evidence_admitted",
+            payloadRef: envelopeRef,
+            evidenceRef: designDepthRegisterRef
+          },
+          {
+            kind: "evidence_admitted",
+            payloadRef: envelopeRef,
+            evidenceRef: designDepthRuleOutcomeRef
+          }
+        );
+      }
       writeJson(
         path.join(operatorRunRoot, "runtime_events.json"),
         {
           kind: "sdlc_runtime_event_archive_projection",
           archiveVersion: "synthetic-v1",
-          eventCount: 2,
-          eventKinds: ["actor_process_started", "actor_process_exited"],
-          events: [
-            { index: 0, kind: "actor_process_started" },
-            { index: 1, kind: "actor_process_exited" }
-          ]
+          eventCount: runtimeEvents.length,
+          eventKinds: [...new Set(runtimeEvents.map((event) => event.kind))],
+          events: runtimeEvents
         },
         dirMtimeMs
       );

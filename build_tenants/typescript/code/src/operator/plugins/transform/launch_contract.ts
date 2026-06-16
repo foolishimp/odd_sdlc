@@ -3745,7 +3745,9 @@ export function assertTraversalIntentPackagePressure(
     manifest.productMaterialization.required &&
     concreteRequirementObligations.length === 0
   ) {
-    throw new TypeError("traversal intent package missing concrete requirement lineage");
+    throw new TypeError(
+      `traversal intent package missing concrete requirement lineage: edge=${manifest.edgeName}; target=${manifest.targetAssetType}; scope=${manifest.featureScope.mode}; obligations=${manifest.traversalObligationContext.obligations.length}`
+    );
   }
   if (
     manifest.productMaterialization.required &&
@@ -4587,7 +4589,7 @@ function transformAxiomsForWorker(): readonly string[] {
     "Do not use PTY transcripts, runtime logs, or worker archives as product authority unless a package ref names them.",
     "Start the output artifact with ## Execution Plan naming read authority, bounded steps, and first materialization target.",
     "Large artifact rule: never emit one monolithic tool payload for a generated register or ADR. Keep each write/edit payload bounded; use compact rows and stable references to source authority instead of duplicating entire upstream surfaces.",
-    "When requirementTraceObligationIds is non-empty, preserve exact ids in worker/result carriers and use grouped counts plus high-signal samples in Markdown product/design surfaces. Emit every exact id only when the target artifact is a traceability/register surface or an outcome directive explicitly requires exact id rows. Use traversal_intent_package as audit context, not as extra product-file tag pressure."
+    "When requirementTraceObligationIds is non-empty, preserve exact ids as lineage/evidence refs only; do not turn them into worker_result_report.obligationAssessments unless the same id is also present in inlineObligationIds. Emit every exact id only when the target artifact is a traceability/register surface or an outcome directive explicitly requires exact id rows. Use traversal_intent_package as audit context, not as extra product-file tag pressure."
   ]);
 }
 
@@ -5686,7 +5688,7 @@ function promptForHandoffSections(
     "- currentState.tenantToolEnvironment",
     "- obligations.inlineObligations typed pressure rows.",
     "- obligations.inlineRequirementPressureRows typed requirement work queue.",
-    "- obligations.requirementTraceObligationIds.",
+    "- obligations.requirementTraceObligationIds are lineage/evidence context only; active report scope is obligations.inlineObligationIds.",
     "- retry/gap/repair rows when present.",
     "- computeSubworkstreamPolicy permission and non-authority rules.",
     "- traversalIntentPackage ref."
@@ -5775,6 +5777,7 @@ function promptForHandoffSections(
         "- Apply worker_construction_brief.json as the single prompt source carrier.",
         "- Archive package files and manifests are replay/audit projections.",
         "- Build a Requirement/Authority/Asset Checklist from requirements, target rows, expected artifacts, and evaluated gaps.",
+        "- worker_result_report.obligationAssessments must cover exactly the active report scope from obligations.inlineObligationIds; do not add omitted requirements, requirementTraceObligationIds, traversalIntentPackage.obligationIds, retrieval hint obligation ids, or full manifest obligations as assessment rows.",
         "- Do not return success while required checklist rows are unmapped. Keep Markdown proportional: use grouped counts plus high-signal samples, and do not list every id unless the target is a requirement-surface Trace Index or admitted traceability/register surface requiring exact rows.",
         ...requirementSurfaceTraceAxiomLines,
         ...ioDisciplineLines,

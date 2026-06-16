@@ -66,6 +66,10 @@ function tokenAppearsInRef(input: {
 
 function featureScopeTokens(featureScope: SdlcFeatureScope): readonly string[] {
   const tokens: string[] = [];
+  for (const requirementRef of featureScope.includedRequirementRefs ?? []) {
+    tokens.push(requirementRef);
+    tokens.push(decodeURIComponent(requirementRef));
+  }
   for (const moduleName of featureScope.includedModuleNames) {
     tokens.push(moduleName);
     const parts = moduleName.split(/[^A-Za-z0-9]+/u).filter(Boolean);
@@ -89,6 +93,64 @@ function featureScopeTokens(featureScope: SdlcFeatureScope): readonly string[] {
     ...featureScope.includedOperationIds
   );
   return uniqueSorted(tokens);
+}
+
+function normalizedRequirementKey(value: string): string | null {
+  const decoded = decodeURIComponent(value).toLowerCase();
+  const normalized = decoded.replace(/[^a-z0-9]+/gu, "_");
+  const parts = normalized.split("_").filter((part) => part.length > 0);
+  const reqIndex = parts.lastIndexOf("req");
+  if (reqIndex < 0 || reqIndex === parts.length - 1) {
+    return null;
+  }
+  return parts
+    .slice(reqIndex)
+    .map((part) => (/^\d+$/u.test(part) ? String(Number(part)) : part))
+    .join(":");
+}
+
+function requirementKeyCandidates(input: {
+  readonly obligation: Pick<
+    SdlcTraversalObligation,
+    "obligationId" | "summary"
+  >;
+}): readonly string[] {
+  const candidates: string[] = [];
+  const obligationKey = normalizedRequirementKey(input.obligation.obligationId);
+  if (obligationKey !== null) {
+    candidates.push(obligationKey);
+  }
+  const summaryMatch = /^Fulfill\s+([^:]+):/iu.exec(input.obligation.summary);
+  if (summaryMatch?.[1] !== undefined) {
+    const summaryKey = normalizedRequirementKey(summaryMatch[1]);
+    if (summaryKey !== null) {
+      candidates.push(summaryKey);
+    }
+  }
+  return uniqueSorted(candidates);
+}
+
+function requirementObligationMatchesIncludedRefs(input: {
+  readonly featureScope: SdlcFeatureScope;
+  readonly obligation: Pick<
+    SdlcTraversalObligation,
+    "obligationId" | "summary"
+  >;
+}): boolean {
+  const includedRequirementRefs =
+    input.featureScope.includedRequirementRefs ?? Object.freeze([]);
+  const includedKeys = new Set(
+    includedRequirementRefs.flatMap((ref) => {
+      const key = normalizedRequirementKey(ref);
+      return key === null ? [] : [key];
+    })
+  );
+  if (includedKeys.size === 0) {
+    return false;
+  }
+  return requirementKeyCandidates({ obligation: input.obligation }).some((key) =>
+    includedKeys.has(key)
+  );
 }
 
 export function sdlcModuleNameInFeatureScope(input: {
@@ -128,6 +190,8 @@ export function sdlcTraversalObligationInFeatureScope(input: {
     "obligationId" | "obligationKind" | "summary" | "evidenceRefs" | "payload"
   >;
 }): boolean {
+  const includedRequirementRefs =
+    input.featureScope.includedRequirementRefs ?? Object.freeze([]);
   if (input.featureScope.mode === "full_breadth") {
     return true;
   }
@@ -139,6 +203,22 @@ export function sdlcTraversalObligationInFeatureScope(input: {
     input.obligation.obligationKind === "prior_gap"
   ) {
     return true;
+  }
+  if (
+    input.featureScope.mode === "targeted_repair" &&
+    input.obligation.obligationKind === "requirement" &&
+    includedRequirementRefs.length === 0
+  ) {
+    return true;
+  }
+  if (
+    input.obligation.obligationKind === "requirement" &&
+    includedRequirementRefs.length > 0
+  ) {
+    return requirementObligationMatchesIncludedRefs({
+      featureScope: input.featureScope,
+      obligation: input.obligation
+    });
   }
   if (
     input.obligation.obligationKind === "design_or_module" &&
@@ -205,6 +285,12 @@ function selectedIds(input: {
   );
 }
 
+function selectedRequirementRefs(refs: readonly string[]): readonly string[] {
+  return uniqueInOrder(
+    refs.filter((ref) => ref.startsWith("requirement://"))
+  );
+}
+
 export function deriveSdlcFeatureScope(
   input: SdlcFeatureScopeDerivationInput
 ): SdlcFeatureScope {
@@ -220,6 +306,7 @@ export function deriveSdlcFeatureScope(
     selectedStrategy: input.selectedStrategy,
     strategyDirectiveRef: input.strategyDirectiveRef
   });
+  const includedRequirementRefs = selectedRequirementRefs(basisRefs);
   if (mode === "full_breadth") {
     return Object.freeze({
       kind: "sdlc_feature_scope" as const,
@@ -227,6 +314,7 @@ export function deriveSdlcFeatureScope(
       mode,
       scopeRef: `scope://odd_sdlc/${slugPart(input.targetAssetType)}/full-breadth`,
       basisRefs,
+      includedRequirementRefs,
       includedModuleNames: declaredModuleNames,
       includedEntityIds: uniqueSorted(input.materializedEntityIds),
       includedOperationIds: uniqueSorted(input.materializedOperationIds),
@@ -242,13 +330,17 @@ export function deriveSdlcFeatureScope(
     includedModuleNames.length === 0 && declaredModuleNames.length === 1
       ? declaredModuleNames
       : includedModuleNames;
-  if (effectiveIncludedModuleNames.length === 0) {
+  if (
+    effectiveIncludedModuleNames.length === 0 &&
+    includedRequirementRefs.length === 0
+  ) {
     return Object.freeze({
       kind: "sdlc_feature_scope" as const,
       scopeVersion: "ts-scope-v1" as const,
       mode: "full_breadth" as const,
       scopeRef: `scope://odd_sdlc/${slugPart(input.targetAssetType)}/full-breadth`,
       basisRefs,
+      includedRequirementRefs,
       includedModuleNames: declaredModuleNames,
       includedEntityIds: uniqueSorted(input.materializedEntityIds),
       includedOperationIds: uniqueSorted(input.materializedOperationIds),
@@ -259,10 +351,12 @@ export function deriveSdlcFeatureScope(
     kind: "sdlc_feature_scope" as const,
     scopeVersion: "ts-scope-v1" as const,
     mode,
-    scopeRef: `scope://odd_sdlc/${slugPart(input.targetAssetType)}/${mode.replace("_", "-")}/${effectiveIncludedModuleNames
-      .map(slugPart)
-      .join("+") || "unscoped"}`,
+    scopeRef: `scope://odd_sdlc/${slugPart(input.targetAssetType)}/${mode.replace("_", "-")}/${[
+      ...effectiveIncludedModuleNames,
+      ...includedRequirementRefs
+    ].map(slugPart).join("+") || "unscoped"}`,
     basisRefs,
+    includedRequirementRefs,
     includedModuleNames: effectiveIncludedModuleNames,
     includedEntityIds: selectedIds({
       ids: input.materializedEntityIds,

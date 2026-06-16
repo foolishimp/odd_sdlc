@@ -26,6 +26,6 @@
     "commandTimeoutMs": 3600000,
     "fullCapabilityCommandTimeoutMs": 43200000,
     "lifecycleCommandTimeoutMs": 21600000,
-    "dataMapperWorkerTransport": "process://codex?model=gpt-5.5&effort=high&sandbox=danger-full-access"
+    "dataMapperWorkerTransport": "process://claude?model=claude-sonnet-4-7&effort=max"
   }
 }

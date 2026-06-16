@@ -353,6 +353,8 @@ export interface OperatorRunCarriers {
   readonly moduleDependencyTraversalSelection: LoadedJson<SdlcDependencyTraversalSelection>;
   readonly testDependencyMap: LoadedJson<SdlcTestDependencyMap>;
   readonly testDependencyTraversalSelection: LoadedJson<SdlcDependencyTraversalSelection>;
+  readonly uatTestDependencyMap: LoadedJson<SdlcTestDependencyMap>;
+  readonly uatTestDependencyTraversalSelection: LoadedJson<SdlcDependencyTraversalSelection>;
   readonly liveFpParallelMaterializationFrontier: LoadedJson<LiveFpParallelMaterializationFrontierRecord>;
   readonly runPerformanceSummary: LoadedJson<RunPerformanceSummaryRecord>;
   readonly edgePerformanceSummary: LoadedJson<RunPerformanceSummaryRecord>;
@@ -393,6 +395,8 @@ export interface OperatorRunFileSizes {
   readonly sdlcModuleDependencyTraversalSelection: number;
   readonly sdlcTestDependencyMap: number;
   readonly sdlcTestDependencyTraversalSelection: number;
+  readonly sdlcUatTestDependencyMap: number;
+  readonly sdlcUatTestDependencyTraversalSelection: number;
   readonly sdlcLiveFpParallelMaterializationFrontier: number;
 }
 
@@ -800,6 +804,9 @@ const OPERATOR_RUN_JSON_GUARDS: Readonly<Record<string, JsonGuard<unknown>>> =
     "operator-run-artifact://module-dependency-traversal-selection": DEPENDENCY_TRAVERSAL_SELECTION_GUARD,
     "operator-run-artifact://test-dependency-map": TEST_DEPENDENCY_MAP_GUARD,
     "operator-run-artifact://test-dependency-traversal-selection": DEPENDENCY_TRAVERSAL_SELECTION_GUARD,
+    "operator-run-artifact://uat-test-dependency-map": TEST_DEPENDENCY_MAP_GUARD,
+    "operator-run-artifact://uat-test-dependency-traversal-selection":
+      DEPENDENCY_TRAVERSAL_SELECTION_GUARD,
     "operator-run-artifact://live-fp-parallel-materialization-frontier":
       isSdlcLiveFpParallelMaterializationFrontier,
     "operator-run-artifact://run-performance-summary": PERF_SUMMARY_GUARD,
@@ -971,6 +978,8 @@ export function readOperatorRunCarriers(operatorRunRoot: string): OperatorRunCar
     sdlcModuleDependencyTraversalSelection: sizeOfArtifact("operator-run-artifact://module-dependency-traversal-selection"),
     sdlcTestDependencyMap: sizeOfArtifact("operator-run-artifact://test-dependency-map"),
     sdlcTestDependencyTraversalSelection: sizeOfArtifact("operator-run-artifact://test-dependency-traversal-selection"),
+    sdlcUatTestDependencyMap: sizeOfArtifact("operator-run-artifact://uat-test-dependency-map"),
+    sdlcUatTestDependencyTraversalSelection: sizeOfArtifact("operator-run-artifact://uat-test-dependency-traversal-selection"),
     sdlcLiveFpParallelMaterializationFrontier: sizeOfArtifact("operator-run-artifact://live-fp-parallel-materialization-frontier")
   });
   return Object.freeze({
@@ -1098,6 +1107,16 @@ export function readOperatorRunCarriers(operatorRunRoot: string): OperatorRunCar
     testDependencyTraversalSelection: loadCatalogedJsonArtifact({
       operatorRunRoot,
       artifactRef: "operator-run-artifact://test-dependency-traversal-selection",
+      guard: DEPENDENCY_TRAVERSAL_SELECTION_GUARD
+    }),
+    uatTestDependencyMap: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://uat-test-dependency-map",
+      guard: TEST_DEPENDENCY_MAP_GUARD
+    }),
+    uatTestDependencyTraversalSelection: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://uat-test-dependency-traversal-selection",
       guard: DEPENDENCY_TRAVERSAL_SELECTION_GUARD
     }),
     liveFpParallelMaterializationFrontier: loadCatalogedJsonArtifact({

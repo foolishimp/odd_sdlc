@@ -641,7 +641,7 @@ test("T-188 re-entered close preserves overlay segment completion authority", ()
   );
   assert.match(
     INSTALLED_OPERATOR_SOURCE,
-    /input\.start\.executionContract\?\.targetGraphFunction \?\?\s+input\.state\.manifest\.edgeName/u
+    /const completedGraphFunctionRef = input\.state\.manifest\.edgeName/u
   );
   assert.match(
     INSTALLED_OPERATOR_SOURCE,
