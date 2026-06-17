@@ -87,7 +87,9 @@ import {
   productAuthorityTargetCoversRelativePath,
   reconcileSdlcProductMaterializationAuthority,
   tenantRelativeOutputArtifactPath
-} from "../../product_materialization/authority.js";
+} from "../../product_materialization/authority.js";import {
+  MATERIALIZED_PRODUCT_FILE_ROLES
+} from "../../product_materialization/surface_paths.js";
 
 const REPORT_FIELDS = Object.freeze([
   "kind",
@@ -111,19 +113,6 @@ const REPORT_FIELDS = Object.freeze([
   "fpTransformStatusSnapshot",
   "fpEvaluateResultRef"
 ] as const);
-
-
-
-const MATERIALIZED_PRODUCT_FILE_ROLES = Object.freeze([
-  "source",
-  "test",
-  "build_config",
-  "design",
-  "documentation",
-  "other"
-] as const);
-
-
 
 const WORKER_OBLIGATION_FULFILLMENT_STATUSES = Object.freeze([
   "fulfilled",

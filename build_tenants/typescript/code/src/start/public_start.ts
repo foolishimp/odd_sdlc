@@ -600,79 +600,82 @@ function traversalOutcomeClassForPublicStart(
   }).outcomeClass;
 }
 
+type PublicStartTraversalSelection = {
+  readonly summary: SdlcDecompositionSummary;
+  readonly selection: SdlcTraversalHopSelection;
+};
+
+function triagedEntryOverlayRefForProfile(
+  profile: SdlcConformProjectProfile
+): SdlcTraversalOverlayRef {
+  const profileOverlayRef = isSdlcTraversalOverlayRef(profile.overlayRef)
+    ? profile.overlayRef
+    : SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF;
+  if (
+    profile.overlayStrategy === "thread" ||
+    profileOverlayRef === SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
+  ) {
+    return SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF;
+  }
+  if (
+    profile.overlayStrategy === "min_fp" ||
+    profileOverlayRef === SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF
+  ) {
+    return SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF;
+  }
+  if (
+    profile.overlayStrategy === "breadth" ||
+    traversalOutcomeClassForPublicStart(profile) === "domain_product"
+  ) {
+    return profileOverlayRef;
+  }
+  if (profileOverlayRef !== SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF) {
+    return profileOverlayRef;
+  }
+  return SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF;
+}
+
+function ticketContractRequestsCurrentFullTraversal(
+  contract: SdlcTicketExecutionContract
+): boolean {
+  return contract.overlayContinuationRows.some(
+    (row) =>
+      row.selectedStartTargetRef === SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF &&
+      row.ruling !== "close" &&
+      row.ruling !== "defer"
+  );
+}
+
+function triagedPublicStartEntryOverlayRef(input: {
+  readonly profile: SdlcConformProjectProfile;
+  readonly ticketExecutionContract: SdlcTicketExecutionContract | null;
+}): SdlcTraversalOverlayRef {
+  if (input.ticketExecutionContract !== null) {
+    return ticketContractRequestsCurrentFullTraversal(input.ticketExecutionContract)
+      ? SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF
+      : SDLC_TICKET_WORKFLOW_OVERLAY_REF;
+  }
+  return triagedEntryOverlayRefForProfile(input.profile);
+}
+
 function frontDoorTraversalSelection(input: {
   readonly request: SdlcPublicStartRequest;
   readonly profile: SdlcConformProjectProfile;
-}): {
-  readonly summary: SdlcDecompositionSummary;
-  readonly selection: SdlcTraversalHopSelection;
-} | null {
+  readonly overlay: SdlcTraversalOverlay;
+}): PublicStartTraversalSelection | null {
   if (input.request.target.kind !== "next") {
     return null;
   }
-  const outcomeClass = traversalOutcomeClassForPublicStart(input.profile);
-  if (outcomeClass === "domain_product") {
-    return null;
-  }
-  const upstreamRef = `requirement://odd-sdlc/public-start/${input.profile.projectSlug}/framework-smoke`;
-  const summary = deriveSdlcDecompositionSummary({
-    stageId: "public_start_framework_smoke_min_fp",
-    upstreamKind: "requirement",
-    downstreamKind: "component",
-    thresholds: SDLC_DEFAULT_DECOMPOSITION_SUMMARY_THRESHOLDS,
-    stageUpstreamUniverseRefs: [upstreamRef],
-    requireTrivialDegenerateProduct: true,
-    rows: [
-      {
-        downstreamId: "component://framework-smoke/hello-world",
-        parentId: "module://framework-smoke",
-        ownedUpstreamRefs: [upstreamRef],
-        publicBoundaryRefs: [
-          `${input.profile.selectedOutputRoot}/src`
-        ],
-        substantiveResponsibilityRefs: ["behavior://framework-smoke/hello-world"],
-        materializationTargetRefs: [
-          `${input.profile.selectedOutputRoot}/src`
-        ]
-      }
-    ]
+  return overlayTraversalSelection({
+    overlay: input.overlay,
+    profile: input.profile
   });
-  const selection = deriveSdlcTraversalHopSelection({
-    selectionRef: `selection://odd-sdlc/public-start/${input.profile.projectSlug}/framework-smoke-min-fp`,
-    outcomeClass,
-    decompositionSummary: summary,
-    bundleEligible: true,
-    skippedEdgeRefs: [
-      "edge://odd-sdlc/current-full-traversal/derive_intent_surface",
-      "edge://odd-sdlc/current-full-traversal/derive_product_surface",
-      "edge://odd-sdlc/current-full-traversal/derive_goal_surface",
-      "edge://odd-sdlc/current-full-traversal/derive_requirement_surface",
-      "edge://odd-sdlc/current-full-traversal/derive_uat_testcases_surface",
-      "edge://odd-sdlc/current-full-traversal/derive_testcase_authority_surface",
-      "edge://odd-sdlc/current-full-traversal/derive_feature_decomp_surface",
-      "edge://odd-sdlc/current-full-traversal/derive_design_surface",
-      "edge://odd-sdlc/current-full-traversal/derive_scenario_surface",
-      "edge://odd-sdlc/current-full-traversal/derive_implementation_design_surface",
-      "edge://odd-sdlc/current-full-traversal/derive_component_code_surface",
-      "edge://odd-sdlc/current-full-traversal/derive_component_test_surface",
-      "edge://odd-sdlc/current-full-traversal/derive_test_execution_result_surface",
-      "edge://odd-sdlc/current-full-traversal/prepare_release_surface"
-    ],
-    evidenceRefs: [
-      "capability://odd-sdlc/trivial_product",
-      "overlay://odd-sdlc/framework-smoke-min-fp"
-    ]
-  });
-  return Object.freeze({ summary, selection });
 }
 
 function overlayTraversalSelection(input: {
   readonly overlay: SdlcTraversalOverlay;
   readonly profile: SdlcConformProjectProfile;
-}): {
-  readonly summary: SdlcDecompositionSummary;
-  readonly selection: SdlcTraversalHopSelection;
-} | null {
+}): PublicStartTraversalSelection | null {
   if (
     input.overlay.overlayRef !== SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF &&
     input.overlay.overlayRef !== SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
@@ -734,10 +737,7 @@ function publicStartBootstrapOptimization(input: {
   readonly profile: SdlcConformProjectProfile;
   readonly selectedOverlay: SdlcTraversalOverlay;
   readonly selectedCandidate: PublicStartActionCandidate;
-  readonly selectedTraversal: {
-    readonly summary: SdlcDecompositionSummary;
-    readonly selection: SdlcTraversalHopSelection;
-  } | null;
+  readonly selectedTraversal: PublicStartTraversalSelection | null;
   readonly sourceRef: string;
 }): SdlcBootstrapPublicStartOptimization {
   const outcomeClass = traversalOutcomeClassForPublicStart(input.profile);
@@ -1020,10 +1020,7 @@ function evaluateInitialPublicStartAction(input: {
   let preferredTargetOutcomeRef: string | null = null;
   let requestedOverlay: SdlcTraversalOverlay | null = null;
   let ticketExecutionContract: SdlcTicketExecutionContract | null = null;
-  let selectedTraversal = frontDoorTraversalSelection({
-    request: input.request,
-    profile: input.conformedProject
-  });
+  let selectedTraversal: PublicStartTraversalSelection | null = null;
   const sourceRef = `${input.request.target.kind}/${input.request.target.handle}`;
   const replayNextGraphFunctionRef =
     input.request.replayNextGraphFunctionRef ?? null;
@@ -1047,15 +1044,10 @@ function evaluateInitialPublicStartAction(input: {
     }
     if (ticketResolution.kind === "admitted") {
       ticketExecutionContract = ticketResolution.contract;
-      const ticketContinuationOverlayRef =
-        ticketExecutionContract.overlayContinuationRows.some(
-          (row) =>
-            row.selectedStartTargetRef === SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF &&
-            row.ruling !== "close" &&
-            row.ruling !== "defer"
-        )
-          ? SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF
-          : SDLC_TICKET_WORKFLOW_OVERLAY_REF;
+      const ticketContinuationOverlayRef = triagedPublicStartEntryOverlayRef({
+        profile: input.conformedProject,
+        ticketExecutionContract
+      });
       requestedOverlay = resolveSdlcTraversalOverlay({
         catalog: getOverlayCatalog(),
         overlayRef: ticketContinuationOverlayRef
@@ -1136,25 +1128,26 @@ function evaluateInitialPublicStartAction(input: {
       blockingReason = candidate === null ? "stale_query_domain" : null;
       preferredTargetOutcomeRef = candidate?.targetOutcomeRef ?? null;
     } else {
-      const minFpOverlay =
-        selectedTraversal === null
+      const triagedOverlay =
+        conformanceStatus === "blocked"
           ? null
           : resolveSdlcTraversalOverlay({
               catalog: getOverlayCatalog(),
-              overlayRef: SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF
+              overlayRef: triagedPublicStartEntryOverlayRef({
+                profile: input.conformedProject,
+                ticketExecutionContract: null
+              })
             });
-      const profileOverlay =
-        conformanceStatus === "blocked"
-          ? null
-          : minFpOverlay ?? resolveSdlcTraversalOverlay({
-              catalog: getOverlayCatalog(),
-              overlayRef: input.conformedProject.overlayRef
-            });
-      if (profileOverlay !== null) {
-        requestedOverlay = profileOverlay;
+      if (triagedOverlay !== null) {
+        requestedOverlay = triagedOverlay;
+        selectedTraversal = frontDoorTraversalSelection({
+          request: input.request,
+          profile: input.conformedProject,
+          overlay: triagedOverlay
+        });
         const candidate = candidateForGraphFunction({
           module: input.module,
-          graphFunctionName: profileOverlay.defaultStartTarget,
+          graphFunctionName: triagedOverlay.defaultStartTarget,
           sourceRef
         });
         candidates = Object.freeze(candidate === null ? [] : [candidate]);

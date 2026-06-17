@@ -300,10 +300,6 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
       .overlayZoomTargetGraphFunctionRefs,
     []
   );
-  assert(
-    jsZoom.expectations.latestArchiveJsonAssertions[0].equals
-      .overlayZoomTargetGraphFunctionRefs.includes("derive_component_test_surface")
-  );
   assert(t133HelloWorldRustLiveScenario({ worker }).maxAdvances >= 16);
   const jsLite = t160HelloWorldJsLiteLiveScenario({ worker });
   assert.deepEqual(jsLite.startTarget, "overlay:lite-design-module-implementation");
@@ -319,18 +315,11 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
   assert.equal(jsLite.stopAfterWorkspaceFilesExist, false);
   assert.equal(jsLite.stopAfterRequiredHandoffEdges, true);
   const rustServiceLive = t164RustHelloServiceLiteLiveScenario({ worker });
-  assert.deepEqual(
-    scenarioStartTargetForStep(rustServiceLive, 0),
-    "overlay:bootstrap-requirements"
-  );
-  assert.deepEqual(
-    scenarioStartTargetForStep(rustServiceLive, 1),
-    "overlay:bootstrap-requirements"
-  );
-  assert.deepEqual(
-    scenarioStartTargetForStep(rustServiceLive, 2),
-    "overlay:lite-design-module-implementation"
-  );
+  assert.deepEqual(rustServiceLive.startTarget, "next");
+  assert.equal(Array.isArray(rustServiceLive.startTargetSequence), false);
+  assert.deepEqual(scenarioStartTargetForStep(rustServiceLive, 0), "next");
+  assert.deepEqual(scenarioStartTargetForStep(rustServiceLive, 1), "next");
+  assert.deepEqual(scenarioStartTargetForStep(rustServiceLive, 2), "next");
   assert(rustServiceLive.maxAdvances >= 16);
   assert.deepEqual(
     rustServiceLive.expectations.handoffEdgeSequencePrefix[0],
@@ -344,14 +333,8 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
     "prepare_test_execution_surface",
     "derive_test_execution_result_surface"
   ]);
-  assert.deepEqual(
-    scenarioStartTargetForStep(rustServiceLive, 4),
-    "overlay:lite-design-module-implementation"
-  );
-  assert.deepEqual(
-    scenarioStartTargetForStep(rustServiceLive, 5),
-    "overlay:lite-design-module-implementation"
-  );
+  assert.deepEqual(scenarioStartTargetForStep(rustServiceLive, 4), "next");
+  assert.deepEqual(scenarioStartTargetForStep(rustServiceLive, 5), "next");
   assert.deepEqual(
     rustServiceLive.expectations.edgeAssuranceArchiveSequencePrefix,
     rustServiceLive.expectations.handoffEdgeSequencePrefix

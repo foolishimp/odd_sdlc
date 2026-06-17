@@ -3,70 +3,53 @@ import path, {
   join,
   relative,
   resolve
-} from "node:path";import type {
+} from "node:path";
+import type {
   SdlcMaterializedProductFileRole,
   SdlcPostflightGapDossier,
   SdlcPostflightGapReason,
   SdlcProductMaterializationContract,
   SdlcProductMaterializationAuthorityReconciliation,
   SdlcWorkerHandoffManifest
-} from "../../carriers.js";import {
+} from "../../carriers.js";
+import {
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
   FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
   FG_CONFORM_PROJECT_AUTHORITY,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
-} from "../../../graph/index.js";import {
+} from "../../../graph/index.js";
+import {
   SDLC_COMPONENT_ATTRIBUTION_CONFIDENCE,
   SDLC_COMPONENT_CONCERN_ROLES,
   SDLC_COMPONENT_REPAIR_SCHEDULE_STATUSES,
   SDLC_COMPONENT_REPAIR_TARGETS,
   SDLC_TEST_CASE_KINDS,
   SDLC_TEST_EXECUTION_LANES
-} from "../../carriers.js";import {
+} from "../../carriers.js";
+import {
   fileURLToPath
-} from "node:url";import {
+} from "node:url";
+import {
   makeSdlcBlockingReason
-} from "../../../shared/blocking_reason.js";import {
+} from "../../../shared/blocking_reason.js";
+import {
   pathIsInside
-} from "../../../shared/path.js";import {
+} from "../../../shared/path.js";
+import {
   reconcileSdlcProductMaterializationAuthority
-} from "../../product_materialization/authority.js";import {
+} from "../../product_materialization/authority.js";
+import {
   sdlcEdgeOutputPolicyForTargetAssetType,
   sdlcInstalledOperatorProjectsOutput
-} from "../../edge_output_policy.js";import {
+} from "../../edge_output_policy.js";
+import {
   uniqueSorted
 } from "../../../shared/collections.js";
-
-const MATERIALIZED_PRODUCT_FILE_ROLES = Object.freeze([
-  "source",
-  "test",
-  "build_config",
-  "design",
-  "documentation",
-  "other"
-] as const);
-
-const WORKSPACE_LOCAL_SDLC_SURFACE_OUTPUT_PATHS = Object.freeze({
-  intent_surface: "specification/INTENT.md",
-  product_surface: "specification/PRODUCT.md",
-  goal_surface: "specification/GOALS.md",
-  requirement_surface: "specification/requirements/10-generated-bootstrap.md",
-  uat_testcases_surface: "specification/scenarios/20-generated-uat-testcases.md",
-  testcase_authority_surface:
-    "specification/scenarios/30-generated-testcase-authority.md"
-} as const satisfies Record<string, string>);
-
-function workspaceLocalSdlcSurfaceRelativePath(targetAssetType: string): string | null {
-  for (const [assetType, relativePath] of Object.entries(
-    WORKSPACE_LOCAL_SDLC_SURFACE_OUTPUT_PATHS
-  )) {
-    if (assetType === targetAssetType) {
-      return relativePath;
-    }
-  }
-  return null;
-}
+import {
+  MATERIALIZED_PRODUCT_FILE_ROLES,
+  workspaceLocalSdlcSurfaceRelativePath
+} from "../../product_materialization/surface_paths.js";
 
 function tenantRelativeOutputArtifactPath(
   manifest: SdlcWorkerHandoffManifest
@@ -891,7 +874,7 @@ export function outcomeDirectivesForWorker(
           : "For component_code_surface, materialize implementation/source files for each source-role declared component and record Component Realization Register evidence. Do not create test files, test component rows, repair schedules, or execution evidence on this edge."
       );
       directives.push(
-        "For component_code_surface, force depth by iterating between admitted source/design authority, source/build_config repair, and source-local syntax or build probes. Do not create, modify, or execute test files on this edge; generated tests and test execution are owned by downstream test graph functions.",
+        "For component_code_surface, force depth by iterating between the smallest admitted UAT/scenario probe, the declared build/test command or execution shard, and source repair. Do not create, modify, or execute test files on this edge; generated tests and test execution are owned by downstream test graph functions.",
         "Do not report a requirement as behavior-fulfilled merely because it is mapped to a component_depth_register row, lineage tag, manifest entry, or worker obligation assessment. Public behavior must be accountable to a source boundary plus scenario/build-test/evaluator evidence, or else be carried as explicit downstream pressure."
       );
       if (

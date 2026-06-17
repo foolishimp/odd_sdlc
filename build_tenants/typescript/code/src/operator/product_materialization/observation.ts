@@ -37,15 +37,9 @@ import {
   reconcileSdlcProductMaterializationAuthority,
   tenantRelativeOutputArtifactPath
 } from "./authority.js";
-
-const MATERIALIZED_PRODUCT_FILE_ROLES = Object.freeze([
-  "source",
-  "test",
-  "build_config",
-  "design",
-  "documentation",
-  "other"
-] as const satisfies readonly SdlcMaterializedProductFileRole[]);
+import {
+  MATERIALIZED_PRODUCT_FILE_ROLES
+} from "./surface_paths.js";
 
 function relativePathLooksLikeTestMaterialization(relativePath: string): boolean {
   const normalized = relativePath.toLowerCase();

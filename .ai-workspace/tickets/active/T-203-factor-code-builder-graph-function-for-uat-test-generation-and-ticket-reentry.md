@@ -12,7 +12,8 @@ related_tickets:
   - .ai-workspace/tickets/completed/T-172-realize-staged-disambiguation-graph-and-decomposition-admission.md
   - .ai-workspace/tickets/completed/T-200-implement-depth-traversal-function-and-decomposition-trace-foldback.md
   - .ai-workspace/tickets/completed/T-202-project-abg-consequence-traversal-catalog-onto-sdlc-overlays.md
-  - /Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/active/T-158-admit-gtl-plugin-result-interface-contracts.md
+  - /Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/T-158-admit-gtl-plugin-result-interface-contracts.md
+  - /Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/active/T-159-formalize-traversal-unit-and-consequence-bind-boundary.md
 governance_scope: STDO Method, ODD_METHOD, DESIGN_MODULE_METHOD
 ---
 
@@ -95,6 +96,15 @@ sandbox outside the builder lane.
    refs, and required progress artifacts that must run together. That selected
    window is carried only as ABG `StartIntent.runtimeTraversalSelections`;
    SDLC does not continue the traversal locally.
+11. Cold start and ticket start are SDLC product entry units over ABIogenesis
+    T-159 traversal law:
+    `traverse<bootstrap, conformant>` and `traverse<ticket, triage>`.
+    SDLC owns the product meaning of bootstrap conformance, ticket triage,
+    overlays, and proportionality evidence. ABG owns the closeable
+    `TraversalUnit<A, B>` atom, consequence bind, runtime transition, replay,
+    and public command control. A local public-start helper may project a
+    current product entry choice while ABI T-159 is source-side, but it is not
+    the traversal unit, bind law, or durable route authority.
 
 ## Superseded Truth
 
@@ -109,6 +119,9 @@ sandbox outside the builder lane.
   proof pass.
 - Treating `ODD_SDLC_TS_TRAVERSAL_STRATEGY_PROFILE` as the steel-thread runtime
   mechanism by rebuilding GTL vector declarations for a run.
+- Treating `triagedPublicStartEntryOverlayRef(...)`, scenario `startTarget`
+  values, or an SDLC CLI command as the formal traversal unit or consequence
+  bind boundary after ABIogenesis T-159 has named that substrate law.
 
 ## Design Commitments
 
@@ -123,6 +136,15 @@ sandbox outside the builder lane.
 - Runtime strategy selection is admitted by ABG through start intent. SDLC may
   compute selected dependency refs from product maps; it must not own the
   runtime traversal envelope or continue work with a local loop.
+- Bootstrap and ticket entry triage are product interpretations of
+  `TraversalUnit<bootstrap, conformant>` and
+  `TraversalUnit<ticket, triage>`, not a new SDLC traversal monad. The
+  consequence bind boundary is the ABIogenesis T-159 boundary:
+  product consequence proposal plus ABG admission, transition, replay, and next
+  unit or terminal projection.
+- The SDLC overlay catalog remains product policy and route vocabulary consumed
+  by consequence bind. It is not a separate graph/overlay registry and must not
+  execute traversal independently of ABG.
 - Plugin result identity, output-carrier selection, and stage-interface
   conformance must be GTL-declared and ABG-admitted. SDLC may consume admitted
   result envelopes and fail closed when they are missing, but it must not
@@ -208,6 +230,32 @@ sandbox outside the builder lane.
       backoff when no explicit requirement window is present, so retry
       narrowing cannot erase the product-materialization requirement authority
       needed for closure.
+- [x] Consolidate SDLC tenant/workspace surface output path maps and
+      materialized product file-role rows into one
+      `product_materialization/surface_paths.ts` carrier, including
+      `uat_test_source_surface`, with a product-gate drift guard against
+      duplicate local map declarations.
+- [x] Factor public-start entry triage so ticket asset starts and cold-start
+      `next` starts share one overlay-entry decision point. Ticket intake still
+      enters `ticket-workflow` unless the admitted ticket continuation contract
+      selects current-full re-entry; cold-start `next` now chooses the
+      profile/proportional overlay before selecting the start graph function.
+- [x] Remove the Rust hello service live launcher's scripted overlay sequence.
+      The scenario launches `next`; SDLC public-start triage selects the lite
+      graph entry for a thread/trivial profile and carries that selection in
+      the bootstrap proportionality report.
+- [x] Align T-203 with ABIogenesis T-159: cold start and ticket start are
+      product entry units over `TraversalUnit<A, B>` and consequence bind, not
+      SDLC-local traversal law.
+- [ ] After an ABIogenesis release snapshot includes T-159, consume the ABG
+      `typecheckGtlProgram(...)` `traversalUnitProjection` in SDLC conformance
+      proof and assert the published `traverse<bootstrap, conformant>` and
+      `traverse<ticket, triage>` entry units.
+      Current gate: ABIogenesis `@abiogenesis/typescript-tenant@4.1.0-rc.1`
+      has been cut and pushed with T-159 in the immutable snapshot. The next
+      odd_sdlc step is a substrate-version bump from the currently consumed
+      `4.0.0-rc.29` snapshot, then a product gate assertion over
+      `traversalUnitProjection`.
 
 ## Proof
 
@@ -296,6 +344,74 @@ sandbox outside the builder lane.
   Product.md and this ticket keep runtime plugin result envelope admission
   ABG-owned/open and that SDLC does not introduce local `fp_evaluate_result`
   compatibility selectors such as latest-run or alias fallback logic.
+- 2026-06-17 STDO tech-debt cleanup consolidated tenant/workspace SDLC
+  surface output paths and materialized product file roles into
+  `product_materialization/surface_paths.ts`. `test_t197_product_gtl_gate`
+  now proves the single-owner map/role surface includes
+  `design/uat_test_source_surface.md` and rejects duplicate declarations
+  outside that carrier. The same pass reconciled stale T-123/T-164 regression
+  expectations with the current T-203 prompt wording and 71-vector catalog.
+  Verification: `npm run build:semantic`, `npm run test:t203`, `node --test
+  test_env/tests/test_t197_product_gtl_gate.test.mjs`, `node --test
+  test_env/tests/test_t168_design_consumer_test_pipeline.test.mjs
+  test_env/tests/test_t174_feature_dependency_dag_frontier.test.mjs`, `node
+  --test test_env/tests/test_t123_per_edge_traversal_strategy.test.mjs
+  test_env/tests/test_t164_edge_gain_closure_contract.test.mjs`, and
+  `npm run test:semantic` passed 1064/1064.
+- 2026-06-17 public-start entry triage fix added
+  `triagedPublicStartEntryOverlayRef(...)` in `public_start.ts`. Ticket starts
+  use it to choose either `ticket-workflow` or an admitted current-full
+  continuation; autonomous `next` starts use it to choose the
+  profile/proportional overlay. The Rust hello service live descriptor now
+  starts with `next` and no per-step overlay sequence. Verification:
+  `npm run build:semantic`; `node --test
+  test_env/tests/test_t165_optimising_overlay.test.mjs`; `node --test
+  test_env/tests/test_t173_complexity_selection.test.mjs`; `node --test
+  --test-name-pattern "T-170 hello-world profile selects thread overlay for
+  next start|T-170 data-mapper profile selects full lifecycle and preserves
+  broad pressure|T-170 profile next replay keeps public-start identity while
+  selecting next vector" test_env/tests/test_t160_traversal_overlays.test.mjs`;
+  `node --test
+  test_env/tests/test_t162_ticket_execution_contract_admission.test.mjs
+  test_env/tests/test_t162_terminal_gap_ticket_intake.test.mjs
+  test_env/tests/test_t162_overlay_segment_ticket_continuation.test.mjs`;
+  `node --test test_env/tests/test_t197_product_gtl_gate.test.mjs`; `node
+  --test --test-name-pattern "hello-world live descriptors bind profile overlay
+  scope|T-164 Rust hello service conformance bootstrap|T-164 Rust hello service
+  live build loop" test_env/sandbox/test_scenario_sandbox.test.mjs`; and
+  `git diff --check` all passed. Final full-suite verification:
+  `npm run test:semantic` passed 1065/1065. The Rust service live build loop
+  remains an opt-in skipped test unless
+  `ODD_SDLC_TS_T164_RUST_HELLO_SERVICE_SCENARIO_LIVE` is set.
+- 2026-06-17 live follow-up:
+  `npm run test:t164:rust-service-live` ran with
+  `ODD_SDLC_TS_T164_RUST_HELLO_SERVICE_SCENARIO_LIVE=1` and failed after
+  543968 ms because `build_tenants/hello_world_rust_service/Cargo.toml` was not
+  materialized. Archive
+  `test_env/test_runs/scenario_t164_rust_hello_service_lite/20260617T090922075Z_pid95552`
+  contains only the conformance archive
+  `.ai-workspace/runtime/odd_sdlc/operator-runs/20260617T090937375Z_pid95552`;
+  no handoff or worker-result archive was emitted for the lite materialization
+  edge. A follow-up non-live projection on the same workspace proved the entry
+  triage fix is active: `start --target next` selected
+  `lite_design_module_implementation` on
+  `overlay://odd-sdlc/lite-design-module-implementation` with
+  `selectedChildOverlayRef =
+  overlay://odd-sdlc/lite-design-module-implementation`, and blocked only as
+  `fp_worker_unattached` when no worker was supplied. The remaining live defect
+  is therefore in live worker/materialization progression after entry triage,
+  not in the launcher overlay sequence or proportional entry selection.
+- 2026-06-18 ABIogenesis T-159 source-side follow-up: GTL/ABG now defines
+  `TraversalUnit<A, B>` as the closeable product traversal atom and
+  consequence as the bind boundary. The source validator now reports a
+  `traversalUnitProjection` over graph functions, graph vectors, target
+  carriers, edge closures, compute composition, plugin result interfaces,
+  consequence catalogs, and public starts; it also rejects SDLC-style
+  product-local CLI/replay/overlay command routers as runtime bind
+  substitutes. T-203 adopts that formalism as design law immediately. Runtime
+  code consumption waits for odd_sdlc to bump its consumed ABI snapshot from
+  `4.0.0-rc.29` to `4.1.0-rc.1` and add product gates over the released
+  `traversalUnitProjection`.
 
 ## Current Substrate Drift Finding
 
@@ -366,6 +482,15 @@ SDLC consumes that admitted envelope or fails closed.
   not rebuild the GTL module with a steel-thread profile.
 - Runtime-selected requirement refs are visible in the ABG attempt envelope and
   SDLC handoff feature scope.
+- Public start `next` is modeled as `traverse<bootstrap, conformant>` and
+  ticket asset start is modeled as `traverse<ticket, triage>`; the current
+  public-start helper is transitional projection only and closure ultimately
+  depends on ABI T-159 `traversalUnitProjection` proof once available in the
+  consumed ABI release snapshot.
+- ABI T-159 is now available in the pushed ABI `4.1.0-rc.1` release snapshot.
+  odd_sdlc's consumed release remains ABI `4.0.0-rc.29` until the next
+  adoption patch. The next adoption step is an odd_sdlc substrate-version bump
+  and product gate assertion over `report.traversalUnitProjection`.
 - A runtime steel-thread selected from a requirement closes over predecessor
   dependency nodes and carries both selected dependency-node refs and
   normalized `requirement://...` refs rather than broadening to unrelated
@@ -409,6 +534,10 @@ SDLC consumes that admitted envelope or fails closed.
   interface instead of consuming GTL-declared, ABG-admitted result truth.
 - Any unresolved duplicate/confused graph path for source/test materialization,
   test-run validation, ticket triage, or re-entry.
+- Any SDLC-local helper, scenario launcher, or CLI command that claims to be
+  the traversal unit, consequence bind, replay route selector, or durable public
+  command authority instead of publishing product meaning for ABG traversal
+  law.
 
 ## STDO Tech-Debt Review
 

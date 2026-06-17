@@ -840,11 +840,14 @@ test("T-197 D2/D3 keep traversal method selection carrier-admitted", () => {
   );
   assert.match(postflightSource, /\bselectedMethodCarrier\b/u);
   assert.doesNotMatch(publicStartSource, /\bselectSdlcDependencyMapTraversal\b/u);
+  assert.match(publicStartSource, /\bfunction triagedPublicStartEntryOverlayRef\b/u);
+  assert.match(publicStartSource, /\bfunction triagedEntryOverlayRefForProfile\b/u);
   assert.match(publicStartSource, /\bfunction frontDoorTraversalSelection\b/u);
   assert.match(publicStartSource, /\bfunction overlayTraversalSelection\b/u);
   assert.match(publicStartSource, /\bevidenceRefs\b/u);
   assert.match(publicStartSource, /capability:\/\/odd-sdlc\/trivial_product/u);
-  assert.match(publicStartSource, /overlay:\/\/odd-sdlc\/framework-smoke-min-fp/u);
+  assert.match(publicStartSource, /\bSDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF\b/u);
+  assert.match(publicStartSource, /\bSDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF\b/u);
   assert.match(publicStartSource, /\binput\.overlay\.overlayRef\b/u);
 });
 
@@ -1159,4 +1162,43 @@ test("T-158/T-203 keep plugin result interfaces under GTL/ABG authority", () => 
     designDepthSource,
     /fallback(?:.|\n){0,120}selectedComposition/u
   );
+});
+
+test("T-203 keeps SDLC surface path maps single-owner with UAT source path", () => {
+  const sharedPath =
+    "build_tenants/typescript/code/src/operator/product_materialization/surface_paths.ts";
+  const sharedSource = repoFile(sharedPath);
+  const sourceFiles = repoFilesUnder("build_tenants/typescript/code/src")
+    .filter((file) => file.endsWith(".ts"))
+    .map((file) => path.relative(REPO_ROOT, file).split(path.sep).join("/"));
+
+  assert.match(
+    sharedSource,
+    /uat_test_source_surface:\s*"design\/uat_test_source_surface\.md"/u
+  );
+  assert.match(
+    sharedSource,
+    /export const TENANT_LOCAL_SDLC_SURFACE_OUTPUT_PATHS/u
+  );
+  assert.match(
+    sharedSource,
+    /export const WORKSPACE_LOCAL_SDLC_SURFACE_OUTPUT_PATHS/u
+  );
+  assert.match(sharedSource, /export const MATERIALIZED_PRODUCT_FILE_ROLES/u);
+
+  for (const constantName of [
+    "TENANT_LOCAL_SDLC_SURFACE_OUTPUT_PATHS",
+    "WORKSPACE_LOCAL_SDLC_SURFACE_OUTPUT_PATHS",
+    "MATERIALIZED_PRODUCT_FILE_ROLES"
+  ]) {
+    const duplicateOwners = sourceFiles.filter((relativePath) => {
+      if (relativePath === sharedPath) {
+        return false;
+      }
+      return new RegExp(`const\\s+${constantName}\\s*=`).test(
+        repoFile(relativePath)
+      );
+    });
+    assert.deepEqual(duplicateOwners, [], `${constantName} has duplicate owners`);
+  }
 });

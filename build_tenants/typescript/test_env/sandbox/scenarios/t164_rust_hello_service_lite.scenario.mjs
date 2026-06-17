@@ -117,15 +117,7 @@ export function t164RustHelloServiceLiteLiveScenario({
       ]
     },
     liveWorker: worker,
-    startTarget: "overlay:lite-design-module-implementation",
-    startTargetSequence: Object.freeze([
-      "overlay:bootstrap-requirements",
-      "overlay:bootstrap-requirements",
-      "overlay:lite-design-module-implementation",
-      "overlay:lite-design-module-implementation",
-      "overlay:lite-design-module-implementation",
-      "overlay:lite-design-module-implementation"
-    ]),
+    startTarget: "next",
     startUntil,
     maxAdvances,
     continueOnEdgeConverge: true,

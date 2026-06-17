@@ -18,6 +18,7 @@ import {
   deriveSdlcWorkspaceIngressReport,
   FG_BOOTSTRAP_SDLC_ENTRY,
   FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
+  FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
   projectSdlcQueryDomain,
   projectSdlcWorkerAttachment,
   publicStartOnce,
@@ -25,7 +26,8 @@ import {
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
   SDLC_DEEP_SDLC_TRAVERSAL_OVERLAY_REF,
   SDLC_EDGE_GAIN_CLOSURE_CONTRACTS,
-  SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF
+  SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
+  SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
 } from "../../build/semantic/code/src/index.js";
 
 function projectContext(input = {}) {
@@ -158,6 +160,65 @@ test("T-165 public start carries optimized bootstrap outcome for framework-smoke
     preStartContract.replayIdentityRefs.includes(
       optimization.entryNode.entryNodeRef
     )
+  );
+});
+
+test("T-203 public start triages thread profile into lite proportional entry", () => {
+  const { module, queryDomain, conformedProject, workspaceRoot } = projectContext({
+    overlayStrategy: "thread"
+  });
+  const outcome = publicStartOnce({
+    request: {
+      kind: "sdlc_public_start_request",
+      workspaceRoot,
+      target: { kind: "next", handle: "auto" },
+      until: "blocked",
+      defaultRegime: "F_P"
+    },
+    module,
+    queryDomain,
+    conformedProject,
+    workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
+  });
+
+  assert.equal(conformedProject.overlayStrategy, "thread");
+  assert.equal(
+    conformedProject.overlayRef,
+    SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
+  );
+  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert(outcome.executionContract);
+  assert.equal(
+    outcome.executionContract.targetGraphFunction,
+    FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE
+  );
+  assert.equal(
+    outcome.executionContract.overlayRef,
+    SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
+  );
+  assert.equal(
+    outcome.executionContract.traversalDecompositionSummary?.stageId,
+    "public_start_lite_design_module_implementation"
+  );
+  assert.equal(
+    outcome.executionContract.traversalHopSelection?.hopClass,
+    "single_hop"
+  );
+
+  const optimization = outcome.executionContract.bootstrapOptimization;
+  assert.equal(optimization.outcome.status, "entry_admitted");
+  assert.equal(optimization.outcome.optimizationStatus, "optimized");
+  assert.equal(
+    optimization.outcome.selectedChildOverlayRef,
+    SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
+  );
+  assert.equal(
+    optimization.proportionalityReport.selectedChildOverlayRef,
+    SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
+  );
+  assert.equal(
+    optimization.proportionalityReport.selectedStartTargetRef,
+    FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE
   );
 });
 
