@@ -247,15 +247,18 @@ sandbox outside the builder lane.
 - [x] Align T-203 with ABIogenesis T-159: cold start and ticket start are
       product entry units over `TraversalUnit<A, B>` and consequence bind, not
       SDLC-local traversal law.
-- [ ] After an ABIogenesis release snapshot includes T-159, consume the ABG
+- [x] After an ABIogenesis release snapshot includes T-159, consume the ABG
       `typecheckGtlProgram(...)` `traversalUnitProjection` in SDLC conformance
       proof and assert the published `traverse<bootstrap, conformant>` and
       `traverse<ticket, triage>` entry units.
-      Current gate: ABIogenesis `@abiogenesis/typescript-tenant@4.1.0-rc.1`
-      has been cut and pushed with T-159 in the immutable snapshot. The next
-      odd_sdlc step is a substrate-version bump from the currently consumed
-      `4.0.0-rc.29` snapshot, then a product gate assertion over
-      `traversalUnitProjection`.
+      Completed by bumping odd_sdlc.TS to ABIogenesis
+      `@abiogenesis/typescript-tenant@4.1.0-rc.1`, consuming the immutable
+      release snapshot tarball, and adding the T-194 product gate over
+      `report.traversalUnitProjection`. The current public-start names remain
+      concrete graph functions (`bootstrap_release_self_test`,
+      `route_ticket_work_item`); the ABI projection proves they resolve to
+      closeable traversal units for the bootstrap/conformant and ticket/triage
+      entry paths.
 
 ## Proof
 
@@ -412,6 +415,22 @@ sandbox outside the builder lane.
   code consumption waits for odd_sdlc to bump its consumed ABI snapshot from
   `4.0.0-rc.29` to `4.1.0-rc.1` and add product gates over the released
   `traversalUnitProjection`.
+- 2026-06-18 odd_sdlc.TS ABI `4.1.0-rc.1` adoption: the TypeScript tenant now
+  consumes the immutable ABIogenesis `4.1.0-rc.1` release snapshot, updates
+  product/design/source identity surfaces, and records the released tarball
+  digest `ac9a5523154deb1d0960e9ff7d99f11fb3e4816f88ab42b6eff02e09d9ed9cbd`
+  in the release-adapter proof. T-194 now asserts ABI
+  `report.traversalUnitProjection` for every current SDLC graph vector and for
+  the bootstrap and ticket public-start entry rows. Verification:
+  `npm run build:semantic`; `node --test
+  test_env/tests/test_t194_gtl_program_conformance.test.mjs`; `node --test
+  test_env/tests/test_t028_abiogenesis_substrate_binding.test.mjs`; `node
+  --test test_env/tests/test_t180_abg_4_current_staged_compute_boundary.test.mjs
+  test_env/tests/test_t192_evaluation_grid_prompt_contract.test.mjs`; `node
+  --test test_env/tests/test_t059_install_release_adapter.test.mjs
+  test_env/tests/test_t197_product_gtl_gate.test.mjs`; `node --test
+  test_env/tests/test_t191_typed_prompt_assets.test.mjs`; and
+  `npm run test:semantic` passed 1065/1065.
 
 ## Current Substrate Drift Finding
 
@@ -487,10 +506,10 @@ SDLC consumes that admitted envelope or fails closed.
   public-start helper is transitional projection only and closure ultimately
   depends on ABI T-159 `traversalUnitProjection` proof once available in the
   consumed ABI release snapshot.
-- ABI T-159 is now available in the pushed ABI `4.1.0-rc.1` release snapshot.
-  odd_sdlc's consumed release remains ABI `4.0.0-rc.29` until the next
-  adoption patch. The next adoption step is an odd_sdlc substrate-version bump
-  and product gate assertion over `report.traversalUnitProjection`.
+- ABI T-159 is available and consumed from the pushed ABI `4.1.0-rc.1` release
+  snapshot. odd_sdlc.TS now gates current graph inventory through
+  `report.traversalUnitProjection`, including bootstrap/conformant and
+  ticket/triage public-start entry rows.
 - A runtime steel-thread selected from a requirement closes over predecessor
   dependency nodes and carries both selected dependency-node refs and
   normalized `requirement://...` refs rather than broadening to unrelated

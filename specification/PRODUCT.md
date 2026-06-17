@@ -30,8 +30,8 @@ for the TypeScript line.
 
 The ABIogenesis TypeScript tenant is substrate evidence consumed through
 explicit release snapshots. The current TypeScript line consumes
-`@abiogenesis/typescript-tenant@4.0.0-rc.29` from the immutable
-`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.0.0-rc.29/`
+`@abiogenesis/typescript-tenant@4.1.0-rc.1` from the immutable
+`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.1.0-rc.1/`
 release snapshot.
 That cut proves GTL/ABG carriers, graph-function iteration, traversal probes,
 evented saga-frontier execution, no-compute-basis failure taxonomy,
@@ -54,7 +54,7 @@ SDLC prompt authority policy remains product overlay data. It also proves
 segment-scoped evaluation redispatch metadata, so downstream SDLC evaluation
 can preserve segment, dimension-cell, fold, and relation scope across ABG-owned
 redispatch instead of collapsing deep evaluation coverage back to edge-granular
-fallbacks. It also carries the clean ABG 4.0.0-rc.29 consolidation of the
+fallbacks. It also carries the clean ABG 4.1.0-rc.1 consolidation of the
 defaults/lever registry, temporal runtime-scope consolidation, iteration
 state-action algebra, prompt asset interface, and contract-fulfillment binding
 API that `odd_sdlc.TS` consumes. It also carries the ABG-owned
@@ -98,6 +98,13 @@ module declarations or hiding selection in product-local loops. SDLC owns the
 domain dependency-map interpretation that chooses requirement/module/test
 schedule refs; ABG owns the runtime envelope, traversal facts, replay, and
 continuation truth for those refs.
+It also carries ABG-owned `TraversalUnit<A, B>` projection from each graph
+vector through target-carrier, edge-closure, compute composition, stage binding,
+plugin result-interface, allowed consequence traversal, and public-start entry
+rows. The consequence stage is the bind boundary: SDLC plugins may return
+admitted evidence and traversal-family candidates, but they may not own
+closure-state enums, replay refresh, continuation transition, or product-local
+iteration dispatch.
 It is not
 itself `odd_sdlc.TS`, and it does not complete the SDLC product behavior.
 
@@ -130,6 +137,7 @@ Compressed capability reload:
 | selection, refinement, synthesis, sub-work, recursion, and re-entry | GTL selection/refinement/synthesis/sub-work/recurse law plus ABG selection, continuation, retry, correction, and replay admission | graph overlays and re-entry policy are product views over GTL/ABG truth; inert or unadmitted route carriers are non-closure defects |
 | prompt construction and typed assets | GTL `AssetSurface` and ABG payload admission | prompt text is a rendered view over typed GTL prompt assets and SDLC product policy, not a prompt-only schema |
 | target-carrier contracts and execution evidence | GTL graph-vector/target-carrier law plus ABG payload/evidence admission | target rows and `sdlc_worker_execution_evidence` must carry visible contract fields and be admitted before closure |
+| traversal unit and consequence bind | GTL graph-vector law plus ABG `TraversalUnit<A, B>` projection and consequence admission | every closeable product traversal atom must project through ABI `typecheckGtlProgram(...)`; SDLC does not define a flat closure enum or local next-action router |
 | public starts, worker binding, transport, and external tools | GTL module/job/role/hook declarations plus ABG worker, transport, payload, and provenance admission | CLI, PTY, MCP, shell, and scenario harness surfaces are gated tools, not product runtime truth or GTL law |
 | command/control handoff | ABG public `start`, `gaps`, result-ingress, control-loop, worker, transport, and plugin admission | after `odd_sdlc.TS` resolves product intent into admitted GTL/ABG carriers, control remains in ABG until ABG exits; SDLC CLI must not duplicate a layered convergence, retry, yield, or replay-refresh loop |
 

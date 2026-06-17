@@ -277,7 +277,7 @@ write ledgers, close work, or fall back to a local family switch.
 
 ### T-202 Implementation State
 
-The substrate pin is resolved by ABG `4.0.0-rc.29`, which carries T-156 and
+The substrate pin is resolved by ABG `4.1.0-rc.1`, which carries T-156 and
 static GTL annotation validation.
 
 The TypeScript tenant now lowers SDLC overlay policy into ABG T-156 GTL

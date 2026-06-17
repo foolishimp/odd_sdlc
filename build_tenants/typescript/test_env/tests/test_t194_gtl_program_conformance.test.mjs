@@ -22,11 +22,69 @@ function assertConformancePassed(report) {
   assert.equal(report.issueCount, 0);
 }
 
+function assertTraversalUnitProjection({ input, report }) {
+  const projection = report.traversalUnitProjection;
+  assert.equal(
+    projection.kind,
+    "gtl_program_traversal_unit_projection"
+  );
+  assert.equal(
+    projection.units.length,
+    input.expectedCoverage.graphVectorCount
+  );
+  assert.equal(
+    projection.entryUnits.length,
+    input.expectedCoverage.publicStartTargetCount
+  );
+
+  const unitRefs = new Set(projection.units.map((unit) => unit.unitRef));
+  assert.equal(unitRefs.size, projection.units.length);
+  for (const unit of projection.units) {
+    assert.equal(unit.kind, "gtl_program_traversal_unit_projection_row");
+    assert.match(unit.unitRef, /^abg:\/\/gtl-program\/traversal-unit\/sha256:/u);
+    assert.equal(unit.targetCarrierContractRefs.length, 1);
+    assert.equal(unit.edgeClosureRefs.length, 1);
+    assert.ok(unit.computeCompositionRefs.length > 0);
+    assert.ok(unit.computeStageBindingRefs.length > 0);
+    assert.ok(unit.pluginResultInterfaceRefs.length > 0);
+    assert.ok(unit.consequencePluginResultInterfaceRefs.length > 0);
+  }
+
+  const entryByPublicStart = new Map(
+    projection.entryUnits.map((entry) => [entry.publicStartRef, entry])
+  );
+  for (const entry of projection.entryUnits) {
+    assert.equal(
+      entry.kind,
+      "gtl_program_traversal_entry_unit_projection_row"
+    );
+    assert.ok(entry.overlayRefs.length > 0);
+    assert.ok(entry.entryUnitRefs.length > 0);
+    for (const unitRef of entry.entryUnitRefs) {
+      assert.equal(
+        unitRefs.has(unitRef),
+        true,
+        `${entry.publicStartRef} resolves unknown traversal unit ${unitRef}`
+      );
+    }
+  }
+
+  for (const publicStartRef of [
+    "bootstrap_release_self_test",
+    "route_ticket_work_item"
+  ]) {
+    const entry = entryByPublicStart.get(publicStartRef);
+    assert.notEqual(entry, undefined);
+    assert.ok(entry.entryUnitRefs.length > 0);
+  }
+}
+
 test("T-194 typechecks the current production SDLC GTL inventory", () => {
   const input = constructCurrentSdlcGtlProgramConformanceInput();
   const report = typecheckCurrentSdlcGtlProgram();
 
   assertConformancePassed(report);
+  assertTraversalUnitProjection({ input, report });
   assert.equal(
     input.expectedCoverage.graphVectorCount,
     input.expectedCoverage.targetCarrierContractCount

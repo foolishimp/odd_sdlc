@@ -16,7 +16,7 @@ structure probes.
 | Surface | Binding |
 | --- | --- |
 | Package | `@abiogenesis/typescript-tenant` |
-| Version | `4.0.0-rc.29` |
+| Version | `4.1.0-rc.1` |
 | Dependency form | release snapshot package dependency |
 | odd_sdlc role | domain product over ABIogenesis substrate |
 | ABIogenesis role | GTL/ABG carrier and runtime truth authority |
@@ -66,12 +66,16 @@ The adapter relies on ABIogenesis TypeScript evidence:
   `typecheckGtlProgram(...)`; the compiler-admitted result-interface catalog
   is the runtime handoff, and runtime plugin result envelopes are admitted and
   replay-visible through ABIogenesis rather than reimplemented in SDLC
+- `T-159`: `TraversalUnit<A, B>` is the closeable product traversal atom
+  projected by `typecheckGtlProgram(...)`; consequence is the bind boundary and
+  SDLC must not replace the projection with a local closure-state enum,
+  replay-refresh loop, continuation transition, or next-action router
 
 These assumptions are dependencies, not copied law.
 
 ## ABIogenesis Runtime, Temporal, Process Callout, Defaults, Evaluator, And Liveness Substrate
 
-As of ABIogenesis `4.0.0-rc.29`, worker process execution remains substrate-owned, the
+As of ABIogenesis `4.1.0-rc.1`, worker process execution remains substrate-owned, the
 first ABG defaults bundle slice remains visible installed configuration, and
 temporal/time-related runtime truth is ABG-owned event and replay projection
 truth. ABIogenesis publishes the T-127 F_P construction evaluator substrate:
