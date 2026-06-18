@@ -6,6 +6,7 @@ import path, {
 } from "node:path";import type {
   SdlcMaterializedProductFileRole,
   SdlcDesignDepthRegister,
+  SdlcTestDesignRegister,
   SdlcProductMaterializationContract,
   SdlcProductMaterializationAuthorityReconciliation,
   SdlcProductMaterializationAuthorityTarget,
@@ -16,6 +17,8 @@ import path, {
 } from "../../graph/index.js";import {
   admitComponentDepthRegisterFromArtifact
 } from "../component_depth_register.js";import {
+  admitTestDesignRegisterFromArtifact
+} from "../test_design_register.js";import {
   admitImplementationDesignRegisterForManifest,
   admitImplementationDesignRegisterForRuntimeEvaluation
 } from "../plugins/evaluate/design_depth_register.js";import {
@@ -1848,33 +1851,58 @@ function designAssetAuthorityTargetsFor(
       sourceRefs: Object.freeze([])
     });
   }
-  const admission = admitComponentDepthRegisterFromArtifact({
+  const currentAdmission = admitComponentDepthRegisterFromArtifact({
     targetAssetType: manifest.targetAssetType,
     outputFile: manifest.outputFile
   });
-  if (admission.status !== "admitted" || admission.register === null) {
-    return Object.freeze({
-      targets: Object.freeze([]),
-      sourceRefs: Object.freeze([])
-    });
-  }
-  const sourceRef = admission.evidenceRefs[0] ?? pathToFileURL(manifest.outputFile).href;
-  const seeds = admission.register.componentTestRows
-    .map((row) =>
-      testTargetSeedFromDesignRelativePath({
-        manifest,
-        relativePath: row.relativePath
-      })
-    )
-    .filter((seed): seed is DeclaredProductTargetSeed => seed !== null);
+  const currentOutputSourceRef =
+    currentAdmission.evidenceRefs[0] ?? pathToFileURL(manifest.outputFile).href;
+  const currentOutputTargets =
+    currentAdmission.status === "admitted" && currentAdmission.register !== null
+      ? targetContractsFromSeeds({
+          source: "design_asset_authority",
+          sourceRef: currentOutputSourceRef,
+          manifest,
+          seeds: currentAdmission.register.componentTestRows
+            .map((row) =>
+              testTargetSeedFromDesignRelativePath({
+                manifest,
+                relativePath: row.relativePath
+              })
+            )
+            .filter((seed): seed is DeclaredProductTargetSeed => seed !== null)
+        })
+      : Object.freeze([] as const);
+  const currentOutputAdmitted =
+    currentAdmission.status === "admitted" && currentAdmission.register !== null;
+  const testDesign = currentOutputAdmitted
+    ? null
+    : readAdmittedTestDesign(manifest);
+  const testDesignTargets =
+    testDesign === null
+      ? Object.freeze([] as const)
+      : targetContractsFromSeeds({
+          source: "design_asset_authority",
+          sourceRef: testDesign.sourceRef,
+          manifest,
+          seeds: testDesign.register.testComponentTopologyRows
+            .map((row) =>
+              testTargetSeedFromDesignRelativePath({
+                manifest,
+                relativePath: row.relativePath
+              })
+            )
+            .filter((seed): seed is DeclaredProductTargetSeed => seed !== null)
+        });
+  const targets = currentOutputAdmitted
+    ? currentOutputTargets
+    : testDesignTargets;
   return Object.freeze({
-    targets: targetContractsFromSeeds({
-      source: "design_asset_authority",
-      sourceRef,
-      manifest,
-      seeds
-    }),
-    sourceRefs: Object.freeze([sourceRef])
+    targets,
+    sourceRefs: uniqueSorted([
+      ...(testDesign === null ? [] : [testDesign.sourceRef]),
+      ...(currentAdmission.status === "admitted" ? [currentOutputSourceRef] : [])
+    ])
   });
 }
 
@@ -2305,6 +2333,29 @@ function componentDepthSurfaceFile(
     return null;
   }
   return join(manifest.productMaterialization.tenantRoot, relativePath);
+}
+
+function readAdmittedTestDesign(
+  manifest: SdlcWorkerHandoffManifest
+): {
+  readonly register: SdlcTestDesignRegister;
+  readonly sourceRef: string;
+} | null {
+  const outputFile = componentDepthSurfaceFile(manifest, "test_design_surface");
+  if (outputFile === null || !existsSync(outputFile)) {
+    return null;
+  }
+  const admission = admitTestDesignRegisterFromArtifact({
+    targetAssetType: "test_design_surface",
+    outputFile
+  });
+  if (admission.status !== "admitted" || admission.register === null) {
+    return null;
+  }
+  return Object.freeze({
+    register: admission.register,
+    sourceRef: admission.evidenceRefs[0] ?? pathToFileURL(outputFile).href
+  });
 }
 
 function readAdmittedImplementationDesign(

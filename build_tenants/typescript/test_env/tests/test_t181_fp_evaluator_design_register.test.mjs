@@ -452,7 +452,11 @@ function designDepthGtlSelectedComposition() {
   };
 }
 
-function writeDesignDepthFpEvaluatorRuleOutcomeProof({ manifest, registerPath }) {
+function writeDesignDepthFpEvaluatorRuleOutcomeProof({
+  manifest,
+  registerPath,
+  includeRuleOutcomeEnvelopeEvidence = true
+}) {
   const composition = designDepthGtlSelectedComposition();
   const registerRef = pathToFileURL(registerPath).href;
   const contentRegisterRef = pathToFileURL(
@@ -494,42 +498,43 @@ function writeDesignDepthFpEvaluatorRuleOutcomeProof({ manifest, registerPath })
   );
   const proofRef = pathToFileURL(proofPath).href;
   const envelopeRef = `plugin-result-envelope:t181:${manifest.runId}`;
+  const envelopeEvents = [
+    {
+      kind: "payload_observed",
+      payloadClass: "admitted_plugin_result_envelope",
+      payloadRef: envelopeRef,
+      authorityRef: composition.resultInterfaceRef,
+      contractRef: composition.resultEnvelopeContractRef
+    },
+    {
+      kind: "payload_validated",
+      payloadRef: envelopeRef,
+      contractRef: composition.resultEnvelopeContractRef,
+      contractDigest: composition.resultInterfaceContractDigest
+    },
+    {
+      kind: "evidence_admitted",
+      payloadRef: envelopeRef,
+      evidenceRef: contentRegisterRef
+    },
+    {
+      kind: "evidence_admitted",
+      payloadRef: envelopeRef,
+      evidenceRef: registerRef
+    },
+    ...(includeRuleOutcomeEnvelopeEvidence
+      ? [
+          {
+            kind: "evidence_admitted",
+            payloadRef: envelopeRef,
+            evidenceRef: proofRef
+          }
+        ]
+      : [])
+  ];
   writeFileSync(
     path.join(manifest.archiveRoot, "runtime_events.json"),
-    `${JSON.stringify(
-      [
-        {
-          kind: "payload_observed",
-          payloadClass: "admitted_plugin_result_envelope",
-          payloadRef: envelopeRef,
-          authorityRef: composition.resultInterfaceRef,
-          contractRef: composition.resultEnvelopeContractRef
-        },
-        {
-          kind: "payload_validated",
-          payloadRef: envelopeRef,
-          contractRef: composition.resultEnvelopeContractRef,
-          contractDigest: composition.resultInterfaceContractDigest
-        },
-        {
-          kind: "evidence_admitted",
-          payloadRef: envelopeRef,
-          evidenceRef: contentRegisterRef
-        },
-        {
-          kind: "evidence_admitted",
-          payloadRef: envelopeRef,
-          evidenceRef: registerRef
-        },
-        {
-          kind: "evidence_admitted",
-          payloadRef: envelopeRef,
-          evidenceRef: proofRef
-        }
-      ],
-      null,
-      2
-    )}\n`,
+    `${JSON.stringify(envelopeEvents, null, 2)}\n`,
     "utf8"
   );
   return proofRef;
@@ -1794,6 +1799,89 @@ test("T-181 component edges read evaluator register from source-asset lineage re
     assert.match(prompt, /construction_brief\.stagePressure\.designDepthEvaluatorRegisterRefs/u);
     assert.match(prompt, /compressed work-category governance/u);
     assert.match(prompt, /config\/work-category-governance\/coding_build\.md/u);
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-203 component-code targets admit predecessor evaluator register when rule outcome is separate", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const graphFunctionName = "Fg_t203_product";
+    const prior = manifestForEdge({
+      workspaceRoot,
+      runId: "20260523T000000010Z_pid20301",
+      graphFunctionName,
+      edgeName: "derive_lite_design_adr_surface"
+    });
+    writeHandoffFiles(prior);
+    mkdirSync(path.dirname(prior.outputFile), { recursive: true });
+    const priorContent = implementationDesignAdr("fp-live-ordering");
+    writeFileSync(prior.outputFile, priorContent, "utf8");
+    const priorRegisterPath = designDepthFpEvaluatorRegisterPath(prior);
+    mkdirSync(path.dirname(priorRegisterPath), { recursive: true });
+    writeFileSync(
+      priorRegisterPath,
+      `${JSON.stringify(
+        implementationDesignRegister(
+          "fp-live-ordering",
+          pathToFileURL(prior.outputFile).href
+        ),
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+    writeDesignDepthFpEvaluatorContentRegister({
+      manifest: prior,
+      registerPath: priorRegisterPath
+    });
+    writeDesignDepthFpEvaluatorRuleOutcomeProof({
+      manifest: prior,
+      registerPath: priorRegisterPath,
+      includeRuleOutcomeEnvelopeEvidence: false
+    });
+    writeFileSync(
+      path.join(prior.archiveRoot, "fp_evaluate_result.json"),
+      `${JSON.stringify(fpEvaluateResultPayloadForRegister(priorRegisterPath), null, 2)}\n`,
+      "utf8"
+    );
+    writePriorWorkerResultReport({ manifest: prior, content: priorContent });
+
+    const current = manifestForEdge({
+      workspaceRoot,
+      runId: "20260523T000000011Z_pid20302",
+      graphFunctionName,
+      edgeName: "derive_lite_component_code_surface"
+    });
+    const admission = admitImplementationDesignRegisterForManifest({
+      manifest: current
+    });
+
+    assert.equal(admission.status, "admitted");
+    assert.ok(
+      admission.evidenceRefs.some((ref) =>
+        ref.endsWith("/design_depth_fp_evaluator_rule_outcome.json")
+      ),
+      JSON.stringify(admission.evidenceRefs, null, 2)
+    );
+
+    const invocationPackage = constructWorkerInvocationPackage({ manifest: current });
+    const expectedSourceTarget = `${current.productMaterialization.selectedOutputRoot}/src/fp-live-ordering.js`;
+    assert.ok(
+      invocationPackage.outputContract.declaredProductFileTargets.includes(
+        expectedSourceTarget
+      ),
+      JSON.stringify(invocationPackage.outputContract, null, 2)
+    );
+    assert.ok(
+      invocationPackage.outputContract.declaredProductTargetContracts.some(
+        (contract) =>
+          contract.path === expectedSourceTarget &&
+          contract.requiredRole === "source"
+      ),
+      JSON.stringify(invocationPackage.outputContract, null, 2)
+    );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
   }

@@ -230,7 +230,10 @@ function continuationEntriesForStrategy(input: {
   readonly strategy: OddSdlcDefaultTraversalStrategy;
   readonly traversalStrategyPlan: OddSdlcTraversalStrategyPlanConfig;
 }): readonly SerializedAttrEntry[] {
-  if (input.strategy !== "full_breadth") {
+  if (
+    input.strategy !== "full_breadth" &&
+    input.name !== "derive_lite_component_code_surface"
+  ) {
     return Object.freeze([]);
   }
   const config = defaultSdlcTraversalContinuationConfigForName(

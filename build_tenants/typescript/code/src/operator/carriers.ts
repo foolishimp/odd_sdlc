@@ -1402,6 +1402,7 @@ export type SdlcTraversalStrategy =
 
 export type SdlcTraversalStrategyDecisionSource =
   | "abg_selected"
+  | "proportionality_selection"
   | "retry_backoff"
   | "odd_sdlc_fallback_plan";
 

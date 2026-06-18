@@ -3880,6 +3880,7 @@ export function deriveWorkerHandoffManifest(input: {
     selectedScheduleItemRefs,
     requiredProgressArtifactRefs:
       traversalAttemptEnvelope?.requiredProgressArtifactRefs ?? Object.freeze([]),
+    traversalHopSelection: input.traversalHopSelection ?? null,
     retryContext
   });
   const featureScope = deriveSdlcFeatureScope({

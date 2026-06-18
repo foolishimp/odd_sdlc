@@ -1434,6 +1434,12 @@ function evaluateInitialPublicStartAction(input: {
       bootstrapOptimization: null
     });
   }
+  if (selectedTraversal === null) {
+    selectedTraversal = overlayTraversalSelection({
+      overlay: selectedOverlay,
+      profile: input.conformedProject
+    });
+  }
   const selectedGraphVectorRef = input.request.replayNextGraphVectorRef ?? null;
   const selectedComposition = deriveSdlcPreRuntimePlanningCompositionIdentity({
     graphFunctionRef: selectedCandidate.graphFunctionRef,

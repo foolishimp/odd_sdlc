@@ -6,12 +6,29 @@
   "buildConfigTargets": [
     "Cargo.toml"
   ],
+  "executionEnvironment": {
+    "hostCachePolicy": "prohibited",
+    "workspaceLocalDirectories": [
+      "target/"
+    ],
+    "environmentVariables": {
+      "HELLO_SERVICE_PORT": "${HELLO_SERVICE_PORT:-18182}"
+    },
+    "byproductRules": [
+      "Cargo.lock",
+      "target/"
+    ]
+  },
   "byproductRules": [
     "Cargo.lock",
     "target/"
   ],
   "testingTechStack": {
     "testMode": "local_http_service_smoke",
+    "testRunner": "curl",
+    "testRoots": [
+      "tests/"
+    ],
     "testBuildConfigTargets": [
       "Cargo.toml"
     ],

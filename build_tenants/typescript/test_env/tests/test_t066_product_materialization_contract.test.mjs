@@ -77,6 +77,7 @@ import {
   publicStartOnce,
   readOddSdlcRuntimeEvents,
   readWorkerResultReport,
+  reconcileSdlcProductMaterializationAuthority,
   resolveSdlcEdgeGainClosureContract,
   sdlcAssessmentCarriesRequirementForDownstreamClosure,
   sdlcWorkerAssessmentCarriesRequirementTransformationSet,
@@ -3968,6 +3969,14 @@ test("T-164 design manifest role normalizes to build_config product materializat
         language: "Rust",
         buildTool: "cargo",
         buildConfigTargets: ["Cargo.toml"],
+        executionEnvironment: {
+          hostCachePolicy: "prohibited",
+          workspaceLocalDirectories: ["target/"],
+          environmentVariables: {
+            HELLO_SERVICE_PORT: "${HELLO_SERVICE_PORT:-18182}"
+          },
+          byproductRules: ["Cargo.lock", "target/"]
+        },
         testingTechStack: {
           testRunner: "cargo test",
           testRoots: ["tests/"],
@@ -4019,6 +4028,10 @@ test("T-164 design manifest role normalizes to build_config product materializat
     "build_tenants/hello_world_rust_service/Cargo.toml",
     "build_tenants/hello_world_rust_service/src/main.rs"
   ]);
+  assert.equal(
+    reconcileSdlcProductMaterializationAuthority(manifest).status,
+    "passed"
+  );
 
   const requirementIds = requirementObligationIds(manifest);
   const cargoPath = path.join(
@@ -4059,6 +4072,82 @@ test("T-164 design manifest role normalizes to build_config product materializat
   assert.equal(cargoRow.role, "build_config");
   const postflight = evaluateSdlcComputeStage({ manifest, report });
   assert.equal(postflight.status, "passed", JSON.stringify(postflight.blockingReasons));
+});
+
+test("T-203 component-test targets derive from admitted test-design topology", () => {
+  const workspace = makeWorkspace();
+  writeFileSync(
+    path.join(workspace, "specification/PRODUCT.md"),
+    [
+      "# Product",
+      "",
+      "Build Tool: cargo",
+      "",
+      "- active tenant: hello_world_rust_service",
+      "- selected output root: build_tenants/hello_world_rust_service",
+      "",
+      "## Product Files",
+      "",
+      "- `build_tenants/hello_world_rust_service/Cargo.toml`",
+      "- `build_tenants/hello_world_rust_service/src/main.rs`"
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: t203_rust_component_test_targets",
+      "active_tenant: hello_world_rust_service",
+      "selected_output_root: build_tenants/hello_world_rust_service",
+      "ambiguity_risk_appetite: low",
+      "build_tenants:",
+      "  hello_world_rust_service:",
+      "    output_dir: build_tenants/hello_world_rust_service",
+      "    language: Rust",
+      "    build_tool: cargo",
+      "    test_runner: curl",
+      "    test_execution_contract: curl",
+      "    module_structure:",
+      "      - hello_world_rust_service"
+    ].join("\n"),
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  writeAdmittedStagedAuthoritySurfaces(workspace);
+
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_test_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "lite_design_module_implementation",
+    edgeName: contract.edgeName,
+    vectorIndex: 11,
+    contract,
+    projectConstraints: constraints,
+    runId: "20260520T091500000Z_pid203"
+  });
+  writeHandoffFiles(manifest);
+  const invocationPackage = constructWorkerInvocationPackage({ manifest });
+
+  assert(
+    declaredProductFileTargets(manifest).includes(
+      "build_tenants/hello_world_rust_service/tests/main.test.rs"
+    )
+  );
+  assert(
+    invocationPackage.outputContract.declaredProductFileTargets.includes(
+      "build_tenants/hello_world_rust_service/tests/main.test.rs"
+    )
+  );
+  assert.equal(
+    invocationPackage.productMaterializationAuthority.declaredProductTargetContracts.find(
+      (target) =>
+        target.path ===
+        "build_tenants/hello_world_rust_service/tests/main.test.rs"
+    )?.requiredRole,
+    "test"
+  );
 });
 
 test("T-164 component-code rejects worker execution evidence even with concrete runner invocation", () => {
@@ -4112,6 +4201,14 @@ test("T-164 component-code rejects worker execution evidence even with concrete 
         language: "Rust",
         buildTool: "cargo",
         buildConfigTargets: ["Cargo.toml"],
+        executionEnvironment: {
+          hostCachePolicy: "prohibited",
+          workspaceLocalDirectories: ["target/"],
+          environmentVariables: {
+            HELLO_SERVICE_PORT: "${HELLO_SERVICE_PORT:-18182}"
+          },
+          byproductRules: ["Cargo.lock", "target/"]
+        },
         testingTechStack: {
           testRunner: "cargo test",
           testRoots: ["tests/"],
@@ -5502,9 +5599,34 @@ test("T-164 lite component-code edge keeps multi-module product targets full-bre
     vectorIndex: 1,
     contract,
     projectConstraints: constraints,
+    traversalAttemptEnvelope: {
+      kind: "traversal_attempt_envelope",
+      envelopeRef: "abg://envelope/t164-lite-component-code-full-design-targets",
+      profileRef: "abg://profile/t164-lite-component-code-full-design-targets",
+      basisId: "basis:t164-lite-component-code-full-design-targets",
+      graphFunctionId: "graph:t164-lite-component-code-full-design-targets",
+      graphCallId: "call:t164-lite-component-code-full-design-targets",
+      frameId: "frame:t164-lite-component-code-full-design-targets",
+      vectorIndex: 1,
+      edge: contract.edgeName,
+      strategyDirectiveRef:
+        `strategy://odd_sdlc/${contract.edgeName}/full_breadth`,
+      backendProfileRef: "backend:t164-lite-component-code-full-design-targets",
+      actorInvocationId:
+        "actor:t164-lite-component-code-full-design-targets",
+      selectedScheduleItemRefs: [],
+      orderingConstraintRefs: [],
+      phaseGateRefs: [],
+      requiredProgressArtifactRefs: [],
+      gapPressureRefs: [],
+      affectRefs: [],
+      retryBudgetRemaining: 1,
+      mustExitAfterBoundedAttempt: true
+    },
     runId: "t164-lite-component-code-full-design-targets"
   });
 
+  assert.equal(manifest.traversalStrategyDecision.decisionSource, "abg_selected");
   assert.equal(manifest.traversalStrategyDecision.selectedStrategy, "full_breadth");
   assert.equal(manifest.featureScope.mode, "full_breadth");
   assert.deepStrictEqual(manifest.featureScope.deferredModuleNames, []);

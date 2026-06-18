@@ -1,6 +1,7 @@
 // Implements: T-123
 
 import type {
+  SdlcTraversalHopSelection,
   SdlcTraversalStrategy,
   SdlcTraversalStrategyDecision,
   SdlcTraversalStrategyPlan,
@@ -90,12 +91,25 @@ function retryContextSelectsTargetedRepair(input: {
   );
 }
 
+function hopSelectionSelectsReducedStrategy(
+  selection: SdlcTraversalHopSelection | null | undefined
+): boolean {
+  if (selection === null || selection === undefined) {
+    return false;
+  }
+  return (
+    selection.outcomeClass !== "domain_product" &&
+    (selection.hopClass === "single_hop" || selection.hopClass === "dual_hop")
+  );
+}
+
 export function deriveSdlcTraversalStrategyDecision(input: {
   readonly edgeName: string;
   readonly targetAssetType: string;
   readonly strategyDirectiveRef?: string | null | undefined;
   readonly selectedScheduleItemRefs?: readonly string[] | undefined;
   readonly requiredProgressArtifactRefs?: readonly string[] | undefined;
+  readonly traversalHopSelection?: SdlcTraversalHopSelection | null | undefined;
   readonly retryContext?: SdlcWorkerRetryContext | undefined;
   readonly fallbackPlan?: SdlcTraversalStrategyPlan | undefined;
 }): SdlcTraversalStrategyDecision {
@@ -111,9 +125,14 @@ export function deriveSdlcTraversalStrategyDecision(input: {
   const retryBackoffApplies =
     retryTargetedRepair &&
     (abgSelectedStrategy === null || abgSelectedStrategy === "full_breadth");
+  const proportionalitySelectionApplies =
+    hopSelectionSelectsReducedStrategy(input.traversalHopSelection) &&
+    (abgSelectedStrategy === null || abgSelectedStrategy === "full_breadth");
   const selectedStrategy =
     retryBackoffApplies
       ? "targeted_repair"
+      : proportionalitySelectionApplies
+        ? "steel_thread"
       : abgSelectedStrategy ??
         strategyForEdge({
           plan: fallbackPlan,
@@ -123,6 +142,8 @@ export function deriveSdlcTraversalStrategyDecision(input: {
   const decisionSource =
     retryBackoffApplies
       ? "retry_backoff"
+      : proportionalitySelectionApplies
+        ? "proportionality_selection"
       : abgSelectedStrategy === null
         ? "odd_sdlc_fallback_plan"
         : "abg_selected";
@@ -137,7 +158,15 @@ export function deriveSdlcTraversalStrategyDecision(input: {
     ]) ?? Object.freeze([])),
     ...(input.retryContext?.priorGapDossiers.map(
       (dossier) => dossier.currentGapDossierRef
-    ) ?? Object.freeze([]))
+    ) ?? Object.freeze([])),
+    ...(input.traversalHopSelection === null ||
+      input.traversalHopSelection === undefined
+      ? []
+      : [
+          input.traversalHopSelection.selectionRef,
+          input.traversalHopSelection.selectedGraphVariantRef,
+          ...input.traversalHopSelection.evidenceRefs
+        ])
   ]);
   const requiresScope = featureScopeRequired(selectedStrategy);
   return Object.freeze({

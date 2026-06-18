@@ -29,6 +29,16 @@ function repoFile(relativePath) {
   return readFileSync(path.join(REPO_ROOT, relativePath), "utf8");
 }
 
+function repoFileFromFirstExisting(relativePaths) {
+  for (const relativePath of relativePaths) {
+    const absolutePath = path.join(REPO_ROOT, relativePath);
+    if (statSync(absolutePath, { throwIfNoEntry: false })?.isFile() === true) {
+      return readFileSync(absolutePath, "utf8");
+    }
+  }
+  assert.fail(`none of the candidate files exist: ${relativePaths.join(", ")}`);
+}
+
 function sourceFunction(source, functionName) {
   const nameIndex = source.indexOf(`function ${functionName}`);
   assert.notEqual(nameIndex, -1, `${functionName} must exist`);
@@ -1089,11 +1099,24 @@ test("T-197 H8-H12 keep low-priority horizontal literals neutral", () => {
   );
 });
 
+test("T-203 keeps tenant test-design technology in typed tenant authority", () => {
+  const promptPolicySource = repoFile(
+    "build_tenants/typescript/code/src/operator/plugins/transform/prompt_edge_policy.ts"
+  );
+
+  assert.match(promptPolicySource, /tenant-declared test root/u);
+  assert.doesNotMatch(
+    promptPolicySource,
+    /src\/main\.rs|local_http_service_smoke|\bcurl\b|tests\/<testClassId>\.sh/u
+  );
+});
+
 test("T-158/T-203 keep plugin result interfaces under GTL/ABG authority", () => {
   const product = repoFile("specification/PRODUCT.md");
-  const ticket = repoFile(
-    ".ai-workspace/tickets/active/T-203-factor-code-builder-graph-function-for-uat-test-generation-and-ticket-reentry.md"
-  );
+  const ticket = repoFileFromFirstExisting([
+    ".ai-workspace/tickets/active/T-203-factor-code-builder-graph-function-for-uat-test-generation-and-ticket-reentry.md",
+    ".ai-workspace/tickets/completed/T-203-factor-code-builder-graph-function-for-uat-test-generation-and-ticket-reentry.md"
+  ]);
   const designDepthSource = repoFile(
     "build_tenants/typescript/code/src/operator/plugins/evaluate/design_depth_register.ts"
   );

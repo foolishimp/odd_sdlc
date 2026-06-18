@@ -195,9 +195,6 @@ function admittedPluginResultEnvelopeEvidenceRefsForRegisterPath(input: {
   const runtimeEventsPath = runtimeEventsPathForRegisterPath(input.registerPath);
   const runtimeEventsRef = pathToFileURL(runtimeEventsPath).href;
   const contentRegisterRef = contentRegisterRefForRegisterPath(input.registerPath);
-  const ruleOutcomeRef = pathToFileURL(
-    join(dirname(input.registerPath), DESIGN_DEPTH_FP_EVALUATOR_RULE_OUTCOME_FILE)
-  ).href;
   const registerRef = pathToFileURL(input.registerPath).href;
   const events = runtimeEventRecordsForRegisterPath(input.registerPath);
   const expectedInterface = designDepthPluginResultInterfaceContract({
@@ -243,7 +240,7 @@ function admittedPluginResultEnvelopeEvidenceRefsForRegisterPath(input: {
     );
     if (
       !envelopeEvidenceRefs.includes(contentRegisterRef) ||
-      !envelopeEvidenceRefs.includes(ruleOutcomeRef)
+      !envelopeEvidenceRefs.includes(registerRef)
     ) {
       continue;
     }
@@ -252,7 +249,6 @@ function admittedPluginResultEnvelopeEvidenceRefsForRegisterPath(input: {
       payloadRef,
       contentRegisterRef,
       registerRef,
-      ruleOutcomeRef,
       ...envelopeEvidenceRefs
     ]);
   }

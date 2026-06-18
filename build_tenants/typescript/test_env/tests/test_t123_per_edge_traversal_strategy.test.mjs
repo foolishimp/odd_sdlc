@@ -197,11 +197,59 @@ function retryContextForAccountingPlaceholderWithCompilerEvidence() {
   };
 }
 
+function frameworkSmokeSingleHopSelection() {
+  return {
+    kind: "sdlc_traversal_hop_selection",
+    selectionRef: "selection://odd-sdlc/t123/framework-smoke-single-hop",
+    outcomeClass: "framework_smoke",
+    hopClass: "single_hop",
+    selectedGraphVariantRef:
+      "graph-variant://odd-sdlc/framework_smoke/single_hop/outcome_class_graph_variant",
+    complexityAssessment: {
+      kind: "sdlc_traversal_complexity_assessment",
+      assessmentRef: "assessment://odd-sdlc/t123/framework-smoke-single-hop",
+      outcomeClass: "framework_smoke",
+      thresholdProfileRef: "threshold://odd-sdlc/t123/framework-smoke",
+      decompositionSummaryRef: "summary://odd-sdlc/t123/framework-smoke",
+      inputObligationCount: 1,
+      outputRowCount: 1,
+      upstreamPerDownstreamRatio: 1,
+      downstreamPerUpstreamRatio: 1,
+      maxOwnedInputsPerOutput: 1,
+      residualRefCount: 0,
+      residualOutsideSubsurfaceRefCount: 0,
+      publicBoundaryCount: 1,
+      substantiveDownstreamResponsibilityCount: 1,
+      blockingReasons: [],
+      evidenceRefs: ["evidence://odd-sdlc/t123/framework-smoke"]
+    },
+    zoomAdmission: {
+      kind: "sdlc_zoom_admission_decision",
+      disposition: "admitted",
+      reasonRefs: ["reason://odd-sdlc/t123/framework-smoke"],
+      selectedZoomStageRef: null
+    },
+    pressurePreservation: {
+      kind: "sdlc_min_fp_pressure_preservation_decision",
+      mechanism: "outcome_class_graph_variant",
+      preservedPressureRefs: ["pressure://odd-sdlc/t123/framework-smoke"],
+      skippedEdgeRefs: [],
+      evidenceRefs: ["evidence://odd-sdlc/t123/framework-smoke"],
+      admissionDecision: "admitted",
+      blockingReasons: []
+    },
+    rejectedAlternativeRefs: [],
+    blockingReasons: [],
+    evidenceRefs: ["evidence://odd-sdlc/t123/framework-smoke"]
+  };
+}
+
 function manifestFor(
   edgeName,
   traversalAttemptEnvelope = null,
   retry = null,
-  graphFunctionName = "graph_function:bootstrap_release_self_test"
+  graphFunctionName = "graph_function:bootstrap_release_self_test",
+  traversalHopSelection = null
 ) {
   const contract = hookContractByEdgeName(edgeName);
   return deriveWorkerHandoffManifest({
@@ -211,6 +259,7 @@ function manifestFor(
     vectorIndex: 0,
     contract,
     traversalAttemptEnvelope,
+    traversalHopSelection,
     ...(retry === null ? {} : { retryContext: retry }),
     conformedProject,
     runId: `t123-${edgeName}`
@@ -377,7 +426,7 @@ test("T-123 code-builder edges declare ABG ten-attempt retry/yield tuning", () =
   const liteCodeHook = traversalStrategyHookForVector(liteCodeVector);
   assert.equal(
     liteCodeHook.ref,
-    `strategy://odd_sdlc/${FG_DERIVE_LITE_COMPONENT_CODE_SURFACE}/full_breadth`
+    `strategy://odd_sdlc/${FG_DERIVE_LITE_COMPONENT_CODE_SURFACE}/steel_thread`
   );
   assert.deepStrictEqual(hookConfigValue(liteCodeHook, "same_edge_until"), {
     kind: "scalar",
@@ -442,6 +491,63 @@ test("T-123 code-builder edges declare ABG ten-attempt retry/yield tuning", () =
     }
   );
   assert.equal(SDLC_ABG_ATTACHED_FP_MAX_RETRY_ATTEMPTS, 10);
+});
+
+test("T-123 proportionality selection narrows lite code prompts before breadth defaults", () => {
+  const traversalHopSelection = frameworkSmokeSingleHopSelection();
+  const decision = deriveSdlcTraversalStrategyDecision({
+    edgeName: FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+    targetAssetType: "component_code_surface",
+    strategyDirectiveRef:
+      `strategy://odd_sdlc/${FG_DERIVE_LITE_COMPONENT_CODE_SURFACE}/full_breadth`,
+    traversalHopSelection
+  });
+
+  assert.equal(decision.decisionSource, "proportionality_selection");
+  assert.equal(decision.selectedStrategy, "steel_thread");
+  assert(decision.basisRefs.includes(traversalHopSelection.selectionRef));
+  assert(decision.basisRefs.includes(traversalHopSelection.selectedGraphVariantRef));
+
+  const manifest = manifestFor(
+    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+    {
+      kind: "traversal_attempt_envelope",
+      envelopeRef: "abg://envelope/t123-framework-smoke",
+      profileRef: "abg://profile/t123-framework-smoke",
+      basisId: "basis:t123-framework-smoke",
+      graphFunctionId: "graph:t123-framework-smoke",
+      graphCallId: "call:t123-framework-smoke",
+      frameId: "frame:t123-framework-smoke",
+      vectorIndex: 0,
+      edge: FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+      strategyDirectiveRef:
+        `strategy://odd_sdlc/${FG_DERIVE_LITE_COMPONENT_CODE_SURFACE}/full_breadth`,
+      backendProfileRef: "backend:t123-framework-smoke",
+      actorInvocationId: "actor:t123-framework-smoke",
+      selectedScheduleItemRefs: [
+        `schedule://odd_sdlc/${FG_DERIVE_LITE_COMPONENT_CODE_SURFACE}/cdme-compiler`
+      ],
+      orderingConstraintRefs: [],
+      phaseGateRefs: [],
+      requiredProgressArtifactRefs: [],
+      gapPressureRefs: [],
+      affectRefs: [],
+      retryBudgetRemaining: 1,
+      mustExitAfterBoundedAttempt: true
+    },
+    null,
+    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+    traversalHopSelection
+  );
+
+  assert.equal(
+    manifest.traversalStrategyDecision.decisionSource,
+    "proportionality_selection"
+  );
+  assert.equal(manifest.traversalStrategyDecision.selectedStrategy, "steel_thread");
+  assert.equal(manifest.featureScope.mode, "steel_thread");
+  assert.equal(manifest.proportionalityProfile.profileClass, "degenerate");
+  assert.equal(manifest.proportionalityProfile.maxComponents, 1);
 });
 
 test("T-123 component-code prompt uses UAT build-test loops as depth pressure", () => {

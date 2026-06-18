@@ -1,11 +1,13 @@
 ---
 id: T-203
 title: Factor code-builder graph function for UAT test generation and ticket re-entry
-status: active
+status: completed
 change_class: design_reframe
 re_entry_point: design
 owner: odd_sdlc
 created: 2026-06-15
+completed: 2026-06-18
+updated_at: 2026-06-18
 source: data_mapper deep SDLC live review, missing generated source tests
 related_tickets:
   - .ai-workspace/tickets/completed/T-168-build-design-consumer-test-pipeline-for-co-affirming-implementation.md
@@ -431,8 +433,130 @@ sandbox outside the builder lane.
   test_env/tests/test_t197_product_gtl_gate.test.mjs`; `node --test
   test_env/tests/test_t191_typed_prompt_assets.test.mjs`; and
   `npm run test:semantic` passed 1065/1065.
+- 2026-06-18 closure pass fixed the remaining code-builder materialization
+  regressions for lite Rust hello-service traversal. Component-code product
+  materialization now admits predecessor design-depth evaluator registers when
+  the rule outcome is a separate persisted evaluator artifact, so
+  `derive_lite_component_code_surface` receives the implementation-design file
+  targets from admitted result-envelope evidence instead of dropping
+  `src/main.rs`. Component-test product materialization now derives generated
+  test-file targets from the admitted upstream `test_design_surface`
+  `testComponentTopologyRows` before it asks the worker to build
+  `component_test_surface`; the target path is the generated test script/file
+  under the tenant test root, not the source-under-test path. The Rust fixture
+  now declares `testingTechStack.testRunner = curl`, `testRoots = ["tests/"]`,
+  and execution-environment byproduct/cache policy for `Cargo.lock` and
+  `target/`.
+- 2026-06-18 focused closure verification passed:
+  `npm run build:semantic`; `node --test --test-name-pattern "T-203
+  component-code targets admit predecessor evaluator register"
+  test_env/tests/test_t181_fp_evaluator_design_register.test.mjs`;
+  `node --test --test-name-pattern "T-164 design manifest role normalizes to
+  build_config product materialization|T-203 component-test targets derive from
+  admitted test-design topology"
+  test_env/tests/test_t066_product_materialization_contract.test.mjs`;
+  `node --test test_env/tests/test_t203_runtime_start_steel_thread.test.mjs`;
+  `node --test test_env/tests/test_t191_typed_prompt_assets.test.mjs`; `node
+  --test test_env/tests/test_t197_product_gtl_gate.test.mjs`; and `git diff
+  --check`.
+- 2026-06-18 diagnostic live archive
+  `test_env/test_runs/scenario_t164_rust_hello_service_lite_live/20260617T204251236Z_pid75913`
+  proved the autonomous `next` launcher path selected
+  `overlay://odd-sdlc/lite-design-module-implementation`, generated
+  implementation design, materialized `Cargo.toml` and `src/main.rs`, built the
+  Rust service, observed `curl` output `helloworld`, generated test design, and
+  packaged `derive_lite_component_test_surface` with
+  `build_tenants/hello_world_rust_service/tests/smoke_hello_world_service.sh`
+  as a declared `test` product target from the admitted ADR-003 test-design
+  surface.
+- 2026-06-18 clean live archive
+  `test_env/test_runs/scenario_t164_rust_hello_service_lite_live/20260617T211520388Z_pid11988`
+  copied the corrected fixture execution environment and ran with autonomous
+  public-start triage. It converged bootstrap conformance, generated
+  implementation design with closure disposition `close`, then built
+  component code with product materialization authority `passed`, declared
+  `Cargo.toml` and `src/main.rs`, ran `cargo build`, and observed exact smoke
+  output `helloworld`. The component-code review-grade evaluator spent
+  435513 ms on the semantic pass and returned
+  `req_t164_rust_svc_005` as `wrong_stage/downstream_deferred`; ABG folded that
+  pressure lawfully, emitted `sdlc_edge_closure_decision.json` with
+  `disposition = close`, and selected
+  `derive_lite_test_design_surface` in `sdlc_next_action_projection.json`.
+  `operator_summary.json` records `currentEdge =
+  derive_lite_test_design_surface`, `status = worker_invoked`,
+  `closureDisposition = close`, and no blocking reason. The run was then
+  manually interrupted before a separate test-design operator-run archive was
+  created. That limits this archive as an end-to-end live pass, but it proves
+  the corrected autonomous path through component-code closure and next-edge
+  selection; the prior diagnostic archive plus focused regression prove
+  component-test target derivation.
+- 2026-06-18 proportionality-selection closure fixed the remaining live
+  defect from the same archive. Forensics showed the autonomous start had
+  selected framework-smoke proportionality, but the lite component-code
+  handoff prompt was still constructed with `selectedStrategy = full_breadth`
+  and `proportionalityProfile = domain_product/staged/broad/unreduced-full`.
+  Edge timing from the archive was: conformance start
+  `2026-06-17T21:15:39.978Z`; `derive_lite_design_adr_surface` start
+  `2026-06-17T21:16:41.631Z`, prompt 128131 ms, evaluator 387565 ms, closed;
+  `derive_lite_component_code_surface` start
+  `2026-06-17T21:25:22.752Z`, worker 293780 ms, evaluator 435513 ms, closed.
+  The 14m20s edge wall time was therefore churn from choosing the broad typed
+  surface for a two-file no-op smoke service, not missing prompt typing.
+  Source fix: `public_start.ts` now reconstructs overlay traversal selection
+  for replay/next starts when an overlay is known, `launch_contract.ts` passes
+  the admitted `SdlcTraversalHopSelection` into
+  `deriveSdlcTraversalStrategyDecision(...)`, and
+  `traversal_strategy.ts` lets reduced hop selections
+  (`framework_smoke` or other non-`domain_product` single/dual hops) select
+  `steel_thread` before null/full-breadth directives or fallback plans widen
+  the handoff. The default lite component-code graph strategy is now
+  `steel_thread`; its code-builder retry/yield continuation carrier remains
+  attached.
+- 2026-06-18 final focused verification for the proportionality and
+  materialization fixes passed: `npm run build:semantic`; `node --test
+  test_env/tests/test_t123_per_edge_traversal_strategy.test.mjs`; `node --test
+  test_env/tests/test_t173_complexity_selection.test.mjs`; `node --test
+  test_env/tests/test_t187_fp_evaluator_prompt_boundary.test.mjs`; `node
+  --test test_env/tests/test_t203_runtime_start_steel_thread.test.mjs`; `node
+  --test test_env/tests/test_t066_product_materialization_contract.test.mjs`;
+  `node --test test_env/tests/test_t181_fp_evaluator_design_register.test.mjs`;
+  `node --test test_env/tests/test_t197_product_gtl_gate.test.mjs`; and
+  `git diff --check`.
 
-## Current Substrate Drift Finding
+- 2026-06-18 code-review follow-up: the unconditional test-design topology
+  union finding was valid against an intermediate patch and is now closed by
+  current-output precedence. Once a `component_test_surface` register is
+  admitted, its valid tenant-local rows are the current edge target authority;
+  invalid or empty current rows do not silently substitute the upstream default
+  test-design target. The shared prompt-policy tenant-tech leak was also
+  valid; unconditional `src/main.rs`, `curl`, `local_http_service_smoke`, and
+  shell-script examples were removed from `prompt_edge_policy.ts` and guarded
+  by the T-197 product gate. The reported T-110 environmental failure did not
+  reproduce on the final worktree.
+- 2026-06-18 live retry note: a fresh Rust hello-service live run started from
+  archive
+  `test_env/test_runs/scenario_t164_rust_hello_service_lite_live/20260618T015230354Z_pid21090`.
+  It proved the reduced public-start handoff at
+  `derive_lite_design_adr_surface` with
+  `outcomeClass=framework_smoke`, `hopClass=single_hop`,
+  `profileClass=degenerate`, and `selectedStrategy=steel_thread`, then passed
+  worker/postflight/evaluator for the design edge. The run was manually
+  cancelled after 410741 ms because it was built before the prompt-policy
+  source-boundary fix and had not yet emitted the component-code handoff. It is
+  forensic evidence for reduced start selection only, not a final live pass for
+  this exact worktree.
+- 2026-06-18 final post-review verification passed: `npm run build:semantic`;
+  `node --test test_env/tests/test_t197_product_gtl_gate.test.mjs`; `node
+  --test test_env/tests/test_t123_per_edge_traversal_strategy.test.mjs`; `node
+  --test test_env/tests/test_t066_product_materialization_contract.test.mjs`;
+  `node --test test_env/tests/test_t187_fp_evaluator_prompt_boundary.test.mjs`;
+  `node --test test_env/tests/test_t203_runtime_start_steel_thread.test.mjs`;
+  `node --test test_env/tests/test_t173_complexity_selection.test.mjs`; `node
+  --test test_env/tests/test_t181_fp_evaluator_design_register.test.mjs`; `node
+  --test test_env/tests/test_t110_typed_callout_projection.test.mjs`; and
+  `git diff --check`.
+
+## Resolved Substrate Drift Finding
 
 The 2026-06-16 data-mapper steel-thread live run exposed a real boundary defect:
 component-code frontier derivation can see multiple predecessor design-depth
@@ -458,6 +582,14 @@ not a license to add "latest run wins", tolerate old result shapes, or make SDLC
 the compiler for `F_P` plugin output APIs. The lawful path is abiogenesis T-158:
 GTL declares the plugin result interface, ABG admits one result envelope, and
 SDLC consumes that admitted envelope or fails closed.
+
+Resolved in this ticket by consuming the admitted plugin result-envelope
+evidence for design-depth evaluator registers and requiring the persisted
+content register plus evaluator register refs, while leaving later rule-outcome
+proof as evaluator closure evidence. SDLC still fails closed when ABG-admitted
+result-envelope truth is absent; it no longer requires a later sidecar
+rule-outcome file to be embedded in the plugin result envelope before a
+predecessor design-depth register can supply code-builder targets.
 
 ## Closure Criteria
 
@@ -501,6 +633,13 @@ SDLC consumes that admitted envelope or fails closed.
   not rebuild the GTL module with a steel-thread profile.
 - Runtime-selected requirement refs are visible in the ABG attempt envelope and
   SDLC handoff feature scope.
+- Admitted reduced traversal-hop selections are visible in worker handoff
+  strategy decisions and proportionality profiles. A framework-smoke
+  single-hop or dual-hop selection narrows lite code/test prompt surfaces before
+  a null or full-breadth directive can broaden the worker handoff.
+- Shared SDLC prompt policy does not carry tenant-specific test technology
+  examples. Runner, command, extension, source path, and script-shape details
+  must come from admitted tenant stack/test-design authority.
 - Public start `next` is modeled as `traverse<bootstrap, conformant>` and
   ticket asset start is modeled as `traverse<ticket, triage>`; the current
   public-start helper is transitional projection only and closure ultimately
@@ -548,6 +687,12 @@ SDLC consumes that admitted envelope or fails closed.
   of runtime start traversal selection.
 - Any runtime-selected requirement dependency window that is broadened back to
   full breadth before the worker handoff.
+- Any reduced traversal-hop selection that reaches public start or replay but
+  is dropped before worker handoff strategy selection, causing the prompt
+  manifest to report `domain_product/staged/broad/unreduced-full`.
+- Any unconditional Rust, curl, shell-script, JVM, JavaScript, or other tenant
+  technology token in shared prompt policy that should instead come from typed
+  tenant authority.
 - Any SDLC code path that treats local result-file shape probing, sidecar
   filename conventions, or archive scans as the authoritative plugin result
   interface instead of consuming GTL-declared, ABG-admitted result truth.
