@@ -8,9 +8,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  invokeOddSdlcSpecMethodCommand,
+  admitOddSdlcWorkspaceTicket,
+  projectOddSdlcWorkspaceTickets,
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
-  SDLC_TICKET_WORKFLOW_OVERLAY_REF
+  SDLC_TICKET_WORKFLOW_OVERLAY_REF,
+  startOddSdlcWorkspace
 } from "../../build/semantic/code/src/index.js";
 import { liveTestArchiveRoot } from "./archive_root.mjs";
 
@@ -19,17 +21,6 @@ const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
 
 function archiveTimestamp() {
   return new Date().toISOString().replace(/[-:.TZ]/gu, "");
-}
-
-async function runCommand(args) {
-  const result = await invokeOddSdlcSpecMethodCommand(args);
-  return Object.freeze({
-    process: Object.freeze({
-      status: result.exitCode,
-      stderr: result.status === "error" ? JSON.stringify(result.payload) : ""
-    }),
-    result
-  });
 }
 
 function writeWorkspace(workspace) {
@@ -192,11 +183,9 @@ test("T-162 live package API projects, admits, and starts an active ticket", asy
   mkdirSync(workspace, { recursive: true });
   writeWorkspace(workspace);
 
-  const tickets = await runCommand(["tickets", "--workspace", workspace]);
-  assert.equal(tickets.process.status, 0, tickets.process.stderr);
-  assert.equal(tickets.result.status, "ok");
-  assert.equal(tickets.result.payload.kind, "sdlc_ticket_workflow_projection");
-  const row = tickets.result.payload.rows.find(
+  const tickets = projectOddSdlcWorkspaceTickets({ workspaceRoot: workspace });
+  assert.equal(tickets.kind, "sdlc_ticket_workflow_projection");
+  const row = tickets.rows.find(
     (candidate) => candidate.ticketId === "T-162"
   );
   assert(row, "ticket workflow projection must include T-162");
@@ -206,52 +195,37 @@ test("T-162 live package API projects, admits, and starts an active ticket", asy
   assert.equal(row.overlayContinuationRows.length, 1);
   assert.equal(row.overlayContinuationRows[0].ruling, "depth_traversal");
 
-  const admitted = await runCommand([
-    "ticket-admit",
-    "--workspace",
-    workspace,
-    "--target",
-    "asset:ticket/T-162"
-  ]);
-  assert.equal(admitted.process.status, 0, admitted.process.stderr);
-  assert.equal(admitted.result.status, "ok");
-  assert.equal(admitted.result.payload.kind, "sdlc_ticket_execution_contract");
-  assert.equal(admitted.result.payload.ticketId, "T-162");
-  assert.equal(admitted.result.payload.reviewDecisionRows.length, 1);
-  assert.equal(admitted.result.payload.overlayContinuationRefs.length, 1);
+  const admitted = admitOddSdlcWorkspaceTicket({
+    workspaceRoot: workspace,
+    ticketId: "T-162"
+  });
+  assert.equal(admitted.kind, "sdlc_ticket_execution_contract");
+  assert.equal(admitted.ticketId, "T-162");
+  assert.equal(admitted.reviewDecisionRows.length, 1);
+  assert.equal(admitted.overlayContinuationRefs.length, 1);
   assert(
-    admitted.result.payload.reviewerProfileIds.includes("codex"),
+    admitted.reviewerProfileIds.includes("codex"),
     "ticket admission must preserve selected reviewer profile"
   );
 
-  const started = await runCommand([
-    "start",
-    "--workspace",
-    workspace,
-    "--target",
-    "asset:ticket/T-162",
-    "--until",
-    "blocked",
-    "--worker",
-    "process://codex"
-  ]);
-  assert.equal(started.process.status, 0, started.process.stderr);
-  assert.equal(started.result.status, "ok");
+  const started = await startOddSdlcWorkspace({
+    workspaceRoot: workspace,
+    target: { kind: "asset", handle: "ticket/T-162" },
+    until: "blocked",
+    workerTransport: "process://codex"
+  });
+  assert.equal(started.kind, "sdlc_installed_operator_start_outcome");
+  assert.equal(started.status, "blocked");
   assert.equal(
-    started.result.payload.kind,
-    "sdlc_installed_operator_start_outcome"
-  );
-  assert.equal(started.result.payload.status, "blocked");
-  assert.equal(
-    started.result.payload.summary.blockingReason,
+    started.summary.blockingReason,
     "installed_topology_invalid"
   );
   assert.equal(
-    started.result.payload.summary.graphFunctionName,
+    started.summary.graphFunctionName,
     "derive_intent_surface"
   );
   assert.equal(
-    started.result.payload.summary.nextLawfulAction,
+    started.summary.nextLawfulAction,
     "run_install_or_repair_installed_topology"
   );
 
@@ -262,12 +236,12 @@ test("T-162 live package API projects, admits, and starts an active ticket", asy
         kind: "t162_ticket_workflow_live_summary",
         workspace,
         ticketRowRef: row.rowRef,
-        executionContractRef: admitted.result.payload.executionContractRef,
+        executionContractRef: admitted.executionContractRef,
         ticketWorkflowOverlayRef: SDLC_TICKET_WORKFLOW_OVERLAY_REF,
         selectedOverlayRef: SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
-        selectedGraphFunction: started.result.payload.summary.graphFunctionName,
-        startBlockingReason: started.result.payload.summary.blockingReason,
-        ticketDigest: admitted.result.payload.ticketDigest
+        selectedGraphFunction: started.summary.graphFunctionName,
+        startBlockingReason: started.summary.blockingReason,
+        ticketDigest: admitted.ticketDigest
       },
       null,
       2

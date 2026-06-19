@@ -15,7 +15,8 @@ import path, { dirname, resolve } from "node:path";
 
 import {
   installOddSdlcTypescript,
-  invokeOddSdlcSpecMethodCommand
+  projectOddSdlcWorkspaceGaps,
+  startOddSdlcWorkspace
 } from "../../build/semantic/code/src/index.js";
 import { liveTestArchiveRoot } from "./archive_root.mjs";
 
@@ -187,66 +188,63 @@ test(
     process.env["ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE"] = "pty-terminal";
     process.env["ABG_TS_AGENT_EXECUTOR_PROFILE"] = "pty-terminal";
     try {
-      const gaps = await invokeOddSdlcSpecMethodCommand(["gaps", "--workspace", workspace]);
+      const gaps = projectOddSdlcWorkspaceGaps({ workspaceRoot: workspace });
       writeJson(path.join(archiveRoot, "gaps_result.json"), gaps);
-      assert.equal(gaps.status, "ok");
+      assert.equal(typeof gaps, "object");
 
-      const start = await invokeOddSdlcSpecMethodCommand([
-        "start",
-        "--workspace",
-        workspace,
-        "--target",
-        "graph_function:bootstrap_release_self_test",
-        "--until",
-        "first_traversal",
-        "--worker",
-        WORKER_TRANSPORT
-      ]);
+      const start = await startOddSdlcWorkspace({
+        workspaceRoot: workspace,
+        target: {
+          kind: "graph_function",
+          handle: "bootstrap_release_self_test"
+        },
+        until: "first_traversal",
+        workerTransport: WORKER_TRANSPORT
+      });
       writeJson(path.join(archiveRoot, "start_result.json"), start);
 
-      assert.equal(start.status, "ok");
-      assert.equal(start.payload.kind, "sdlc_installed_operator_start_outcome");
-      assert.equal(start.payload.status, "worker_invoked");
-      assert.equal(start.payload.workerRun.executorProfile, "pty-terminal");
-      assert.equal(start.payload.workerRun.streamModel, "terminal-transcript");
-      assert.equal(typeof start.payload.workerRun.terminalSessionId, "string");
-      assert.equal(start.payload.workerRun.terminalSessionId.length > 0, true);
-      assert.equal(start.payload.workerRun.outcome.kind, "exited");
-      assert.equal(start.payload.workerRun.outcome.status, 0);
-      assert.equal(start.payload.workerRun.status, 0);
-      assert.ok(start.payload.workerRun.traceRoot.includes(".trace"));
-      assert.equal(start.payload.workerRun.terminalTranscriptRef !== undefined, true);
-      assert.equal(start.payload.workerRun.traceResultRef !== undefined, true);
+      assert.equal(start.kind, "sdlc_installed_operator_start_outcome");
+      assert.equal(start.status, "worker_invoked");
+      assert.equal(start.workerRun.executorProfile, "pty-terminal");
+      assert.equal(start.workerRun.streamModel, "terminal-transcript");
+      assert.equal(typeof start.workerRun.terminalSessionId, "string");
+      assert.equal(start.workerRun.terminalSessionId.length > 0, true);
+      assert.equal(start.workerRun.outcome.kind, "exited");
+      assert.equal(start.workerRun.outcome.status, 0);
+      assert.equal(start.workerRun.status, 0);
+      assert.ok(start.workerRun.traceRoot.includes(".trace"));
+      assert.equal(start.workerRun.terminalTranscriptRef !== undefined, true);
+      assert.equal(start.workerRun.traceResultRef !== undefined, true);
       if (isClaudeWorkerBinding(WORKER_TRANSPORT)) {
         assert.ok(
-          start.payload.workerRun.structuredEventCount > 0,
+          start.workerRun.structuredEventCount > 0,
           "Claude stream-json events should be observed through the PTY transcript"
         );
       }
 
-      const traceResultPath = pathFromFileRef(start.payload.workerRun.traceResultRef);
+      const traceResultPath = pathFromFileRef(start.workerRun.traceResultRef);
       assert.equal(existsSync(traceResultPath), true);
       const traceResult = readJson(traceResultPath);
       writeJson(path.join(archiveRoot, "trace_result_snapshot.json"), traceResult);
       assert.equal(traceResult.executorProfile, "pty-terminal");
       assert.equal(traceResult.streamModel, "terminal-transcript");
-      assert.equal(traceResult.terminalSessionId, start.payload.workerRun.terminalSessionId);
+      assert.equal(traceResult.terminalSessionId, start.workerRun.terminalSessionId);
       assert.equal(traceResult.outcome.kind, "exited");
       assert.equal(traceResult.outcome.status, 0);
 
       const startedContextPath = path.join(
-        start.payload.archiveRoot,
+        start.archiveRoot,
         "worker_process_started_context.json"
       );
       assert.equal(existsSync(startedContextPath), true);
       const startedContext = readJson(startedContextPath);
       assert.equal(
         startedContext.terminalSessionId,
-        start.payload.workerRun.terminalSessionId
+        start.workerRun.terminalSessionId
       );
 
       const processSummaryPath = path.join(
-        start.payload.archiveRoot,
+        start.archiveRoot,
         "worker_process_summary.json"
       );
       assert.equal(existsSync(processSummaryPath), true);
@@ -254,7 +252,7 @@ test(
       assert.equal(processSummary.kind, "sdlc_worker_process_summary");
       assert.equal(
         processSummary.terminalSessionId,
-        start.payload.workerRun.terminalSessionId
+        start.workerRun.terminalSessionId
       );
       assert.equal(
         processSummary.runtimeLivenessAuthority,
@@ -265,7 +263,7 @@ test(
       assert.equal(processSummary.runtimeLivenessDispositionReason, "activity_recent");
 
       const livenessProjectionPath = path.join(
-        start.payload.archiveRoot,
+        start.archiveRoot,
         "runtime_liveness_observer_projection.json"
       );
       assert.equal(existsSync(livenessProjectionPath), true);

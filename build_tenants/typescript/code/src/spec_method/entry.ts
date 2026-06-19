@@ -2315,6 +2315,76 @@ function gapsPayload(request: OddSdlcSpecMethodTraversalRequest): unknown {
   });
 }
 
+export interface OddSdlcWorkspaceTraversalInput {
+  readonly workspaceRoot: string;
+  readonly outputWorkspaceRoot?: string | null;
+  readonly target?: OddSdlcSpecMethodTraversalRequest["target"];
+  readonly until?: SdlcPublicStartUntil;
+  readonly workerTransport?: string | null;
+  readonly evaluatorPriorityEdge?: string | null;
+  readonly runtimeTraversalSelections?: readonly StartRuntimeTraversalStrategySelection[];
+}
+
+function workspaceTraversalRequest(input: OddSdlcWorkspaceTraversalInput & {
+  readonly command: "gaps" | "start";
+}): OddSdlcSpecMethodTraversalRequest {
+  return Object.freeze({
+    kind: "odd_sdlc_spec_method_request" as const,
+    command: input.command,
+    workspaceRoot: input.workspaceRoot,
+    outputWorkspaceRoot: input.outputWorkspaceRoot ?? null,
+    target: input.target ?? { kind: "next" as const, handle: "next" },
+    until: input.until ?? "blocked",
+    workerTransport: input.workerTransport ?? null,
+    evaluatorPriorityEdge: input.evaluatorPriorityEdge ?? null,
+    ...(input.runtimeTraversalSelections === undefined
+      ? {}
+      : { runtimeTraversalSelections: input.runtimeTraversalSelections })
+  });
+}
+
+export function projectOddSdlcWorkspaceTickets(input: {
+  readonly workspaceRoot: string;
+  readonly outputWorkspaceRoot?: string | null;
+}): ReturnType<typeof projectSdlcQueryDomain>["ticketWorkflow"] {
+  return queryDomainFor(
+    workspaceContext({
+      workspaceRoot: input.workspaceRoot,
+      outputWorkspaceRoot: input.outputWorkspaceRoot ?? null
+    })
+  ).ticketWorkflow;
+}
+
+export function admitOddSdlcWorkspaceTicket(input: {
+  readonly workspaceRoot: string;
+  readonly outputWorkspaceRoot?: string | null;
+  readonly ticketId: string;
+}): ReturnType<typeof admitSdlcTicketExecutionContract> {
+  return admitSdlcTicketExecutionContract({
+    workflow: projectOddSdlcWorkspaceTickets(input),
+    ticketId: input.ticketId
+  });
+}
+
+export function projectOddSdlcWorkspaceGaps(
+  input: OddSdlcWorkspaceTraversalInput
+): unknown {
+  return gapsPayload(workspaceTraversalRequest({
+    ...input,
+    command: "gaps"
+  }));
+}
+
+export async function startOddSdlcWorkspace(
+  input: OddSdlcWorkspaceTraversalInput
+): Promise<unknown> {
+  assertCurrentSdlcGtlProgramConformance();
+  return installedStartPayloadFor(workspaceTraversalRequest({
+    ...input,
+    command: "start"
+  }));
+}
+
 export interface SdlcAnalyzeRunCliEnvelope {
   readonly kind: "sdlc_analyze_run_cli_envelope";
   readonly format: SdlcFdRunAnalysisFormat;

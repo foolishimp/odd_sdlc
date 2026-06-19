@@ -526,6 +526,50 @@ Next blocker set:
 - classify historical docs and temp-prefix references so they do not look like
   retained command law
 
+### 2026-06-19 Typed Workspace API Cut Result
+
+Cut scope: introduce structured package APIs for workspace ticket projection,
+ticket admission, gaps projection, and installed start so live callers can stop
+using argv-shaped private command helpers.
+
+Changed contract:
+
+- `spec_method/entry.ts` now exports typed workspace APIs:
+  `projectOddSdlcWorkspaceTickets(...)`,
+  `admitOddSdlcWorkspaceTicket(...)`,
+  `projectOddSdlcWorkspaceGaps(...)`, and
+  `startOddSdlcWorkspace(...)`.
+- T-162 live ticket workflow now projects/admit/starts through those typed APIs
+  instead of `invokeOddSdlcSpecMethodCommand(...)`.
+- T-110 live PTY operator proof now uses typed gaps/start APIs instead of
+  `invokeOddSdlcSpecMethodCommand(...)`.
+
+Current private-helper metrics after this cut, excluding archived
+`test_env/test_runs` and generated `build/semantic` output:
+
+| Surface | Files | Matches | Delta from second cut |
+| --- | ---: | ---: | ---: |
+| `invokeOddSdlcSpecMethodCommand` | 15 | 48 | -2 files / -5 matches |
+| `invokeOddSdlcSpecMethodCommandSync` | 9 | 49 | unchanged |
+| `serializeOddSdlcSpecMethodResult` | 5 | 12 | unchanged |
+| `commandPayload` | 1 | 5 | unchanged |
+
+Focused proof completed:
+
+- `npm run build:semantic` passed.
+- `node --test test_env/live/test_t110_live_agent_pty_installed_operator.test.mjs test_env/live/test_t162_ticket_workflow_live.test.mjs`
+  passed; T-110 skipped because its live env flag was absent, T-162 passed.
+- focused ESLint passed for T-110 and T-162 live harness files.
+
+Next blocker set:
+
+- migrate remaining async helper users in sandbox/test package API callers where
+  typed APIs now exist
+- replace sync helper users in gaps/analyze-run tests with structured APIs or
+  reclassify them as parser/serializer tests
+- split command grammar and serialization into a quarantined legacy/parser
+  surface before deletion
+
 ### 2026-06-19 Initial CLI-Path Function Audit
 
 Scope: this is a first pass from the public package bin through
