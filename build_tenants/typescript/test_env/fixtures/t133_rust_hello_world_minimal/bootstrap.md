@@ -187,7 +187,7 @@ program.
       "graphFunction": "install_odd_sdlc_runtime",
       "humanDecision": "continue",
       "expectedCarrier": "schema://odd_sdlc/t133/installed_odd_sdlc_surface",
-      "donePredicate": "node_modules/.bin/odd-sdlc-ts exists and gaps can run",
+      "donePredicate": "node_modules/.bin/genesis-ts exists and gaps can run",
       "retryAction": "action:repair_odd_sdlc_install"
     },
     {
@@ -211,14 +211,14 @@ program.
   ],
   "commands": {
     "installOddSdlc": [
-      "odd-sdlc-ts install --target <workspace> --package-source <odd_sdlc_source>"
+      "installOddSdlcTypescript({ targetRoot: <workspace>, packageSourceRoot: <odd_sdlc_source> })"
     ],
     "conformProjectAuthority": [
-      "odd-sdlc-ts start --workspace <workspace> --target graph_function:Fg_conform_project_authority --until first_traversal --worker <worker>"
+      "node_modules/.bin/genesis-ts start --workspace <workspace> --scope workspace --target graph_function:Fg_conform_project_authority --until first_traversal"
     ],
     "buildProduct": [
-      "odd-sdlc-ts gaps --workspace <workspace>",
-      "odd-sdlc-ts start --workspace <workspace> --target next --until first_traversal --worker <worker>"
+      "node_modules/.bin/genesis-ts gaps --workspace <workspace> --scope workspace",
+      "node_modules/.bin/genesis-ts start --workspace <workspace> --scope workspace --target asset:component_code_surface --until first_traversal"
     ],
     "testProduct": [
       "cd build_tenants/hello_world_rust && cargo run --quiet"

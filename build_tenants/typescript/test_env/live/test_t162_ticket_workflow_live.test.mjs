@@ -2,13 +2,13 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  invokeOddSdlcSpecMethodCommand,
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
   SDLC_TICKET_WORKFLOW_OVERLAY_REF
 } from "../../build/semantic/code/src/index.js";
@@ -16,39 +16,20 @@ import { liveTestArchiveRoot } from "./archive_root.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
-const CLI_MAIN = resolve(PACKAGE_ROOT, "build/semantic/code/src/cli/main.js");
 
 function archiveTimestamp() {
   return new Date().toISOString().replace(/[-:.TZ]/gu, "");
 }
 
-function runCli(args) {
-  const result = spawnSync(process.execPath, [CLI_MAIN, ...args], {
-    cwd: PACKAGE_ROOT,
-    encoding: "utf8",
-    env: {
-      ...process.env,
-      ODD_SDLC_TS_OUTPUT: "json",
-      ODD_SDLC_TEST_ONLY_MINIMUM_OPERATOR_TIMEOUT_MS: "60000",
-      ODD_SDLC_WORKER_TIMEOUT_MS: "900000",
-      ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS: "180000"
-    }
+async function runCommand(args) {
+  const result = await invokeOddSdlcSpecMethodCommand(args);
+  return Object.freeze({
+    process: Object.freeze({
+      status: result.exitCode,
+      stderr: result.status === "error" ? JSON.stringify(result.payload) : ""
+    }),
+    result
   });
-  const output = result.status === 0 ? result.stdout : result.stderr;
-  let parsed;
-  try {
-    parsed = JSON.parse(output);
-  } catch (error) {
-    assert.fail(
-      [
-        `CLI emitted non-JSON output: ${error instanceof Error ? error.message : String(error)}`,
-        `status: ${String(result.status)}`,
-        `stdout: ${result.stdout}`,
-        `stderr: ${result.stderr}`
-      ].join("\n")
-    );
-  }
-  return Object.freeze({ process: result, result: parsed });
 }
 
 function writeWorkspace(workspace) {
@@ -139,7 +120,7 @@ type: feature
 ticket_category: implementation
 status: active
 goal: ticket-workflow-live-start
-change_intent: prove ticket workflow through built CLI
+change_intent: prove ticket workflow through package API
 change_class: design_reframe
 re_entry_point: design
 triaged_at: 2026-06-14
@@ -149,9 +130,9 @@ target_truth: active ticket authority admits before graph traversal
 superseded_truth: prompt-only ticket execution
 closure_law: ticket workflow live test must project, admit, and start through asset:ticket/T-162
 evaluation_criteria:
-  - built CLI projects ticket workflow
-  - built CLI admits the ticket execution contract
-  - built CLI starts asset:ticket/T-162 through route_ticket_work_item
+  - package API projects ticket workflow
+  - package API admits the ticket execution contract
+  - package API starts asset:ticket/T-162 through route_ticket_work_item
 non_closure_conditions:
   - comments set ticket status
   - asset:ticket start bypasses admission
@@ -201,7 +182,7 @@ overlay_continuation_proof_expectation: start through admitted ticket authority
   );
 }
 
-test("T-162 live CLI projects, admits, and starts an active ticket", () => {
+test("T-162 live package API projects, admits, and starts an active ticket", async () => {
   const archiveRoot = liveTestArchiveRoot(
     "t162_ticket_workflow_live",
     archiveTimestamp(),
@@ -211,7 +192,7 @@ test("T-162 live CLI projects, admits, and starts an active ticket", () => {
   mkdirSync(workspace, { recursive: true });
   writeWorkspace(workspace);
 
-  const tickets = runCli(["tickets", "--workspace", workspace]);
+  const tickets = await runCommand(["tickets", "--workspace", workspace]);
   assert.equal(tickets.process.status, 0, tickets.process.stderr);
   assert.equal(tickets.result.status, "ok");
   assert.equal(tickets.result.payload.kind, "sdlc_ticket_workflow_projection");
@@ -225,7 +206,7 @@ test("T-162 live CLI projects, admits, and starts an active ticket", () => {
   assert.equal(row.overlayContinuationRows.length, 1);
   assert.equal(row.overlayContinuationRows[0].ruling, "depth_traversal");
 
-  const admitted = runCli([
+  const admitted = await runCommand([
     "ticket-admit",
     "--workspace",
     workspace,
@@ -243,7 +224,7 @@ test("T-162 live CLI projects, admits, and starts an active ticket", () => {
     "ticket admission must preserve selected reviewer profile"
   );
 
-  const started = runCli([
+  const started = await runCommand([
     "start",
     "--workspace",
     workspace,
@@ -258,7 +239,7 @@ test("T-162 live CLI projects, admits, and starts an active ticket", () => {
   assert.equal(started.result.status, "ok");
   assert.equal(
     started.result.payload.kind,
-    "sdlc_installed_operator_start_cli_projection"
+    "sdlc_installed_operator_start_outcome"
   );
   assert.equal(started.result.payload.status, "blocked");
   assert.equal(

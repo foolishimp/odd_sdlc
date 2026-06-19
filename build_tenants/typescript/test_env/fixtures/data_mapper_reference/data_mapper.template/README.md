@@ -63,12 +63,19 @@ npm run build:semantic
 
 ```bash
 cd /Users/jim/src/apps/odd_sdlc/build_tenants/typescript
-ODD_SDLC_TS_OUTPUT=json \
-node build/semantic/code/src/cli/main.js install \
-  --target <throwaway-data-mapper-workspace> \
-  --installed-package-name odd-sdlc-data-mapper-testXX \
-  --package-source /Users/jim/src/apps/odd_sdlc/build_tenants/typescript \
-  --abg-package-source /Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/typescript
+node --input-type=module <<'NODE'
+import { installOddSdlcTypescript } from "./build/semantic/code/src/index.js";
+
+const result = await installOddSdlcTypescript({
+  targetRoot: "<throwaway-data-mapper-workspace>",
+  installedPackageName: "odd-sdlc-data-mapper-testXX",
+  packageSourceRoot: "/Users/jim/src/apps/odd_sdlc/build_tenants/typescript",
+  abgPackageSourceRoot:
+    "/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/typescript"
+});
+console.log(JSON.stringify(result, null, 2));
+if (result.kind !== "installed") process.exit(1);
+NODE
 ```
 
 This install command runs the ABG TypeScript installer as part of the
@@ -81,30 +88,30 @@ This install command runs the ABG TypeScript installer as part of the
 
 ```bash
 cd <throwaway-data-mapper-workspace>
-node_modules/.bin/odd-sdlc-ts gaps --workspace .
+node_modules/.bin/genesis-ts gaps --workspace . --scope workspace
 ```
 
 5. Review the gap output before traversal.
 
 6. Only then run the executable workflow path. Attach a real worker transport
-for live traversal. Without `--worker`, `start` may fail closed at
-`fp_worker_unattached`.
+through the installed runtime environment. Without a worker transport, `start`
+may fail closed at `fp_worker_unattached`.
 
 ```bash
-node_modules/.bin/odd-sdlc-ts start --workspace . --target next --until blocked --worker process://claude
+ODD_SDLC_TS_WORKER_TRANSPORT=process://claude node_modules/.bin/genesis-ts start --workspace . --scope workspace --target graph_function:F_lite_design_module_implementation_executive --until first_traversal
 ```
 
 For an autonomous loop, raise the stop condition explicitly:
 
 ```bash
-node_modules/.bin/odd-sdlc-ts start --workspace . --target next --until converged --worker process://claude
+ODD_SDLC_TS_WORKER_TRANSPORT=process://claude node_modules/.bin/genesis-ts start --workspace . --scope workspace --target graph_function:F_lite_design_module_implementation_executive --until converged
 ```
 
 7. Use the installed workspace guidance and RC projection surfaces rather than
 legacy source-repo habits.
 
 ```bash
-node_modules/.bin/odd-sdlc-ts rc-report
+node_modules/.bin/genesis-ts gaps --workspace . --scope workspace
 ```
 
 ## Historical Note

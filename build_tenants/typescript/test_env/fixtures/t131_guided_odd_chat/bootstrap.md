@@ -462,7 +462,7 @@ or decide release closure.
       "graphFunction": "install_odd_sdlc_runtime",
       "humanDecision": "continue",
       "expectedCarrier": "schema://odd_sdlc/t131/installed_odd_sdlc_surface",
-      "donePredicate": "node_modules/.bin/odd-sdlc-ts exists and gaps can run",
+      "donePredicate": "node_modules/.bin/genesis-ts exists and gaps can run",
       "retryAction": "action:repair_odd_sdlc_install"
     },
     {
@@ -587,13 +587,13 @@ or decide release closure.
     ],
     "installOddSdlc": [
       "npm install",
-      "node_modules/.bin/odd-sdlc-ts gaps --workspace ."
+      "node_modules/.bin/genesis-ts gaps --workspace . --scope workspace"
     ],
     "conformProjectAuthority": [
-      "node_modules/.bin/odd-sdlc-ts start --workspace . --target graph_function:Fg_conform_project_authority --until first_traversal"
+      "node_modules/.bin/genesis-ts start --workspace . --scope workspace --target graph_function:Fg_conform_project_authority --until first_traversal"
     ],
     "materializeProduct": [
-      "node_modules/.bin/odd-sdlc-ts start --workspace . --target asset:component_code_surface --until first_traversal"
+      "node_modules/.bin/genesis-ts start --workspace . --scope workspace --target asset:component_code_surface --until first_traversal"
     ],
     "buildOddChat": [
       "cd build_tenants/typescript && npm install",

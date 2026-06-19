@@ -102,21 +102,22 @@ function freshDataMapperWorkspace(archiveRoot) {
   return workspace;
 }
 
-function installedOddSdlcCommand(install) {
+function installedAbgCommand(install) {
   const commandPath = install.commandPaths.find(
-    (candidate) => path.basename(candidate) === "odd-sdlc-ts"
+    (candidate) => path.basename(candidate) === "genesis-ts"
   );
-  assert(commandPath, "odd-sdlc-ts command path missing");
+  assert(commandPath, "genesis-ts command path missing");
   return commandPath;
 }
 
-function runInstalled(commandPath, args, workspace, archiveRoot, label) {
+function runInstalled(commandPath, args, workspace, archiveRoot, label, envOverrides = {}) {
   const run = spawnSync(commandPath, args, {
     cwd: workspace,
     encoding: "utf8",
     env: {
       ...process.env,
-      ODD_SDLC_TS_OUTPUT: "json"
+      ODD_SDLC_TS_OUTPUT: "json",
+      ...envOverrides
     },
     maxBuffer: 1024 * 1024 * 50,
     timeout: COMMAND_TIMEOUT_MS
@@ -135,14 +136,43 @@ function runInstalled(commandPath, args, workspace, archiveRoot, label) {
   writeJson(path.join(archiveRoot, `${label}.process.json`), record);
   writeFileSync(path.join(archiveRoot, `${label}.stdout.json`), run.stdout ?? "", "utf8");
   writeFileSync(path.join(archiveRoot, `${label}.stderr.log`), run.stderr ?? "", "utf8");
-  assert.equal(run.status, 0, run.stderr || JSON.stringify(record, null, 2));
   const parsed = JSON.parse(run.stdout);
-  assert.equal(parsed.kind, "odd_sdlc_spec_method_result");
-  assert.equal(parsed.status, "ok", JSON.stringify(parsed, null, 2));
-  return parsed.payload;
+  assert.equal(parsed.command, args[0]);
+  if (args[0] === "gaps") {
+    assert.equal(run.status, 0, run.stderr || JSON.stringify(record, null, 2));
+  } else {
+    assert.notEqual(run.status, 1, run.stderr || JSON.stringify(record, null, 2));
+    assert.notEqual(parsed.status, "error", JSON.stringify(parsed, null, 2));
+  }
+  return parsed;
+}
+
+function currentEdgeFromGaps(payload) {
+  return payload.gaps?.[0]?.edge ?? null;
 }
 
 function edgeSummary(payload) {
+  if (payload.command === "gaps") {
+    const current = payload.gaps?.[0] ?? null;
+    return {
+      status: payload.status,
+      currentEdge: current?.edge ?? null,
+      postflight: null,
+      assurance: null,
+      blockingReason: current?.terminal_kind ?? null,
+      archiveRoot: null
+    };
+  }
+  if (payload.command === "start") {
+    return {
+      status: payload.status,
+      currentEdge: payload.edge ?? null,
+      postflight: null,
+      assurance: null,
+      blockingReason: payload.stopped_by ?? null,
+      archiveRoot: payload.events_path ?? null
+    };
+  }
   return {
     status: payload.status,
     currentEdge: payload.projection?.currentEdge ?? payload.summary?.currentEdge ?? null,
@@ -273,7 +303,7 @@ test(
       installedPackageName: "odd-sdlc-t115-live-data-mapper"
     });
     assert.equal(install.kind, "installed");
-    const commandPath = installedOddSdlcCommand(install);
+    const commandPath = installedAbgCommand(install);
     const target = "graph_function:bootstrap_release_self_test";
     const workerTransport = `process://node?script=${encodeURIComponent(workerScript)}`;
     const requiredEdges = new Set([
@@ -287,12 +317,12 @@ test(
     for (let step = 0; step < MAX_STEPS; step += 1) {
       const gaps = runInstalled(
         commandPath,
-        ["gaps", "--workspace", workspace],
+        ["gaps", "--workspace", workspace, "--scope", "workspace"],
         workspace,
         archiveRoot,
         `step-${String(step).padStart(2, "0")}-gaps`
       );
-      const currentEdge = gaps.projection.currentEdge;
+      const currentEdge = currentEdgeFromGaps(gaps);
       steps.push({ step, phase: "gaps", ...edgeSummary(gaps) });
       if (currentEdge === null) {
         break;
@@ -300,7 +330,17 @@ test(
       if (currentEdge === FG_CONFORM_PROJECT) {
         const induction = runInstalled(
           commandPath,
-          ["start", "--workspace", workspace, "--until", "blocked"],
+          [
+            "start",
+            "--workspace",
+            workspace,
+            "--scope",
+            "workspace",
+            "--target",
+            `graph_function:${FG_CONFORM_PROJECT}`,
+            "--until",
+            "converged"
+          ],
           workspace,
           archiveRoot,
           `step-${String(step).padStart(2, "0")}-induction`
@@ -315,20 +355,24 @@ test(
           "start",
           "--workspace",
           workspace,
+          "--scope",
+          "workspace",
           "--target",
           target,
           "--until",
-          "first_traversal",
-          "--worker",
-          workerTransport
+          "first_traversal"
         ],
         workspace,
         archiveRoot,
-        `step-${String(step).padStart(2, "0")}-start-${currentEdge}`
+        `step-${String(step).padStart(2, "0")}-start-${currentEdge}`,
+        { ODD_SDLC_TS_WORKER_TRANSPORT: workerTransport }
       );
       steps.push({ step, phase: "start", requestedEdge: currentEdge, ...edgeSummary(start) });
       writeJson(path.join(archiveRoot, "steps.json"), steps);
-      assert.equal(start.status, "worker_invoked", JSON.stringify(start, null, 2));
+      assert(
+        start.status === "yielded" || start.status === "converged",
+        JSON.stringify(start, null, 2)
+      );
       assert.equal(
         JSON.stringify(start).includes("worker_report_unresolved_reasons_present"),
         false,

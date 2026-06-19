@@ -464,6 +464,68 @@ Next blocker set:
   `serializeOddSdlcSpecMethodResult` after callers move to ABG CLI or typed
   product/package APIs
 
+### 2026-06-19 Second Live Harness CLI Cut Result
+
+Cut scope: remove active live-harness and fixture dependence on the deleted
+semantic CLI path and installed `odd-sdlc-ts` command. This cut keeps
+`spec_method/entry.ts` private package helpers as explicit remaining blockers;
+it does not accept them as command law.
+
+Changed contract:
+
+- T-109, T-115, and T-131 live traversal harnesses install through
+  `installOddSdlcTypescript(...)` and drive traversal through installed
+  `genesis-ts`.
+- T-131 guided odd_chat bootstrap fixture now teaches installed ABG
+  `genesis-ts gaps/start --scope workspace`, not `odd-sdlc-ts`.
+- T-162 ticket workflow live proof uses the package API and expects the package
+  `sdlc_installed_operator_start_outcome`, not the retired CLI projection
+  wrapper.
+- `run_full_external_data_mapper_sandbox.mjs` and
+  `run_t199_data_mapper_code_depth_resume.mjs` no longer invoke
+  `build/semantic/code/src/cli/main.js` for install and no longer require an
+  installed `odd-sdlc-ts` command path.
+- active data_mapper and Rust hello-world fixture guidance now uses the package
+  installer API plus installed ABG `genesis-ts` for `gaps/start`.
+- the retired T-164 resume helper no longer names the retired command as the
+  path to use.
+
+Current tracked-file metrics after this cut, excluding archived
+`test_env/test_runs` and generated `build/semantic` output:
+
+| Surface | Files | Matches | Interpretation |
+| --- | ---: | ---: | --- |
+| Active TS source files under `code/src` | 179 | n/a | Unchanged from first cut; this cut only touched harness/fixture surfaces. |
+| Active TS source lines under `code/src` | 98,185 | n/a | Unchanged from first cut. |
+| `build/semantic/code/src/cli/main.js` / `CLI_MAIN` in active source/test/spec surfaces | 0 | 0 | No active caller remains; one historical docs release-note hit is retained as historical evidence. |
+| hard retired command instructions in active source/test/spec surfaces | 1 | 4 | All four are negative assertions in `test_t059_install_release_adapter.test.mjs`; no positive instruction remains. |
+| `invokeOddSdlcSpecMethodCommand` | 17 | 53 | Private package command-helper blocker remains across tests/live harnesses. |
+| `invokeOddSdlcSpecMethodCommandSync` | 9 | 49 | Sync private command-helper blocker remains in replay/gaps/analyzer and package API live paths. |
+| `serializeOddSdlcSpecMethodResult` | 5 | 12 | Serializer remains only for private helper/analyzer tests. |
+| `odd-sdlc-ts` | 13 | 59 | Remaining hits are retired-command proof, negative assertions, temp prefixes, historical docs, and ticket text; no active live/source caller remains. |
+| `installedStartPayloadFor` | 2 | 3 | Still in `spec_method/entry.ts`; next cut must classify library API versus delete. |
+| `startOutcomeForObservedReplay` | 3 | 5 | Still in `spec_method/entry.ts`; next cut must move/delete replay helper authority. |
+| `commandPayload` | 1 | 5 | Still confined to `spec_method/entry.ts`; delete or split with command dispatcher. |
+
+Focused proof completed:
+
+- `npm run build:semantic` passed.
+- `node --check` passed for all edited live harness scripts.
+- focused ESLint passed for all edited live harness scripts.
+- `node --test` over T-109, T-115, T-131, and T-162 live harness files
+  passed; live-gated tests skipped when their live env flags were absent.
+- `node --test test_env/tests/test_t059_install_release_adapter.test.mjs test_env/tests/test_t087_project_induction.test.mjs`
+  passed.
+
+Next blocker set:
+
+- split `spec_method/entry.ts` into typed product/package APIs versus deleted
+  command grammar
+- remove or replace `invokeOddSdlcSpecMethodCommand*`, `commandPayload*`, and
+  `serializeOddSdlcSpecMethodResult`
+- classify historical docs and temp-prefix references so they do not look like
+  retained command law
+
 ### 2026-06-19 Initial CLI-Path Function Audit
 
 Scope: this is a first pass from the public package bin through
@@ -1249,21 +1311,21 @@ Direct library caller checklist:
 
 Built CLI / installed binary caller checklist:
 
-- [ ] `build_tenants/typescript/test_env/live/test_t109_live_installed_data_mapper_pty.test.mjs`
-- [ ] `build_tenants/typescript/test_env/live/test_t110_live_agent_pty_installed_operator.test.mjs`
-- [ ] `build_tenants/typescript/test_env/live/test_t115_live_installed_data_mapper_repair_flow.test.mjs`
-- [ ] `build_tenants/typescript/test_env/live/test_t131_guided_odd_chat_live_build.test.mjs`
-- [ ] `build_tenants/typescript/test_env/live/test_t162_ticket_workflow_live.test.mjs`
-- [ ] `build_tenants/typescript/test_env/live/run_full_external_data_mapper_sandbox.mjs`
-- [ ] `build_tenants/typescript/test_env/live/run_t199_data_mapper_code_depth_resume.mjs`
-- [ ] `build_tenants/typescript/test_env/live/resume_t164_data_mapper_full_capability_live.mjs`
-- [ ] `build_tenants/typescript/test_env/sandbox/abg_installed_workspace.mjs`
+- [x] `build_tenants/typescript/test_env/live/test_t109_live_installed_data_mapper_pty.test.mjs`
+- [x] `build_tenants/typescript/test_env/live/test_t110_live_agent_pty_installed_operator.test.mjs`
+- [x] `build_tenants/typescript/test_env/live/test_t115_live_installed_data_mapper_repair_flow.test.mjs`
+- [x] `build_tenants/typescript/test_env/live/test_t131_guided_odd_chat_live_build.test.mjs`
+- [x] `build_tenants/typescript/test_env/live/test_t162_ticket_workflow_live.test.mjs`
+- [x] `build_tenants/typescript/test_env/live/run_full_external_data_mapper_sandbox.mjs`
+- [x] `build_tenants/typescript/test_env/live/run_t199_data_mapper_code_depth_resume.mjs`
+- [x] `build_tenants/typescript/test_env/live/resume_t164_data_mapper_full_capability_live.mjs`
+- [x] `build_tenants/typescript/test_env/sandbox/abg_installed_workspace.mjs`
 
 Fixture/doc caller checklist:
 
-- [ ] `build_tenants/typescript/test_env/fixtures/data_mapper_reference/data_mapper.template/README.md`
-- [ ] `build_tenants/typescript/test_env/fixtures/t131_guided_odd_chat/bootstrap.md`
-- [ ] `build_tenants/typescript/test_env/fixtures/t133_rust_hello_world_minimal/bootstrap.md`
+- [x] `build_tenants/typescript/test_env/fixtures/data_mapper_reference/data_mapper.template/README.md`
+- [x] `build_tenants/typescript/test_env/fixtures/t131_guided_odd_chat/bootstrap.md`
+- [x] `build_tenants/typescript/test_env/fixtures/t133_rust_hello_world_minimal/bootstrap.md`
 - [ ] `build_tenants/typescript/test_env/test_surface_map.md`
 - [ ] `docs/ODD_SDLC_V2_0_0_RELEASE_NOTE.md`
 - [ ] `docs/ODD_SDLC_V2_0_0_RC_4_RELEASE_NOTE.md`

@@ -23,7 +23,8 @@ import {
   FG_CONFORM_PROJECT_AUTHORITY,
   ODD_SDLC_OPERATOR_RUN_ROOT_RELATIVE_PATH,
   ODD_SDLC_RUNTIME_ROOT_RELATIVE_PATH,
-  ODD_SDLC_TRANSFORM_ASSET_ROOT_RELATIVE_PATH
+  ODD_SDLC_TRANSFORM_ASSET_ROOT_RELATIVE_PATH,
+  installOddSdlcTypescript
 } from "../../build/semantic/code/src/index.js";
 import { liveTestArchiveRoot } from "./archive_root.mjs";
 import {
@@ -44,7 +45,6 @@ const BOOTSTRAP_PATH = path.join(FIXTURE_ROOT, "bootstrap.md");
 const DOMAIN_PACKAGE_ROOT = path.join(FIXTURE_ROOT, "domains/document_to_requirements");
 const DOMAIN_PACKAGE_PATH = path.join(DOMAIN_PACKAGE_ROOT, "domain.json");
 const START_DOCUMENT_PATH = path.join(FIXTURE_ROOT, "examples/start_document.md");
-const SOURCE_ODD_SDLC_CLI = path.join(PACKAGE_ROOT, "build/semantic/code/src/cli/main.js");
 const LIVE_ENABLED = process.env["ODD_SDLC_TS_T131_GUIDED_ODD_CHAT_LIVE"] === "1";
 const CONFORMANCE_ONLY = process.env["ODD_SDLC_TS_LIVE_CONFORMANCE_ONLY"] === "1";
 const LIVE_WORKER =
@@ -285,9 +285,9 @@ function assertScenarioContract(contract) {
     "testOddChat"
   ], "commands");
   assert.equal(
-    contract.commands.installOddSdlc.some((command) => command.includes("odd-sdlc-ts gaps")),
+    contract.commands.installOddSdlc.some((command) => command.includes("genesis-ts gaps")),
     true,
-    "installOddSdlc commands must prove odd_sdlc can inspect the workspace"
+    "installOddSdlc commands must prove ABG can inspect the workspace"
   );
   assert.equal(
     contract.commands.deployOddChat.some((command) => command.includes("npm link")),
@@ -546,11 +546,11 @@ function assertConformedProjectWorkspace(workspace, contract) {
   }
 }
 
-function installedOddSdlcCommand(install) {
+function installedAbgCommand(install) {
   const commandPath = install.commandPaths.find(
-    (candidate) => path.basename(candidate) === "odd-sdlc-ts"
+    (candidate) => path.basename(candidate) === "genesis-ts"
   );
-  assert(commandPath, "odd-sdlc-ts command path missing");
+  assert(commandPath, "genesis-ts command path missing");
   return commandPath;
 }
 
@@ -566,55 +566,49 @@ function installedCommandEnv() {
   };
 }
 
-function runSourceInstallCommand(workspace, archiveRoot) {
-  const args = [
-    SOURCE_ODD_SDLC_CLI,
-    "install",
-    "--target",
-    workspace,
-    "--package-source",
-    PACKAGE_ROOT,
-    "--abg-package-source",
-    ABG_TYPESCRIPT_ROOT,
-    "--installed-package-name",
-    "odd-sdlc-t131-guided-odd-chat"
-  ];
-  const run = spawnSync(process.execPath, args, {
-    cwd: PACKAGE_ROOT,
-    encoding: "utf8",
-    env: installedCommandEnv(),
-    maxBuffer: 1024 * 1024 * 50,
-    timeout: INSTALL_COMMAND_TIMEOUT_MS
-  });
+async function runSourceInstallCommand(workspace, archiveRoot) {
+  const startedAt = new Date().toISOString();
+  const request = {
+    targetRoot: workspace,
+    packageSourceRoot: PACKAGE_ROOT,
+    abgPackageSourceRoot: ABG_TYPESCRIPT_ROOT,
+    installedPackageName: "odd-sdlc-t131-guided-odd-chat"
+  };
+  const result = await installOddSdlcTypescript(request);
   writeJson(path.join(archiveRoot, "install.process.json"), {
     label: "install",
-    commandPath: process.execPath,
-    args,
+    commandPath: "package-api:installOddSdlcTypescript",
+    request,
     cwd: PACKAGE_ROOT,
-    status: run.status,
-    signal: run.signal,
-    error: run.error?.message ?? null,
+    status: result.kind === "installed" ? 0 : 1,
+    signal: null,
+    error: result.kind === "installed" ? null : result.reason ?? "install_rejected",
     timeoutMs: INSTALL_COMMAND_TIMEOUT_MS,
-    stdoutBytes: Buffer.byteLength(run.stdout ?? "", "utf8"),
-    stderrBytes: Buffer.byteLength(run.stderr ?? "", "utf8")
+    stdoutBytes: Buffer.byteLength(JSON.stringify(result), "utf8"),
+    stderrBytes: 0,
+    startedAt,
+    endedAt: new Date().toISOString()
   });
-  writeFileSync(path.join(archiveRoot, "install.stdout.json"), run.stdout ?? "", "utf8");
-  writeFileSync(path.join(archiveRoot, "install.stderr.log"), run.stderr ?? "", "utf8");
-  assert.equal(run.status, 0, run.stderr || run.error?.message);
-  const result = JSON.parse(run.stdout);
-  writeJson(path.join(archiveRoot, "install_result.json"), result);
-  assert.equal(result.kind, "odd_sdlc_spec_method_result");
-  assert.equal(result.command, "install");
-  assert.equal(result.status, "ok");
-  assert.equal(result.payload?.kind, "installed");
-  return result.payload;
+  writeJson(path.join(archiveRoot, "install.stdout.json"), result);
+  writeFileSync(path.join(archiveRoot, "install.stderr.log"), "", "utf8");
+  writeJson(path.join(archiveRoot, "install_result.json"), {
+    kind: "odd_sdlc_package_api_result",
+    command: "install",
+    status: result.kind === "installed" ? "ok" : "rejected",
+    payload: result
+  });
+  assert.equal(result.kind, "installed", JSON.stringify(result, null, 2));
+  return result;
 }
 
-function runInstalled(commandPath, args, workspace, archiveRoot, label) {
+function runInstalled(commandPath, args, workspace, archiveRoot, label, envOverrides = {}) {
   const options = {
     cwd: workspace,
     encoding: "utf8",
-    env: installedCommandEnv(),
+    env: {
+      ...installedCommandEnv(),
+      ...envOverrides
+    },
     maxBuffer: 1024 * 1024 * 50
   };
   if (INSTALLED_COMMAND_TIMEOUT_MS > 0) {
@@ -636,11 +630,15 @@ function runInstalled(commandPath, args, workspace, archiveRoot, label) {
   writeJson(path.join(archiveRoot, `${label}.process.json`), record);
   writeFileSync(path.join(archiveRoot, `${label}.stdout.json`), run.stdout ?? "", "utf8");
   writeFileSync(path.join(archiveRoot, `${label}.stderr.log`), run.stderr ?? "", "utf8");
-  assert.equal(run.status, 0, run.stderr || JSON.stringify(record, null, 2));
   const parsed = JSON.parse(run.stdout);
-  assert.equal(parsed.kind, "odd_sdlc_spec_method_result");
-  assert.equal(parsed.status, "ok", JSON.stringify(parsed, null, 2));
-  return parsed.payload;
+  assert.equal(parsed.command, args[0]);
+  if (args[0] === "gaps") {
+    assert.equal(run.status, 0, run.stderr || JSON.stringify(record, null, 2));
+  } else {
+    assert.notEqual(run.status, 1, run.stderr || JSON.stringify(record, null, 2));
+    assert.notEqual(parsed.status, "error", JSON.stringify(parsed, null, 2));
+  }
+  return parsed;
 }
 
 function runGeneratedOddChatCommand(workspace, archiveRoot, label, command, args) {
@@ -686,6 +684,31 @@ function proveGeneratedOddChat(workspace, archiveRoot) {
 }
 
 function edgeSummary(payload) {
+  if (payload.command === "gaps") {
+    const current = payload.gaps?.[0] ?? null;
+    return {
+      status: payload.status,
+      currentEdge: current?.edge ?? null,
+      summaryEdge: null,
+      graphFunction: current?.graph_function_handle ?? null,
+      postflight: null,
+      assurance: null,
+      blockingReason: current?.terminal_kind ?? null,
+      archiveRoot: null
+    };
+  }
+  if (payload.command === "start") {
+    return {
+      status: payload.status,
+      currentEdge: payload.edge ?? null,
+      summaryEdge: payload.edge ?? null,
+      graphFunction: payload.resolved_target ?? null,
+      postflight: null,
+      assurance: null,
+      blockingReason: payload.stopped_by ?? null,
+      archiveRoot: payload.events_path ?? null
+    };
+  }
   return {
     status: payload.status,
     currentEdge: payload.projection?.currentEdge ?? payload.summary?.currentEdge ?? null,
@@ -696,6 +719,10 @@ function edgeSummary(payload) {
     blockingReason: payload.summary?.blockingReason ?? payload.blockingReason ?? null,
     archiveRoot: payload.archiveRoot ?? payload.summary?.archiveRoot ?? null
   };
+}
+
+function currentEdgeFromGaps(payload) {
+  return payload.gaps?.[0]?.edge ?? null;
 }
 
 function listFilesRecursively(root) {
@@ -797,10 +824,10 @@ test(
       contract
     });
 
-    const install = runSourceInstallCommand(workspace, archiveRoot);
+    const install = await runSourceInstallCommand(workspace, archiveRoot);
     assert.equal(install.kind, "installed");
-    const commandPath = installedOddSdlcCommand(install);
-    assert.equal(existsSync(path.join(workspace, "node_modules/.bin/odd-sdlc-ts")), true);
+    const commandPath = installedAbgCommand(install);
+    assert.equal(existsSync(path.join(workspace, "node_modules/.bin/genesis-ts")), true);
 
     const steps = [];
     const target = "asset:component_code_surface";
@@ -810,7 +837,17 @@ test(
 
     const conformance = runInstalled(
       commandPath,
-      ["start", "--workspace", workspace, "--until", "blocked"],
+      [
+        "start",
+        "--workspace",
+        workspace,
+        "--scope",
+        "workspace",
+        "--target",
+        `graph_function:${FG_CONFORM_PROJECT}`,
+        "--until",
+        "converged"
+      ],
       workspace,
       archiveRoot,
       "bootstrap-conform-project-start"
@@ -830,16 +867,19 @@ test(
         "start",
         "--workspace",
         workspace,
+        "--scope",
+        "workspace",
         "--target",
         `graph_function:${FG_CONFORM_PROJECT_AUTHORITY}`,
         "--until",
-        "first_traversal",
-        "--worker",
-        LIVE_WORKER
+        "first_traversal"
       ],
       workspace,
       archiveRoot,
-      "bootstrap-authority-start"
+      "bootstrap-authority-start",
+      {
+        ODD_SDLC_TS_WORKER_TRANSPORT: LIVE_WORKER
+      }
     );
     const bootstrapSummary = edgeSummary(bootstrap);
     steps.push({ step: -1, phase: "bootstrap_authority", ...bootstrapSummary });
@@ -870,12 +910,12 @@ test(
     for (let step = 0; step < MAX_STEPS; step += 1) {
       const gaps = runInstalled(
         commandPath,
-        ["gaps", "--workspace", workspace],
+        ["gaps", "--workspace", workspace, "--scope", "workspace"],
         workspace,
         archiveRoot,
         `step-${String(step).padStart(2, "0")}-gaps`
       );
-      const currentEdge = gaps.projection.currentEdge;
+      const currentEdge = currentEdgeFromGaps(gaps);
       steps.push({ step, phase: "gaps", ...edgeSummary(gaps) });
       writeJson(path.join(archiveRoot, "steps.json"), steps);
       if (currentEdge === null) {
@@ -884,7 +924,17 @@ test(
       if (currentEdge === FG_CONFORM_PROJECT) {
         const induction = runInstalled(
           commandPath,
-          ["start", "--workspace", workspace, "--until", "blocked"],
+          [
+            "start",
+            "--workspace",
+            workspace,
+            "--scope",
+            "workspace",
+            "--target",
+            `graph_function:${FG_CONFORM_PROJECT}`,
+            "--until",
+            "converged"
+          ],
           workspace,
           archiveRoot,
           `step-${String(step).padStart(2, "0")}-induction`
@@ -897,26 +947,25 @@ test(
             "start",
             "--workspace",
             workspace,
+            "--scope",
+            "workspace",
             "--target",
             target,
             "--until",
-            "first_traversal",
-            "--worker",
-            LIVE_WORKER
+            "first_traversal"
           ],
           workspace,
           archiveRoot,
-          `step-${String(step).padStart(2, "0")}-start-${currentEdge}`
+          `step-${String(step).padStart(2, "0")}-start-${currentEdge}`,
+          {
+            ODD_SDLC_TS_WORKER_TRANSPORT: LIVE_WORKER
+          }
         );
         steps.push({ step, phase: "start", requestedEdge: currentEdge, ...edgeSummary(start) });
         assert(
-          start.status === "worker_invoked" || start.status === "converged" || start.status === "blocked",
+          start.status === "yielded" || start.status === "converged" || start.status === "blocked",
           JSON.stringify(start, null, 2)
         );
-        if (start.workerRun !== null) {
-          assert.equal(start.workerRun.executorProfile, "pty-terminal");
-          assert.equal(start.workerRun.streamModel, "terminal-transcript");
-        }
       }
       terminalState = generatedProductState(workspace, contract);
       writeJson(

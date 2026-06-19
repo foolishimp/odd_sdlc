@@ -21,7 +21,8 @@ import {
   FG_CONFORM_PROJECT,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
-  admitComponentDepthRegisterFromArtifact
+  admitComponentDepthRegisterFromArtifact,
+  installOddSdlcTypescript
 } from "../../build/semantic/code/src/index.js";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -740,21 +741,6 @@ async function runCommandUntilFirstFreshCodegenResult(input) {
   });
 }
 
-function specPayload(parsed, label) {
-  if (parsed?.kind !== "odd_sdlc_spec_method_result" || parsed.status !== "ok") {
-    throw new Error(`${label} returned non-ok spec-method result: ${JSON.stringify(parsed, null, 2)}`);
-  }
-  return parsed.payload;
-}
-
-function installedSpecPayload(parsed, label) {
-  const payload = specPayload(parsed, label);
-  if (payload?.kind !== "installed") {
-    throw new Error(`${label} rejected: ${JSON.stringify(payload, null, 2)}`);
-  }
-  return payload;
-}
-
 function copiedWorkspaceInstalledPackageName(workspace) {
   const packageJsonPath = path.join(workspace, "package.json");
   if (!existsSync(packageJsonPath)) {
@@ -770,14 +756,64 @@ function copiedWorkspaceInstalledPackageName(workspace) {
     : "odd-sdlc-t199-data-mapper-code-depth-resume";
 }
 
-function installedCommandFromInstallPayload(payload, workspace) {
-  const commandPath = payload.commandPaths?.find(
-    (candidate) => path.basename(candidate) === "odd-sdlc-ts"
-  );
-  if (commandPath !== undefined) {
-    return commandPath;
+async function runInstallPackageApi(input) {
+  const startedAt = new Date().toISOString();
+  const processRecordPath = path.join(input.archiveRoot, `${input.label}.process.json`);
+  const request = {
+    targetRoot: input.targetRoot,
+    packageSourceRoot: input.packageSourceRoot,
+    abgPackageSourceRoot: input.abgPackageSourceRoot,
+    installedPackageName: input.installedPackageName
+  };
+  writeJson(processRecordPath, {
+    kind: "odd_sdlc_live_sandbox_process_result",
+    lifecycleStatus: "started",
+    label: input.label,
+    command: "package-api:installOddSdlcTypescript",
+    request,
+    cwd: input.cwd,
+    status: null,
+    signal: null,
+    error: null,
+    stdoutBytes: 0,
+    stderrBytes: 0,
+    commandTimeoutMs: COMMAND_TIMEOUT_MS,
+    startedAt,
+    endedAt: null,
+    hostPid: process.pid
+  });
+  const payload = await installOddSdlcTypescript(request);
+  const stdout = `${JSON.stringify({
+    kind: "odd_sdlc_spec_method_result",
+    command: "install",
+    status: payload.kind === "installed" ? "ok" : "failed",
+    payload
+  }, null, 2)}\n`;
+  const status = payload.kind === "installed" ? 0 : 1;
+  const endedAt = new Date().toISOString();
+  writeJson(processRecordPath, {
+    kind: "odd_sdlc_live_sandbox_process_result",
+    lifecycleStatus: "completed",
+    label: input.label,
+    command: "package-api:installOddSdlcTypescript",
+    request,
+    cwd: input.cwd,
+    status,
+    signal: null,
+    error: payload.kind === "installed" ? null : payload.reason ?? "install_rejected",
+    stdoutBytes: Buffer.byteLength(stdout, "utf8"),
+    stderrBytes: 0,
+    commandTimeoutMs: COMMAND_TIMEOUT_MS,
+    startedAt,
+    endedAt,
+    hostPid: process.pid
+  });
+  writeFileSync(path.join(input.archiveRoot, `${input.label}.stdout.json`), stdout, "utf8");
+  writeFileSync(path.join(input.archiveRoot, `${input.label}.stderr.log`), "", "utf8");
+  if (status !== 0) {
+    throw new Error(`${input.label} failed: ${JSON.stringify(payload, null, 2)}`);
   }
-  return path.join(workspace, "node_modules/.bin/odd-sdlc-ts");
+  return payload;
 }
 
 function installedAbgCommandFromInstallPayload(payload, workspace, commandName) {
@@ -1104,8 +1140,6 @@ async function main() {
     workspace,
     preconditions: copiedSeedPreconditions
   });
-  const sourceCli = path.join(PACKAGE_ROOT, "build/semantic/code/src/cli/main.js");
-  assertExists(sourceCli, "built source odd-sdlc-ts CLI");
   const installedPackageName = copiedWorkspaceInstalledPackageName(workspace);
   const toolCache = sandboxToolCache({ archiveRoot, workspace });
 
@@ -1151,30 +1185,15 @@ async function main() {
   const beforeWorkerInvocationPackagePaths = new Set(
     runtimeFilesNamed(workspace, "worker_invocation_package.json")
   );
-  const installPayload = installedSpecPayload(
-    runCommand({
+  const installPayload = await runInstallPackageApi({
       label: "install",
-      command: process.execPath,
-      args: [
-        sourceCli,
-        "install",
-        "--target",
-        ".",
-        "--package-source",
-        PACKAGE_ROOT,
-        "--abg-package-source",
-        ABG_TYPESCRIPT_ROOT,
-        "--installed-package-name",
-        installedPackageName
-      ],
+      targetRoot: workspace,
+      packageSourceRoot: PACKAGE_ROOT,
+      abgPackageSourceRoot: ABG_TYPESCRIPT_ROOT,
+      installedPackageName,
       cwd: workspace,
-      env: baseEnv,
       archiveRoot
-    }),
-    "install"
-  );
-  const installedCommand = installedCommandFromInstallPayload(installPayload, workspace);
-  assertExists(installedCommand, "installed odd-sdlc-ts command");
+    });
   const installManifest =
     installPayload.manifest ??
     (typeof installPayload.installManifestPath === "string"
@@ -1188,7 +1207,6 @@ async function main() {
   );
   assertExists(genesisCommand, "installed genesis-ts command");
   assertExists(abgRuntimeBindingPath, "installed ABG runtime binding");
-  summary.installedCommand = installedCommand;
   summary.abgCommand = genesisCommand;
   summary.installManifestPath = installPayload.installManifestPath ?? null;
   summary.abgRuntimeBindingPath = abgRuntimeBindingPath;
