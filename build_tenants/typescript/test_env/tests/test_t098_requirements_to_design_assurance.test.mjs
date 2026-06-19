@@ -17,9 +17,9 @@ import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  installOddSdlcTypescript,
-  startOddSdlcWorkspace
+  installOddSdlcTypescript
 } from "../../build/semantic/code/src/index.js";
+import { executeOddSdlcWorkspaceStartForTest } from "../workspace_start_harness.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
@@ -133,7 +133,7 @@ function writeWorkerScript(workspaceRoot) {
 }
 
 async function startOne(workspace, workerScript) {
-  return startOddSdlcWorkspace({
+  return executeOddSdlcWorkspaceStartForTest({
     workspaceRoot: workspace,
     target: {
       kind: "graph_function",

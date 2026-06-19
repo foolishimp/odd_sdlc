@@ -1343,9 +1343,9 @@ test("T-160 public start consumes overlay catalog rather than query-domain start
   assert.equal(evaluateBody.includes("input.queryDomain.startTargets"), false);
 });
 
-test("T-160 spec-method replay preserves overlay target identity", () => {
+test("T-160 workspace API replay preserves overlay target identity", () => {
   const source = readFileSync(
-    new URL("../../code/src/spec_method/entry.ts", import.meta.url),
+    new URL("../../code/src/workspace_api/entry.ts", import.meta.url),
     "utf8"
   );
   const startOutcomeBody = source.slice(
@@ -1372,7 +1372,7 @@ test("T-160 spec-method replay preserves overlay target identity", () => {
 
 test("T-160 cross-graph repair reentry does not replay already-closed target basis", () => {
   const source = readFileSync(
-    new URL("../../code/src/spec_method/entry.ts", import.meta.url),
+    new URL("../../code/src/workspace_api/entry.ts", import.meta.url),
     "utf8"
   );
   const operatorSource = readFileSync(

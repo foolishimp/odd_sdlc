@@ -31,12 +31,11 @@ import {
   projectSdlcWorkerAttachment,
   publicStartOnce,
   readWorkerResultReport,
-  invokeOddSdlcSpecMethodCommand,
   runSdlcHookTurn,
-  serializeOddSdlcSpecMethodResult,
   sha256Text,
   writeHandoffFiles
 } from "../../build/semantic/code/src/index.js";
+import { executeOddSdlcWorkspaceStartForTest } from "../workspace_start_harness.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
@@ -290,55 +289,6 @@ function writeFailingWorkerScript(workspaceRoot) {
   return workerPath;
 }
 
-test("T-158 installed start JSON serialization emits compact CLI projection", () => {
-  const archiveRoot = path.join(makeWorkspace(), ".ai-workspace/runtime/odd_sdlc/operator-runs/t158-cli-projection");
-  const previous = process.env["ODD_SDLC_TS_OUTPUT"];
-  process.env["ODD_SDLC_TS_OUTPUT"] = "json";
-  try {
-    const serialized = serializeOddSdlcSpecMethodResult({
-      kind: "odd_sdlc_spec_method_result",
-      command: "start",
-      status: "ok",
-      exitCode: 0,
-      payload: {
-        kind: "sdlc_installed_operator_start_outcome",
-        status: "worker_invoked",
-        archiveRoot,
-        summary: {
-          status: "worker_invoked",
-          archiveRoot,
-          graphFunctionName: "bootstrap_release_self_test",
-          currentEdge: "derive_component_code_surface",
-          blockingReason: null,
-          nextLawfulAction: "close_or_reprice"
-        },
-        manifest: { kind: "large_manifest" },
-        workerReport: { kind: "large_report" },
-        postflight: { kind: "large_postflight" },
-        gapDossier: null,
-        traversalConsequence: { kind: "sdlc_installed_operator_traversal_consequence" },
-        emittedRuntimeEventKinds: ["basis_admitted"]
-      }
-    });
-    const result = JSON.parse(serialized);
-
-    assert.equal(result.kind, "odd_sdlc_spec_method_result");
-    assert.equal(result.payload.kind, "sdlc_installed_operator_start_cli_projection");
-    assert.equal(result.payload.sourceOutcomeKind, "sdlc_installed_operator_start_outcome");
-    assert.equal(result.payload.compacted, true);
-    assert.match(result.payload.sourceOutcomeRef, /\/run\.json$/u);
-    assert.equal(
-      result.payload.omittedCarrierRefs.some((ref) => ref.endsWith("/handoff_manifest.json")),
-      true
-    );
-  } finally {
-    if (previous === undefined) {
-      delete process.env["ODD_SDLC_TS_OUTPUT"];
-    } else {
-      process.env["ODD_SDLC_TS_OUTPUT"] = previous;
-    }
-  }
-});
 test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () => {
   const workspace = makeWorkspace();
   const install = await installOddSdlcTypescript({
@@ -360,117 +310,114 @@ test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () 
   process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"] = "10000";
   process.env["ODD_SDLC_WORKER_HEARTBEAT_MS"] = "20";
   try {
-    const start = await invokeOddSdlcSpecMethodCommand([
-      "start",
-      "--workspace",
-      workspace,
-      "--target",
-      "graph_function:bootstrap_release_self_test",
-      "--until",
-      "first_traversal",
-      "--worker",
-      `process://node?script=${encodeURIComponent(workerScript)}`
-    ]);
+    const start = await executeOddSdlcWorkspaceStartForTest({
+      workspaceRoot: workspace,
+      target: {
+        kind: "graph_function",
+        handle: "bootstrap_release_self_test"
+      },
+      until: "first_traversal",
+      workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`
+    });
 
-    assert.equal(start.status, "ok", start.payload?.error ?? start.status);
-    assert.equal(start.payload.status, "worker_failed");
-    assert.equal(start.payload.workerRun.timedOut, true);
-    assert.equal(start.payload.workerRun.stdoutByteCount, 0);
-    assert.equal(start.payload.workerRun.stderrByteCount, 0);
+    assert.equal(start.status, "worker_failed");
+    assert.equal(start.workerRun.timedOut, true);
+    assert.equal(start.workerRun.stdoutByteCount, 0);
+    assert.equal(start.workerRun.stderrByteCount, 0);
     assert.equal(
-      start.payload.postflight.blockingReasonCarriers[0].code,
+      start.postflight.blockingReasonCarriers[0].code,
       "worker_hard_timeout"
     );
-    assert.equal(start.payload.manifest.retryContext.priorGapDossiers.length, 0);
-    assert.equal(start.payload.gapDossier.retryEligible, false);
+    assert.equal(start.manifest.retryContext.priorGapDossiers.length, 0);
+    assert.equal(start.gapDossier.retryEligible, false);
     assert.deepStrictEqual(
-      start.payload.gapDossier.nextLawfulActions,
+      start.gapDossier.nextLawfulActions,
       ["triage_gap"]
     );
     assert.match(
-      start.payload.postflight.blockingReasonCarriers[0].detail,
+      start.postflight.blockingReasonCarriers[0].detail,
       /sharpenedRetryAvailable=false/u
     );
     assert.match(
-      start.payload.postflight.blockingReasonCarriers[0].detail,
+      start.postflight.blockingReasonCarriers[0].detail,
       /pid=\d+/u
     );
     assert.match(
-      start.payload.postflight.blockingReasonCarriers[0].detail,
+      start.postflight.blockingReasonCarriers[0].detail,
       /outcome=hard_timeout/u
     );
     assert.match(
-      start.payload.postflight.blockingReasonCarriers[0].detail,
+      start.postflight.blockingReasonCarriers[0].detail,
       /hardTimeoutMs=120/u
     );
     assert.match(
-      start.payload.postflight.blockingReasonCarriers[0].detail,
+      start.postflight.blockingReasonCarriers[0].detail,
       /inactivityTimeoutMs=10000/u
     );
     assert.match(
-      start.payload.postflight.blockingReasonCarriers[0].detail,
+      start.postflight.blockingReasonCarriers[0].detail,
       /heartbeatMs=20/u
     );
     assert.match(
-      start.payload.postflight.blockingReasonCarriers[0].detail,
+      start.postflight.blockingReasonCarriers[0].detail,
       /lastHeartbeatElapsedMs=\d+/u
     );
     assert.match(
-      start.payload.postflight.blockingReasonCarriers[0].detail,
+      start.postflight.blockingReasonCarriers[0].detail,
       /signalSequence=SIGTERM@\d+ms/u
     );
     assert.match(
-      start.payload.postflight.blockingReasonCarriers[0].detail,
+      start.postflight.blockingReasonCarriers[0].detail,
       /runtimeLivenessAuthority=abiogenesis_runtime_liveness_observer_projection/u
     );
     assert.match(
-      start.payload.postflight.blockingReasonCarriers[0].detail,
+      start.postflight.blockingReasonCarriers[0].detail,
       /runtimeLivenessProjectionRef=file:.*runtime_liveness_observer_projection\.json/u
     );
     assert.match(
-      start.payload.postflight.blockingReasonCarriers[0].detail,
+      start.postflight.blockingReasonCarriers[0].detail,
       /runtimeLivenessLeaseState=externally_interrupted/u
     );
     assert.match(
-      start.payload.postflight.blockingReasonCarriers[0].detail,
+      start.postflight.blockingReasonCarriers[0].detail,
       /runtimeLivenessDispositionAction=block/u
     );
     assert.match(
-      start.payload.postflight.blockingReasonCarriers[0].detail,
+      start.postflight.blockingReasonCarriers[0].detail,
       /processSummaryRef=file:.*worker_process_summary\.json/u
     );
-    assert.deepStrictEqual(start.payload.gapDossier.nextLawfulActions, [
+    assert.deepStrictEqual(start.gapDossier.nextLawfulActions, [
       "triage_gap"
     ]);
-    assert.equal(start.payload.gapDossier.retryEligible, false);
+    assert.equal(start.gapDossier.retryEligible, false);
     assert.match(
       readFileSync(
-        path.join(start.payload.archiveRoot, "worker_process_events.jsonl"),
+        path.join(start.archiveRoot, "worker_process_events.jsonl"),
         "utf8"
       ),
       /actor_process_timeout/u
     );
     assert.equal(
-      start.payload.postflight.evidenceRefs.some((ref) =>
+      start.postflight.evidenceRefs.some((ref) =>
         ref.includes("worker_process_events.jsonl")
       ),
       true
     );
     assert.equal(
-      start.payload.postflight.evidenceRefs.some((ref) =>
+      start.postflight.evidenceRefs.some((ref) =>
         ref.includes("worker_process_started_context.json")
       ),
       true
     );
     assert.equal(
-      start.payload.postflight.evidenceRefs.some((ref) =>
+      start.postflight.evidenceRefs.some((ref) =>
         ref.includes("worker_process_summary.json")
       ),
       true
     );
     const processSummary = JSON.parse(
       readFileSync(
-        path.join(start.payload.archiveRoot, "worker_process_summary.json"),
+        path.join(start.archiveRoot, "worker_process_summary.json"),
         "utf8"
       )
     );
@@ -499,7 +446,7 @@ test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () 
     assert.match(processSummary.outputRef, /specification\/INTENT\.md$/u);
     const livenessProjection = JSON.parse(
       readFileSync(
-        path.join(start.payload.archiveRoot, "runtime_liveness_observer_projection.json"),
+        path.join(start.archiveRoot, "runtime_liveness_observer_projection.json"),
         "utf8"
       )
     );
@@ -549,33 +496,30 @@ test("T-128 installed start returns worker_failed envelope after process failure
   assert.equal(install.kind, "installed");
   const workerScript = writeFailingWorkerScript(workspace);
 
-  const start = await invokeOddSdlcSpecMethodCommand([
-    "start",
-    "--workspace",
-    workspace,
-    "--target",
-    "graph_function:bootstrap_release_self_test",
-    "--until",
-    "first_traversal",
-    "--worker",
-    `process://node?script=${encodeURIComponent(workerScript)}`
-  ]);
+  const start = await executeOddSdlcWorkspaceStartForTest({
+    workspaceRoot: workspace,
+    target: {
+      kind: "graph_function",
+      handle: "bootstrap_release_self_test"
+    },
+    until: "first_traversal",
+    workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`
+  });
 
-  assert.equal(start.status, "ok", start.payload?.error ?? JSON.stringify(start.payload));
-  assert.equal(start.payload.kind, "sdlc_installed_operator_start_outcome");
-  assert.equal(start.payload.status, "worker_failed");
-  assert.equal("loop" in start.payload, false);
-  assert.equal(start.payload.workerRun.status, 7);
-  assert.equal(start.payload.postflight.status, "blocked");
-  assert.equal(start.payload.gapDossier.status, "open");
-  assert.equal(start.payload.gapDossier.retryEligible, false);
-  assert.deepStrictEqual(start.payload.gapDossier.nextLawfulActions, [
+  assert.equal(start.kind, "sdlc_installed_operator_start_outcome");
+  assert.equal(start.status, "worker_failed");
+  assert.equal("loop" in start, false);
+  assert.equal(start.workerRun.status, 7);
+  assert.equal(start.postflight.status, "blocked");
+  assert.equal(start.gapDossier.status, "open");
+  assert.equal(start.gapDossier.retryEligible, false);
+  assert.deepStrictEqual(start.gapDossier.nextLawfulActions, [
     "triage_gap"
   ]);
   assert.equal(
     existsSync(
       path.join(
-        start.payload.manifest.archiveRoot,
+        start.manifest.archiveRoot,
         "worker_process_failure_postflight.json"
       )
     ),
@@ -899,39 +843,36 @@ test("T-159 assurance rejection rewrites F_P evaluate result as blocked", async 
   assert.equal(install.kind, "installed");
   const workerScript = writeInvalidComponentTopologyWorkerScript(workspace);
 
-  const start = await invokeOddSdlcSpecMethodCommand([
-    "start",
-    "--workspace",
-    workspace,
-    "--target",
-    "graph_function:derive_implementation_design_surface",
-    "--until",
-    "first_traversal",
-    "--worker",
-    `process://node?script=${encodeURIComponent(workerScript)}`
-  ]);
+  const start = await executeOddSdlcWorkspaceStartForTest({
+    workspaceRoot: workspace,
+    target: {
+      kind: "graph_function",
+      handle: "derive_implementation_design_surface"
+    },
+    until: "first_traversal",
+    workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`
+  });
 
-  assert.equal(start.status, "ok", start.payload?.error ?? JSON.stringify(start.payload));
-  assert.equal(start.payload.status, "blocked");
+  assert.equal(start.status, "blocked");
   assert.equal(
-    existsSync(path.join(start.payload.archiveRoot, "postflight.json")),
+    existsSync(path.join(start.archiveRoot, "postflight.json")),
     true
   );
   const evaluateResult = JSON.parse(
-    readFileSync(path.join(start.payload.archiveRoot, "fp_evaluate_result.json"), "utf8")
+    readFileSync(path.join(start.archiveRoot, "fp_evaluate_result.json"), "utf8")
   );
   const postflight = JSON.parse(
-    readFileSync(path.join(start.payload.archiveRoot, "postflight.json"), "utf8")
+    readFileSync(path.join(start.archiveRoot, "postflight.json"), "utf8")
   );
   const preliminaryPostflight = JSON.parse(
     readFileSync(
-      path.join(start.payload.archiveRoot, "pre_fp_evaluator_postflight.json"),
+      path.join(start.archiveRoot, "pre_fp_evaluator_postflight.json"),
       "utf8"
     )
   );
   const designDepthPostflight = JSON.parse(
     readFileSync(
-      path.join(start.payload.archiveRoot, "design_depth_fp_evaluator_postflight.json"),
+      path.join(start.archiveRoot, "design_depth_fp_evaluator_postflight.json"),
       "utf8"
     )
   );
@@ -944,7 +885,7 @@ test("T-159 assurance rejection rewrites F_P evaluate result as blocked", async 
   assert.match(evaluateResult.postflightRef, /design_depth_fp_evaluator_postflight\.json$/u);
   assert.match(
     [
-      start.payload.summary.blockingReason ?? "",
+      start.summary.blockingReason ?? "",
       ...evaluateResult.blockingReasons,
       ...designDepthPostflight.blockingReasonCarriers.map((reason) => reason.detail ?? "")
     ].join(","),

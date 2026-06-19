@@ -395,7 +395,8 @@ function reviewGradeTargetAssetRuleLines(
 ): readonly string[] {
   if (manifest.targetAssetType === "component_test_surface") {
     return Object.freeze([
-      "- On component_test_surface, do not make admitted test-execution evidence a same-edge blocker when generated tests, lineage, and component-test carrier rows are present. If the only missing evidence is admitted execution_result/runtime_execution proof, mark those requirement findings partial with failureClass wrong_stage and requiredAction naming the later test-execution edge.",
+      "- On component_test_surface, admitted execution_result/runtime_execution proof is not same-edge authority. When generated tests, lineage, and component-test carrier rows realize the reviewed requirement, mark that requirement fulfilled even if later test-execution evidence is absent.",
+      "- On component_test_surface, use partial/blocked for a requirement only when the generated test source or component-test carrier fails this edge's owned proof obligation: missing/incorrect testcase lineage, missing requirement/component binding, wrong test semantics, wrong product path, wrong module system, or schema-invalid carrier rows.",
       "- For component_test_surface, compare generated tests to accepted testcase/test-design authority and source responsibilities."
     ]);
   }

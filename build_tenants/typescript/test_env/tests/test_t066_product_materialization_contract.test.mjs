@@ -8272,6 +8272,18 @@ test("T-159 component-depth prompts pin the top-level register envelope on first
       ]
     },
     {
+      edgeName: "derive_uat_test_source_surface",
+      targetAssetType: "uat_test_source_surface",
+      registerKind: "component_depth_register",
+      carrierKind: "sdlc_component_depth_register",
+      registerVersion: "ts-component-depth-v1",
+      rowDirective: /payload\.componentTestRows/u,
+      extraDirectives: [
+        /fields testClassId, relativePath, testcaseIds, componentIds, requirementIds, and shardId/u,
+        /componentTestRows\[\]\.componentIds is required and must be a string array/u
+      ]
+    },
+    {
       edgeName: "derive_component_repair_schedule_surface",
       targetAssetType: "component_repair_schedule_surface",
       registerKind: "component_depth_register",
@@ -8417,6 +8429,8 @@ test("T-100 component-test postflight admits materialized tests before execution
   assert.match(prompt, /payload\.componentTestRows\[\]\.relativePath must name/);
   assert.match(prompt, /evidence archives, not product test files/);
   assert.match(prompt, /On schema-local re-entry, repair the rejected component_depth_register fields first/u);
+  assert.match(prompt, /JavaScript test files under admitted ESM module-system authority/u);
+  assert.match(prompt, /moduleSystem=esm, generated test files must use ESM imports/u);
   assert.match(prompt, /Materialized tests must preserve declared testClassId/);
   assert.match(prompt, /avoid local identifiers that collide with matcher words/u);
   assert.match(prompt, /prefer shouldEqual or parenthesized shouldBe RHS/u);

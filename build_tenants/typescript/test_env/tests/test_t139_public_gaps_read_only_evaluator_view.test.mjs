@@ -26,13 +26,16 @@ import {
   deriveSdlcGapDossier,
   deriveSdlcSourceInput,
   deriveSdlcWorkspaceIngressReport,
-  invokeOddSdlcSpecMethodCommandSync,
+  projectOddSdlcWorkspaceGaps,
   publicRequirementStatusToClosureRegisterStatus,
   projectSdlcRequirementFulfillmentPublicViewFromAssessments,
   projectSdlcRequirementFulfillmentPublicViewFromPriorProjection,
-  serializeOddSdlcSpecMethodResult,
   projectSdlcQueryDomain
 } from "../../build/semantic/code/src/index.js";
+
+function workspaceGaps(workspaceRoot) {
+  return projectOddSdlcWorkspaceGaps({ workspaceRoot });
+}
 
 function moduleBasis(handle = "bootstrap_release_self_test") {
   const module = constructSdlcGtlModule();
@@ -569,33 +572,32 @@ test("T-139 Spec Method gaps rehydrates installed traversal consequence archives
     "utf8"
   );
 
-  const result = invokeOddSdlcSpecMethodCommandSync(["gaps", "--workspace", workspace]);
+  const result = workspaceGaps(workspace);
 
-  assert.equal(result.status, "ok");
-  assert.equal(result.payload.requirementFulfillment.counts.fulfilled, 1);
-  assert.equal(result.payload.requirementFulfillment.counts.partial, 1);
+  assert.equal(result.requirementFulfillment.counts.fulfilled, 1);
+  assert.equal(result.requirementFulfillment.counts.partial, 1);
   assert.deepEqual(
-    result.payload.requirementFulfillment.edgeFulfillmentCounts,
+    result.requirementFulfillment.edgeFulfillmentCounts,
     ledger.counts
   );
   assert.equal(
-    result.payload.requirementFulfillment.edgeClosureDisposition,
+    result.requirementFulfillment.edgeClosureDisposition,
     closureDecision.disposition
   );
   assert.deepEqual(
-    result.payload.dossier.requirementFulfillment.edgeFulfillmentCounts,
+    result.dossier.requirementFulfillment.edgeFulfillmentCounts,
     ledger.counts
   );
   assert.equal(
-    result.payload.requirementFulfillment.archiveRehydration.status,
+    result.requirementFulfillment.archiveRehydration.status,
     "rehydrated"
   );
   assert.match(
-    result.payload.requirementFulfillment.archiveRehydration.archiveRef,
+    result.requirementFulfillment.archiveRehydration.archiveRef,
     /t139-archived-run/
   );
   assert.deepEqual(
-    result.payload.requirementFulfillment.archiveRehydration.missingArtifactRefs,
+    result.requirementFulfillment.archiveRehydration.missingArtifactRefs,
     []
   );
 });
@@ -630,20 +632,19 @@ test("T-139 Spec Method gaps reports incomplete consequence archive rehydration"
     "utf8"
   );
 
-  const result = invokeOddSdlcSpecMethodCommandSync(["gaps", "--workspace", workspace]);
+  const result = workspaceGaps(workspace);
 
-  assert.equal(result.status, "ok");
   assert.equal(
-    result.payload.requirementFulfillment.archiveRehydration.status,
+    result.requirementFulfillment.archiveRehydration.status,
     "no_archive_with_consequence_triple"
   );
   assert(
-    result.payload.requirementFulfillment.archiveRehydration.missingArtifactRefs.some(
+    result.requirementFulfillment.archiveRehydration.missingArtifactRefs.some(
       (ref) => ref.endsWith("sdlc_edge_closure_decision.json")
     )
   );
   assert(
-    result.payload.requirementFulfillment.archiveRehydration.missingArtifactRefs.some(
+    result.requirementFulfillment.archiveRehydration.missingArtifactRefs.some(
       (ref) => ref.endsWith("sdlc_next_action_projection.json")
     )
   );
@@ -651,26 +652,24 @@ test("T-139 Spec Method gaps reports incomplete consequence archive rehydration"
 
 test("T-139 Spec Method gaps exposes unresolved requirement pressure without executable authority", () => {
   const workspace = conformantWorkspace();
-  const result = invokeOddSdlcSpecMethodCommandSync(["gaps", "--workspace", workspace]);
+  const result = workspaceGaps(workspace);
 
-  assert.equal(result.status, "ok");
-  assert.equal(result.payload.dossier.readOnly, true);
-  assert.equal(result.payload.dossier.choosesNextTraversal, false);
-  assert.equal(result.payload.dossier.requirementFulfillment.counts.total, 2);
-  assert.equal(result.payload.dossier.requirementFulfillment.counts.unresolved, 2);
+  assert.equal(result.dossier.readOnly, true);
+  assert.equal(result.dossier.choosesNextTraversal, false);
+  assert.equal(result.dossier.requirementFulfillment.counts.total, 2);
+  assert.equal(result.dossier.requirementFulfillment.counts.unresolved, 2);
   assert.equal(
-    result.payload.dossier.requirementFulfillment.archiveRehydration.status,
+    result.dossier.requirementFulfillment.archiveRehydration.status,
     "no_operator_runs"
   );
   assert.equal(
-    result.payload.dossier.requirementFulfillment.rows[0].readOnly,
+    result.dossier.requirementFulfillment.rows[0].readOnly,
     true
   );
   assert.deepEqual(
-    result.payload.dossier.requirementFulfillment.fulfilledRequirementIds,
+    result.dossier.requirementFulfillment.fulfilledRequirementIds,
     []
   );
-  const compact = serializeOddSdlcSpecMethodResult(result);
-  assert.match(compact, /read_only: true/u);
-  assert.match(compact, /chooses_next_traversal: false/u);
+  assert.equal(result.dossier.readOnly, true);
+  assert.equal(result.dossier.choosesNextTraversal, false);
 });

@@ -56,7 +56,7 @@ preserving the Python helper topology.
 | `work_item_routing.py` | ticket/work-item route contracts | `triage/` |
 | `operational_dispatch.py` | cooperative operational transition adapter | `operational/` |
 | `test_lane_evidence.py` | test source and run evidence admission | `operational/`, `projection/` |
-| `app.py` | split across Spec Method entrypoint, start, runtime, projection, workspace, and qualification adapters | not copied as one module |
+| `app.py` | split across ABG command binding, typed workspace API, start projection, runtime plugins, projection, workspace, and qualification adapters | not copied as one module |
 | `__main__.py` | process launcher only | `cli/` |
 
 ## Translation Rule

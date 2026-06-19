@@ -431,7 +431,6 @@ function runInstalled(
     encoding: "utf8",
     env: {
       ...process.env,
-      ODD_SDLC_TS_OUTPUT: "json",
       ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE: "pty-terminal",
       ABG_TS_AGENT_EXECUTOR_PROFILE: "pty-terminal",
       ...envOverrides

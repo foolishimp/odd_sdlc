@@ -27,7 +27,7 @@ flowchart TD
   Projection[SdlcGapDossier + QueryDomain + RequirementClosure]
   Triage[SdlcTriageDecision]
   Operational[SdlcOperationalTransitionCommand / Result / Projection]
-  SpecMethod[Spec Method entrypoint]
+  WorkspaceApi[Typed workspace product API]
   Qualification[Scenario / sandbox / live proof]
 
   Spec --> Graph
@@ -44,7 +44,7 @@ flowchart TD
   Graph --> Start
   Domain --> Start
   Workspace --> Domain
-  SpecMethod --> Start
+  WorkspaceApi --> Start
   Start --> ABG
   ABG --> Hooks
   Hooks --> ABG

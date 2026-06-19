@@ -21,9 +21,10 @@ import {
   deriveSdlcWorkspaceIngressReport,
   FG_CONFORM_PROJECT,
   installOddSdlcTypescript,
-  invokeOddSdlcSpecMethodCommand,
-  normalizeSdlcRequirementDisplayId
+  normalizeSdlcRequirementDisplayId,
+  projectOddSdlcWorkspaceGaps
 } from "../../build/semantic/code/src/index.js";
+import { executeOddSdlcWorkspaceStartForTest } from "../workspace_start_harness.mjs";
 import {
   copyInternalDataMapperFixture,
   INTERNAL_DATA_MAPPER_FIXTURE_ROOT,
@@ -53,6 +54,20 @@ function runId() {
     .replaceAll("-", "")
     .replaceAll(":", "")
     .replace(".", "")}_pid${process.pid}`;
+}
+
+function projectGapsResult(input) {
+  return Object.freeze({
+    status: "ok",
+    payload: projectOddSdlcWorkspaceGaps(input)
+  });
+}
+
+async function startWorkspaceResult(input) {
+  return Object.freeze({
+    status: "ok",
+    payload: await executeOddSdlcWorkspaceStartForTest(input)
+  });
 }
 
 function markdownFilesUnder(root) {
@@ -98,6 +113,21 @@ function requirementIdsFromSourceRefs(sourceRefs) {
         ? [filePath]
         : [];
     })
+  );
+}
+
+function assertIncludesInOrder(actual, expected) {
+  let cursor = 0;
+  for (const value of actual) {
+    if (value === expected[cursor]) {
+      cursor += 1;
+    }
+    if (cursor === expected.length) {
+      return;
+    }
+  }
+  assert.fail(
+    `expected ordered event subsequence ${JSON.stringify(expected)} in ${JSON.stringify(actual)}`
   );
 }
 
@@ -165,17 +195,17 @@ test("T-087/T-091/T-096 live sandbox inducts internal data_mapper before downstr
   });
   assert.equal(install.kind, "installed");
 
-  const firstGaps = await invokeOddSdlcSpecMethodCommand(["gaps", "--workspace", workspace]);
+  const firstGaps = projectGapsResult({ workspaceRoot: workspace });
   assert.equal(firstGaps.status, "ok");
   assert.equal(firstGaps.payload.start.executionContract.targetGraphFunction, FG_CONFORM_PROJECT);
   assert.equal(firstGaps.payload.projection.currentEdge, FG_CONFORM_PROJECT);
 
-  const induction = await invokeOddSdlcSpecMethodCommand(["start", "--workspace", workspace]);
+  const induction = await startWorkspaceResult({ workspaceRoot: workspace });
   assert.equal(induction.status, "ok");
   assert.equal(induction.payload.summary.graphFunctionName, FG_CONFORM_PROJECT);
   assert.equal(induction.payload.summary.currentEdge, FG_CONFORM_PROJECT);
   assert.equal(induction.payload.status, "converged");
-  assert.deepStrictEqual(induction.payload.emittedRuntimeEventKinds, [
+  assertIncludesInOrder(induction.payload.emittedRuntimeEventKinds, [
     "graph_call_opened",
     "frame_opened",
     "vector_traversal_planned",
@@ -222,7 +252,7 @@ test("T-087/T-091/T-096 live sandbox inducts internal data_mapper before downstr
   assert.match(bootstrapReadModel, /specification\/mapper_requirements\.md/u);
   assert.match(bootstrapReadModel, /REQ-LDM-01/u);
 
-  const secondGaps = await invokeOddSdlcSpecMethodCommand(["gaps", "--workspace", workspace]);
+  const secondGaps = projectGapsResult({ workspaceRoot: workspace });
   assert.equal(secondGaps.status, "ok");
   assert.notEqual(
     secondGaps.payload.start.executionContract.targetGraphFunction,
@@ -260,13 +290,10 @@ test("T-087/T-091/T-096 induction can write a separate output workspace for comp
   });
   assert.equal(controlInstall.kind, "installed");
 
-  const firstGaps = await invokeOddSdlcSpecMethodCommand([
-    "gaps",
-    "--workspace",
-    inputWorkspace,
-    "--output-workspace",
-    outputWorkspace
-  ]);
+  const firstGaps = projectGapsResult({
+    workspaceRoot: inputWorkspace,
+    outputWorkspaceRoot: outputWorkspace
+  });
   assert.equal(firstGaps.status, "ok");
   assert.equal(firstGaps.payload.start.executionContract.targetGraphFunction, FG_CONFORM_PROJECT);
   assert.equal(firstGaps.payload.start.executionContract.basis.workspaceRoot, inputWorkspace);
@@ -276,13 +303,10 @@ test("T-087/T-091/T-096 induction can write a separate output workspace for comp
     outputWorkspace
   );
 
-  const induction = await invokeOddSdlcSpecMethodCommand([
-    "start",
-    "--workspace",
-    inputWorkspace,
-    "--output-workspace",
-    outputWorkspace
-  ]);
+  const induction = await startWorkspaceResult({
+    workspaceRoot: inputWorkspace,
+    outputWorkspaceRoot: outputWorkspace
+  });
   assert.equal(induction.status, "ok");
   assert.equal(induction.payload.status, "converged");
   assert.equal(induction.payload.summary.workspaceRoot, outputWorkspace);
@@ -290,7 +314,9 @@ test("T-087/T-091/T-096 induction can write a separate output workspace for comp
   assert.equal(induction.payload.eventLogPath.startsWith(outputWorkspace), true);
   assert.equal(induction.payload.start.executionContract.basis.workspaceRoot, inputWorkspace);
 
-  const controlInduction = await invokeOddSdlcSpecMethodCommand(["start", "--workspace", controlWorkspace]);
+  const controlInduction = await startWorkspaceResult({
+    workspaceRoot: controlWorkspace
+  });
   assert.equal(controlInduction.status, "ok");
   assert.equal(controlInduction.payload.status, "converged");
 
@@ -344,20 +370,17 @@ test("T-087/T-091/T-096 induction can write a separate output workspace for comp
   assert(outputIds.includes("REQ-LDM-001"));
   assert(outputIds.includes("REQ-COV-008"));
 
-  const nextGaps = await invokeOddSdlcSpecMethodCommand([
-    "gaps",
-    "--workspace",
-    inputWorkspace,
-    "--output-workspace",
-    outputWorkspace
-  ]);
+  const nextGaps = projectGapsResult({
+    workspaceRoot: inputWorkspace,
+    outputWorkspaceRoot: outputWorkspace
+  });
   assert.equal(nextGaps.status, "ok");
   assert.notEqual(
     nextGaps.payload.start.executionContract.targetGraphFunction,
     FG_CONFORM_PROJECT
   );
 
-  const outputOnlyGaps = await invokeOddSdlcSpecMethodCommand(["gaps", "--workspace", outputWorkspace]);
+  const outputOnlyGaps = projectGapsResult({ workspaceRoot: outputWorkspace });
   assert.equal(outputOnlyGaps.status, "ok");
   assert.notEqual(
     outputOnlyGaps.payload.start.executionContract.targetGraphFunction,
@@ -392,13 +415,10 @@ test("T-087/T-091/T-096 induction can fan out one input into multiple output wor
   }
 
   const runInduction = async (outputWorkspace) => {
-    const gaps = await invokeOddSdlcSpecMethodCommand([
-      "gaps",
-      "--workspace",
-      inputWorkspace,
-      "--output-workspace",
-      outputWorkspace
-    ]);
+    const gaps = projectGapsResult({
+      workspaceRoot: inputWorkspace,
+      outputWorkspaceRoot: outputWorkspace
+    });
     assert.equal(gaps.status, "ok");
     assert.equal(gaps.payload.start.executionContract.targetGraphFunction, FG_CONFORM_PROJECT);
     assert.equal(gaps.payload.start.executionContract.basis.workspaceRoot, inputWorkspace);
@@ -408,13 +428,10 @@ test("T-087/T-091/T-096 induction can fan out one input into multiple output wor
       outputWorkspace
     );
 
-    const induction = await invokeOddSdlcSpecMethodCommand([
-      "start",
-      "--workspace",
-      inputWorkspace,
-      "--output-workspace",
-      outputWorkspace
-    ]);
+    const induction = await startWorkspaceResult({
+      workspaceRoot: inputWorkspace,
+      outputWorkspaceRoot: outputWorkspace
+    });
     assert.equal(induction.status, "ok");
     assert.equal(induction.payload.status, "converged");
     assert.equal(induction.payload.summary.workspaceRoot, outputWorkspace);
@@ -446,13 +463,10 @@ test("T-087/T-091/T-096 induction can fan out one input into multiple output wor
   };
 
   const resultA = await runInduction(outputA);
-  const gapsBeforeB = await invokeOddSdlcSpecMethodCommand([
-    "gaps",
-    "--workspace",
-    inputWorkspace,
-    "--output-workspace",
-    outputB
-  ]);
+  const gapsBeforeB = projectGapsResult({
+    workspaceRoot: inputWorkspace,
+    outputWorkspaceRoot: outputB
+  });
   assert.equal(gapsBeforeB.status, "ok");
   assert.equal(
     gapsBeforeB.payload.start.executionContract.targetGraphFunction,

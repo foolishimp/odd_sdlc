@@ -162,7 +162,7 @@ test("T-197 product gate fails closed when target-carrier rows are missing", () 
 test("T-197 product entry points call the GTL conformance gate", () => {
   const entrySources = [
     "build_tenants/typescript/code/src/start/public_start.ts",
-    "build_tenants/typescript/code/src/spec_method/entry.ts",
+    "build_tenants/typescript/code/src/workspace_api/entry.ts",
     "build_tenants/typescript/code/src/release/release_cut.ts",
     "build_tenants/typescript/code/src/release/release_snapshot.ts"
   ];
@@ -551,7 +551,7 @@ test("T-197 A5 gates installed convergence on ABG terminal convergence", () => {
 test("T-197 A2 keeps SDLC start as shell over one admitted ABG boundary", () => {
   const product = repoFile("specification/PRODUCT.md");
   const entry = repoFile(
-    "build_tenants/typescript/code/src/spec_method/entry.ts"
+    "build_tenants/typescript/code/src/workspace_api/entry.ts"
   );
   const operatorIndex = repoFile(
     "build_tenants/typescript/code/src/operator/index.ts"

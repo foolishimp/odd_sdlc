@@ -23,8 +23,6 @@ import {
   deriveOddSdlcTypescriptReleaseSnapshot,
   installOddSdlcTypescript,
   oddSdlcTypescriptProductInstallRoot,
-  invokeOddSdlcSpecMethodCommandSync,
-  invokeOddSdlcSpecMethodCommand,
   resolveDefaultAbgDocsSourceRoot,
   resolveDefaultAbgPackageSourceRoot,
   resolveDefaultAbgStandardsSourceRoot
@@ -419,10 +417,7 @@ test("T-129 install preserves editable ABG config and ABG CLI fails closed on ma
     {
       cwd: targetRoot,
       encoding: "utf8",
-      env: {
-        ...process.env,
-        ODD_SDLC_TS_OUTPUT: "json"
-      },
+      env: process.env,
       maxBuffer: 1024 * 1024 * 5
     }
   );
@@ -430,29 +425,22 @@ test("T-129 install preserves editable ABG config and ABG CLI fails closed on ma
   assert.match(`${malformedRun.stdout}\n${malformedRun.stderr}`, /observerPromptRef/u);
 });
 
-test("T-059 package install helper uses the async bounded adapter", async () => {
-  const targetRoot = makeTargetWorkspace("install-cli");
+test("T-059 package install helper uses the bounded package API", async () => {
+  const targetRoot = makeTargetWorkspace("install-package-api");
   writeFileSync(path.join(targetRoot, "AGENTS.md"), "# Existing Agents\n\nKeep this guidance.\n", "utf8");
   writeFileSync(path.join(targetRoot, "CLAUDE.md"), "# Existing Claude\n\nKeep this guidance.\n", "utf8");
-  const result = await invokeOddSdlcSpecMethodCommand([
-    "install",
-    "--target",
+  const result = await installOddSdlcTypescript({
     targetRoot,
-    "--package-source",
-    PACKAGE_ROOT,
-    "--abg-package-source",
-    ABG_TYPESCRIPT_ROOT,
-    "--installed-package-name",
-    "odd-sdlc-t059-cli"
-  ]);
+    packageSourceRoot: PACKAGE_ROOT,
+    abgPackageSourceRoot: ABG_TYPESCRIPT_ROOT,
+    installedPackageName: "odd-sdlc-t059-package-api"
+  });
 
-  assert.equal(result.status, "ok");
-  assert.equal(result.command, "install");
-  assert.equal(result.payload.kind, "installed");
-  assert.equal(result.payload.productInstallRoot, oddSdlcTypescriptProductInstallRoot(targetRoot));
+  assert.equal(result.kind, "installed");
+  assert.equal(result.productInstallRoot, oddSdlcTypescriptProductInstallRoot(targetRoot));
   assert.equal(existsSync(path.join(targetRoot, ".odd_sdlc")), false);
   assert.deepEqual(
-    result.payload.instructionFiles.map((entry) => [entry.filename, entry.action, entry.verified]),
+    result.instructionFiles.map((entry) => [entry.filename, entry.action, entry.verified]),
     [
       ["AGENTS.md", "prepended", true],
       ["CLAUDE.md", "prepended", true]
@@ -460,8 +448,8 @@ test("T-059 package install helper uses the async bounded adapter", async () => 
   );
   assert(readFileSync(path.join(targetRoot, "AGENTS.md"), "utf8").includes("Keep this guidance."));
   assert(readFileSync(path.join(targetRoot, "CLAUDE.md"), "utf8").includes("Keep this guidance."));
-  assertNoCommandPath(result.payload.commandPaths, "odd-sdlc-ts");
-  assertCommandPath(result.payload.commandPaths, "genesis-ts");
+  assertNoCommandPath(result.commandPaths, "odd-sdlc-ts");
+  assertCommandPath(result.commandPaths, "genesis-ts");
   const packageJson = readJson(path.join(targetRoot, "package.json"));
   assert.match(
     packageJson.dependencies["@odd-sdlc/typescript-tenant"],
@@ -472,37 +460,29 @@ test("T-059 package install helper uses the async bounded adapter", async () => 
     /^file:\.abiogenesis\/package-pack\//u
   );
 
-  const syncResult = invokeOddSdlcSpecMethodCommandSync(["install", "--target", targetRoot]);
-  assert.equal(syncResult.status, "error");
-  assert.match(syncResult.payload.error, /invokeOddSdlcSpecMethodCommand/u);
 });
 
 test("T-177 package install helper resolves the pinned ABG release package by default", async () => {
-  const targetRoot = makeTargetWorkspace("install-cli-default-abg");
-  const result = await invokeOddSdlcSpecMethodCommand([
-    "install",
-    "--target",
+  const targetRoot = makeTargetWorkspace("install-package-api-default-abg");
+  const result = await installOddSdlcTypescript({
     targetRoot,
-    "--package-source",
-    PACKAGE_ROOT,
-    "--installed-package-name",
-    "odd-sdlc-t124-default-abg"
-  ]);
+    packageSourceRoot: PACKAGE_ROOT,
+    abgPackageSourceRoot: resolveDefaultAbgPackageSourceRoot(PACKAGE_ROOT),
+    installedPackageName: "odd-sdlc-t124-default-abg"
+  });
 
-  assert.equal(result.status, "ok");
-  assert.equal(result.command, "install");
-  assert.equal(result.payload.kind, "installed");
-  assertNoCommandPath(result.payload.commandPaths, "odd-sdlc-ts");
-  assertCommandPath(result.payload.commandPaths, "abiogenesis-ts");
+  assert.equal(result.kind, "installed");
+  assertNoCommandPath(result.commandPaths, "odd-sdlc-ts");
+  assertCommandPath(result.commandPaths, "abiogenesis-ts");
   assert.equal(existsSync(path.join(targetRoot, ".odd_sdlc")), false);
   assert.equal(
-    result.payload.abgOutcome.packageSourceRoot,
+    result.abgOutcome.packageSourceRoot,
     path.join(PACKAGE_ROOT, "node_modules/@abiogenesis/typescript-tenant")
   );
-  assert.equal(result.payload.abgOutcome.packageVersion, ABG_RELEASE_VERSION);
-  assert.equal(result.payload.abgOutcome.docsSourceRoot, resolve(REPO_ROOT, "../abiogenesis/docs"));
+  assert.equal(result.abgOutcome.packageVersion, ABG_RELEASE_VERSION);
+  assert.equal(result.abgOutcome.docsSourceRoot, resolve(REPO_ROOT, "../abiogenesis/docs"));
   assert.equal(
-    result.payload.abgOutcome.standardsSourceRoot,
+    result.abgOutcome.standardsSourceRoot,
     resolve(REPO_ROOT, "../specification_methodology/specification/standards")
   );
 });
@@ -557,15 +537,11 @@ test("T-059 release-cut adapter writes package artifact and no public command ev
   assert.deepEqual(outcome.manifest.publicCommandSurface.publishedCommandNames, []);
   assert.deepEqual(outcome.manifest.publicCommandSurface.retiredCommandNames, ["odd-sdlc-ts"]);
 
-  const cliResult = await invokeOddSdlcSpecMethodCommand([
-    "release-cut",
-    "--archive-root",
-    path.join(archiveRoot, "cli"),
-    "--package-source",
-    PACKAGE_ROOT
-  ]);
-  assert.equal(cliResult.status, "ok");
-  assert.equal(cliResult.payload.kind, "odd_sdlc_typescript_release_cut");
+  const packageApiResult = await deriveOddSdlcTypescriptReleaseCut({
+    archiveRoot: path.join(archiveRoot, "package-api"),
+    packageSourceRoot: PACKAGE_ROOT
+  });
+  assert.equal(packageApiResult.kind, "odd_sdlc_typescript_release_cut");
 });
 
 test("T-177 release-snapshot adapter writes versioned package evidence and ABG substrate pin", async () => {
@@ -601,29 +577,21 @@ test("T-177 release-snapshot adapter writes versioned package evidence and ABG s
   const manifest = readJson(outcome.manifestPath);
   assertAbgReleaseSnapshotPin(manifest.abgSubstrate);
 
-  const cliSnapshotRoot = path.join(
-    mkdtempSync(path.join(tmpdir(), "odd-sdlc-ts-release-snapshot-cli-")),
+  const packageApiSnapshotRoot = path.join(
+    mkdtempSync(path.join(tmpdir(), "odd-sdlc-ts-release-snapshot-package-api-")),
     ODD_SDLC_PACKAGE_VERSION
   );
-  const cliResult = await invokeOddSdlcSpecMethodCommand([
-    "release-snapshot",
-    "--release-identity",
-    ODD_SDLC_PACKAGE_VERSION,
-    "--snapshot-root",
-    cliSnapshotRoot,
-    "--package-source",
-    PACKAGE_ROOT,
-    "--expected-package-name",
-    "@odd-sdlc/typescript-tenant",
-    "--expected-package-version",
-    ODD_SDLC_PACKAGE_VERSION,
-    "--allow-dirty-source",
-    "--npm-cache-root",
-    path.join(dirname(cliSnapshotRoot), ".npm-cache")
-  ]);
-  assert.equal(cliResult.status, "ok");
-  assert.equal(cliResult.payload.kind, "created");
-  assertAbgReleaseSnapshotPin(cliResult.payload.manifest.abgSubstrate);
+  const packageApiResult = await deriveOddSdlcTypescriptReleaseSnapshot({
+    releaseIdentity: ODD_SDLC_PACKAGE_VERSION,
+    packageSourceRoot: PACKAGE_ROOT,
+    snapshotRoot: packageApiSnapshotRoot,
+    expectedPackageName: "@odd-sdlc/typescript-tenant",
+    expectedPackageVersion: ODD_SDLC_PACKAGE_VERSION,
+    allowDirtySource: true,
+    npmCacheRoot: path.join(dirname(packageApiSnapshotRoot), ".npm-cache")
+  });
+  assert.equal(packageApiResult.kind, "created");
+  assertAbgReleaseSnapshotPin(packageApiResult.manifest.abgSubstrate);
 });
 
 test("T-177 migrated release-cut archives live under root release snapshots", () => {

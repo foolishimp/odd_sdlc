@@ -18,10 +18,10 @@ import { fileURLToPath } from "node:url";
 import {
   deriveSdlcInstalledQualificationInitialState,
   installOddSdlcTypescript,
-  startOddSdlcWorkspace,
   writeSdlcInstalledQualificationInitialStateArchive
 } from "../../build/semantic/code/src/index.js";
 import { canonicalDataMapperFixtureRoot } from "../fixtures/data_mapper_fixture.mjs";
+import { executeOddSdlcWorkspaceStartForTest } from "../workspace_start_harness.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
@@ -115,7 +115,7 @@ test("T-069 initial-state validation fails closed without installed topology", (
 
 test("T-069 typed worker start blocks before graph execution when install topology is absent", async () => {
   const workspaceRoot = freshDataMapperWorkspace();
-  const started = await startOddSdlcWorkspace({
+  const started = await executeOddSdlcWorkspaceStartForTest({
     workspaceRoot,
     target: {
       kind: "graph_function",

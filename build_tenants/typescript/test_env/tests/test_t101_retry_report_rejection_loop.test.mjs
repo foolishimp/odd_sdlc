@@ -15,8 +15,7 @@ import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  installOddSdlcTypescript,
-  invokeOddSdlcSpecMethodCommand
+  installOddSdlcTypescript
 } from "../../build/semantic/code/src/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));

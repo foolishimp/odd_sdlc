@@ -783,12 +783,7 @@ async function runInstallPackageApi(input) {
     hostPid: process.pid
   });
   const payload = await installOddSdlcTypescript(request);
-  const stdout = `${JSON.stringify({
-    kind: "odd_sdlc_spec_method_result",
-    command: "install",
-    status: payload.kind === "installed" ? "ok" : "failed",
-    payload
-  }, null, 2)}\n`;
+  const stdout = `${JSON.stringify(payload, null, 2)}\n`;
   const status = payload.kind === "installed" ? 0 : 1;
   const endedAt = new Date().toISOString();
   writeJson(processRecordPath, {
@@ -1147,7 +1142,6 @@ async function main() {
     ...process.env,
     ...dataMapperWorkerRuntimeEnv(),
     ...toolCache.env,
-    ODD_SDLC_TS_OUTPUT: "json",
     ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE: "pty-terminal",
     ABG_TS_AGENT_EXECUTOR_PROFILE: "pty-terminal",
     ODD_SDLC_TS_WORKER_TRANSPORT: WORKER_TRANSPORT,

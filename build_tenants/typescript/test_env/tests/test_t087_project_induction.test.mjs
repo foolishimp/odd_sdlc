@@ -11,9 +11,9 @@ import { fileURLToPath } from "node:url";
 import {
   FG_CONFORM_PROJECT,
   installOddSdlcTypescript,
-  projectOddSdlcWorkspaceGaps,
-  startOddSdlcWorkspace
+  projectOddSdlcWorkspaceGaps
 } from "../../build/semantic/code/src/index.js";
+import { executeOddSdlcWorkspaceStartForTest } from "../workspace_start_harness.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
@@ -94,7 +94,7 @@ test("T-087 routes understructured installed workspace through Fg_conform_projec
   assert.equal(firstGaps.start.executionContract.basis.resolvedPolicy.defaultRegime, "F_D");
   assert.equal(firstGaps.start.executionContract.workerAttachment.status, "unattached");
 
-  const induction = await startOddSdlcWorkspace({ workspaceRoot: workspace });
+  const induction = await executeOddSdlcWorkspaceStartForTest({ workspaceRoot: workspace });
   assert.equal(induction.kind, "sdlc_installed_operator_start_outcome");
   assert.equal(induction.summary.graphFunctionName, FG_CONFORM_PROJECT);
   assert.equal(induction.summary.currentEdge, FG_CONFORM_PROJECT);

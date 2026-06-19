@@ -26,7 +26,7 @@ classify the behavior into an ODD role:
 - projection/read model
 - triage decision
 - operational command/result
-- Spec Method entrypoint
+- typed workspace product API
 - qualification proof
 
 After classification, the implementation must look for local and global
@@ -212,4 +212,4 @@ The TypeScript tenant shall not:
 - hide graph functions in service methods
 - copy Python controller loops as architecture
 - close requirements from trace-token presence alone
-- treat command intent as operational result evidence
+- treat command intent as operational result evidence outside ABG command/control

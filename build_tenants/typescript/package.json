@@ -9,10 +9,6 @@
       "types": "./build/semantic/code/src/index.d.ts",
       "import": "./build/semantic/code/src/index.js"
     },
-    "./spec-method": {
-      "types": "./build/semantic/code/src/spec_method/index.d.ts",
-      "import": "./build/semantic/code/src/spec_method/index.js"
-    },
     "./install": {
       "types": "./build/semantic/code/src/install/index.d.ts",
       "import": "./build/semantic/code/src/install/index.js"

@@ -414,6 +414,7 @@ function compactComponentDepthDirective(
         "For component_test_surface, do not copy source componentTopologyRows or componentRealizationRows from component_code_surface; bind tests to source ownership only through componentTestRows[].componentIds.",
         "Represent unused component-depth fields as payload.componentTopologyRows=[], payload.componentRealizationRows=[], payload.testComponentTopologyRows=[], payload.componentTestQualificationRows=[], payload.componentExecutionFailureRegister=null, payload.componentRepairSchedule=null, and payload.releaseDepthParity=null.",
         "Materialize tests only against the admitted testcase authority, test stack profile, test decomposition summary, and test dependency map named by targetCarrierProjection.requiredStagedAuthorityRefs.",
+        "For JavaScript test files under admitted ESM module-system authority, use ESM import syntax for node:test, node:assert/strict, node:child_process, and local modules; do not emit CommonJS require/module.exports syntax unless the admitted tenant stack authority declares CommonJS.",
         "Preserve testClassId/testcase allocation from the composite test design authority.",
         "On re-entry, existing testcaseIds, requirementIds, source-overlap rows, and test files are monotonic: do not remove or narrow them unless Current evaluated gaps specifically cite that row as wrong_stage, trace_missing, schema_invalid, boundary_collapsed, semantic_not_realized, or test_overlap_missing.",
         "On schema-local re-entry, repair the rejected component_depth_register fields first, then update only the affected test-file tags or register rows named by Current evaluated gaps."
@@ -421,7 +422,8 @@ function compactComponentDepthDirective(
     case "uat_test_source_surface":
       return [
         envelopeDirective,
-        "Emit payload.componentTestRows with row kind `sdlc_component_test_realization_row` for requirement-specific UAT executable tests only.",
+        "Emit payload.componentTestRows with row kind `sdlc_component_test_realization_row` and fields testClassId, relativePath, testcaseIds, componentIds, requirementIds, and shardId for requirement-specific UAT executable tests only.",
+        "componentTestRows[].componentIds is required and must be a string array naming the source component ids covered by the UAT test; do not omit it even when the UAT testcase is requirement-scoped.",
         "UAT test source is requirement/testcase specific: bind every row to testcaseIds and requirementIds, and do not require implementation module-specific source shape as the generation basis.",
         "Use the admitted test stack profile, testcase authority, UAT testcase rows, and expected-result bindings to create framework-discoverable role=test files.",
         "Do not copy component source topology rows into this carrier. Component/module consistency is checked later by qualification fan-in.",
@@ -925,6 +927,7 @@ export function outcomeDirectivesForWorker(
 	        "payload.componentTestRows[].relativePath must name the tenant-relative or selected-output-root-prefixed product test file path. Do not point componentTestRows at .ai-workspace/runtime asset paths; those paths are evidence archives, not product test files.",
 	        "Generated test files are authored for the matching workerInvocationPackage.productMaterialization.executionShards[].workingDirectory; the installed operator executes the declared shard command after this transform returns.",
 	        "Generated tests must derive paths and module/runtime syntax from the admitted tenant test stack authority, design rows, and shard workingDirectory; keep runtime compatibility inside declared source/test files or admitted design-declared support files.",
+	        "If admitted JavaScript tenant stack authority declares moduleSystem=esm, generated test files must use ESM imports; CommonJS require/module.exports syntax is a materialized product module-system mismatch.",
 	        "Materialized tests must preserve declared testClassId; avoid local identifiers that collide with matcher words; prefer shouldEqual or parenthesized shouldBe RHS."
 	      );
     }

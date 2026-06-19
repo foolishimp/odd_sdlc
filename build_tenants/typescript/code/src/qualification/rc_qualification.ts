@@ -39,8 +39,8 @@ export const ODD_SDLC_TYPESCRIPT_RC_QUALIFICATION_REPORT = Object.freeze({
         "build_tenants/typescript/test_env/sandbox/test_t052_abg_installed_sandbox_contract.test.mjs"
     }),
     Object.freeze({
-      name: "T-058/T-120 Spec Method entrypoint",
-      category: "spec_method",
+      name: "T-058/T-120 typed workspace projection API",
+      category: "workspace_api",
       command: "npm run test:t058",
       status: "passed",
       evidenceRef:

@@ -241,10 +241,10 @@ test("T-164 full data_mapper live runner keeps SBT caches inside sandbox workspa
   assert.match(runner, /ODD_SDLC_TS_DATA_MAPPER_START_TARGET/u);
   assert.match(runner, /`graph_function:\$\{TARGET_GRAPH_FUNCTION\}`/u);
   assert.match(runner, /isOverlayStartTarget\(startTarget\)/u);
-  assert.match(runner, /sdlcStartArgs\(startTarget\)/u);
+  assert.match(runner, /abgStartArgs\(startTarget/u);
   assert.match(runner, /"first_traversal"/u);
   assert.match(runner, /odd-sdlc-start-first-traversal/u);
-  assert.match(runner, /odd_sdlc_cli_overlay_start_first_traversal/u);
+  assert.match(runner, /abg_cli_overlay_start_first_traversal/u);
   assert.match(runner, /isSuccessfulSdlcTraversalStart/u);
   assert.match(runner, /status === "worker_invoked"/u);
   assert.match(runner, /closureDisposition === "close"/u);
@@ -254,8 +254,8 @@ test("T-164 full data_mapper live runner keeps SBT caches inside sandbox workspa
   assert.match(runner, /detailZoomStopSatisfied\(workspace\)/u);
   assert.match(runner, /sdlcOverlayStartLoop/u);
   assert.match(runner, /args: abgStartArgs\(`graph_function:\$\{FG_CONFORM_PROJECT\}`\)/u);
-  assert.match(runner, /args: startArgsForTarget\(START_TARGET\)/u);
-  assert.match(runner, /command: startCommandForTarget\(\{ startTarget: START_TARGET, genesisCommand, installedCommand \}\)/u);
+  assert.match(runner, /args: abgStartArgs\(START_TARGET\)/u);
+  assert.match(runner, /command: genesisCommand/u);
   const promptPolicy = readFileSync(
     path.join(
       path.resolve(dirname(fileURLToPath(import.meta.url)), "../.."),

@@ -22,8 +22,9 @@ import {
   FG_DECOMPOSE_DEPTH_BETWEEN_NODES,
   FG_CONFORM_PROJECT,
   FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
-  installOddSdlcTypescript,
-  invokeOddSdlcSpecMethodCommandSync
+  admitOddSdlcWorkspaceTicket,
+  createSdlcTerminalGapTicketsFromOperatorRun,
+  installOddSdlcTypescript
 } from "../../build/semantic/code/src/index.js";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -75,16 +76,6 @@ const DATA_MAPPER_EXERCISE_TERMINAL_GAP_TICKETS =
   process.env["ODD_SDLC_TS_DATA_MAPPER_EXERCISE_TERMINAL_GAP_TICKETS"] === "true";
 const DATA_MAPPER_RUNTIME_TRAVERSAL_STRATEGY =
   process.env["ODD_SDLC_TS_DATA_MAPPER_RUNTIME_TRAVERSAL_STRATEGY"] ?? "";
-const DATA_MAPPER_RUNTIME_SELECTED_REFS =
-  process.env["ODD_SDLC_TS_DATA_MAPPER_RUNTIME_SELECTED_REFS"] ?? "";
-const DATA_MAPPER_RUNTIME_EDGE_REFS =
-  process.env["ODD_SDLC_TS_DATA_MAPPER_RUNTIME_EDGE_REFS"] ?? "";
-const DEFAULT_DATA_MAPPER_STEEL_THREAD_REQUIREMENT_REFS = Object.freeze([
-  "requirement://data-mapper/REQ-LDM-01",
-  "requirement://data-mapper/REQ-LDM-02",
-  "requirement://data-mapper/REQ-LDM-03",
-  "requirement://data-mapper/REQ-TYP-06"
-]);
 const DATA_MAPPER_DETAIL_ZOOM_EDGES = Object.freeze([
   "derive_component_code_surface",
   "qualify_component_realization_surface",
@@ -98,8 +89,6 @@ const DATA_MAPPER_DETAIL_ZOOM_EDGES = Object.freeze([
   "derive_component_repair_schedule_surface",
   "derive_test_run_archive_surface"
 ]);
-const SPEC_METHOD_PACKAGE_API_COMMAND = "package-api:invokeOddSdlcSpecMethodCommand";
-
 function cliStringFlag(flagName) {
   const equalsPrefix = `${flagName}=`;
   for (let index = 2; index < process.argv.length; index += 1) {
@@ -129,64 +118,6 @@ function archiveTimestamp() {
 function writeJson(filePath, payload) {
   mkdirSync(dirname(filePath), { recursive: true });
   writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
-}
-
-function commaSeparatedRefs(value) {
-  return Object.freeze(
-    value
-      .split(",")
-      .map((item) => item.trim())
-      .filter((item) => item.length > 0)
-  );
-}
-
-function runtimeTraversalSelectionArgs(startTarget) {
-  if (DATA_MAPPER_RUNTIME_TRAVERSAL_STRATEGY.length === 0) {
-    return Object.freeze([]);
-  }
-  if (DATA_MAPPER_RUNTIME_TRAVERSAL_STRATEGY !== "steel_thread") {
-    throw new Error(
-      `unsupported ODD_SDLC_TS_DATA_MAPPER_RUNTIME_TRAVERSAL_STRATEGY=${DATA_MAPPER_RUNTIME_TRAVERSAL_STRATEGY}`
-    );
-  }
-  const selectedScheduleItemRefs =
-    DATA_MAPPER_RUNTIME_SELECTED_REFS.length === 0
-      ? DEFAULT_DATA_MAPPER_STEEL_THREAD_REQUIREMENT_REFS
-      : commaSeparatedRefs(DATA_MAPPER_RUNTIME_SELECTED_REFS);
-  if (selectedScheduleItemRefs.length === 0) {
-    throw new Error("runtime steel_thread selection requires selected refs");
-  }
-  const edgeRefs = commaSeparatedRefs(DATA_MAPPER_RUNTIME_EDGE_REFS);
-  const selection = {
-    kind: "start_runtime_traversal_strategy_selection",
-    selectionRef:
-      `selection://odd-sdlc/data-mapper/runtime-steel-thread/${encodeURIComponent(startTarget)}`,
-    strategyOwnerRef: "policy://odd-sdlc/runtime/steel-thread",
-    strategyLabel: "steel_thread",
-    enforcementPrimitives: [
-      "bounded_batch",
-      "ordered_schedule_prefix"
-    ],
-    selectedScheduleItemRefs,
-    basisRefs: [
-      "ticket://odd-sdlc/T-203",
-      startTarget
-    ],
-    ...(edgeRefs.length === 0 ? {} : { edgeRefs }),
-    batch: {
-      targetItemCount: selectedScheduleItemRefs.length,
-      maxItemCount: selectedScheduleItemRefs.length
-    },
-    continuation: {
-      sameEdgeUntil: "foldback_closed",
-      maxAttemptsWithoutNewSignal: 10,
-      maxTotalAttempts: 64
-    }
-  };
-  return Object.freeze([
-    "--runtime-traversal-selection",
-    JSON.stringify(selection)
-  ]);
 }
 
 function readJsonFile(filePath) {
@@ -298,6 +229,7 @@ function runCommand(input) {
     label: input.label,
     command: input.command,
     args: input.args,
+    ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
     cwd: input.cwd,
     status: null,
     signal: null,
@@ -309,56 +241,6 @@ function runCommand(input) {
     endedAt: null,
     hostPid: process.pid
   });
-  if (input.command === SPEC_METHOD_PACKAGE_API_COMMAND) {
-    const previousCwd = process.cwd();
-    const previousEnv = new Map();
-    for (const [key, value] of Object.entries(input.env ?? {})) {
-      previousEnv.set(key, process.env[key]);
-      process.env[key] = value;
-    }
-    let apiResult;
-    try {
-      process.chdir(input.cwd);
-      apiResult = invokeOddSdlcSpecMethodCommandSync(input.args);
-    } finally {
-      process.chdir(previousCwd);
-      for (const [key, value] of previousEnv.entries()) {
-        if (value === undefined) {
-          delete process.env[key];
-        } else {
-          process.env[key] = value;
-        }
-      }
-    }
-    const stdout = `${JSON.stringify(apiResult, null, 2)}\n`;
-    const status = apiResult.status === "ok" ? 0 : 1;
-    const endedAt = new Date().toISOString();
-    const record = {
-      kind: "odd_sdlc_live_sandbox_process_result",
-      lifecycleStatus: "completed",
-      label: input.label,
-      command: input.command,
-      args: input.args,
-      cwd: input.cwd,
-      status,
-      signal: null,
-      error: apiResult.status === "ok" ? null : apiResult.error ?? "package_api_rejected",
-      stdoutBytes: Buffer.byteLength(stdout, "utf8"),
-      stderrBytes: 0,
-      commandTimeoutMs: COMMAND_TIMEOUT_MS,
-      startedAt,
-      endedAt,
-      hostPid: process.pid
-    };
-    writeJson(processRecordPath, record);
-    writeFileSync(path.join(input.archiveRoot, `${input.label}.stdout.json`), stdout, "utf8");
-    writeFileSync(path.join(input.archiveRoot, `${input.label}.stderr.log`), "", "utf8");
-    const acceptedStatuses = input.acceptedStatuses ?? Object.freeze([0]);
-    if (!acceptedStatuses.includes(status)) {
-      throw new Error(`${input.label} failed: ${JSON.stringify(apiResult, null, 2)}`);
-    }
-    return apiResult;
-  }
   const result = spawnSync(input.command, input.args, {
     cwd: input.cwd,
     encoding: "utf8",
@@ -373,6 +255,7 @@ function runCommand(input) {
     label: input.label,
     command: input.command,
     args: input.args,
+    ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
     cwd: input.cwd,
     status: result.status,
     signal: result.signal,
@@ -404,13 +287,6 @@ function runCommand(input) {
   return result.stdout === "" ? null : JSON.parse(result.stdout);
 }
 
-function specPayload(parsed, label) {
-  if (parsed?.kind !== "odd_sdlc_spec_method_result" || parsed.status !== "ok") {
-    throw new Error(`${label} returned non-ok spec-method result: ${JSON.stringify(parsed, null, 2)}`);
-  }
-  return parsed.payload;
-}
-
 async function runInstallPackageApi(input) {
   const startedAt = new Date().toISOString();
   const processRecordPath = path.join(input.archiveRoot, `${input.label}.process.json`);
@@ -438,12 +314,7 @@ async function runInstallPackageApi(input) {
     hostPid: process.pid
   });
   const payload = await installOddSdlcTypescript(request);
-  const stdout = `${JSON.stringify({
-    kind: "odd_sdlc_spec_method_result",
-    command: "install",
-    status: payload.kind === "installed" ? "ok" : "failed",
-    payload
-  }, null, 2)}\n`;
+  const stdout = `${JSON.stringify(payload, null, 2)}\n`;
   const status = payload.kind === "installed" ? 0 : 1;
   const endedAt = new Date().toISOString();
   writeJson(processRecordPath, {
@@ -469,6 +340,58 @@ async function runInstallPackageApi(input) {
     throw new Error(`${input.label} failed: ${JSON.stringify(payload, null, 2)}`);
   }
   return payload;
+}
+
+function abgCliStartTargetFor(input) {
+  if (runtimeTraversalSelectionEnabled()) {
+    throw new Error(
+      "runtime traversal selections require an ABG CLI carrier; refusing odd_sdlc package start fallback"
+    );
+  }
+  if (
+    input.startTarget === "next" ||
+    input.startTarget.startsWith("graph_function:") ||
+    input.startTarget.startsWith("asset:")
+  ) {
+    return input.startTarget;
+  }
+  if (!isOverlayStartTarget(input.startTarget)) {
+    return `graph_function:${input.startTarget}`;
+  }
+  throw new Error(
+    "overlay start targets require ABG CLI target-carrier support; refusing odd_sdlc projection fallback"
+  );
+}
+
+function runStartAbgCli(input) {
+  const abgTarget = abgCliStartTargetFor(input);
+  return runCommand({
+    label: input.label,
+    command: input.installedCommand,
+    args: abgStartArgs(abgTarget, input.until),
+    cwd: input.workspace,
+    env: input.env,
+    archiveRoot: input.archiveRoot,
+    acceptedStatuses: input.acceptedStatuses,
+    metadata: {
+      requestedStartTarget: input.startTarget,
+      abgStartTarget: abgTarget,
+      commandAuthority: "abg_cli"
+    }
+  });
+}
+
+function ticketIdFromTicketRef(ticketRef) {
+  if (typeof ticketRef !== "string") {
+    throw new TypeError(`ticket ref must be a string: ${String(ticketRef)}`);
+  }
+  if (ticketRef.startsWith("asset:ticket/")) {
+    return ticketRef.slice("asset:ticket/".length);
+  }
+  if (ticketRef.startsWith("ticket/")) {
+    return ticketRef.slice("ticket/".length);
+  }
+  throw new TypeError(`ticket ref must name asset:ticket/<id>: ${ticketRef}`);
 }
 
 function installedAbgCommandFromInstallPayload(payload, workspace, commandName) {
@@ -772,7 +695,7 @@ function runtimeTraversalSelectionEnabled() {
   return DATA_MAPPER_RUNTIME_TRAVERSAL_STRATEGY.length > 0;
 }
 
-function abgStartArgs(startTarget) {
+function abgStartArgs(startTarget, until = "converged") {
   return [
     "start",
     "--workspace",
@@ -782,37 +705,8 @@ function abgStartArgs(startTarget) {
     "--target",
     startTarget,
     "--until",
-    "converged"
+    until
   ];
-}
-
-function sdlcStartArgs(startTarget) {
-  return [
-    "start",
-    "--workspace",
-    ".",
-    "--target",
-    startTarget,
-    "--until",
-    "first_traversal",
-    "--worker",
-    WORKER_TRANSPORT,
-    ...runtimeTraversalSelectionArgs(startTarget)
-  ];
-}
-
-function startCommandForTarget(input) {
-  return isOverlayStartTarget(input.startTarget) ||
-    runtimeTraversalSelectionEnabled()
-    ? input.installedCommand
-    : input.genesisCommand;
-}
-
-function startArgsForTarget(startTarget) {
-  return isOverlayStartTarget(startTarget) ||
-    runtimeTraversalSelectionEnabled()
-    ? sdlcStartArgs(startTarget)
-    : abgStartArgs(startTarget);
 }
 
 function startLabelForTarget(startTarget) {
@@ -879,16 +773,6 @@ function nextGraphFunctionStartTargetFromStart(start, currentStartTarget) {
   return null;
 }
 
-function unwrapStartPayload(parsed, label) {
-  if (parsed?.kind === "odd_sdlc_spec_method_result") {
-    if (parsed.status !== "ok") {
-      throw new Error(`${label} returned non-ok spec-method result: ${JSON.stringify(parsed, null, 2)}`);
-    }
-    return parsed.payload;
-  }
-  return parsed;
-}
-
 function summaryStepFromStart(phase, start) {
   const summary = start?.summary ?? null;
   return {
@@ -913,8 +797,11 @@ function compactStartForSummary(start) {
     kind: start?.kind ?? null,
     status: start?.status ?? summary?.status ?? null,
     graphFunctionName:
-      summary?.graphFunctionName ?? executionContract?.targetGraphFunction ?? null,
-    currentEdge: summary?.currentEdge ?? null,
+      summary?.graphFunctionName ??
+      executionContract?.targetGraphFunction ??
+      graphFunctionFromStartTarget(start?.resolved_target) ??
+      null,
+    currentEdge: summary?.currentEdge ?? start?.edge ?? null,
     blockingReason: summary?.blockingReason ?? null,
     nextLawfulAction: summary?.nextLawfulAction ?? null,
     archiveRoot: start?.archiveRoot ?? summary?.archiveRoot ?? null,
@@ -1046,7 +933,7 @@ function shouldRunTerminalGapTicketWorkflow(start) {
   });
 }
 
-function maybeRunTerminalGapTicketWorkflow(input) {
+async function maybeRunTerminalGapTicketWorkflow(input) {
   const operatorRunRoot = startArchiveRoot(input.start);
   if (operatorRunRoot === null || !shouldRunTerminalGapTicketWorkflow(input.start)) {
     return null;
@@ -1063,70 +950,33 @@ function maybeRunTerminalGapTicketWorkflow(input) {
   ) {
     return null;
   }
-  const intake = specPayload(
-    runCommand({
-      label: "ticket-intake-terminal-gap",
-      command: input.installedCommand,
-      args: [
-        "ticket-intake",
-        "--workspace",
-        ".",
-        "--from-run",
-        operatorRunRoot,
-        "--kind",
-        "code_review_triage"
-      ],
-      cwd: input.workspace,
-      env: input.env,
-      archiveRoot: input.archiveRoot
-    }),
-    "ticket-intake"
-  );
+  const intake = createSdlcTerminalGapTicketsFromOperatorRun({
+    workspaceRoot: input.workspace,
+    operatorRunRoot,
+    intakeKind: "code_review_triage"
+  });
   const parentTicketRef = intake?.parentTicket?.ticketRef;
   if (typeof parentTicketRef !== "string" || parentTicketRef.length === 0) {
     throw new Error(
       `ticket-intake did not return a parent ticket ref: ${JSON.stringify(intake, null, 2)}`
     );
   }
-  const admitted = specPayload(
-    runCommand({
-      label: "ticket-admit-terminal-gap",
-      command: input.installedCommand,
-      args: [
-        "ticket-admit",
-        "--workspace",
-        ".",
-        "--target",
-        parentTicketRef
-      ],
-      cwd: input.workspace,
-      env: input.env,
-      archiveRoot: input.archiveRoot
-    }),
-    "ticket-admit"
-  );
-  const ticketStart = unwrapStartPayload(
-    runCommand({
+  writeJson(path.join(input.archiveRoot, "ticket-intake-terminal-gap.stdout.json"), intake);
+  const admitted = admitOddSdlcWorkspaceTicket({
+    workspaceRoot: input.workspace,
+    ticketId: ticketIdFromTicketRef(parentTicketRef)
+  });
+  writeJson(path.join(input.archiveRoot, "ticket-admit-terminal-gap.stdout.json"), admitted);
+  const ticketStart = runStartAbgCli({
       label: "ticket-start-terminal-gap",
-      command: input.installedCommand,
-      args: [
-        "start",
-        "--workspace",
-        ".",
-        "--target",
-        parentTicketRef,
-        "--until",
-        "blocked",
-        "--worker",
-        WORKER_TRANSPORT
-      ],
-      cwd: input.workspace,
+      installedCommand: input.installedCommand,
+      workspace: input.workspace,
+      startTarget: parentTicketRef,
+      until: "blocked",
       env: input.env,
       archiveRoot: input.archiveRoot,
       acceptedStatuses: Object.freeze([0, 4])
-    }),
-    "ticket-start-terminal-gap"
-  );
+    });
   return Object.freeze({
     kind: "data_mapper_terminal_gap_ticket_workflow",
     sourceStopKind: intake.sourceStopKind ?? null,
@@ -1251,17 +1101,17 @@ function writeTerminalGapTicketWorkflowExerciseOperatorRun(input) {
   });
 }
 
-function runTerminalGapTicketWorkflowExercise(input) {
+async function runTerminalGapTicketWorkflowExercise(input) {
   if (!DATA_MAPPER_EXERCISE_TERMINAL_GAP_TICKETS) {
     return null;
   }
   const exercise = writeTerminalGapTicketWorkflowExerciseOperatorRun({
     workspace: input.workspace
   });
-  const workflow = maybeRunTerminalGapTicketWorkflow({
+  const workflow = await maybeRunTerminalGapTicketWorkflow({
     start: exercise.start,
-    installedCommand: input.installedCommand,
     workspace: input.workspace,
+    installedCommand: input.installedCommand,
     env: input.env,
     archiveRoot: input.archiveRoot
   });
@@ -1299,7 +1149,7 @@ function isSuccessfulSdlcTraversalStart(start) {
   );
 }
 
-function sdlcOverlayStartLoop(input) {
+async function sdlcOverlayStartLoop(input) {
   if (!Number.isInteger(DATA_MAPPER_MAX_ADVANCES) || DATA_MAPPER_MAX_ADVANCES < 1) {
     throw new TypeError("ODD_SDLC_TS_DATA_MAPPER_MAX_ADVANCES must be a positive integer");
   }
@@ -1319,15 +1169,16 @@ function sdlcOverlayStartLoop(input) {
   let currentStartTarget = input.startTarget;
   for (let step = 0; step < DATA_MAPPER_MAX_ADVANCES; step += 1) {
     const label = `odd-sdlc-start-first-traversal-${String(step + 1).padStart(3, "0")}`;
-    const start = unwrapStartPayload(runCommand({
+    const start = runStartAbgCli({
       label,
-      command: input.installedCommand,
-      args: sdlcStartArgs(currentStartTarget),
-      cwd: input.workspace,
+      installedCommand: input.installedCommand,
+      workspace: input.workspace,
+      startTarget: currentStartTarget,
+      until: "first_traversal",
       env: input.env,
       archiveRoot: input.archiveRoot,
       acceptedStatuses: Object.freeze([0, 4])
-    }), label);
+    });
     starts.push(compactStartForSummary(start));
     input.summary.steps.push(summaryStepFromStart(`sdlc-overlay-start-${step + 1}`, start));
     input.summary.sdlcOverlayStarts = starts;
@@ -1362,6 +1213,7 @@ function sdlcOverlayStartLoop(input) {
     const graphFunctionName =
       start?.summary?.graphFunctionName ??
       start?.start?.executionContract?.targetGraphFunction ??
+      graphFunctionFromStartTarget(start?.resolved_target) ??
       null;
     const traversalProgressKey = [
       graphFunctionName,
@@ -1414,6 +1266,11 @@ function sdlcOverlayStartLoop(input) {
 }
 
 async function main() {
+  if (runtimeTraversalSelectionEnabled()) {
+    throw new Error(
+      "ODD_SDLC_TS_DATA_MAPPER_RUNTIME_TRAVERSAL_STRATEGY requires an ABG CLI runtime traversal selection carrier; T-204 forbids falling back to odd_sdlc package start"
+    );
+  }
   const testRunRoot = resolve(
     process.env["ODD_SDLC_TS_TEST_RUN_ROOT"] ?? DEFAULT_TEST_RUN_ROOT
   );
@@ -1427,7 +1284,6 @@ async function main() {
     ...process.env,
     ...dataMapperWorkerRuntimeEnv(),
     ...toolCache.env,
-    ODD_SDLC_TS_OUTPUT: "json",
     ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE: "pty-terminal",
     ABG_TS_AGENT_EXECUTOR_PROFILE: "pty-terminal",
     ODD_SDLC_TS_WORKER_TRANSPORT: WORKER_TRANSPORT,
@@ -1437,7 +1293,7 @@ async function main() {
     kind: "odd_sdlc_full_external_data_mapper_sandbox_run",
     commandBinding: isOverlayStartTarget(START_TARGET) ||
       runtimeTraversalSelectionEnabled()
-      ? "odd_sdlc_package_api_overlay_start_first_traversal"
+      ? "abg_cli_overlay_start_first_traversal"
       : "abg_cli_start_until_converged",
     archiveRoot,
     workspace,
@@ -1474,7 +1330,6 @@ async function main() {
       cwd: workspace,
       archiveRoot
     });
-  const installedCommand = SPEC_METHOD_PACKAGE_API_COMMAND;
   const installManifest =
     installPayload.manifest ??
     (typeof installPayload.installManifestPath === "string"
@@ -1488,7 +1343,6 @@ async function main() {
   );
   assertExists(genesisCommand, "installed genesis-ts command");
   assertExists(abgRuntimeBindingPath, "installed ABG runtime binding");
-  summary.specMethodCommand = installedCommand;
   summary.abgCommand = genesisCommand;
   summary.installManifestPath = installPayload.installManifestPath ?? null;
   summary.abgRuntimeBindingPath = abgRuntimeBindingPath;
@@ -1508,25 +1362,24 @@ async function main() {
 
   const startResult = isOverlayStartTarget(START_TARGET) ||
     runtimeTraversalSelectionEnabled()
-    ? sdlcOverlayStartLoop({
+      ? await sdlcOverlayStartLoop({
         startTarget: START_TARGET,
-        installedCommand,
-        genesisCommand,
+        installedCommand: genesisCommand,
         workspace,
         env: baseEnv,
         archiveRoot,
         summary
       })
     : Object.freeze({
-        start: unwrapStartPayload(runCommand({
+        start: runCommand({
           label: startLabelForTarget(START_TARGET),
-          command: startCommandForTarget({ startTarget: START_TARGET, genesisCommand, installedCommand }),
-          args: startArgsForTarget(START_TARGET),
+          command: genesisCommand,
+          args: abgStartArgs(START_TARGET),
           cwd: workspace,
           env: baseEnv,
           archiveRoot,
           acceptedStatuses: Object.freeze([0, 4])
-        }), startLabelForTarget(START_TARGET)),
+        }),
         starts: Object.freeze([]),
         terminalReason: null
       });
@@ -1539,10 +1392,10 @@ async function main() {
   summary.observedDetailZoomEdges = observedDetailZoomEdges(workspace);
   summary.releaseProofConverged = releaseProofStopSatisfied(workspace);
   summary.terminalReason = startResult.terminalReason ?? terminalReasonFromStart(start);
-  summary.terminalGapTicketWorkflow = maybeRunTerminalGapTicketWorkflow({
+  summary.terminalGapTicketWorkflow = await maybeRunTerminalGapTicketWorkflow({
     start,
-    installedCommand,
     workspace,
+    installedCommand: genesisCommand,
     env: baseEnv,
     archiveRoot
   });
@@ -1550,9 +1403,9 @@ async function main() {
     summary.terminalGapTicketWorkflow?.sourceStopKind === "retry_exhaustion"
       ? summary.terminalGapTicketWorkflow
       : null;
-  summary.terminalGapTicketWorkflowExercise = runTerminalGapTicketWorkflowExercise({
-    installedCommand,
+  summary.terminalGapTicketWorkflowExercise = await runTerminalGapTicketWorkflowExercise({
     workspace,
+    installedCommand: genesisCommand,
     env: baseEnv,
     archiveRoot
   });

@@ -31,6 +31,7 @@ import {
 } from "./scenarios/t131_odd_chat.scenario.mjs";
 import {
   T132_HELLO_WORLD_JS_DEEP_CODE_TEST_EDGES,
+  T132_HELLO_WORLD_JS_LIVE_START_TARGET_SEQUENCE,
   T132_HELLO_WORLD_JS_MIN_FP_EDGES,
   t132HelloWorldJsDeepSdlcZoomLiveScenario,
   t132HelloWorldJsLiveScenario,
@@ -250,7 +251,14 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
   assert.equal(jsLive.maxAdvances, 8);
   assert.deepEqual(jsLive.startTarget, "next");
   assert.deepEqual(jsLive.startUntil, "converged");
-  assert.equal(Array.isArray(jsLive.startTargetSequence), false);
+  assert.deepEqual(jsLive.startTargetSequence, [
+    ...T132_HELLO_WORLD_JS_LIVE_START_TARGET_SEQUENCE
+  ]);
+  assert.equal(jsLive.startTargetSequence.length, jsLive.maxAdvances);
+  assert.deepEqual(
+    jsLive.startTargetSequence.slice(1),
+    T132_HELLO_WORLD_JS_MIN_FP_EDGES.map((edge) => `graph_function:${edge}`)
+  );
   assert.equal(jsLive.continueOnEdgeConverge, true);
   assert.equal(jsLive.stopAfterGraphClose, true);
   assert.equal(jsLive.expectations.forbidRetryClosureDecisions, true);

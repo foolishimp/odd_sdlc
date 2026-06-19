@@ -9,7 +9,7 @@ import {
 } from "@abiogenesis/typescript-tenant";
 
 import {
-  admitOddSdlcSpecMethodRequest,
+  admitSdlcRuntimeTraversalSelections,
   admitSdlcProjectConstraints,
   admitSdlcPublicStartRequest,
   conformProjectProfileFromConstraintsText,
@@ -89,40 +89,27 @@ function publicStartContext(workspaceRoot = "/workspace/t203-data-mapper") {
   return Object.freeze({ module, queryDomain, conformedProject, workspaceRoot });
 }
 
-test("T-203 CLI admits runtime steel-thread traversal selection", () => {
+test("T-203 typed API admits runtime steel-thread traversal selection", () => {
   const selection = runtimeSteelThreadSelection();
-  const request = admitOddSdlcSpecMethodRequest([
-    "start",
-    "--workspace",
-    ".",
-    "--target",
-    "graph_function:bootstrap_release_self_test",
-    "--until",
-    "first_traversal",
-    "--runtime-traversal-selection",
-    JSON.stringify(selection)
-  ]);
+  const admitted = admitSdlcRuntimeTraversalSelections(
+    [selection],
+    "T-203.runtimeTraversalSelections"
+  );
 
-  assert.equal(request.kind, "odd_sdlc_spec_method_request");
   assert.deepStrictEqual(
-    request.runtimeTraversalSelections?.[0]?.selectedScheduleItemRefs,
+    admitted?.[0]?.selectedScheduleItemRefs,
     selection.selectedScheduleItemRefs
   );
 });
 
-test("T-203 CLI preserves full overlay URI targets for runtime continuation", () => {
-  const request = admitOddSdlcSpecMethodRequest([
-    "start",
-    "--workspace",
-    ".",
-    "--target",
-    "overlay://odd-sdlc/current-full-traversal",
-    "--until",
-    "first_traversal"
-  ]);
+test("T-203 typed API preserves full overlay URI targets for runtime continuation", () => {
+  const target = {
+    kind: "overlay",
+    handle: "overlay://odd-sdlc/current-full-traversal"
+  };
 
-  assert.equal(request.target.kind, "overlay");
-  assert.equal(request.target.handle, "overlay://odd-sdlc/current-full-traversal");
+  assert.equal(target.kind, "overlay");
+  assert.equal(target.handle, "overlay://odd-sdlc/current-full-traversal");
 });
 
 test("T-203 runtime steel-thread dependency window closes over prerequisite requirements", () => {

@@ -17,12 +17,16 @@ import {
   deriveSdlcConformProjectProfileFromWorkspace,
   deriveSdlcWorkspaceIngressReport,
   executeInstalledOperatorStart,
-  invokeOddSdlcSpecMethodCommandSync,
   materializeSdlcProjectConformance,
+  projectOddSdlcWorkspaceGaps,
   projectSdlcQueryDomain,
   projectSdlcWorkerAttachment,
   publicStartOnce
 } from "../../build/semantic/code/src/index.js";
+
+function workspaceGaps(workspaceRoot) {
+  return projectOddSdlcWorkspaceGaps({ workspaceRoot });
+}
 
 function graphTrackRefs(graphFunctionName) {
   const graphFunction = constructSdlcGtlModule().graphFunctions.find(
@@ -713,18 +717,17 @@ test("T-158 non-close F_P dispatch publishes consequence before returning dispat
   assert(closedInvocation);
   assert.match(closedInvocation.resultRef, /worker_result_report\.json$/u);
 
-  const gaps = invokeOddSdlcSpecMethodCommandSync(["gaps", "--workspace", workspace]);
-  assert.equal(gaps.status, "ok");
+  const gaps = workspaceGaps(workspace);
   assert.equal(
-    gaps.payload.requirementFulfillment.archiveRehydration.status,
+    gaps.requirementFulfillment.archiveRehydration.status,
     "rehydrated"
   );
   assert.equal(
-    gaps.payload.requirementFulfillment.edgeClosureDisposition,
+    gaps.requirementFulfillment.edgeClosureDisposition,
     "retry"
   );
   assert(
-    gaps.payload.requirementFulfillment.rows.some((row) =>
+    gaps.requirementFulfillment.rows.some((row) =>
       row.evaluatorSourceRefs.includes(nextActionProjection.nextActionProjectionRef)
     )
   );
@@ -739,11 +742,10 @@ test("T-158 replayed Eval_Action must carry graph-vector track authority", () =>
     nextGraphVectorRef: null
   });
 
-  const stale = invokeOddSdlcSpecMethodCommandSync(["gaps", "--workspace", workspace]);
-  assert.equal(stale.status, "ok");
-  assert.equal(stale.payload.blockingReason, "next_action_projection_graph_vector_missing");
+  const stale = workspaceGaps(workspace);
+  assert.equal(stale.blockingReason, "next_action_projection_graph_vector_missing");
   assert(
-    stale.payload.blockingReasonCarriers.some(
+    stale.blockingReasonCarriers.some(
       (reason) => reason.code === "next_action_projection_graph_vector_missing"
     )
   );
@@ -755,17 +757,16 @@ test("T-158 replayed Eval_Action must carry graph-vector track authority", () =>
     nextGraphVectorRef: componentCode.graphVectorRef
   });
 
-  const replayed = invokeOddSdlcSpecMethodCommandSync(["gaps", "--workspace", workspace]);
-  assert.equal(replayed.status, "ok");
+  const replayed = workspaceGaps(workspace);
   assert.equal(
-    replayed.payload.start.executionContract.targetGraphFunction,
+    replayed.start.executionContract.targetGraphFunction,
     "derive_component_code_surface"
   );
   assert.equal(
-    replayed.payload.start.executionContract.nextActionProjection.nextGraphVectorRef,
+    replayed.start.executionContract.nextActionProjection.nextGraphVectorRef,
     componentCode.graphVectorRef
   );
-  assert.equal(replayed.payload.projection.currentEdge, "derive_component_code_surface");
+  assert.equal(replayed.projection.currentEdge, "derive_component_code_surface");
 });
 
 test("T-158 replayed Eval_Action boundary refs fail as typed diagnostics", () => {
@@ -805,15 +806,14 @@ test("T-158 replayed Eval_Action boundary refs fail as typed diagnostics", () =>
       nextGraphVectorRef: testCase.nextGraphVectorRef
     });
 
-    const result = invokeOddSdlcSpecMethodCommandSync(["gaps", "--workspace", workspace]);
+    const result = workspaceGaps(workspace);
 
-    assert.equal(result.status, "ok");
-    assert.equal(result.payload.blockingReason, testCase.code);
+    assert.equal(result.blockingReason, testCase.code);
     assert(
-      result.payload.blockingReasonCarriers.some(
+      result.blockingReasonCarriers.some(
         (reason) => reason.code === testCase.code
       ),
-      JSON.stringify(result.payload, null, 2)
+      JSON.stringify(result, null, 2)
     );
   }
 });
@@ -1064,7 +1064,7 @@ test("T-158 installed operator admits non-close consequence before dispatch retu
   );
   const publishMarkers =
     source.match(/publishDispatchState\(current\)/gu) ?? [];
-  assert.equal(publishMarkers.length, 3);
+  assert.equal(publishMarkers.length, 4);
 
   for (const branchStatus of [
     'status: "worker_failed"',

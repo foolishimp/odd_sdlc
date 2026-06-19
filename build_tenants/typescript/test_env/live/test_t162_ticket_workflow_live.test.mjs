@@ -11,10 +11,10 @@ import {
   admitOddSdlcWorkspaceTicket,
   projectOddSdlcWorkspaceTickets,
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
-  SDLC_TICKET_WORKFLOW_OVERLAY_REF,
-  startOddSdlcWorkspace
+  SDLC_TICKET_WORKFLOW_OVERLAY_REF
 } from "../../build/semantic/code/src/index.js";
 import { liveTestArchiveRoot } from "./archive_root.mjs";
+import { executeOddSdlcWorkspaceStartForTest } from "../workspace_start_harness.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
@@ -208,7 +208,7 @@ test("T-162 live package API projects, admits, and starts an active ticket", asy
     "ticket admission must preserve selected reviewer profile"
   );
 
-  const started = await startOddSdlcWorkspace({
+  const started = await executeOddSdlcWorkspaceStartForTest({
     workspaceRoot: workspace,
     target: { kind: "asset", handle: "ticket/T-162" },
     until: "blocked",

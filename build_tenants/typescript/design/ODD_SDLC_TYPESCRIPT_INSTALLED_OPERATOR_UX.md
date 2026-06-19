@@ -6,12 +6,13 @@
 
 ## Problem
 
-The Spec Method entrypoint can project `start` and `gaps`, but an installed
-operator needs an executable loop:
+The installed ABG command binding owns `start` and `gaps` command/control.
+odd_sdlc contributes typed product projections, graph policy, and plugins behind
+that boundary. An installed operator needs this executable loop:
 
 ```text
 User -> Agentic_Coder_CLI
-  -> Spec Method command intent
+  -> ABG CLI command request
   -> installed odd_sdlc callable contract
   -> ABG runtime truth
   -> GTL graph-function edge
@@ -22,10 +23,12 @@ User -> Agentic_Coder_CLI
   -> User
 ```
 
-`ODD_SDLC_TYPESCRIPT_SPEC_METHOD_ENTRYPOINT.md` owns the single method command
-entry. This design adds the installed operator slice below it. The operator
-slice may invoke workers and append ABG-compatible runtime events, but it does
-not choose graph traversal outside replay-derived ABG projection.
+`ODD_SDLC_TYPESCRIPT_SPEC_METHOD_ENTRYPOINT.md` owns the product/API split:
+ABG CLI is the installed command/control surface, while odd_sdlc exposes typed
+workspace projections and plugin/package APIs. This design describes the
+installed operator slice behind that ABG ingress. The operator slice may invoke
+workers and append ABG-compatible runtime events, but it does not choose graph
+traversal outside replay-derived ABG projection.
 
 This is an `STDO-UX` boundary. The agentic coder CLI is the primary flexible
 user interface over installed product truth. It accepts user intent, reads
@@ -49,15 +52,21 @@ classDiagram
   class AgenticCoderCli {
     transport
     readsBootstrapProvenance
-    invokesSpecMethodEntrypoint
+    invokesAbgCommandBinding
   }
 
-  class OddSdlcSpecMethodRequest {
-    command
+  class AbgCliStartRequest {
     workspaceRoot
+    scope
     target
     until
-    workerTransport
+  }
+
+  class OddSdlcWorkspaceProjection {
+    queryDomain
+    gaps
+    startProjection
+    ticketWorkflow
   }
 
   class SdlcPublicStartOutcome {
@@ -142,9 +151,10 @@ classDiagram
   }
 
   UserIntent --> AgenticCoderCli
-  UserIntent --> OddSdlcSpecMethodRequest
-  AgenticCoderCli --> OddSdlcSpecMethodRequest
-  OddSdlcSpecMethodRequest --> SdlcPublicStartOutcome
+  UserIntent --> AbgCliStartRequest
+  AgenticCoderCli --> AbgCliStartRequest
+  AbgCliStartRequest --> SdlcPublicStartOutcome
+  OddSdlcWorkspaceProjection --> SdlcPublicStartOutcome
   SdlcPublicStartOutcome --> SdlcInstalledOperatorRun
   SdlcInstalledOperatorRun --> SdlcWorkerTransportContract
   SdlcInstalledOperatorRun --> SdlcWorkerHandoffManifest
@@ -160,9 +170,10 @@ classDiagram
 
 | Carrier | Boundary | Authority | Admission | Inadmissible Shortcut |
 | --- | --- | --- | --- | --- |
-| `UserIntent` | UI/operator | operator requested outcome | natural language lowered through bootstrap provenance and installed command contract | prompt-only execution without installed command/projection truth |
+| `UserIntent` | UI/operator | operator requested outcome | natural language lowered through bootstrap provenance and installed ABG command contract | prompt-only execution without installed command/projection truth |
 | `AgenticCoderCli` | UI/operator binding | interface transport | generated `AGENTS.md`/`CLAUDE.md` plus installed manifest/provenance | rival controller or hidden workflow runtime |
-| `OddSdlcSpecMethodRequest` | Spec Method entrypoint | command intent | Spec Method request admission | private test harness command |
+| `AbgCliStartRequest` | ABG CLI command/control | start/gaps operator request | ABG public start admission plus installed runtime binding | private odd_sdlc command or package dispatch path |
+| `OddSdlcWorkspaceProjection` | odd_sdlc product API | read-model product policy and replay projection | closed workspace API input plus public start/request admission where projected | dispatching workers or appending events |
 | `SdlcPublicStartOutcome` | start projection | selected graph-function basis | existing public start carrier | local traversal selection |
 | `SdlcWorkerTransportContract` | operator execution | worker process binding | `process://...` URI admission | ambient command string |
 | `SdlcWorkerHandoffManifest` | operator execution | graph edge handoff | derived from execution basis and hook contract | prompt-only authority |
@@ -175,8 +186,9 @@ classDiagram
 
 ## Module Responsibilities
 
-- `spec_method/entry.ts` admits method command intent and routes `start` with a
-  supplied worker to the installed operator slice.
+- ABG CLI admits operator command/control and enters installed start/gaps.
+- `workspace_api/` admits commandless product projection inputs and exposes
+  query-domain, gaps, start projection, and ticket workflow read models.
 - `operator/event_store.ts` reads and appends the installed ABG event log at
   `.ai-workspace/events/events.jsonl`.
 - `operator/transport.ts` admits worker process transports and invokes the
@@ -270,7 +282,7 @@ bar; that remains tracked by `T-041` and `T-066`.
 
 Local optimization:
 
-- keep worker transport and result parsing out of `spec_method/entry.ts`
+- keep worker transport and result parsing out of `workspace_api/entry.ts`
 - reuse hook contracts and hook postflight instead of making a second SDLC
   evaluator family
 - use the existing ABG `RuntimeEvent` family and event log path

@@ -560,7 +560,6 @@ function installedCommandEnv() {
   delete env.ODD_SDLC_TS_LIVE_TEST_RUN_ROOT;
   return {
     ...env,
-    ODD_SDLC_TS_OUTPUT: "json",
     ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE: "pty-terminal",
     ABG_TS_AGENT_EXECUTOR_PROFILE: "pty-terminal"
   };

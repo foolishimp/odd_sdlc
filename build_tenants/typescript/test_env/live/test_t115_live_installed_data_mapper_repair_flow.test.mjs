@@ -116,7 +116,6 @@ function runInstalled(commandPath, args, workspace, archiveRoot, label, envOverr
     encoding: "utf8",
     env: {
       ...process.env,
-      ODD_SDLC_TS_OUTPUT: "json",
       ...envOverrides
     },
     maxBuffer: 1024 * 1024 * 50,

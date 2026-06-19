@@ -1546,3 +1546,207 @@ non-public retention lane.
 If any non-command source file cannot be deleted or moved tonight, it must also
 be explicitly listed with a survival classification and a removal/migration
 condition. Unclassified source is non-closure.
+
+## Review Response Cut: Package Surface Closure And Proof-Lane Migration
+
+Date: 2026-06-20
+
+Review finding disposition:
+
+- accepted: public bin deletion was not enough while `./spec-method` and root
+  package exports still exposed command law.
+- accepted: typed workspace helpers were proxying through an
+  `OddSdlcSpecMethodTraversalRequest` with `command: "gaps" | "start"`.
+- accepted: the active TypeScript design still described Spec Method as the
+  operator entrypoint.
+- accepted: scenario/live proof lanes still contained SDLC command grammar.
+
+Cut result:
+
+- `package.json` no longer exports `./spec-method`.
+- root `index.ts` no longer re-exports `spec_method/index.ts`.
+- `spec_method/index.ts` exports nothing.
+- new narrow package exports exist under `workspace_api/` and `package_api/`.
+  They expose typed product/package APIs only:
+  `projectOddSdlcWorkspaceGaps`, `startOddSdlcWorkspace`,
+  `projectOddSdlcWorkspaceTickets`, `admitOddSdlcWorkspaceTicket`, and ABG
+  source-root resolver helpers.
+- `projectOddSdlcWorkspaceGaps` and `startOddSdlcWorkspace` now normalize into a
+  commandless `SdlcWorkspaceTraversalRequest`. They do not construct an
+  `OddSdlcSpecMethodTraversalRequest` and do not carry a command discriminator.
+- `ODD_SDLC_TYPESCRIPT_SPEC_METHOD_ENTRYPOINT.md` now states the current
+  authority split: ABG CLI is the only installed operator command/control
+  surface; odd_sdlc exposes product APIs, projections, policy overlays, and
+  package APIs.
+- `test_env/sandbox/scenario_sandbox.mjs` uses typed product APIs for product
+  gaps/start and keeps ABG installed sandbox setup separate.
+- `test_env/sandbox/test_t087_t091_t096_internal_data_mapper_induction_sandbox.test.mjs`
+  uses typed product APIs and now accepts additional ABG-owned event kinds while
+  still requiring the core traversal events in order.
+- `test_env/live/run_full_external_data_mapper_sandbox.mjs` no longer creates
+  `package-api:invokeOddSdlcSpecMethodCommand`; ABG CLI remains the external
+  command path and overlay/ticket starts use typed package APIs.
+- T-059 install/release tests use direct package APIs instead of
+  `invokeOddSdlcSpecMethodCommand*`.
+
+Current source/test/design metrics, excluding `test_env/test_runs` and ticket
+text:
+
+| Surface | Files | Matches | Current interpretation |
+| --- | ---: | ---: | --- |
+| `package-api:invokeOddSdlcSpecMethodCommand` | 0 | 0 | removed from live proof lane |
+| package export `./spec-method` | 0 | 0 | removed from package law |
+| root `export * from "./spec_method"` | 0 | 0 | removed from root package law |
+| `invokeOddSdlcSpecMethodCommand` | 10 | 53 | remaining private parser/legacy-test debt |
+| `invokeOddSdlcSpecMethodCommandSync` | 7 | 45 | remaining private parser/legacy-test debt |
+| `serializeOddSdlcSpecMethodResult` | 5 | 12 | remaining serializer legacy-test debt |
+| `commandPayload*` | 1 | 5 | confined to private `spec_method/entry.ts` pending deletion |
+
+Remaining command-helper callers:
+
+- `test_env/tests/test_t058_spec_method_entrypoint.test.mjs`
+- `test_env/tests/test_t064_installed_operator_ux.test.mjs`
+- `test_env/tests/test_t093_scheduling_phase.test.mjs`
+- `test_env/tests/test_t101_retry_report_rejection_loop.test.mjs`
+- `test_env/tests/test_t139_public_gaps_read_only_evaluator_view.test.mjs`
+- `test_env/tests/test_t145_replay_visible_closure_authority.test.mjs`
+- `test_env/tests/test_t150_visible_defaults_catalog_lookup.test.mjs`
+- `test_env/tests/test_t158_consequence_admission_regression.test.mjs`
+- `test_env/tests/test_t161_fd_run_analysis_linter.test.mjs`
+
+Removal condition:
+
+- read-model/query tests move to direct product projection APIs.
+- start/gaps tests move to ABG CLI or typed product APIs, depending on whether
+  the test is proving operator command/control or product projection behavior.
+- analyzer formatting tests move to `analysis/` APIs or a non-command renderer.
+- after those callers move, delete `admitOddSdlcSpecMethodRequest`,
+  `commandPayload*`, `invokeOddSdlcSpecMethodCommand*`, and
+  `serializeOddSdlcSpecMethodResult`.
+
+Proof run:
+
+- passed: `npm run build:semantic`
+- passed: focused no-CLI lane, 30 tests:
+  T-059, T-069, T-086, T-087, T-096, T-097, T-098, T-110, and T-162 live
+  package API.
+- passed: `npm run test:t132`
+- passed: `npm run test:t087-t096:data-mapper-sandbox`
+
+## 2026-06-20 Deletion Cut
+
+Current reality:
+
+- `spec_method/entry.ts` no longer contains the SDLC command registry, argv
+  option parsers, command request/result envelope, command dispatchers,
+  analyze-run CLI envelope, or CLI result serializer.
+- the former implementation file has moved to `workspace_api/entry.ts`; the
+  source tree no longer contains `code/src/spec_method/entry.ts`.
+- Deleted symbols include `ODD_SDLC_SPEC_METHOD_COMMAND_VALUES`,
+  `admitOddSdlcSpecMethodRequest`, `commandPayload`,
+  `commandPayloadAsync`, `invokeOddSdlcSpecMethodCommandSync`,
+  `invokeOddSdlcSpecMethodCommand`, `SdlcAnalyzeRunCliEnvelope`, and
+  `serializeOddSdlcSpecMethodResult`.
+- `workspace_api/` now exposes commandless workspace APIs:
+  `projectOddSdlcWorkspaceGaps`, `projectOddSdlcWorkspaceStart`,
+  `projectOddSdlcWorkspaceQueryDomain`, `projectOddSdlcWorkspaceTickets`, and
+  `admitOddSdlcWorkspaceTicket`.
+- `projectOddSdlcWorkspaceStart` preserves projection-only start behavior for
+  read-model tests without dispatching a worker. The dispatching
+  `startOddSdlcWorkspace` package API has been removed; source tests that need
+  installed-operator execution use `test_env/workspace_start_harness.mjs`
+  instead of package law.
+- T-058, T-064, T-161, and T-203 no longer use the old command helper or CLI
+  serializer. T-158 count assertions were updated for the current
+  `publishDispatchState(current)` branches.
+- root tenant capability metadata now advertises `typed_workspace_product_api`
+  instead of `spec_method_installed_entrypoint`.
+- `ODD_SDLC_TYPESCRIPT_SPEC_METHOD_ENTRYPOINT.md` now records that the
+  command dispatcher has been deleted, ABG CLI is the only operator
+  command/control ingress, and `workspace_api/entry.ts` is a projection host.
+
+Current source/test metrics, excluding this ticket text and `test_runs`:
+
+| Surface | Files | Matches | Current interpretation |
+| --- | ---: | ---: | --- |
+| `invokeOddSdlcSpecMethodCommand` | 0 | 0 | deleted from source/tests |
+| `invokeOddSdlcSpecMethodCommandSync` | 0 | 0 | deleted from source/tests |
+| `serializeOddSdlcSpecMethodResult` | 0 | 0 | deleted from source/tests |
+| `admitOddSdlcSpecMethodRequest` | 0 | 0 | deleted from source/tests |
+| `commandPayload*` | 0 | 0 | deleted from source/tests |
+| `ODD_SDLC_SPEC_METHOD_COMMAND_VALUES` | 0 | 0 | deleted from source/tests |
+| `SdlcAnalyzeRunCliEnvelope` | 0 | 0 | deleted from source/tests |
+| public `startOddSdlcWorkspace` export | 0 | 0 | removed from package API |
+| `package-api:startOddSdlcWorkspace` | 0 | 0 | removed from live proof lane |
+
+Deletion-cut line movement:
+
+| File group | Added | Deleted | Net |
+| --- | ---: | ---: | ---: |
+| `code/src/spec_method/entry.ts` | 46 | 1509 | -1463 |
+| T-058/T-064/T-158/T-161/T-203 migrated tests | 320 | 527 | -207 |
+
+Proof run:
+
+- passed: `npm run build:semantic`
+- passed: `node --test test_env/tests/test_t058_spec_method_entrypoint.test.mjs test_env/tests/test_t158_consequence_admission_regression.test.mjs`
+  with 28/28 tests passing after the projection/marker fixes.
+- passed: focused post-deletion no-command lane with 94/94 tests:
+  T-058, T-064, T-093, T-101, T-139, T-145, T-150, T-158, T-161, and T-203.
+- passed: post-metadata `npm run build:semantic`
+- passed: `git diff --check`
+
+## 2026-06-20 Review Follow-Up: Remove Dispatching Workspace Start API
+
+Review finding disposition:
+
+- accepted: `startOddSdlcWorkspace` was a second operative start surface even
+  after the command helper deletion.
+- accepted: public workspace API declarations must not return `unknown` or a
+  mixed projection/execution carrier.
+- accepted: live proof must not dispatch start through an odd_sdlc package API.
+
+Cut result:
+
+- `workspace_api/index.ts` no longer exports `startOddSdlcWorkspace` or
+  `OddSdlcWorkspaceStartOutcome`.
+- `workspace_api/entry.ts` no longer imports or calls
+  `executeInstalledOperatorStart`; it is a projection/admission host only.
+- the dispatching source-test path moved to
+  `test_env/workspace_start_harness.mjs`, which composes
+  `projectOddSdlcWorkspaceStart(...)` with `executeInstalledOperatorStart(...)`
+  for installed-operator unit tests only.
+- `run_full_external_data_mapper_sandbox.mjs` dispatches installed starts
+  through `genesis-ts`/ABG CLI. Overlay targets are projected to graph-function
+  targets before ABG CLI dispatch; runtime traversal selections now fail fast
+  until ABG CLI exposes that carrier.
+- active design now says `workspace_api/entry.ts` is the projection host and
+  ABG CLI is the only operator command/control ingress.
+
+Scans:
+
+| Surface | Result |
+| --- | --- |
+| generated declarations for `startOddSdlcWorkspace` | 0 matches |
+| source/test `package-api:startOddSdlcWorkspace` | 0 matches |
+| source/test old command helpers and serializer | 0 matches |
+| remaining `startOddSdlcWorkspace` source/test matches | T-188 negative assertions only |
+
+Verification:
+
+- passed: `npm run build:semantic`
+- passed: full T-058 workspace API/projection lane, 19/19 tests. Runtime:
+  206.4s; current hotspots are the read-only gap dossier/priority failure tests,
+  not command dispatch.
+- passed: T-188/T-164 boundary guard pair, 13 passed / 1 live-gated skipped.
+- passed: migrated helper lane T-069/T-087/T-110, 7/7 tests.
+- passed: `git diff --check`
+
+Line movement note:
+
+- tracked diff is 4,334 deleted / 1,044 added before untracked new files.
+- new files are 1,879 lines total:
+  `workspace_api/entry.ts`, `workspace_api/index.ts`, `package_api/index.ts`,
+  and `test_env/workspace_start_harness.mjs`.
+  The net cut is still materially negative because the old
+  `spec_method/entry.ts` command surface was removed.

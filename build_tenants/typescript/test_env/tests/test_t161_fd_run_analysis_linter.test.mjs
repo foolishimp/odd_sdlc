@@ -26,8 +26,6 @@ import {
   SDLC_FD_RUN_ANALYSIS_PROFILE_VALUES
 } from "../../build/semantic/code/src/analysis/index.js";
 import {
-  invokeOddSdlcSpecMethodCommandSync,
-  serializeOddSdlcSpecMethodResult,
   typecheckCurrentSdlcGtlProgram
 } from "../../build/semantic/code/src/index.js";
 
@@ -2086,23 +2084,45 @@ test("T-197 H2 analysis profile behavior is capability-driven, not product-name-
   assert.equal(spec.forbidRawDisplayIdRequirementTagsInProductFiles, true);
 });
 
-test("T-161 CLI dispatch returns JSON envelope and exit code 0 on clean synthetic archive", () => {
-  const archiveRoot = makeTempDir("odd-sdlc-ts-t161-cli-json-");
+test("T-161 analysis API returns JSON result on clean synthetic archive", () => {
+  const archiveRoot = makeTempDir("odd-sdlc-ts-t161-api-json-");
   try {
     buildSyntheticT132Archive({ rootDir: archiveRoot });
-    const result = invokeOddSdlcSpecMethodCommandSync([
-      "analyze-run",
-      "--run-archive",
-      archiveRoot,
-      "--profile",
-      "hello_world",
-      "--format",
-      "json"
-    ]);
-    assert.equal(result.status, "ok");
-    assert.equal(result.exitCode, 0);
-    assert.equal(result.command, "analyze-run");
-    const serialized = serializeOddSdlcSpecMethodResult(result);
+    const result = analyzeSdlcFdRunArchive({
+      inspectedRoot: archiveRoot,
+      profile: "hello_world"
+    });
+    assert.equal(result.kind, SDLC_FD_RUN_ANALYSIS_KIND);
+  } finally {
+    rmSync(archiveRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-161 analysis renderer emits markdown for clean synthetic archive", () => {
+  const archiveRoot = makeTempDir("odd-sdlc-ts-t161-api-default-md-");
+  try {
+    buildSyntheticT132Archive({ rootDir: archiveRoot });
+    const result = analyzeSdlcFdRunArchive({
+      inspectedRoot: archiveRoot,
+      profile: "hello_world"
+    });
+    const rendered = renderSdlcFdRunAnalysisMarkdown(result);
+    assert.ok(rendered.startsWith("# F_D Run Analysis"));
+    assert.ok(rendered.includes("## Current State Telemetry"));
+  } finally {
+    rmSync(archiveRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-161 analysis result serializes as JSON", () => {
+  const archiveRoot = makeTempDir("odd-sdlc-ts-t161-api-raw-");
+  try {
+    buildSyntheticT132Archive({ rootDir: archiveRoot });
+    const result = analyzeSdlcFdRunArchive({
+      inspectedRoot: archiveRoot,
+      profile: "hello_world"
+    });
+    const serialized = JSON.stringify(result, null, 2);
     const parsed = JSON.parse(serialized);
     assert.equal(parsed.kind, SDLC_FD_RUN_ANALYSIS_KIND);
   } finally {
@@ -2110,87 +2130,33 @@ test("T-161 CLI dispatch returns JSON envelope and exit code 0 on clean syntheti
   }
 });
 
-test("T-161 CLI dispatch defaults to markdown when neither --format nor --raw is given", () => {
-  const archiveRoot = makeTempDir("odd-sdlc-ts-t161-cli-default-md-");
+test("T-161 markdown renderer emits markdown text", () => {
+  const archiveRoot = makeTempDir("odd-sdlc-ts-t161-api-md-");
   try {
     buildSyntheticT132Archive({ rootDir: archiveRoot });
-    const result = invokeOddSdlcSpecMethodCommandSync([
-      "analyze-run",
-      "--run-archive",
-      archiveRoot,
-      "--profile",
-      "hello_world"
-    ]);
-    assert.equal(result.status, "ok");
-    const serialized = serializeOddSdlcSpecMethodResult(result);
-    assert.ok(serialized.startsWith("# F_D Run Analysis"));
-    assert.ok(serialized.includes("## Current State Telemetry"));
+    const result = analyzeSdlcFdRunArchive({
+      inspectedRoot: archiveRoot,
+      profile: "hello_world"
+    });
+    const rendered = renderSdlcFdRunAnalysisMarkdown(result);
+    assert.ok(rendered.startsWith("# F_D Run Analysis"));
+    assert.ok(rendered.includes("## Current State Telemetry"));
   } finally {
     rmSync(archiveRoot, { recursive: true, force: true });
   }
 });
 
-test("T-161 CLI dispatch --raw emits JSON envelope", () => {
-  const archiveRoot = makeTempDir("odd-sdlc-ts-t161-cli-raw-");
-  try {
-    buildSyntheticT132Archive({ rootDir: archiveRoot });
-    const result = invokeOddSdlcSpecMethodCommandSync([
-      "analyze-run",
-      "--run-archive",
-      archiveRoot,
-      "--profile",
-      "hello_world",
-      "--raw"
-    ]);
-    assert.equal(result.status, "ok");
-    const serialized = serializeOddSdlcSpecMethodResult(result);
-    const parsed = JSON.parse(serialized);
-    assert.equal(parsed.kind, SDLC_FD_RUN_ANALYSIS_KIND);
-  } finally {
-    rmSync(archiveRoot, { recursive: true, force: true });
-  }
-});
-
-test("T-161 CLI dispatch markdown format emits markdown text", () => {
-  const archiveRoot = makeTempDir("odd-sdlc-ts-t161-cli-md-");
-  try {
-    buildSyntheticT132Archive({ rootDir: archiveRoot });
-    const result = invokeOddSdlcSpecMethodCommandSync([
-      "analyze-run",
-      "--run-archive",
-      archiveRoot,
-      "--profile",
-      "hello_world",
-      "--format",
-      "markdown"
-    ]);
-    assert.equal(result.status, "ok");
-    const serialized = serializeOddSdlcSpecMethodResult(result);
-    assert.ok(serialized.startsWith("# F_D Run Analysis"));
-    assert.ok(serialized.includes("## Current State Telemetry"));
-  } finally {
-    rmSync(archiveRoot, { recursive: true, force: true });
-  }
-});
-
-test("T-161 CLI dispatch --output writes outside inspected root", () => {
-  const archiveRoot = makeTempDir("odd-sdlc-ts-t161-cli-out-");
-  const outDir = makeTempDir("odd-sdlc-ts-t161-cli-outdest-");
+test("T-161 analysis renderer output can be caller-managed outside inspected root", () => {
+  const archiveRoot = makeTempDir("odd-sdlc-ts-t161-api-out-");
+  const outDir = makeTempDir("odd-sdlc-ts-t161-api-outdest-");
   const outputPath = path.join(outDir, "analysis.json");
   try {
     buildSyntheticT132Archive({ rootDir: archiveRoot });
-    const result = invokeOddSdlcSpecMethodCommandSync([
-      "analyze-run",
-      "--run-archive",
-      archiveRoot,
-      "--profile",
-      "hello_world",
-      "--format",
-      "json",
-      "--output",
-      outputPath
-    ]);
-    assert.equal(result.status, "ok");
+    const result = analyzeSdlcFdRunArchive({
+      inspectedRoot: archiveRoot,
+      profile: "hello_world"
+    });
+    writeFileSync(outputPath, JSON.stringify(result, null, 2), "utf8");
     assert.ok(existsSync(outputPath));
     const written = readFileSync(outputPath, "utf8");
     const parsed = JSON.parse(written);
@@ -2201,23 +2167,17 @@ test("T-161 CLI dispatch --output writes outside inspected root", () => {
   }
 });
 
-test("T-161 CLI dispatch rejects --output inside the inspected root", () => {
-  const archiveRoot = makeTempDir("odd-sdlc-ts-t161-cli-rej-");
+test("T-161 analysis API leaves inspected root write-free", () => {
+  const archiveRoot = makeTempDir("odd-sdlc-ts-t161-api-no-mutate-");
   try {
     buildSyntheticT132Archive({ rootDir: archiveRoot });
-    const result = invokeOddSdlcSpecMethodCommandSync([
-      "analyze-run",
-      "--run-archive",
-      archiveRoot,
-      "--profile",
-      "hello_world",
-      "--format",
-      "json",
-      "--output",
-      path.join(archiveRoot, "analysis.json")
-    ]);
-    assert.equal(result.status, "error");
-    assert.equal(result.exitCode, 2);
+    const before = snapshotInspectedRoot(archiveRoot);
+    const result = analyzeSdlcFdRunArchive({
+      inspectedRoot: archiveRoot,
+      profile: "hello_world"
+    });
+    renderSdlcFdRunAnalysisMarkdown(result);
+    assert.deepStrictEqual(snapshotInspectedRoot(archiveRoot), before);
   } finally {
     rmSync(archiveRoot, { recursive: true, force: true });
   }

@@ -1,1 +1,1 @@
-export * from "./entry.js";
+export {};

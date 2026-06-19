@@ -1,4 +1,4 @@
-# odd_sdlc TypeScript Spec Method Entrypoint
+# odd_sdlc TypeScript Product API And ABG Operator Boundary
 
 **Status**: Active
 **Date**: 2026-05-07
@@ -9,23 +9,28 @@
 
 ## Purpose
 
-Define the single TypeScript operator entrypoint under Spec Method discipline.
+Define the TypeScript product API boundary after T-204.
 
-The entrypoint admits method command intent and calls the installed
-ABG/odd_sdlc contract. It is not a CLI controller, retry controller, traversal
-controller, or compatibility facade. T-204 retires the public executable process
-binding; any remaining direct command-helper caller is an interim private test
-or package API dependency, not operator command law.
+ABG CLI is the only operator command/control surface for installed `gaps` and
+`start`. `odd_sdlc.TS` exposes typed product APIs, policy overlays, package
+install/release APIs, and read-model projections consumed by ABG and tests. It
+does not publish an SDLC command dispatcher, argv admission surface, serializer,
+retry controller, traversal controller, or compatibility facade.
+
+The historical `spec_method/entry.ts` command dispatcher has been deleted.
+`workspace_api/entry.ts` hosts commandless workspace product projections; it is
+not package law as a command module and is not an operator surface.
 
 ## IACS
 
 | Carrier | Owner | Notes |
 | --- | --- | --- |
-| `OddSdlcSpecMethodRequest` | `spec_method/entry.ts` | admitted method command intent and options |
-| `OddSdlcSpecMethodResult` | `spec_method/entry.ts` | closed method result projection |
-| gaps evaluator priority edge | `spec_method/entry.ts` | single public domain-policy ingress for read-only gap priority customization; admitted only on `gaps` and projected through ABG construction priority carriers |
-| workspace source snapshots | `spec_method/entry.ts` | read-only filesystem admission into `deriveSdlcSourceInput` |
-| project constraints fallback | `spec_method/entry.ts` | admission default when imported workspace has no project constraints file |
+| ABG operator command intent | ABG CLI / installed ABG binding | only command/control ingress for installed `gaps` and `start` |
+| `OddSdlcWorkspaceTraversalInput` | `workspace_api/` | typed package API input for product start/gap projections; no command discriminant |
+| workspace ticket APIs | `workspace_api/`, `tickets/` | typed ticket projection/admission APIs |
+| gaps evaluator priority edge | product policy projection | domain-policy input projected through ABG construction priority carriers, not a command option authority |
+| workspace source snapshots | product projection API | read-only filesystem admission into `deriveSdlcSourceInput` |
+| project constraints fallback | product projection API | admission default when imported workspace has no project constraints file |
 | graph catalog | `graph/` | entrypoint reads only |
 | query-domain projection | `projection/` | entrypoint reads only |
 | public start outcome | `start/` | entrypoint reads only |
@@ -36,17 +41,18 @@ or package API dependency, not operator command law.
 
 ```text
 operator intent
-  -> spec_method/entry.ts
-      -> workspace source snapshots
-      -> workspace/deriveSdlcWorkspaceIngressReport
-      -> graph/constructSdlcGtlModule
-      -> projection/projectSdlcQueryDomain
-      -> start/publicStartOnce
-      -> operator/executeInstalledOperatorStartWithReentry
-      -> projection/deriveSdlcGapDossier
-      -> runtime/deriveOddSdlcConstructionEvaluatorReport
-      -> qualification/describeOddSdlcTypescriptRcQualification
-  -> OddSdlcSpecMethodResult
+  -> ABG CLI / installed ABG command binding
+      -> ABG runtime command/control, replay, continuation, and traversal truth
+      -> odd_sdlc product policy and projection APIs
+          -> workspace/deriveSdlcWorkspaceIngressReport
+          -> graph/constructSdlcGtlModule
+          -> projection/projectSdlcQueryDomain
+          -> start/publicStartOnce
+          -> operator/executeInstalledOperatorStart
+          -> projection/deriveSdlcGapDossier
+          -> runtime/deriveOddSdlcConstructionEvaluatorReport
+          -> qualification/describeOddSdlcTypescriptRcQualification
+  -> ABG-owned runtime/archive truth plus odd_sdlc read models
 ```
 
 The package does not publish an `odd-sdlc-ts` shell binary. Operator command
@@ -57,40 +63,39 @@ resolves product policy, plugins, runtime binding, and read-model projection.
 
 | Module | Classification | Owns | Does Not Own |
 | --- | --- | --- | --- |
-| `spec_method/entry.ts` | Spec Method entrypoint | method intent admission, read-only workspace source discovery, dispatch to graph/query/start/operator/release/install surfaces | graph truth, vector advancement, retry budget, closure fold, repair policy |
+| `workspace_api/` | Typed product API | commandless workspace start/gap/ticket package APIs over admitted product carriers | argv admission, process exit, command serialization, retry/reentry control |
+| `workspace_api/entry.ts` | Workspace API implementation host | commandless typed workspace projection realization behind `workspace_api/` | argv admission, command dispatch, package law, operator command/control |
 | `cli/main.ts` | Retired process launcher | nothing; file is absent under T-204 | command semantics, retry/reentry, traversal law |
 | `operator/installed_operator.ts` | Installed ABG boundary | installed start execution, ABG plugin dispatch, typed retry/reentry projection, archives | user-interface grammar |
 
-## Commands
+## Product API Surfaces
 
-`catalog` returns the declared TypeScript graph-function catalog.
+`graph/` returns the declared TypeScript graph-function catalog.
 
-`query-domain` reads workspace authority surfaces, derives ingress, constructs
+`projection/` reads workspace authority surfaces, derives ingress, constructs
 the TypeScript GTL module, and projects the query domain.
 
-`gaps` derives a read-only gap dossier from ABG replay/start truth. It may
-admit `--evaluator-priority-edge <edge-name>` as the single public
-odd_sdlc-domain priority customization surface. That option names a published
-graph edge and is converted into an ABG construction priority scheme for the
-gap evaluator projection. The entrypoint does not rank candidate actions
-locally and does not choose or dispatch traversal. In this command,
-`nextLawfulActions` is read-only evaluator preview truth; runner-facing code
-must consume admitted evaluator/action carriers rather than treating that field
-as traversal control.
+`workspace_api/projectOddSdlcWorkspaceGaps` derives a read-only gap dossier from
+ABG replay/start truth. Domain priority customization is typed product policy
+that is converted into ABG construction priority carriers. It does not choose or
+dispatch traversal.
 
-`start` admits the public start contract first. If no worker transport is
-provided for `F_P`, the command returns the typed worker-unattached block. If a
-worker is attached, the entrypoint calls the installed operator boundary. The
-installed operator, not the entrypoint, owns retry/reentry control and emits
-runtime/archive truth through ABG-compatible surfaces.
+`workspace_api/projectOddSdlcWorkspaceStart` admits commandless start projection
+input and reads replay-visible next-action truth. It returns a projected start
+carrier only; installed operator command/control must enter through ABG CLI.
 
-`install`, `release-cut`, and `rc-report` remain package APIs while T-204
-decommissions public command dispatch. They do not own traversal or retry
-policy and must not reintroduce a product-local shell command.
+Dispatching workspace starts are not exported as package API. Source tests that
+exercise installed-operator internals may compose the projection with
+`executeInstalledOperatorStart` through `test_env/workspace_start_harness.mjs`;
+live proof paths must enter through ABG CLI.
+
+`install`, `release-cut`, `release-snapshot`, and `rc-report` remain typed
+package/projection APIs. They do not own traversal or retry policy and must not
+reintroduce a product-local shell command.
 
 ## Non-Ownership
 
-The Spec Method entrypoint must not:
+The workspace API implementation host must not:
 
 - select next vectors directly
 - rank candidate actions locally
@@ -99,6 +104,7 @@ The Spec Method entrypoint must not:
 - retry worker output
 - treat `repair_worker_output` as prose without a typed repair/reentry plan
 - export a second CLI command module
+- export a spec-method command dispatcher or argv parser as package API
 - claim full Python operational replacement
 - publish or require `odd-sdlc-ts`
 
@@ -111,12 +117,16 @@ prove:
 - `cli/command.ts` is absent
 - `cli/main.ts` is absent
 - `package.json` publishes no product-local command binding
-- `spec_method/entry.ts` contains no retry loop or retry context synthesis
-- `gaps --evaluator-priority-edge <edge-name>` proves domain priority is
-  admitted through the Spec Method surface and ranked by ABG construction
-  priority projection
-- invalid, duplicate, unknown, and already-closed priority edge selectors fail
-  closed through the same Spec Method request surface
+- `package.json` does not export `./spec-method`
+- root package exports do not re-export `spec_method/entry.ts`
+- root package exports do not export a dispatching `startOddSdlcWorkspace`
+  workspace API
+- typed workspace APIs do not construct the retired spec-method request carrier
+  or carry a `command` discriminator
+- `workspace_api/entry.ts` contains no retry loop or retry context synthesis
+- product gap priority policy is admitted as product policy and ranked by ABG
+  construction priority projection
+- invalid, duplicate, unknown, and already-closed priority selectors fail closed
 - installed retry/reentry control is owned by `operator/installed_operator.ts`
 - focused tests run and remain available for operator review before ticket
   closure

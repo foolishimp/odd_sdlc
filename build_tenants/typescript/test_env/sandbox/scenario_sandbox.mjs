@@ -19,7 +19,8 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
-  statSync
+  statSync,
+  writeFileSync
 } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path, { dirname, resolve } from "node:path";
@@ -27,7 +28,6 @@ import { fileURLToPath } from "node:url";
 
 import {
   installOddSdlcTypescript,
-  invokeOddSdlcSpecMethodCommand,
   normalizeSdlcRequirementDisplayId
 } from "../../build/semantic/code/src/index.js";
 import {
@@ -122,20 +122,252 @@ export function scenarioStartUntilForStep(scenario, step) {
   return scenario.startUntil;
 }
 
-function buildStartArgs(workspace, scenario, step) {
-  const args = ["start", "--workspace", workspace];
-  if (scenario.liveWorker !== undefined && scenario.liveWorker !== null) {
-    args.push("--worker", scenario.liveWorker);
+function scenarioHasMoreExplicitStartTargets(scenario, step) {
+  return (
+    Array.isArray(scenario.startTargetSequence) &&
+    step < scenario.startTargetSequence.length - 1
+  );
+}
+
+function scenarioHasExplicitStartTargetForStep(scenario, step) {
+  return (
+    Array.isArray(scenario.startTargetSequence) &&
+    step >= 0 &&
+    step < scenario.startTargetSequence.length
+  );
+}
+
+function stableJson(payload) {
+  return `${JSON.stringify(payload, null, 2)}\n`;
+}
+
+function writeJson(filePath, payload) {
+  mkdirSync(path.dirname(filePath), { recursive: true });
+  writeFileSync(filePath, stableJson(payload), "utf8");
+}
+
+function commandPathFromInstall(install, commandName) {
+  const commandPath = install.commandPaths?.find(
+    (candidate) => path.basename(candidate) === commandName
+  );
+  if (typeof commandPath !== "string" || commandPath.length === 0) {
+    throw new Error(`installed ${commandName} command path missing`);
   }
-  const startTarget = scenarioStartTargetForStep(scenario, step);
-  if (typeof startTarget === "string" && startTarget.length > 0) {
-    args.push("--target", startTarget);
+  return commandPath;
+}
+
+function startTargetFromScenarioValue(rawTarget, fallbackGraphFunction) {
+  if (typeof rawTarget !== "string" || rawTarget.length === 0 || rawTarget === "next") {
+    if (typeof fallbackGraphFunction === "string" && fallbackGraphFunction.length > 0) {
+      return `graph_function:${fallbackGraphFunction}`;
+    }
+    return "next";
   }
+  if (rawTarget.startsWith("graph_function:") || rawTarget.startsWith("asset:")) {
+    return rawTarget;
+  }
+  if (rawTarget.startsWith("overlay://") || rawTarget.startsWith("overlay:")) {
+    throw new Error(
+      "overlay start targets require ABG CLI target-carrier support; refusing odd_sdlc projection fallback"
+    );
+  }
+  return `graph_function:${rawTarget}`;
+}
+
+function abgStartArgs(workspace, scenario, step, fallbackGraphFunction) {
   const startUntil = scenarioStartUntilForStep(scenario, step);
-  if (typeof startUntil === "string" && startUntil.length > 0) {
-    args.push("--until", startUntil);
+  return [
+    "start",
+    "--workspace",
+    workspace,
+    "--scope",
+    "workspace",
+    "--target",
+    startTargetFromScenarioValue(
+      scenarioStartTargetForStep(scenario, step),
+      fallbackGraphFunction
+    ),
+    "--until",
+    typeof startUntil === "string" && startUntil.length > 0
+      ? startUntil
+      : "converged"
+  ];
+}
+
+function abgGapsArgs(workspace) {
+  return [
+    "gaps",
+    "--workspace",
+    workspace,
+    "--scope",
+    "workspace"
+  ];
+}
+
+function typedApiResult(payload) {
+  return Object.freeze({
+    kind: "odd_sdlc_workspace_api_result",
+    status: "ok",
+    payload
+  });
+}
+
+function typedApiFailure(error) {
+  return Object.freeze({
+    kind: "odd_sdlc_workspace_api_result",
+    status: "error",
+    payload: {
+      error: error instanceof Error ? error.message : String(error)
+    }
+  });
+}
+
+function runAbgJsonCommand(input) {
+  const safeLabel = String(input.label).replace(/[^a-zA-Z0-9_-]/gu, "-");
+  const startedAt = new Date().toISOString();
+  const processRecordPath = path.join(input.runRoot, `${safeLabel}.process.json`);
+  writeJson(processRecordPath, {
+    kind: "odd_sdlc_scenario_abg_command_result",
+    lifecycleStatus: "started",
+    label: input.label,
+    command: input.command,
+    args: input.args,
+    cwd: input.cwd,
+    status: null,
+    signal: null,
+    error: null,
+    stdoutBytes: 0,
+    stderrBytes: 0,
+    startedAt,
+    endedAt: null
+  });
+  const result = spawnSync(input.command, input.args, {
+    cwd: input.cwd,
+    encoding: "utf8",
+    env: input.env,
+    maxBuffer: 1024 * 1024 * 100
+  });
+  const endedAt = new Date().toISOString();
+  writeJson(processRecordPath, {
+    kind: "odd_sdlc_scenario_abg_command_result",
+    lifecycleStatus: "completed",
+    label: input.label,
+    command: input.command,
+    args: input.args,
+    cwd: input.cwd,
+    status: result.status,
+    signal: result.signal,
+    error: result.error?.message ?? null,
+    stdoutBytes: Buffer.byteLength(result.stdout ?? "", "utf8"),
+    stderrBytes: Buffer.byteLength(result.stderr ?? "", "utf8"),
+    startedAt,
+    endedAt
+  });
+  writeFileSync(
+    path.join(input.runRoot, `${safeLabel}.stdout.json`),
+    result.stdout ?? "",
+    "utf8"
+  );
+  writeFileSync(
+    path.join(input.runRoot, `${safeLabel}.stderr.log`),
+    result.stderr ?? "",
+    "utf8"
+  );
+  const acceptedStatuses = input.acceptedStatuses ?? [0];
+  if (!acceptedStatuses.includes(result.status)) {
+    throw new Error(
+      `${input.label} failed: ${result.stderr || result.error?.message || result.stdout}`
+    );
   }
-  return args;
+  if ((result.stdout ?? "").trim().length === 0) {
+    return null;
+  }
+  return JSON.parse(result.stdout);
+}
+
+function normalizeGapsPayload(payload) {
+  const firstGap = Array.isArray(payload?.gaps) ? payload.gaps[0] : null;
+  const targetGraphFunction =
+    typeof firstGap?.graph_function_handle === "string"
+      ? firstGap.graph_function_handle
+      : typeof payload?.read_only_evaluator?.best_graph_function_ref === "string"
+        ? payload.read_only_evaluator.best_graph_function_ref
+        : null;
+  return Object.freeze({
+    ...payload,
+    start: Object.freeze({
+      executionContract:
+        targetGraphFunction === null
+          ? null
+          : Object.freeze({
+              targetGraphFunction
+            })
+    })
+  });
+}
+
+function normalizeStartPayload(payload, workspace) {
+  const resolvedTarget =
+    typeof payload?.resolved_target === "string" ? payload.resolved_target : null;
+  const targetGraphFunction =
+    resolvedTarget?.startsWith("graph_function:") === true
+      ? resolvedTarget.slice("graph_function:".length)
+      : typeof payload?.graph_function_id === "string"
+        ? payload.graph_function_id
+        : null;
+  return Object.freeze({
+    ...payload,
+    archiveRoot: latestOperatorRunRoot(workspace),
+    emittedRuntimeEventKinds: Array.isArray(payload?.event_kinds)
+      ? payload.event_kinds
+      : [],
+    executionContract:
+      targetGraphFunction === null
+        ? null
+        : Object.freeze({
+            targetGraphFunction,
+            overlayRef: null
+          })
+  });
+}
+
+function projectGapsResult(input) {
+  try {
+    const payload = runAbgJsonCommand({
+      label: `step-${input.step}-gaps`,
+      command: input.genesisCommand,
+      args: abgGapsArgs(input.workspace),
+      cwd: input.workspace,
+      runRoot: input.runRoot,
+      env: input.env,
+      acceptedStatuses: [0]
+    });
+    return typedApiResult(normalizeGapsPayload(payload));
+  } catch (error) {
+    return typedApiFailure(error);
+  }
+}
+
+function startWorkspaceResult(input) {
+  try {
+    const payload = runAbgJsonCommand({
+      label: `step-${input.step}-start`,
+      command: input.genesisCommand,
+      args: abgStartArgs(
+        input.workspace,
+        input.scenario,
+        input.step,
+        input.fallbackGraphFunction
+      ),
+      cwd: input.workspace,
+      runRoot: input.runRoot,
+      env: input.env,
+      acceptedStatuses: [0, 2, 3, 4, 6]
+    });
+    return typedApiResult(normalizeStartPayload(payload, input.workspace));
+  } catch (error) {
+    return typedApiFailure(error);
+  }
 }
 
 function isStopStatus(status, stopStatuses) {
@@ -964,6 +1196,17 @@ export async function runScenarioSandbox(scenario, options = {}) {
   if (install.kind !== "installed") {
     throw new Error(`odd_sdlc install did not complete: ${JSON.stringify(install)}`);
   }
+  const genesisCommand = commandPathFromInstall(install, "genesis-ts");
+  const commandEnv = {
+    ...process.env,
+    ...(typeof scenario.liveWorker === "string" && scenario.liveWorker.length > 0
+      ? {
+          ODD_SDLC_TS_WORKER_TRANSPORT: scenario.liveWorker,
+          ODD_SDLC_TS_DATA_MAPPER_WORKER: scenario.liveWorker,
+          ODD_SDLC_WORKER_TRANSPORT: scenario.liveWorker
+        }
+      : {})
+  };
 
   const advances = [];
   let lastStatus = null;
@@ -972,11 +1215,13 @@ export async function runScenarioSandbox(scenario, options = {}) {
   let noProgressReason = null;
   const expectCommandFailure = scenario.expectCommandFailure === true;
   for (let step = 0; step < maxAdvances; step += 1) {
-    const gaps = await invokeOddSdlcSpecMethodCommand([
-      "gaps",
-      "--workspace",
-      workspace
-    ]);
+    const gaps = projectGapsResult({
+      workspace,
+      step,
+      genesisCommand,
+      runRoot,
+      env: commandEnv
+    });
     if (gaps.status !== "ok" && !expectCommandFailure) {
       throw new Error(
         `${scenario.scenarioId}: gaps command failed at step ${step}: ${JSON.stringify(gaps)}`
@@ -986,6 +1231,7 @@ export async function runScenarioSandbox(scenario, options = {}) {
       gaps?.payload?.start?.executionContract?.targetGraphFunction ?? null;
     if (
       continueOnEdgeConverge &&
+      !scenarioHasExplicitStartTargetForStep(scenario, step) &&
       lastGapsEdge !== null &&
       currentGapsEdge !== null &&
       currentGapsEdge === lastGapsEdge &&
@@ -999,7 +1245,19 @@ export async function runScenarioSandbox(scenario, options = {}) {
     } else {
       consecutiveSameEdgeAfterConverge = 0;
     }
-    const start = await invokeOddSdlcSpecMethodCommand(buildStartArgs(workspace, scenario, step));
+    const fallbackGraphFunction =
+      step === 0 && typeof scenario.expectations?.firstEdge === "string"
+        ? scenario.expectations.firstEdge
+        : currentGapsEdge;
+    const start = startWorkspaceResult({
+      workspace,
+      scenario,
+      step,
+      genesisCommand,
+      runRoot,
+      env: commandEnv,
+      fallbackGraphFunction
+    });
     advances.push({ step, gaps, start });
     lastStatus = start?.payload?.status ?? null;
     lastGapsEdge = currentGapsEdge;
@@ -1032,6 +1290,7 @@ export async function runScenarioSandbox(scenario, options = {}) {
     if (isStopStatus(lastStatus, stopStatuses)) break;
     if (
       scenario.stopAfterGraphClose === true &&
+      !scenarioHasMoreExplicitStartTargets(scenario, step) &&
       scenarioGraphCloseStopSatisfied(workspace)
     ) {
       break;
@@ -1124,7 +1383,9 @@ export function assertScenarioExpectations(result, scenario) {
     firstStartPayload?.start?.executionContract;
 
   if (expectations.firstEdge !== undefined) {
-    const target = firstGapsPayload?.start?.executionContract?.targetGraphFunction;
+    const target =
+      firstStartExecutionContract?.targetGraphFunction ??
+      firstGapsPayload?.start?.executionContract?.targetGraphFunction;
     if (target !== expectations.firstEdge) {
       throw new Error(
         `${scenario.scenarioId}: first edge mismatch — expected ${expectations.firstEdge}, saw ${target}`

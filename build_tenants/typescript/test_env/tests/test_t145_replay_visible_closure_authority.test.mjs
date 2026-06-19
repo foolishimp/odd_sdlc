@@ -8,7 +8,7 @@ import path from "node:path";
 
 import {
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
-  invokeOddSdlcSpecMethodCommandSync
+  projectOddSdlcWorkspaceGaps
 } from "../../build/semantic/code/src/index.js";
 
 function writeJson(filePath, value) {
@@ -133,28 +133,26 @@ function writeWorkerReport(workspace, input) {
 }
 
 function runTargetedGaps(workspace) {
-  const result = invokeOddSdlcSpecMethodCommandSync([
-    "gaps",
-    "--workspace",
-    workspace,
-    "--target",
-    `graph_function:${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`
-  ]);
-  assert.equal(result.status, "ok");
-  return result;
+  return projectOddSdlcWorkspaceGaps({
+    workspaceRoot: workspace,
+    target: {
+      kind: "graph_function",
+      handle: FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+    }
+  });
 }
 
 function authorityFields(result) {
   return Object.freeze({
-    startTarget: result.payload.start.executionContract.targetGraphFunction,
-    projectionStatus: result.payload.projection.status,
-    projectionCurrentEdge: result.payload.projection.currentEdge,
-    dossierStatus: result.payload.dossier.status,
-    dossierEdge: result.payload.dossier.edge,
-    bestActionRef: result.payload.dossier.bestActionRef,
-    bestGraphFunctionRef: result.payload.dossier.bestGraphFunctionRef,
-    nextActionProjectionRef: result.payload.dossier.nextActionProjectionRef,
-    nextLawfulActions: result.payload.dossier.nextLawfulActions
+    startTarget: result.start.executionContract.targetGraphFunction,
+    projectionStatus: result.projection.status,
+    projectionCurrentEdge: result.projection.currentEdge,
+    dossierStatus: result.dossier.status,
+    dossierEdge: result.dossier.edge,
+    bestActionRef: result.dossier.bestActionRef,
+    bestGraphFunctionRef: result.dossier.bestGraphFunctionRef,
+    nextActionProjectionRef: result.dossier.nextActionProjectionRef,
+    nextLawfulActions: result.dossier.nextLawfulActions
   });
 }
 
@@ -164,31 +162,31 @@ test("T-145 archive-only terminal closure cannot converge public gaps", () => {
 
   const result = runTargetedGaps(workspace);
 
-  assert.equal(result.payload.projection.status, "open");
+  assert.equal(result.projection.status, "open");
   assert.equal(
-    result.payload.projection.currentEdge,
+    result.projection.currentEdge,
     FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
   );
-  assert.equal(result.payload.projection.nextVectorIndex, 0);
-  assert.deepEqual(result.payload.projection.closedVectorIndexes, []);
-  assert.equal(result.payload.dossier.status, "open");
-  assert.equal(result.payload.dossier.edge, FG_MATERIALIZE_DECLARED_PRODUCT_ASSET);
+  assert.equal(result.projection.nextVectorIndex, 0);
+  assert.deepEqual(result.projection.closedVectorIndexes, []);
+  assert.equal(result.dossier.status, "open");
+  assert.equal(result.dossier.edge, FG_MATERIALIZE_DECLARED_PRODUCT_ASSET);
   assert.equal(
-    result.payload.dossier.bestGraphFunctionRef,
+    result.dossier.bestGraphFunctionRef,
     FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
   );
   assert.equal(
-    result.payload.dossier.rankingReasonRefs.some((ref) =>
+    result.dossier.rankingReasonRefs.some((ref) =>
       ref.startsWith("terminal_closed_edge_replayed:")
     ),
     false
   );
   assert.equal(
-    result.payload.dossier.gapPressureRefs.some((ref) => ref.startsWith("closed-edge://")),
+    result.dossier.gapPressureRefs.some((ref) => ref.startsWith("closed-edge://")),
     false
   );
   assert.notEqual(
-    result.payload.dossier.nextActionProjectionRef,
+    result.dossier.nextActionProjectionRef,
     "construction-priority-projection://t145/archive-only-terminal"
   );
 });

@@ -15,10 +15,10 @@ import path, { dirname, resolve } from "node:path";
 
 import {
   installOddSdlcTypescript,
-  projectOddSdlcWorkspaceGaps,
-  startOddSdlcWorkspace
+  projectOddSdlcWorkspaceGaps
 } from "../../build/semantic/code/src/index.js";
 import { liveTestArchiveRoot } from "./archive_root.mjs";
+import { executeOddSdlcWorkspaceStartForTest } from "../workspace_start_harness.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
@@ -192,7 +192,7 @@ test(
       writeJson(path.join(archiveRoot, "gaps_result.json"), gaps);
       assert.equal(typeof gaps, "object");
 
-      const start = await startOddSdlcWorkspace({
+      const start = await executeOddSdlcWorkspaceStartForTest({
         workspaceRoot: workspace,
         target: {
           kind: "graph_function",

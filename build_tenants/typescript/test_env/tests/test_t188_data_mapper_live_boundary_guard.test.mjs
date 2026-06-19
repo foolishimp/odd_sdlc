@@ -235,15 +235,16 @@ test("T-203 data_mapper detail live harness consumes admitted next actions and U
   );
   assert.match(runnerSource, /return currentStartTarget;/u);
   assert.match(runnerSource, /currentStartTarget = nextStartTarget/u);
+  assert.match(runnerSource, /function runStartAbgCli/u);
   assert.match(runnerSource, /command: input\.installedCommand/u);
-  assert.match(runnerSource, /args: sdlcStartArgs\(currentStartTarget\)/u);
+  assert.match(runnerSource, /args: abgStartArgs\(abgTarget, input\.until\)/u);
   assert.match(
     runnerSource,
     /isOverlayStartTarget\(START_TARGET\) \|\|\s*runtimeTraversalSelectionEnabled\(\)/u
   );
   assert.match(
     runnerSource,
-    /isOverlayStartTarget\(input\.startTarget\) \|\|\s*runtimeTraversalSelectionEnabled\(\)/u
+    /const start = runStartAbgCli\(\{/u
   );
   assert.match(runnerSource, /blockingReason === "retry_budget_exhausted"/u);
   assert.match(runnerSource, /return closureDisposition === "retry";/u);
@@ -266,6 +267,14 @@ test("T-203 data_mapper detail live harness consumes admitted next actions and U
   assert.doesNotMatch(
     runnerSource,
     /code === "review_grade_edge_fulfillment_blocked"/u
+  );
+  assert.doesNotMatch(
+    runnerSource,
+    /startOddSdlcWorkspace/u
+  );
+  assert.doesNotMatch(
+    runnerSource,
+    new RegExp("package-api:" + "startOddSdlcWorkspace", "u")
   );
   assert.doesNotMatch(
     runnerSource,
@@ -335,7 +344,7 @@ test("T-188 data_mapper release proof completion is not reported as overlay no-p
 
 test("T-188 explicit graph-function resume is not hijacked by overlay replay", () => {
   const source = readFileSync(
-    path.join(PACKAGE_ROOT, "code/src/spec_method/entry.ts"),
+    path.join(PACKAGE_ROOT, "code/src/workspace_api/entry.ts"),
     "utf8"
   );
   const start = source.indexOf("function selectedArchiveMatchesRequestedStart");

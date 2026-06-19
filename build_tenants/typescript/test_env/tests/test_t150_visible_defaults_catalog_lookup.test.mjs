@@ -26,7 +26,7 @@ import {
   deriveSdlcGapDossier,
   deriveSdlcWorkspaceIngressReport,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
-  invokeOddSdlcSpecMethodCommandSync,
+  projectOddSdlcWorkspaceGaps,
   projectSdlcQueryDomain
 } from "../../build/semantic/code/src/index.js";
 
@@ -268,18 +268,13 @@ test("T-150 archive next-action lookup requires a published catalog ref", () => 
     `unpublished-suffix-only:${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`
   );
 
-  const result = invokeOddSdlcSpecMethodCommandSync([
-    "gaps",
-    "--workspace",
-    workspace
-  ]);
+  const result = projectOddSdlcWorkspaceGaps({ workspaceRoot: workspace });
 
-  assert.equal(result.status, "ok");
-  assert.equal(result.payload.blockingReason, "unknown_graph_function_boundary_ref");
+  assert.equal(result.blockingReason, "unknown_graph_function_boundary_ref");
   assert(
-    result.payload.blockingReasonCarriers.some(
+    result.blockingReasonCarriers.some(
       (reason) => reason.code === "unknown_graph_function_boundary_ref"
     ),
-    JSON.stringify(result.payload, null, 2)
+    JSON.stringify(result, null, 2)
   );
 });

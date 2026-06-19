@@ -27,9 +27,9 @@ import {
   legacyBlockingReasonCode,
   makeSdlcBlockingReason,
   sha256Text,
-  sdlcBlockingReasonFromLegacy,
-  startOddSdlcWorkspace
+  sdlcBlockingReasonFromLegacy
 } from "../../build/semantic/code/src/index.js";
+import { executeOddSdlcWorkspaceStartForTest } from "../workspace_start_harness.mjs";
 
 function makeWorkspace() {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t086-"));
@@ -364,7 +364,7 @@ test("T-086 rejected install exposes typed blocking reason", async () => {
 
 test("T-086 typed start preserves typed summary blocking reasons", async () => {
   const root = makeWorkspace();
-  const result = await startOddSdlcWorkspace({
+  const result = await executeOddSdlcWorkspaceStartForTest({
     workspaceRoot: root,
     target: {
       kind: "graph_function",

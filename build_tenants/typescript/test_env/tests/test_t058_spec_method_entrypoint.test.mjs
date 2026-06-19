@@ -23,9 +23,11 @@ import {
   FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
   SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
+  constructSdlcGraphFunctionCatalog,
   constructSdlcGtlModule,
-  invokeOddSdlcSpecMethodCommandSync,
-  serializeOddSdlcSpecMethodResult
+  projectOddSdlcWorkspaceGaps,
+  projectOddSdlcWorkspaceQueryDomain,
+  projectOddSdlcWorkspaceStart
 } from "../../build/semantic/code/src/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
@@ -69,7 +71,7 @@ function makeConformantWorkspace() {
   const root = makeWorkspace();
   writeFileSync(
     path.join(root, "specification/GOALS.md"),
-    ["# Goals", "", "GOAL-CLI-001: Exercise Spec Method entrypoint."].join("\n"),
+    ["# Goals", "", "GOAL-CLI-001: Exercise typed workspace projection API."].join("\n"),
     "utf8"
   );
   writeFileSync(
@@ -103,6 +105,22 @@ function writeRuntimeEvents(workspace, events) {
     `${events.map((event) => JSON.stringify(event)).join("\n")}\n`,
     "utf8"
   );
+}
+
+function graphFunctionTarget(handle) {
+  return { kind: "graph_function", handle };
+}
+
+function assetTarget(handle) {
+  return { kind: "asset", handle };
+}
+
+function overlayTarget(handle) {
+  return { kind: "overlay", handle };
+}
+
+function workspaceGaps(workspaceRoot, input = {}) {
+  return projectOddSdlcWorkspaceGaps({ workspaceRoot, ...input });
 }
 
 function graphTrackRefs(graphFunctionName) {
@@ -304,19 +322,16 @@ function writePassedComputeWithoutBindArchive(workspace, input = {}) {
   return archiveRoot;
 }
 
-test("T-058 Spec Method catalog command reads graph catalog without workspace mutation", () => {
-  const result = invokeOddSdlcSpecMethodCommandSync(["catalog"]);
+test("T-058 workspace catalog API reads graph catalog without workspace mutation", () => {
+  const result = constructSdlcGraphFunctionCatalog();
 
-  assert.equal(result.status, "ok");
-  assert.equal(result.command, "catalog");
-  assert.equal(result.exitCode, 0);
   assert(
-    result.payload.functions.some(
+    result.functions.some(
       (entry) => entry.backingGraphFunction === "derive_code_surface"
     )
   );
   assert(
-    result.payload.executives.some(
+    result.executives.some(
       (entry) => entry.backingGraphFunction === "bootstrap_release_self_test"
     )
   );
@@ -326,23 +341,40 @@ test("T-058 vector-backed post-close next action becomes the next start target",
   const workspace = makeConformantWorkspace();
   writePostCloseNextActionArchive(workspace);
 
-  const result = invokeOddSdlcSpecMethodCommandSync([
-    "gaps",
-    "--workspace",
-    workspace
-  ]);
+  const result = workspaceGaps(workspace);
 
-  assert.equal(result.status, "ok");
   assert.equal(
-    result.payload.start.executionContract.targetGraphFunction,
+    result.start.executionContract.targetGraphFunction,
     "derive_component_code_surface"
   );
   assert.equal(
-    result.payload.projection.currentEdge,
+    result.projection.currentEdge,
     "derive_component_code_surface"
   );
   assert.equal(
-    result.payload.start.executionContract.nextActionProjection.nextGraphVectorRef,
+    result.start.executionContract.nextActionProjection.nextGraphVectorRef,
+    graphTrackRefs("derive_component_code_surface").graphVectorRef
+  );
+});
+
+test("T-204 workspace start projection reads replay-visible next action", () => {
+  const workspace = makeConformantWorkspace();
+  writePostCloseNextActionArchive(workspace);
+
+  const start = projectOddSdlcWorkspaceStart({
+    workspaceRoot: workspace,
+    target: { kind: "next", handle: "next" },
+    until: "blocked"
+  });
+
+  assert.equal(start.kind, "sdlc_public_start_blocked");
+  assert.equal(start.blockingReason, "fp_worker_unattached");
+  assert.equal(
+    start.executionContract?.targetGraphFunction,
+    "derive_component_code_surface"
+  );
+  assert.equal(
+    start.executionContract?.nextActionProjection.nextGraphVectorRef,
     graphTrackRefs("derive_component_code_surface").graphVectorRef
   );
 });
@@ -357,24 +389,19 @@ test("T-158 archived next traversal does not compare predecessor overlay binding
     overlayBindingRef: "overlay-binding://odd-sdlc/predecessor-edge-binding"
   });
 
-  const result = invokeOddSdlcSpecMethodCommandSync([
-    "gaps",
-    "--workspace",
-    workspace
-  ]);
+  const result = workspaceGaps(workspace);
 
-  assert.equal(result.status, "ok");
   assert.equal(
-    result.payload.start.executionContract.targetGraphFunction,
+    result.start.executionContract.targetGraphFunction,
     "derive_feature_decomp_surface"
   );
-  assert.equal(result.payload.start.executionContract.requestedUntil, "blocked");
+  assert.equal(result.start.executionContract.requestedUntil, "blocked");
   assert.equal(
-    result.payload.start.executionContract.nextActionProjection.nextGraphVectorRef,
+    result.start.executionContract.nextActionProjection.nextGraphVectorRef,
     "derive_feature_decomp_surface"
   );
   assert.notEqual(
-    result.payload.start.executionContract.overlayBindingRef,
+    result.start.executionContract.overlayBindingRef,
     "overlay-binding://odd-sdlc/predecessor-edge-binding"
   );
 });
@@ -409,27 +436,22 @@ test("T-170 archived next traversal preserves target-next basis identity", () =>
     overlayRef: SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
   });
 
-  const result = invokeOddSdlcSpecMethodCommandSync([
-    "gaps",
-    "--workspace",
-    workspace
-  ]);
+  const result = workspaceGaps(workspace);
 
-  assert.equal(result.status, "ok");
   assert.equal(
-    result.payload.start.executionContract.targetGraphFunction,
+    result.start.executionContract.targetGraphFunction,
     FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE
   );
   assert.equal(
-    result.payload.start.executionContract.nextActionProjection.nextGraphVectorRef,
+    result.start.executionContract.nextActionProjection.nextGraphVectorRef,
     FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
   );
   assert.match(
-    result.payload.start.executionContract.overlayBindingRef,
+    result.start.executionContract.overlayBindingRef,
     /public-start%2Fnext%2Fnext/
   );
   assert.doesNotMatch(
-    result.payload.start.executionContract.overlayBindingRef,
+    result.start.executionContract.overlayBindingRef,
     /public-start%2Fgraph_function/
   );
 });
@@ -458,15 +480,10 @@ test("T-160 archived overlay replay preserves prior vector replay basis", () => 
     "utf8"
   );
 
-  const initial = invokeOddSdlcSpecMethodCommandSync([
-    "gaps",
-    "--workspace",
-    workspace,
-    "--target",
-    "overlay:lite-design-module-implementation"
-  ]);
-  assert.equal(initial.status, "ok");
-  const basis = initial.payload.start.executionContract.basis;
+  const initial = workspaceGaps(workspace, {
+    target: overlayTarget("lite-design-module-implementation")
+  });
+  const basis = initial.start.executionContract.basis;
   writeRuntimeEvents(workspace, [
     constructGraphCallOpenedEvent(basis),
     constructFrameOpenedEvent(basis),
@@ -484,41 +501,36 @@ test("T-160 archived overlay replay preserves prior vector replay basis", () => 
     overlayRef: SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
   });
 
-  const replay = invokeOddSdlcSpecMethodCommandSync([
-    "gaps",
-    "--workspace",
-    workspace,
-    "--target",
-    "overlay:lite-design-module-implementation"
-  ]);
+  const replay = workspaceGaps(workspace, {
+    target: overlayTarget("lite-design-module-implementation")
+  });
 
-  assert.equal(replay.status, "ok");
   assert.equal(
-    replay.payload.start.executionContract.targetGraphFunction,
+    replay.start.executionContract.targetGraphFunction,
     FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE
   );
   assert.equal(
-    replay.payload.start.executionContract.nextActionProjection.nextGraphVectorRef,
+    replay.start.executionContract.nextActionProjection.nextGraphVectorRef,
     FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
   );
   assert.equal(
-    replay.payload.start.executionContract.basis.id,
-    initial.payload.start.executionContract.basis.id
+    replay.start.executionContract.basis.id,
+    initial.start.executionContract.basis.id
   );
   assert.equal(
-    replay.payload.start.executionContract.overlayBindingRef,
-    initial.payload.start.executionContract.overlayBindingRef
+    replay.start.executionContract.overlayBindingRef,
+    initial.start.executionContract.overlayBindingRef
   );
   assert.equal(
-    replay.payload.projection.currentEdge,
+    replay.projection.currentEdge,
     FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
   );
   assert.doesNotMatch(
-    replay.payload.start.executionContract.overlayBindingRef,
+    replay.start.executionContract.overlayBindingRef,
     /public-start%2Fgraph_function/
   );
   assert.match(
-    replay.payload.start.executionContract.overlayBindingRef,
+    replay.start.executionContract.overlayBindingRef,
     /public-start%2Foverlay%2Flite-design-module-implementation/
   );
 });
@@ -534,16 +546,11 @@ test("T-160 archived next traversal rejects inconsistent predecessor overlay bin
     overlayBindingRef: "overlay-binding://odd-sdlc/projection-drift"
   });
 
-  const result = invokeOddSdlcSpecMethodCommandSync([
-    "gaps",
-    "--workspace",
-    workspace
-  ]);
+  const result = workspaceGaps(workspace);
 
-  assert.equal(result.status, "ok");
-  assert.equal(result.payload.blockingReason, "stale_query_domain");
+  assert.equal(result.blockingReason, "stale_query_domain");
   assert.match(
-    result.payload.start.detail,
+    result.start.detail,
     /overlayBindingRef does not match its admitted closure\/ledger binding/
   );
 });
@@ -552,23 +559,18 @@ test("T-205 passed compute archive without bind outcome fails closed", () => {
   const workspace = makeConformantWorkspace();
   writePassedComputeWithoutBindArchive(workspace);
 
-  const result = invokeOddSdlcSpecMethodCommandSync([
-    "gaps",
-    "--workspace",
-    workspace
-  ]);
+  const result = workspaceGaps(workspace);
 
-  assert.equal(result.status, "ok");
   assert.equal(
-    result.payload.blockingReason,
+    result.blockingReason,
     "missing_bind_outcome_after_passed_compute"
   );
   assert.match(
-    result.payload.start.detail,
+    result.start.detail,
     /passed worker\/postflight\/F_P evaluation facts without the required traversal consequence triple/u
   );
   assert.match(
-    JSON.stringify(result.payload.start.evidenceRefs),
+    JSON.stringify(result.start.evidenceRefs),
     /sdlc_edge_closure_decision\.json/u
   );
 });
@@ -579,21 +581,16 @@ test("T-158 explicit graph-function target is not overridden by another archived
     graphFunctionName: "derive_component_code_surface"
   });
 
-  const result = invokeOddSdlcSpecMethodCommandSync([
-    "gaps",
-    "--workspace",
-    workspace,
-    "--target",
-    "graph_function:bootstrap_release_self_test"
-  ]);
+  const result = workspaceGaps(workspace, {
+    target: graphFunctionTarget("bootstrap_release_self_test")
+  });
 
-  assert.equal(result.status, "ok");
   assert.equal(
-    result.payload.start.executionContract.targetGraphFunction,
+    result.start.executionContract.targetGraphFunction,
     "bootstrap_release_self_test"
   );
   assert.notEqual(
-    result.payload.start.executionContract.targetGraphFunction,
+    result.start.executionContract.targetGraphFunction,
     "derive_component_code_surface"
   );
 });
@@ -607,23 +604,17 @@ test("T-102 converged graph-function target resumes its archived post-close succ
     overlayRef: "overlay://odd-sdlc/current-full-traversal"
   });
 
-  const result = invokeOddSdlcSpecMethodCommandSync([
-    "gaps",
-    "--workspace",
-    workspace,
-    "--target",
-    "graph_function:derive_test_execution_result_surface",
-    "--until",
-    "converged"
-  ]);
+  const result = workspaceGaps(workspace, {
+    target: graphFunctionTarget("derive_test_execution_result_surface"),
+    until: "converged"
+  });
 
-  assert.equal(result.status, "ok");
   assert.equal(
-    result.payload.start.executionContract.targetGraphFunction,
+    result.start.executionContract.targetGraphFunction,
     "qualify_component_test_execution_surface"
   );
   assert.equal(
-    result.payload.start.executionContract.nextActionProjection.nextGraphVectorRef,
+    result.start.executionContract.nextActionProjection.nextGraphVectorRef,
     "qualify_component_test_execution_surface"
   );
 });
@@ -637,23 +628,17 @@ test("T-102 converged graph-function target resumes later same-overlay archived 
     overlayRef: "overlay://odd-sdlc/current-full-traversal"
   });
 
-  const result = invokeOddSdlcSpecMethodCommandSync([
-    "gaps",
-    "--workspace",
-    workspace,
-    "--target",
-    "graph_function:derive_test_execution_result_surface",
-    "--until",
-    "converged"
-  ]);
+  const result = workspaceGaps(workspace, {
+    target: graphFunctionTarget("derive_test_execution_result_surface"),
+    until: "converged"
+  });
 
-  assert.equal(result.status, "ok");
   assert.equal(
-    result.payload.start.executionContract.targetGraphFunction,
+    result.start.executionContract.targetGraphFunction,
     "derive_component_repair_schedule_surface"
   );
   assert.equal(
-    result.payload.start.executionContract.nextActionProjection.nextGraphVectorRef,
+    result.start.executionContract.nextActionProjection.nextGraphVectorRef,
     "derive_component_repair_schedule_surface"
   );
 });
@@ -670,15 +655,10 @@ test("T-058 newer terminal post-close projection prevents stale next-action repl
     nextGraphFunctionRef: null
   });
 
-  const result = invokeOddSdlcSpecMethodCommandSync([
-    "gaps",
-    "--workspace",
-    workspace
-  ]);
+  const result = workspaceGaps(workspace);
 
-  assert.equal(result.status, "ok");
   assert.notEqual(
-    result.payload.start.executionContract.targetGraphFunction,
+    result.start.executionContract.targetGraphFunction,
     FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
   );
 });
@@ -693,190 +673,150 @@ test("T-145 archive-only terminal closure does not retire a public gap edge", ()
     nextGraphFunctionRef: null
   });
 
-  const result = invokeOddSdlcSpecMethodCommandSync([
-    "gaps",
-    "--workspace",
-    workspace,
-    "--target",
-    `graph_function:${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`
-  ]);
+  const result = workspaceGaps(workspace, {
+    target: graphFunctionTarget(FG_MATERIALIZE_DECLARED_PRODUCT_ASSET)
+  });
 
-  assert.equal(result.status, "ok");
-  assert.equal(result.payload.projection.status, "open");
+  assert.equal(result.projection.status, "open");
   assert.equal(
-    result.payload.projection.currentEdge,
+    result.projection.currentEdge,
     FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
   );
-  assert.equal(result.payload.dossier.status, "open");
-  assert.equal(result.payload.dossier.edge, FG_MATERIALIZE_DECLARED_PRODUCT_ASSET);
+  assert.equal(result.dossier.status, "open");
+  assert.equal(result.dossier.edge, FG_MATERIALIZE_DECLARED_PRODUCT_ASSET);
   assert.equal(
-    result.payload.dossier.bestGraphFunctionRef,
+    result.dossier.bestGraphFunctionRef,
     FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
   );
-  assert.notDeepEqual(result.payload.dossier.nextLawfulActions, ["close_or_reprice"]);
+  assert.notDeepEqual(result.dossier.nextLawfulActions, ["close_or_reprice"]);
   assert.equal(
-    result.payload.dossier.rankingReasonRefs.some((ref) =>
+    result.dossier.rankingReasonRefs.some((ref) =>
       ref.startsWith("terminal_closed_edge_replayed:")
     ),
     false
   );
 });
 
-test("T-058 Spec Method query-domain command projects admitted workspace sources", () => {
+test("T-058 workspace query-domain API projects admitted workspace sources", () => {
   const workspace = makeConformantWorkspace();
-  const result = invokeOddSdlcSpecMethodCommandSync(["query-domain", "--workspace", workspace]);
+  const result = projectOddSdlcWorkspaceQueryDomain({ workspaceRoot: workspace });
 
-  assert.equal(result.status, "ok");
-  assert.equal(result.payload.kind, "sdlc_query_domain_projection");
-  assert.equal(result.payload.workspaceRootUri, `file://${workspace}`);
+  assert.equal(result.kind, "sdlc_query_domain_projection");
+  assert.equal(result.workspaceRootUri, `file://${workspace}`);
   assert(
-    result.payload.startTargets.some(
+    result.startTargets.some(
       (entry) => entry.name === "bootstrap_release_self_test"
     )
   );
   assert(
-    result.payload.assetOwnership.some((entry) => entry.assetType === "code_surface")
+    result.assetOwnership.some((entry) => entry.assetType === "code_surface")
   );
 });
 
-test("T-058 Spec Method gaps command emits read-only dossier without choosing traversal", () => {
+test("T-058 workspace gaps API emits read-only dossier without choosing traversal", () => {
   const workspace = makeConformantWorkspace();
-  const result = invokeOddSdlcSpecMethodCommandSync(["gaps", "--workspace", workspace]);
+  const result = workspaceGaps(workspace);
 
-  assert.equal(result.status, "ok");
-  assert.equal(result.payload.start.kind, "sdlc_public_start_blocked");
-  assert.equal(result.payload.projection.kind, "sdlc_gap_projection");
-  assert.equal(result.payload.dossier.kind, "sdlc_gap_dossier");
-  assert.equal(result.payload.dossier.choosesNextTraversal, false);
+  assert.equal(result.start.kind, "sdlc_public_start_blocked");
+  assert.equal(result.projection.kind, "sdlc_gap_projection");
+  assert.equal(result.dossier.kind, "sdlc_gap_dossier");
+  assert.equal(result.dossier.choosesNextTraversal, false);
   assert.equal(
-    result.payload.homeostaticTriage.kind,
+    result.homeostaticTriage.kind,
     "sdlc_homeostatic_gap_triage_surface"
   );
-  assert.equal(result.payload.homeostaticTriage.observation.kind, "sdlc_gap_observation");
+  assert.equal(result.homeostaticTriage.observation.kind, "sdlc_gap_observation");
   assert.equal(
-    result.payload.homeostaticTriage.observation.requirementTransformLineage[0].kind,
+    result.homeostaticTriage.observation.requirementTransformLineage[0].kind,
     "sdlc_requirement_transform_lineage"
   );
   assert.match(
-    result.payload.homeostaticTriage.observation.requirementTransformLineage[0]
+    result.homeostaticTriage.observation.requirementTransformLineage[0]
       .immediateTransformObligationRef,
     /^transform-obligation:\/\/odd-sdlc\/[^/]+\/REQ-/u
   );
   assert.equal(
-    result.payload.homeostaticTriage.observation.requirementTransformLineage[0]
+    result.homeostaticTriage.observation.requirementTransformLineage[0]
       .lineageStatus,
     "lineage_observed"
   );
   assert.equal(
-    result.payload.homeostaticTriage.observation.requirementTransformLineage[0]
+    result.homeostaticTriage.observation.requirementTransformLineage[0]
       .lineageSource,
     "requirement_transform_authority"
   );
   assert(
-    result.payload.homeostaticTriage.observation.requirementTransformLineage[0]
+    result.homeostaticTriage.observation.requirementTransformLineage[0]
       .lineageAuthorityRefs.some((ref) =>
         ref.startsWith("requirement-transform://odd-sdlc/ingress/")
       )
   );
   assert.equal(
-    result.payload.homeostaticTriage.classification.frameworkLayer,
+    result.homeostaticTriage.classification.frameworkLayer,
     "code"
   );
   assert.equal(
-    result.payload.homeostaticTriage.classification.frameworkCondition,
+    result.homeostaticTriage.classification.frameworkCondition,
     "open_gap"
   );
   assert.equal(
-    result.payload.homeostaticTriage.routeBinding.targetGraphFunction,
+    result.homeostaticTriage.routeBinding.targetGraphFunction,
     "derive_code_surface"
   );
   assert.equal(
-    result.payload.homeostaticTriage.routeBinding.mayApplyConstitutionalChange,
+    result.homeostaticTriage.routeBinding.mayApplyConstitutionalChange,
     false
   );
-  assert.match(
-    serializeOddSdlcSpecMethodResult(result),
-    /triage: code\/open_gap -> code:derive_code_surface/u
+  assert.equal(
+    `${result.homeostaticTriage.classification.frameworkLayer}/${result.homeostaticTriage.classification.frameworkCondition}`,
+    "code/open_gap"
   );
 });
 
-test("T-058 Spec Method gaps command admits one evaluator priority surface", () => {
+test("T-058 workspace gaps API admits one evaluator priority surface", () => {
   const workspace = makeConformantWorkspace();
-  const result = invokeOddSdlcSpecMethodCommandSync([
-    "gaps",
-    "--workspace",
-    workspace,
-    "--evaluator-priority-edge",
-    "derive_intent_surface"
-  ]);
+  const result = workspaceGaps(workspace, {
+    evaluatorPriorityEdge: "derive_intent_surface"
+  });
 
-  assert.equal(result.status, "ok");
-  assert.equal(result.payload.projection.currentEdge, "derive_intent_surface");
-  assert.equal(result.payload.dossier.choosesNextTraversal, false);
+  assert.equal(result.projection.currentEdge, "derive_intent_surface");
+  assert.equal(result.dossier.choosesNextTraversal, false);
   assert.equal(
-    result.payload.dossier.rankingAuthority,
+    result.dossier.rankingAuthority,
     "abiogenesis_construction_priority_projection"
   );
-  assert.equal(result.payload.dossier.localRankingAuthority, false);
+  assert.equal(result.dossier.localRankingAuthority, false);
   assert.match(
-    result.payload.dossier.prioritySchemeRef,
-    /^priority-scheme:\/\/odd-sdlc\/spec-method\/gaps\//
+    result.dossier.prioritySchemeRef,
+    /^priority-scheme:\/\/odd-sdlc\/workspace-api\/gaps\//
   );
   assert.equal(
-    result.payload.dossier.bestGraphVectorRef,
+    result.dossier.bestGraphVectorRef,
     "derive_intent_surface"
   );
-  assert.deepEqual(result.payload.dossier.nextLawfulActions, [
+  assert.deepEqual(result.dossier.nextLawfulActions, [
     "construction-action:derive_intent_surface:derive_intent_surface"
   ]);
   assert(
-    result.payload.dossier.rankingReasonRefs.includes(
-      "spec-method://odd-sdlc/gaps/evaluator-priority-edge/derive_intent_surface"
+    result.dossier.rankingReasonRefs.includes(
+      "workspace-api://odd-sdlc/gaps/evaluator-priority-edge/derive_intent_surface"
     )
   );
-
-  const rejected = invokeOddSdlcSpecMethodCommandSync([
-    "start",
-    "--workspace",
-    workspace,
-    "--evaluator-priority-edge",
-    "derive_intent_surface"
-  ]);
-  assert.equal(rejected.status, "error");
-  assert.match(rejected.payload.error, /only valid for gaps/);
 });
 
-test("T-058 Spec Method gaps priority fails closed on invalid edge selectors", () => {
+test("T-058 workspace gaps priority fails closed on invalid edge selectors", () => {
   const unknownWorkspace = makeConformantWorkspace();
-  const unknown = invokeOddSdlcSpecMethodCommandSync([
-    "gaps",
-    "--workspace",
-    unknownWorkspace,
-    "--evaluator-priority-edge",
-    "missing_edge"
-  ]);
-  assert.equal(unknown.status, "error");
-  assert.match(unknown.payload.error, /does not name a published graph edge/);
-
-  const duplicate = invokeOddSdlcSpecMethodCommandSync([
-    "gaps",
-    "--workspace",
-    makeConformantWorkspace(),
-    "--evaluator-priority-edge",
-    "derive_design_surface",
-    "--evaluator-priority-edge",
-    "derive_release_depth_parity_surface"
-  ]);
-  assert.equal(duplicate.status, "error");
-  assert.match(duplicate.payload.error, /may be declared once/);
+  assert.throws(
+    () =>
+      workspaceGaps(unknownWorkspace, {
+        evaluatorPriorityEdge: "missing_edge"
+      }),
+    /does not name a published graph edge/u
+  );
 
   const closedWorkspace = makeConformantWorkspace();
-  const initial = invokeOddSdlcSpecMethodCommandSync([
-    "gaps",
-    "--workspace",
-    closedWorkspace
-  ]);
-  const basis = initial.payload.start.executionContract.basis;
+  const initial = workspaceGaps(closedWorkspace);
+  const basis = initial.start.executionContract.basis;
   writeRuntimeEvents(closedWorkspace, [
     constructGraphCallOpenedEvent(basis),
     constructFrameOpenedEvent(basis),
@@ -887,55 +827,42 @@ test("T-058 Spec Method gaps priority fails closed on invalid edge selectors", (
       closureKind: "advanced"
     })
   ]);
-  const closed = invokeOddSdlcSpecMethodCommandSync([
-    "gaps",
-    "--workspace",
-    closedWorkspace,
-    "--evaluator-priority-edge",
-    "derive_intent_surface"
-  ]);
-  assert.equal(closed.status, "error");
-  assert.match(closed.payload.error, /already closed graph edge/);
+  assert.throws(
+    () =>
+      workspaceGaps(closedWorkspace, {
+        evaluatorPriorityEdge: "derive_intent_surface"
+      }),
+    /already closed graph edge/u
+  );
 });
 
-test("T-058 Spec Method start command is an ABG entrypoint over worker attachment", () => {
+test("T-058 workspace start projection API projects worker attachment", () => {
   const workspace = makeConformantWorkspace();
-  const blocked = invokeOddSdlcSpecMethodCommandSync([
-    "start",
-    "--workspace",
-    workspace,
-    "--target",
-    "graph_function:bootstrap_release_self_test",
-    "--until",
-    "blocked"
-  ]);
-  assert.equal(blocked.status, "ok");
-  assert.equal(blocked.payload.kind, "sdlc_public_start_blocked");
-  assert.equal(blocked.payload.blockingReason, "fp_worker_unattached");
+  const blocked = projectOddSdlcWorkspaceStart({
+    workspaceRoot: workspace,
+    target: graphFunctionTarget("bootstrap_release_self_test"),
+    until: "blocked"
+  });
+  assert.equal(blocked.kind, "sdlc_public_start_blocked");
+  assert.equal(blocked.blockingReason, "fp_worker_unattached");
 
-  const attached = invokeOddSdlcSpecMethodCommandSync([
-    "start",
-    "--workspace",
-    workspace,
-    "--target",
-    "asset:code_surface",
-    "--until",
-    "blocked",
-    "--worker",
-    "process://codex"
-  ]);
-  assert.equal(attached.status, "ok");
-  assert.equal(attached.payload.kind, "sdlc_public_start_projected");
-  assert.equal(attached.payload.status, "dispatch_required");
+  const attached = projectOddSdlcWorkspaceStart({
+    workspaceRoot: workspace,
+    target: assetTarget("code_surface"),
+    until: "blocked",
+    workerTransport: "process://codex"
+  });
+  assert.equal(attached.kind, "sdlc_public_start_projected");
+  assert.equal(attached.status, "dispatch_required");
   assert.equal(
-    attached.payload.executionContract.targetGraphFunction,
+    attached.executionContract.targetGraphFunction,
     "derive_code_surface"
   );
 });
 
-test("T-058 Spec Method entry stays free of retry/control authority", () => {
+test("T-058 workspace API entry stays free of retry/control authority", () => {
   const source = readFileSync(
-    resolve(PACKAGE_ROOT, "code/src/spec_method/entry.ts"),
+    resolve(PACKAGE_ROOT, "code/src/workspace_api/entry.ts"),
     "utf8"
   );
   assert(!source.includes("deriveAdvancementTransition("));

@@ -128,7 +128,7 @@ test("T-038 qualification report scopes RC claim and tickets remaining gaps", ()
   assert(!report.nonClaimedScope.includes("side-effecting installed-workspace CLI replacement for the Python tenant"));
   assert(report.gates.some((gate) => gate.name === "T-038 composed harnessed sandbox" && gate.status === "passed"));
   assert(report.gates.some((gate) => gate.name === "T-052 ABG-populated installed sandbox contract" && gate.status === "passed"));
-  assert(report.gates.some((gate) => gate.name === "T-058/T-120 Spec Method entrypoint" && gate.status === "passed"));
+  assert(report.gates.some((gate) => gate.name === "T-058/T-120 typed workspace projection API" && gate.status === "passed"));
   assert(report.gates.some((gate) => gate.name === "T-139 public requirements-fulfillment gaps view" && gate.status === "passed"));
   assert(report.gates.some((gate) => gate.name === "T-140 no local forced-iteration authority" && gate.status === "passed"));
   assert(report.gates.some((gate) => gate.name === "T-059 install and release-cut adapter" && gate.status === "passed"));

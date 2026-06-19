@@ -1473,14 +1473,14 @@ test("B-085 component repair row open becomes typed component-test repair reentr
   assert.match(prompt, /Worker package fields to apply/u);
 });
 
-test("T-120 Spec Method entry does not own installed retry control", () => {
+test("T-120 workspace API entry does not own installed retry control", () => {
   const packageRoot = process.cwd();
   assert.equal(
     existsSync(path.join(packageRoot, "code/src/cli/command.ts")),
     false
   );
   const entry = readFileSync(
-    path.join(packageRoot, "code/src/spec_method/entry.ts"),
+    path.join(packageRoot, "code/src/workspace_api/entry.ts"),
     "utf8"
   );
   const installedOperator = readFileSync(

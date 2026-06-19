@@ -524,18 +524,17 @@ Canonical command:
 
 - `npm run test:t058`
 
-The lane proves the bounded installed Spec Method entrypoint for `catalog`,
-`query-domain`, `gaps`, `start`, and `rc-report`. The shell binary is only a
-process launcher over the same entrypoint. Command law, traversal selection,
-retry/reentry, and runtime projection stay behind the installed
-odd_sdlc/ABG boundary.
+The lane proves commandless workspace product projections for query-domain,
+gaps, start projection, ticket projection, and replay-visible next-action
+selection. Operator command/control belongs to the installed ABG command
+binding; this lane does not publish or preserve an odd_sdlc command adapter.
 
-The lane also proves the package binary returns JSON, propagates command
-errors, and does not contain local iteration or a hidden ABG runner.
+The lane also proves the workspace projection APIs fail closed on invalid edge
+selectors and do not contain local iteration or a hidden ABG runner.
 
-This closes only the bounded command-adapter slice. It does not close
-side-effecting install/normalize, release-cut packaging, or full Python
-operational replacement.
+This closes only the product projection slice. It does not close side-effecting
+install/normalize, release-cut packaging, or full Python operational
+replacement.
 
 ## T-059 Install/Normalize And Release-Cut Adapter Lane
 
@@ -606,16 +605,13 @@ Canonical command:
 
 - `npm run test:t064`
 
-The lane proves the first installed-operator loop above the bounded public CLI
-adapter. A supplied `process://...` worker transport is admitted, a handoff
+The lane proves the first installed-operator loop behind the ABG command/control
+boundary. A supplied `process://...` worker transport is admitted, a handoff
 manifest is derived from the selected graph-function edge, the worker writes a
 typed output artifact and JSON result report, deterministic postflight passes,
 ABG-compatible runtime events are appended to `.ai-workspace/events/events.jsonl`,
 and a second `gaps` projection advances from `derive_intent_surface` to
 `derive_product_surface`.
-
-The lane also guards the operator UX: default `gaps`/`start` serialization is
-compact text, while `ODD_SDLC_TS_OUTPUT=json` preserves the full machine payload.
 
 The lane closes only the one-edge installed-operator steel thread. It does not
 claim full `data_mapper` RC depth, multi-edge autonomous convergence, or generic

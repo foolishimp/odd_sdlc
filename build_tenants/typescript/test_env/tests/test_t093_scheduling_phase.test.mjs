@@ -20,7 +20,6 @@ import {
   deriveWorkerHandoffManifest,
   hookContractByEdgeName,
   installOddSdlcTypescript,
-  invokeOddSdlcSpecMethodCommand,
   SDLC_HOOK_TARGET_POLICY
 } from "../../build/semantic/code/src/index.js";
 
