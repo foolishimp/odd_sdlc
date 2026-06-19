@@ -442,7 +442,7 @@ test("T-118 prompt points workers to the construction brief and not forensic pac
   assert.match(prompt, /Read boundary: use only workspace-relative paths/u);
   assert.match(prompt, /home memory/u);
   assert.match(prompt, /outside-workspace absolute paths/u);
-  assert.match(prompt, /Control boundary: do not run odd-sdlc-ts/u);
+  assert.match(prompt, /Control boundary: do not run product-local or ABG command bindings/u);
   assert.match(prompt, /Do not spawn an odd_sdlc\/ABG worker, start another traversal/u);
   assert.match(prompt, /parent transform turn/u);
   assert.match(

@@ -76,7 +76,7 @@ function makeTargetWorkspace(label) {
   mkdirSync(path.join(targetRoot, "specification/requirements"), { recursive: true });
   writeFileSync(
     path.join(targetRoot, "README.md"),
-    ["# Installed Workspace", "", "REQ-INSTALL-001: keep installed commands public."].join("\n"),
+    ["# Installed Workspace", "", "REQ-INSTALL-001: keep installed ABG commands public."].join("\n"),
     "utf8"
   );
   writeFileSync(
@@ -130,6 +130,14 @@ function assertCommandPath(paths, commandName) {
   assert(commandPath, `missing ${commandName} command path`);
   assert.equal(existsSync(commandPath), true, `${commandName} command path does not exist`);
   return commandPath;
+}
+
+function assertNoCommandPath(paths, commandName) {
+  assert.equal(
+    paths.some((candidate) => path.basename(candidate) === commandName),
+    false,
+    `${commandName} command path should not be published`
+  );
 }
 
 function assertPackageManagerReplayKeepsCommand(targetRoot, commandName) {
@@ -254,6 +262,15 @@ function assertBootstrapGovernanceCarrier(carrier) {
   assert.match(carrier.executionContractRule, /first missing layer/u);
 }
 
+test("T-204 package publishes no product-local public CLI", () => {
+  assert.equal("bin" in PACKAGE_JSON, false);
+  assert.equal(
+    existsSync(path.join(PACKAGE_ROOT, "code/src/cli")),
+    false,
+    "code/src/cli must stay retired"
+  );
+});
+
 test("T-059 API installs odd_sdlc.TS and ABG runtime into a target workspace", async () => {
   const targetRoot = makeTargetWorkspace("install-api");
   const outcome = await installOddSdlcTypescript({
@@ -273,8 +290,8 @@ test("T-059 API installs odd_sdlc.TS and ABG runtime into a target workspace", a
   );
   assert.equal(existsSync(path.join(expectedProductInstallRoot, "package-extract")), true);
   assert.equal(existsSync(path.join(targetRoot, ".odd_sdlc")), false);
-  const oddSdlcCommand = assertCommandPath(outcome.commandPaths, "odd-sdlc-ts");
-  assertCommandPath(outcome.commandPaths, "genesis-ts");
+  assertNoCommandPath(outcome.commandPaths, "odd-sdlc-ts");
+  const genesisCommand = assertCommandPath(outcome.commandPaths, "genesis-ts");
   assertCommandPath(outcome.commandPaths, "abiogenesis-ts");
   assert.equal(existsSync(installedAbgConfigPath(targetRoot)), true);
   assert.equal(existsSync(outcome.installManifestPath), true);
@@ -290,15 +307,18 @@ test("T-059 API installs odd_sdlc.TS and ABG runtime into a target workspace", a
     packageJson.dependencies["@abiogenesis/typescript-tenant"],
     /^file:\.abiogenesis\/package-pack\//u
   );
-  assertPackageManagerReplayKeepsCommand(targetRoot, "odd-sdlc-ts");
+  assertPackageManagerReplayKeepsCommand(targetRoot, "genesis-ts");
   for (const filename of ["AGENTS.md", "CLAUDE.md"]) {
     const instructionPath = path.join(targetRoot, filename);
     assert.equal(existsSync(instructionPath), true, `${filename} was not written`);
     const instructionText = readFileSync(instructionPath, "utf8");
     assert(instructionText.includes("<!-- ODD_SDLC_BOOTLOADER_START -->"));
     assert(instructionText.includes("<!-- ODD_SDLC_BOOTLOADER_END -->"));
-    assert(instructionText.includes("odd-sdlc-ts gaps --workspace ."));
-    assert(instructionText.includes("odd-sdlc-ts start --workspace . --target next --until blocked"));
+    assert(instructionText.includes(`${path.relative(targetRoot, genesisCommand)} gaps --workspace . --scope workspace`));
+    assert(instructionText.includes(`${path.relative(targetRoot, genesisCommand)} start --workspace . --scope workspace`));
+    assert(!instructionText.includes("odd-sdlc-ts gaps"));
+    assert(!instructionText.includes("odd-sdlc-ts start"));
+    assert(!instructionText.includes("node_modules/.bin/odd-sdlc-ts"));
     assertBootstrapGovernanceText(instructionText);
   }
   assertBootstrapGovernanceText(readFileSync(outcome.bootstrapGuidePath, "utf8"));
@@ -314,6 +334,7 @@ test("T-059 API installs odd_sdlc.TS and ABG runtime into a target workspace", a
     ]
   );
   assert.equal(manifest.packageName, "@odd-sdlc/typescript-tenant");
+  assert.deepEqual(manifest.commandBindings, []);
   assert(manifest.runtimeIdentity.substrateRuntimeRef.includes("@abiogenesis/typescript-tenant"));
   assert.equal(
     manifest.abgRuntimeBindingPath,
@@ -327,26 +348,12 @@ test("T-059 API installs odd_sdlc.TS and ABG runtime into a target workspace", a
   assertBootstrapGovernanceCarrier(manifest.bootstrapGovernance);
   const normalization = readJson(outcome.normalizationPath);
   assert.equal(normalization.abgRuntimeBindingPath, manifest.abgRuntimeBindingPath);
+  assert.deepEqual(manifest.commandBindings, []);
+  assertNoCommandPath(normalization.commandPaths, "odd-sdlc-ts");
   assertBootstrapGovernanceCarrier(normalization.bootstrapGovernance);
-
-  const run = spawnSync(oddSdlcCommand, ["gaps", "--workspace", targetRoot], {
-    cwd: targetRoot,
-    encoding: "utf8",
-    env: {
-      ...process.env,
-      ODD_SDLC_TS_OUTPUT: "json"
-    },
-    maxBuffer: 1024 * 1024 * 5
-  });
-  assert.equal(run.status, 0, run.stderr);
-  const payload = JSON.parse(run.stdout);
-  assert.equal(payload.kind, "odd_sdlc_spec_method_result");
-  assert.equal(payload.command, "gaps");
-  assert.equal(payload.status, "ok");
-  assert.equal(payload.payload.dossier.choosesNextTraversal, false);
 });
 
-test("T-129 install preserves editable ABG config and public CLI fails closed on malformed fallback edits", async () => {
+test("T-129 install preserves editable ABG config and ABG CLI fails closed on malformed fallback edits", async () => {
   const targetRoot = makeTargetWorkspace("install-abg-fallback-config");
   const outcome = await installOddSdlcTypescript({
     targetRoot,
@@ -355,7 +362,7 @@ test("T-129 install preserves editable ABG config and public CLI fails closed on
     installedPackageName: "odd-sdlc-t129"
   });
   assert.equal(outcome.kind, "installed");
-  assertCommandPath(outcome.commandPaths, "odd-sdlc-ts");
+  assertNoCommandPath(outcome.commandPaths, "odd-sdlc-ts");
   const genesisCommand = assertCommandPath(outcome.commandPaths, "genesis-ts");
   assertCommandPath(outcome.commandPaths, "abiogenesis-ts");
 
@@ -423,7 +430,7 @@ test("T-129 install preserves editable ABG config and public CLI fails closed on
   assert.match(`${malformedRun.stdout}\n${malformedRun.stderr}`, /observerPromptRef/u);
 });
 
-test("T-059 CLI install command uses the async bounded adapter", async () => {
+test("T-059 package install helper uses the async bounded adapter", async () => {
   const targetRoot = makeTargetWorkspace("install-cli");
   writeFileSync(path.join(targetRoot, "AGENTS.md"), "# Existing Agents\n\nKeep this guidance.\n", "utf8");
   writeFileSync(path.join(targetRoot, "CLAUDE.md"), "# Existing Claude\n\nKeep this guidance.\n", "utf8");
@@ -453,7 +460,8 @@ test("T-059 CLI install command uses the async bounded adapter", async () => {
   );
   assert(readFileSync(path.join(targetRoot, "AGENTS.md"), "utf8").includes("Keep this guidance."));
   assert(readFileSync(path.join(targetRoot, "CLAUDE.md"), "utf8").includes("Keep this guidance."));
-  assertCommandPath(result.payload.commandPaths, "odd-sdlc-ts");
+  assertNoCommandPath(result.payload.commandPaths, "odd-sdlc-ts");
+  assertCommandPath(result.payload.commandPaths, "genesis-ts");
   const packageJson = readJson(path.join(targetRoot, "package.json"));
   assert.match(
     packageJson.dependencies["@odd-sdlc/typescript-tenant"],
@@ -469,7 +477,7 @@ test("T-059 CLI install command uses the async bounded adapter", async () => {
   assert.match(syncResult.payload.error, /invokeOddSdlcSpecMethodCommand/u);
 });
 
-test("T-177 CLI install resolves the pinned ABG release package by default", async () => {
+test("T-177 package install helper resolves the pinned ABG release package by default", async () => {
   const targetRoot = makeTargetWorkspace("install-cli-default-abg");
   const result = await invokeOddSdlcSpecMethodCommand([
     "install",
@@ -484,7 +492,7 @@ test("T-177 CLI install resolves the pinned ABG release package by default", asy
   assert.equal(result.status, "ok");
   assert.equal(result.command, "install");
   assert.equal(result.payload.kind, "installed");
-  assertCommandPath(result.payload.commandPaths, "odd-sdlc-ts");
+  assertNoCommandPath(result.payload.commandPaths, "odd-sdlc-ts");
   assertCommandPath(result.payload.commandPaths, "abiogenesis-ts");
   assert.equal(existsSync(path.join(targetRoot, ".odd_sdlc")), false);
   assert.equal(
@@ -535,7 +543,7 @@ test("T-124 default ABG source-root falls back to packaged dependency", () => {
   assert.equal(resolveDefaultAbgPackageSourceRoot(packageRoot), dependencyRoot);
 });
 
-test("T-059 release-cut adapter writes package artifact and binary evidence", async () => {
+test("T-059 release-cut adapter writes package artifact and no public command evidence", async () => {
   const archiveRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-ts-release-"));
   const outcome = await deriveOddSdlcTypescriptReleaseCut({
     packageSourceRoot: PACKAGE_ROOT,
@@ -546,11 +554,8 @@ test("T-059 release-cut adapter writes package artifact and binary evidence", as
   assert.equal(existsSync(outcome.packedPackage.tarballPath), true);
   assert.equal(existsSync(outcome.releaseManifestPath), true);
   assert.equal(existsSync(outcome.postmortemPath), true);
-  assert.equal(outcome.manifest.binaryBinding.commandName, "odd-sdlc-ts");
-  assert.equal(
-    outcome.manifest.binaryBinding.relativePackageCommandPath,
-    "./build/semantic/code/src/cli/main.js"
-  );
+  assert.deepEqual(outcome.manifest.publicCommandSurface.publishedCommandNames, []);
+  assert.deepEqual(outcome.manifest.publicCommandSurface.retiredCommandNames, ["odd-sdlc-ts"]);
 
   const cliResult = await invokeOddSdlcSpecMethodCommand([
     "release-cut",

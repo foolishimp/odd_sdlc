@@ -340,7 +340,7 @@ current source, tests, sandbox/live scripts, fixtures, and specification text.
 | `startOutcomeForObservedReplay` | 3 | 5 | Replay-aware start selector remains in `spec_method/entry.ts`; tests pin it as drift evidence. |
 | `commandPayload` | 1 | 5 | Internal command dispatcher remains confined to `spec_method/entry.ts`. |
 
-Current first blocker set:
+Pre-cut first blocker set:
 
 - `build_tenants/typescript/package.json` still publishes
   `bin.odd-sdlc-ts`.
@@ -386,6 +386,83 @@ Immediate next execution checkpoint:
 - For each direct command-helper caller, choose one migration target before
   deleting `cli/main.ts`: ABG CLI, product library API, package/release API,
   or deleted historical test.
+
+### 2026-06-19 First Public CLI Cut Result
+
+Cut scope: remove the public `odd-sdlc-ts` process entrypoint and reprice the
+package/install/release/qualification contract away from an `odd_sdlc` command
+binding. This cut intentionally does not delete `spec_method/entry.ts` command
+helpers; they remain tracked blockers for the next T-204 cut.
+
+| Metric | Baseline | After cut |
+| --- | ---: | ---: |
+| Active TS source files under `code/src` | 180 | 179 |
+| Active TS source lines under `code/src` | 98,222 | 98,185 |
+| Published package bins | 1 | 0 |
+| `code/src/cli` files | 1 | 0 |
+| `code/src/cli` directory present | yes | no |
+| Hard command surface lines/files | 3,126 / 3 | 3,110 / 2 |
+
+Changed contract:
+
+- `package.json` and `package-lock.json` no longer publish `odd-sdlc-ts`.
+- `code/src/cli/main.ts` is deleted; the source `cli/` directory is absent.
+- install uses no `odd_sdlc` command binding and records ABG command paths only.
+- generated `AGENTS.md`/`CLAUDE.md` guidance maps `gaps` and `start` to
+  installed `genesis-ts` with `--scope workspace`.
+- release-cut proof now fails closed if the package publishes any public
+  command binding and records the retired command as release evidence.
+- installed initial-state qualification requires `genesis-ts` and
+  `abiogenesis-ts`, not `odd-sdlc-ts`.
+- active requirements/design text no longer teaches `odd-sdlc-ts` as operator
+  command law.
+
+Remaining caller counts after this cut, excluding archived `test_env/test_runs`
+and generated `build/semantic` output:
+
+| Surface | Files | Matches | Interpretation |
+| --- | ---: | ---: | --- |
+| `invokeOddSdlcSpecMethodCommand` | 15 | 50 | Async private command-helper blocker remains across tests/live harnesses. |
+| `invokeOddSdlcSpecMethodCommandSync` | 8 | 47 | Sync private command-helper blocker remains in replay/gaps/analyzer tests. |
+| `serializeOddSdlcSpecMethodResult` | 5 | 12 | Serializer remains only for private helper/analyzer tests. |
+| `odd-sdlc-ts` | 22 | 98 | Remaining hits are retired-command proof, negative assertions, temp prefixes, historical design/tests, and live harness blockers. |
+| `build/semantic/code/src/cli/main.js` / `CLI_MAIN` | 6 | 10 | Remaining direct source-CLI callers are live harness blockers, not accepted package surfaces. |
+| `installedStartPayloadFor` | 2 | 3 | Still in `spec_method/entry.ts`; next cut must classify library API versus delete. |
+| `startOutcomeForObservedReplay` | 3 | 5 | Still in `spec_method/entry.ts`; next cut must move/delete replay helper authority. |
+| `commandPayload` | 1 | 3 | Still confined to `spec_method/entry.ts`; delete with command dispatcher. |
+
+Focused proof completed:
+
+- `npm run build:semantic` passed.
+- `node --test test_env/tests/test_t059_install_release_adapter.test.mjs`
+  passed, including new T-204 gate rejecting package bin and `code/src/cli`.
+- `node --test test_env/tests/test_t069_installed_initial_state.test.mjs`
+  passed.
+- `node --test` over `test_t058_spec_method_entrypoint.test.mjs`,
+  `test_t118_worker_invocation_package.test.mjs`, and
+  `test_t161_fd_run_analysis_linter.test.mjs` passed.
+- Focused ESLint over edited harness files passed.
+
+Rejected proof boundary:
+
+- The broad `node --test` run over
+  `test_t064_installed_operator_ux.test.mjs`,
+  `test_t066_product_materialization_contract.test.mjs`, and
+  `test_t076_deterministic_traversal_state_machine.test.mjs` failed in
+  `test_t066_product_materialization_contract.test.mjs` on the
+  existing product-materialization launch-blocker class
+  `sdlc_product_materialization_launch_blocked:*`. That failure is not caused
+  by the CLI cut and remains outside this first-cut proof lane.
+
+Next blocker set:
+
+- migrate or delete live harnesses that still reference
+  `build/semantic/code/src/cli/main.js` or installed `odd-sdlc-ts`
+- split `spec_method/entry.ts` into product read-model/package APIs versus
+  deleted command grammar
+- remove `invokeOddSdlcSpecMethodCommand*`, `commandPayload*`, and
+  `serializeOddSdlcSpecMethodResult` after callers move to ABG CLI or typed
+  product/package APIs
 
 ### 2026-06-19 Initial CLI-Path Function Audit
 

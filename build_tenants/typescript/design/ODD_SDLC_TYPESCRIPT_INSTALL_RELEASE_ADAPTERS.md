@@ -1,7 +1,7 @@
 # odd_sdlc TypeScript Install And Release Adapters
 
 **Status**: Active
-**Owner Ticket**: `.ai-workspace/tickets/completed/T-059-realize-typescript-install-normalize-and-release-cut-adapters.md`
+**Owner Ticket**: `.ai-workspace/tickets/completed/T-059-realize-typescript-install-normalize-and-release-cut-adapters.md`, `.ai-workspace/tickets/active/T-204-decommission-odd-sdlc-cli-orchestration-surface.md`
 **Implements**: `REQ-F-ODDSDLC-040`, `REQ-F-ODDSDLC-043`
 
 ## Position
@@ -19,22 +19,23 @@ operator boundary.
 
 ```text
 operator
-  -> odd-sdlc-ts install --target <workspace>
+  -> package install API
     -> install adapter
       -> package binding: pack/extract @odd-sdlc/typescript-tenant
-      -> command binding: odd-sdlc-ts
+      -> no odd_sdlc product-local command binding
       -> ABG TypeScript public installer from pinned release package
+      -> ABG command bindings: genesis-ts, abiogenesis-ts
       -> manifests + bootstrap guide + normalization projection
 
 operator
-  -> odd-sdlc-ts release-cut --archive-root <dir>
+  -> package release-cut API
     -> release adapter
       -> package binding: npm pack
-      -> binary-binding proof
+      -> no-public-command proof
       -> release manifest + postmortem
 
 operator
-  -> odd-sdlc-ts release-snapshot --release-identity <version> --snapshot-root <dir>
+  -> package release-snapshot API
     -> release-snapshot adapter
       -> semantic build
       -> npm pack --json
@@ -42,8 +43,9 @@ operator
       -> versioned snapshot manifest + checksums
 
 operator
-  -> odd-sdlc-ts start/gaps/query-domain
-    -> existing public graph/query/start adapters
+  -> genesis-ts start/gaps --scope workspace
+    -> ABG command binding
+    -> installed odd_sdlc runtime binding and plugins
     -> GTL/ABG traversal authority
 ```
 
@@ -57,7 +59,8 @@ Owns Node package mechanics:
 - run `npm pack`
 - extract a package tarball into `node_modules`
 - link package dependencies from the source package context
-- bind package binaries into `node_modules/.bin`
+- bind package binaries into `node_modules/.bin` for packages that lawfully
+  publish binaries. The `odd_sdlc.TS` package itself publishes none.
 
 This module is an effect boundary. It has no SDLC domain semantics and no graph
 traversal authority.
@@ -77,7 +80,8 @@ Owns the `odd_sdlc.TS` install request:
 - invoke the public ABIogenesis TypeScript installer
 - write the TypeScript install manifest
 - write a normalization projection
-- write bootstrap command guidance
+- write bootstrap command guidance that points `gaps` and `start` at the
+  installed ABG command bindings
 - inject marker-governed `AGENTS.md` and `CLAUDE.md` instruction sections for
   cold-agent `gaps` and `start` operation
 - embed STDO bootstrap provenance for cold-agent ticket execution, including
@@ -93,7 +97,7 @@ It does not select next traversal, retry work, or close gaps.
 Owns package release-cut and release-snapshot evidence:
 
 - pack the TypeScript tenant package
-- prove that `odd-sdlc-ts` is declared and materialized
+- prove that the package publishes no product-local public command binding
 - write a release-cut manifest and postmortem
 - write ABIogenesis-style versioned release snapshots under
   `release_snapshots/odd-sdlc-typescript-tenant/<release>/`
@@ -110,17 +114,16 @@ surface. They are migrated under
 legacy release-snapshot manifest, release note, package tarball, checksums, and
 preserved proof artifacts. Because those old release-cut manifests did not
 record ABG substrate pins, they are historical evidence only; new release
-closure must use `odd-sdlc-ts release-snapshot`.
+closure must use the package release-snapshot API.
 
 It does not claim live worker proof or installed-workspace convergence.
 
-### `cli`
+### Public command surface
 
-Owns command adaptation only.
-
-`install` and `release-cut` are async side-effect commands. Existing
-`catalog`, `query-domain`, `gaps`, `start`, and `rc-report` remain bounded
-read/start adapters.
+The package does not publish `odd-sdlc-ts`. `install`, `release-cut`,
+`release-snapshot`, and `rc-report` remain package APIs while T-204 retires the
+former public command dispatcher. Runtime command/control belongs to installed
+ABG command bindings.
 
 ## IACS
 
@@ -207,15 +210,16 @@ The TypeScript package dependency for ABIogenesis is release-pinned:
 - Authority seam closure: package/install/release effects are isolated from
   graph traversal and ABG runtime truth.
 - Projection-source coherence: install and release projections derive from
-  package identity, materialized command paths, and ABG public installer output.
+  package identity, ABG command paths, and ABG public installer output.
 - Prime module shape: package mechanics are separated from SDLC install meaning
   and from release evidence.
 - ODD alignment: side-effect adapters publish installation and release
   evidence; they do not become graph programs or continuation controllers.
 - Cold-agent operation: install is complete only when target-root instruction
-  files tell a fresh agent that `gaps` and `start` map to installed
-  `odd-sdlc-ts` commands, that STDO aliases expand to the four governing
-  methods, and that ticket execution starts with first-missing-layer triage.
+  files tell a fresh agent that `gaps` and `start` map to installed ABG command
+  bindings over the `odd_sdlc` runtime contract, that STDO aliases expand to
+  the four governing methods, and that ticket execution starts with
+  first-missing-layer triage.
 - STDO-UX: when the active ticket is about UI/operator experience, the
   installer bootstrap must preserve the agentic-coder CLI as an operator UI
   binding over installed product truth, not as a rival runtime or hidden worker

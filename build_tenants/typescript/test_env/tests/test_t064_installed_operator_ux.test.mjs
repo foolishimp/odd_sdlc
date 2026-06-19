@@ -11,7 +11,6 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path, { dirname, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
@@ -46,7 +45,6 @@ const ABG_TYPESCRIPT_ROOT = resolve(
   REPO_ROOT,
   "../abiogenesis/build_tenants/abiogenesis/typescript"
 );
-const CLI_MAIN = resolve(PACKAGE_ROOT, "build/semantic/code/src/cli/main.js");
 
 function makeWorkspace() {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t064-"));

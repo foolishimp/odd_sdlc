@@ -2,7 +2,7 @@
 
 **Status**: Active
 **Date**: 2026-05-07
-**Owner Tickets**: `.ai-workspace/tickets/completed/T-058-realize-typescript-public-cli-adapter-over-graph-query-start-surfaces.md`, `.ai-workspace/tickets/active/T-120-realize-retry-local-repair-prompts-from-typed-gap-dossiers.md`, `.ai-workspace/tickets/active/T-194-migrate-typescript-tenant-to-abg-4-0-0-rc-1.md`
+**Owner Tickets**: `.ai-workspace/tickets/completed/T-058-realize-typescript-public-cli-adapter-over-graph-query-start-surfaces.md`, `.ai-workspace/tickets/active/T-120-realize-retry-local-repair-prompts-from-typed-gap-dossiers.md`, `.ai-workspace/tickets/active/T-194-migrate-typescript-tenant-to-abg-4-0-0-rc-1.md`, `.ai-workspace/tickets/active/T-204-decommission-odd-sdlc-cli-orchestration-surface.md`
 **Supersedes**: `ODD_SDLC_TYPESCRIPT_PUBLIC_CLI_ADAPTER.md`
 **Implements**: REQ-F-ODDSDLC-040, REQ-F-ODDSDLC-041, REQ-F-ODDSDLC-043, REQ-F-ODDSDLC-051
 **Derives From**: `ODD_SDLC_TYPESCRIPT_TENANT_DERIVATION.md`, `ODD_SDLC_TYPESCRIPT_POLICY_SURFACES.md`, `ODD_SDLC_TYPESCRIPT_DETERMINISTIC_TRAVERSAL_STATE_MACHINE.md`
@@ -13,8 +13,9 @@ Define the single TypeScript operator entrypoint under Spec Method discipline.
 
 The entrypoint admits method command intent and calls the installed
 ABG/odd_sdlc contract. It is not a CLI controller, retry controller, traversal
-controller, or compatibility facade. The executable process binding is only a
-launch mechanism for the same method entrypoint.
+controller, or compatibility facade. T-204 retires the public executable process
+binding; any remaining direct command-helper caller is an interim private test
+or package API dependency, not operator command law.
 
 ## IACS
 
@@ -48,15 +49,16 @@ operator intent
   -> OddSdlcSpecMethodResult
 ```
 
-The shell binary `odd-sdlc-ts` may call this entrypoint, but it does not define
-command law and does not export a separate CLI command module.
+The package does not publish an `odd-sdlc-ts` shell binary. Operator command
+and control flows through installed ABG command bindings after `odd_sdlc`
+resolves product policy, plugins, runtime binding, and read-model projection.
 
 ## Module Shape
 
 | Module | Classification | Owns | Does Not Own |
 | --- | --- | --- | --- |
 | `spec_method/entry.ts` | Spec Method entrypoint | method intent admission, read-only workspace source discovery, dispatch to graph/query/start/operator/release/install surfaces | graph truth, vector advancement, retry budget, closure fold, repair policy |
-| `cli/main.ts` | Process launcher | argv/stdout/stderr/exit binding | command semantics, retry/reentry, traversal law |
+| `cli/main.ts` | Retired process launcher | nothing; file is absent under T-204 | command semantics, retry/reentry, traversal law |
 | `operator/installed_operator.ts` | Installed ABG boundary | installed start execution, ABG plugin dispatch, typed retry/reentry projection, archives | user-interface grammar |
 
 ## Commands
@@ -82,8 +84,9 @@ worker is attached, the entrypoint calls the installed operator boundary. The
 installed operator, not the entrypoint, owns retry/reentry control and emits
 runtime/archive truth through ABG-compatible surfaces.
 
-`install`, `release-cut`, and `rc-report` call their product-owned modules.
-They do not own traversal or retry policy.
+`install`, `release-cut`, and `rc-report` remain package APIs while T-204
+decommissions public command dispatch. They do not own traversal or retry
+policy and must not reintroduce a product-local shell command.
 
 ## Non-Ownership
 
@@ -97,6 +100,7 @@ The Spec Method entrypoint must not:
 - treat `repair_worker_output` as prose without a typed repair/reentry plan
 - export a second CLI command module
 - claim full Python operational replacement
+- publish or require `odd-sdlc-ts`
 
 ## Accepted Proof
 
@@ -105,6 +109,8 @@ describes a public CLI adapter as the command authority. Current closure must
 prove:
 
 - `cli/command.ts` is absent
+- `cli/main.ts` is absent
+- `package.json` publishes no product-local command binding
 - `spec_method/entry.ts` contains no retry loop or retry context synthesis
 - `gaps --evaluator-priority-edge <edge-name>` proves domain priority is
   admitted through the Spec Method surface and ranked by ABG construction

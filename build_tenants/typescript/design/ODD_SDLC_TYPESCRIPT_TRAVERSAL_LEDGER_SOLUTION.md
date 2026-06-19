@@ -500,7 +500,7 @@ canonical relationship between those carriers.
 
 ```mermaid
 sequenceDiagram
-  participant CLI as odd-sdlc-ts CLI
+  participant CLI as ABG CLI
   participant Operator as installed operator
   participant ABG as runEngineIterateAsync
   participant Handoff as handoff manifest
@@ -794,7 +794,7 @@ itself. Closure is the ledger predicate.
 
 ```mermaid
 sequenceDiagram
-  participant CLI as odd-sdlc-ts CLI
+  participant CLI as ABG CLI
   participant ABG as ABG graph iteration
   participant Operator as odd_sdlc F_P plugin
   participant ProjectLedger as project construction ledger

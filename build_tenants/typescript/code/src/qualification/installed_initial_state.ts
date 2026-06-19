@@ -26,7 +26,7 @@ export interface SdlcInstalledInitialStatePathCheck {
 
 export interface SdlcInstalledInitialStateCommandCheck {
   readonly kind: "sdlc_installed_initial_state_command_check";
-  readonly commandName: "odd-sdlc-ts" | "abiogenesis-ts" | "genesis-ts";
+  readonly commandName: "abiogenesis-ts" | "genesis-ts";
   readonly path: string;
   readonly present: boolean;
 }
@@ -151,7 +151,6 @@ export function deriveSdlcInstalledQualificationInitialState(input: {
     pathCheck("claude_bootstrap", path.join(input.workspaceRoot, "CLAUDE.md"))
   ]);
   const commandChecks = Object.freeze([
-    commandCheck(input.workspaceRoot, "odd-sdlc-ts"),
     commandCheck(input.workspaceRoot, "abiogenesis-ts"),
     commandCheck(input.workspaceRoot, "genesis-ts")
   ]);

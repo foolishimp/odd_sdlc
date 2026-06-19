@@ -5732,7 +5732,7 @@ function promptForHandoffSections(
         "- Do not inspect odd_sdlc framework source code to infer carrier schemas.",
         "- Do not render target-carrier protocol fields unless asked for a structured carrier.",
         "- Read boundary: use only workspace-relative paths; no sibling sandboxes, historical test_runs, home memory, /tmp, or outside-workspace absolute paths.",
-        "- Control boundary: do not run odd-sdlc-ts, abiogenesis-ts, genesis-ts, start, gaps, analyze-run, install, traversal, or resume.",
+        "- Control boundary: do not run product-local or ABG command bindings, including start, gaps, analyze-run, install, traversal, or resume.",
         "- Do not spawn an odd_sdlc/ABG worker, start another traversal, or leave child processes running; stay under this parent transform turn.",
         "- Write only the contracted output/product artifacts, then exit; the framework evaluates the artifact after this process exits.",
         "- Do not inspect sibling operator-run dirs or add local axiom variants."

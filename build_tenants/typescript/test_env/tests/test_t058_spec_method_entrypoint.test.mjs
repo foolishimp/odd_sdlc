@@ -8,7 +8,6 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path, { dirname, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -31,7 +30,6 @@ import {
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
-const CLI_MAIN = resolve(PACKAGE_ROOT, "build/semantic/code/src/cli/main.js");
 
 function makeWorkspace() {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-ts-cli-"));
@@ -933,26 +931,6 @@ test("T-058 Spec Method start command is an ABG entrypoint over worker attachmen
     attached.payload.executionContract.targetGraphFunction,
     "derive_code_surface"
   );
-});
-
-test("T-058 package binary returns JSON and propagates command errors", () => {
-  const okRun = spawnSync(process.execPath, [CLI_MAIN, "rc-report"], {
-    cwd: PACKAGE_ROOT,
-    encoding: "utf8"
-  });
-  assert.equal(okRun.status, 0);
-  const okPayload = JSON.parse(okRun.stdout);
-  assert.equal(okPayload.kind, "odd_sdlc_spec_method_result");
-  assert.equal(okPayload.command, "rc-report");
-  assert.equal(okPayload.status, "ok");
-
-  const badRun = spawnSync(process.execPath, [CLI_MAIN, "unknown-command"], {
-    cwd: PACKAGE_ROOT,
-    encoding: "utf8"
-  });
-  assert.equal(badRun.status, 2);
-  const badPayload = JSON.parse(badRun.stderr);
-  assert.equal(badPayload.status, "error");
 });
 
 test("T-058 Spec Method entry stays free of retry/control authority", () => {

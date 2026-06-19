@@ -738,8 +738,8 @@ export function deriveSdlcWorkerRetryContextFromTraversalConsequence(input: {
     retryAttemptRefs: Object.freeze([
       Object.freeze({
         vectorIndex: input.outcome.manifest.vectorIndex,
-        retryRunId: `retry-run://odd-sdlc-ts/installed-reentry/${refSegment}/${input.attemptIndex}`,
-        retryCallId: `retry-call://odd-sdlc-ts/installed-reentry/${refSegment}/${input.attemptIndex}`,
+        retryRunId: `retry-run://odd-sdlc/installed-reentry/${refSegment}/${input.attemptIndex}`,
+        retryCallId: `retry-call://odd-sdlc/installed-reentry/${refSegment}/${input.attemptIndex}`,
         manifestId: manifestRef,
         priorAuthorityRef,
         attemptIndex: input.attemptIndex,

@@ -271,7 +271,7 @@ async function installAdmittedOddSdlcTypescript(
       packageExtractRoot: join(productInstallRoot, "package-extract"),
       identity,
       tarballPath: packed.tarballPath,
-      commandNames: ["odd-sdlc-ts"]
+      commandNames: []
     });
     const abgOutcome = requireInstalledAbg(
       await installAbiogenesisTypescript({
@@ -308,10 +308,6 @@ async function installAdmittedOddSdlcTypescript(
       packageName: installedPackageForManifest.packageName,
       tarballPath: installedPackageForManifest.tarballPath
     });
-    const oddSdlcCommandPath = installedPackage.commandBindings[0]?.commandPath;
-    if (oddSdlcCommandPath === undefined) {
-      throw new Error("odd-sdlc-ts command binding was not created");
-    }
     const genesisCommandPath =
       abgOutcome.commandPaths.find((candidate) => candidate.endsWith("/genesis-ts")) ??
       null;
@@ -338,7 +334,6 @@ async function installAdmittedOddSdlcTypescript(
     const instructionFiles = await writeOddSdlcInstructionFiles({
       targetRoot: request.targetRoot,
       productInstallRoot,
-      oddSdlcCommandPath,
       genesisCommandPath,
       abiogenesisCommandPath,
       bootstrapGuidePath,

@@ -16,10 +16,9 @@ export interface OddSdlcTypescriptReleaseCutManifest {
   readonly archiveRoot: string;
   readonly tarballPath: string;
   readonly releaseManifestPath: string;
-  readonly binaryBinding: {
-    readonly commandName: "odd-sdlc-ts";
-    readonly relativePackageCommandPath: string;
-    readonly sourceCommandPath: string;
+  readonly publicCommandSurface: {
+    readonly publishedCommandNames: readonly string[];
+    readonly retiredCommandNames: readonly string[];
   };
   readonly packageIdentity: NodePackageIdentity;
 }

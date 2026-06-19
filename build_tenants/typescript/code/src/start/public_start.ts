@@ -1629,7 +1629,7 @@ function constructExecutionContract(input: {
             outputWorkspace: Object.freeze({
               workspaceRef: "workspace://odd-sdlc/output",
               workspaceRoot: input.request.outputWorkspaceRoot,
-              authorityRef: "cli://odd-sdlc-ts/output-workspace"
+              authorityRef: "public-start://odd-sdlc/output-workspace"
             })
           })
         ]);

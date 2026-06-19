@@ -13,7 +13,6 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -1203,52 +1202,6 @@ function freshDataMapperWorkspace() {
     "data_mapper template must provide testing technology stack authority"
   );
   return workspaceRoot;
-}
-
-function installedOddSdlcCommand(install) {
-  const commandPath = install.commandPaths.find(
-    (candidate) => path.basename(candidate) === "odd-sdlc-ts"
-  );
-  assert(commandPath, "odd-sdlc-ts command path missing");
-  return commandPath;
-}
-
-function runInstalledOddSdlc(commandPath, args, workspaceRoot) {
-  const run = spawnSync(commandPath, args, {
-    cwd: workspaceRoot,
-    encoding: "utf8",
-    env: {
-      ...process.env,
-      ODD_SDLC_TS_OUTPUT: "json"
-    },
-    maxBuffer: 1024 * 1024 * 10
-  });
-  assert.equal(
-    run.status,
-    0,
-    JSON.stringify(
-      {
-        error: run.error instanceof Error ? run.error.message : null,
-        signal: run.signal,
-        stderr: run.stderr.slice(0, 2000),
-        stdoutPrefix: run.stdout.slice(0, 2000),
-        stdoutBytes: Buffer.byteLength(run.stdout, "utf8"),
-        args
-      },
-      null,
-      2
-    )
-  );
-  const parsed = JSON.parse(run.stdout);
-  assert.equal(parsed.kind, "odd_sdlc_spec_method_result");
-  assert.equal(parsed.status, "ok");
-  if (
-    parsed.payload?.kind === "sdlc_installed_operator_start_cli_projection" &&
-    typeof parsed.payload.sourceOutcomeRef === "string"
-  ) {
-    return JSON.parse(readFileSync(fileURLToPath(parsed.payload.sourceOutcomeRef), "utf8"));
-  }
-  return parsed.payload;
 }
 
 function writeDataMapperInventoryWorkerScript(workspaceRoot) {

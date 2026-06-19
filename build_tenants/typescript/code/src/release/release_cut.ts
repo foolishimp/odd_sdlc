@@ -1,6 +1,6 @@
 // Implements: REQ-F-ODDSDLC-040
 
-import { mkdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import {
   packNodePackage,
@@ -33,13 +33,6 @@ function requiredString(record: Record<string, unknown>, key: string): string {
   return value.trim();
 }
 
-async function assertFile(path: string, label: string): Promise<void> {
-  const fileStat = await stat(path);
-  if (!fileStat.isFile()) {
-    throw new Error(`${label} is not a file: ${path}`);
-  }
-}
-
 async function writeTextFile(targetPath: string, content: string): Promise<void> {
   await mkdir(dirname(targetPath), { recursive: true });
   await writeFile(targetPath, content, "utf8");
@@ -62,8 +55,8 @@ function postmortemFor(manifest: OddSdlcTypescriptReleaseCutManifest): string {
     "",
     `- package: ${manifest.packageName}@${manifest.packageVersion}`,
     `- artifact: ${manifest.tarballPath}`,
-    `- binary: ${manifest.binaryBinding.commandName}`,
-    `- binary path: ${manifest.binaryBinding.relativePackageCommandPath}`,
+    `- public command bindings: ${manifest.publicCommandSurface.publishedCommandNames.length}`,
+    `- retired command bindings: ${manifest.publicCommandSurface.retiredCommandNames.join(", ")}`,
     "",
     "This release-cut proof is package evidence only. It does not claim graph traversal, live F_P execution, or installed-workspace convergence by itself.",
     ""
@@ -78,15 +71,12 @@ export async function deriveOddSdlcTypescriptReleaseCut(
     packageRoot: request.packageSourceRoot
   });
   const identity = await readNodePackageIdentity(request.packageSourceRoot);
-  const relativePackageCommandPath = identity.bin["odd-sdlc-ts"];
-  if (relativePackageCommandPath === undefined) {
-    throw new Error("package does not publish odd-sdlc-ts binary binding");
+  const publishedCommandNames = Object.freeze(Object.keys(identity.bin).sort());
+  if (publishedCommandNames.length > 0) {
+    throw new Error(
+      `package must not publish public command bindings: ${publishedCommandNames.join(", ")}`
+    );
   }
-  const sourceCommandPath = join(
-    request.packageSourceRoot,
-    relativePackageCommandPath
-  );
-  await assertFile(sourceCommandPath, "odd-sdlc-ts source binary");
   const packedPackage = await packNodePackage({
     packageSourceRoot: request.packageSourceRoot,
     packDestinationRoot: join(request.archiveRoot, "package"),
@@ -102,10 +92,9 @@ export async function deriveOddSdlcTypescriptReleaseCut(
     archiveRoot: request.archiveRoot,
     tarballPath: packedPackage.tarballPath,
     releaseManifestPath,
-    binaryBinding: Object.freeze({
-      commandName: "odd-sdlc-ts",
-      relativePackageCommandPath,
-      sourceCommandPath
+    publicCommandSurface: Object.freeze({
+      publishedCommandNames,
+      retiredCommandNames: Object.freeze(["odd-sdlc-ts"] as const)
     }),
     packageIdentity: identity
   });

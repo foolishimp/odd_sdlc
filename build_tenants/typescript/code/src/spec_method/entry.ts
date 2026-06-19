@@ -2296,7 +2296,7 @@ function gapsPayload(request: OddSdlcSpecMethodTraversalRequest): unknown {
     basis: start.executionContract.basis,
     events,
     triageInput: "spec_method:gaps",
-    evidenceRefs: ["spec-method://odd-sdlc-ts/gaps"],
+    evidenceRefs: ["spec-method://odd-sdlc/gaps"],
     requirementFulfillment,
     domainDefaults: queryDomain.domainDefaults,
     ...(priorityScheme === undefined ? {} : { priorityScheme })
@@ -3030,7 +3030,7 @@ function compactGapsResult(result: OddSdlcSpecMethodResult): string | null {
       ? "inspect_json"
       : stringField(routeBinding, "targetGraphFunction") ?? "none";
   return [
-    "odd-sdlc-ts gaps",
+    "gaps",
     `status: ${stringField(projection, "status") ?? result.status}`,
     `graph_function: ${stringField(projection, "graphFunctionName") ?? "n/a"}`,
     `current_edge: ${stringField(projection, "currentEdge") ?? "n/a"}`,
@@ -3055,7 +3055,7 @@ function compactInstalledStartResult(result: OddSdlcSpecMethodResult): string | 
     return null;
   }
   return [
-    "odd-sdlc-ts start",
+    "start",
     `status: ${stringField(summary, "status") ?? result.status}`,
     `graph_function: ${stringField(summary, "graphFunctionName") ?? "n/a"}`,
     `current_edge: ${stringField(summary, "currentEdge") ?? "n/a"}`,
@@ -3072,7 +3072,7 @@ function compactPublicStartResult(result: OddSdlcSpecMethodResult): string | nul
   }
   const executionContract = childRecord(result.payload, "executionContract");
   return [
-    "odd-sdlc-ts start",
+    "start",
     `status: ${stringField(result.payload, "status") ?? result.status}`,
     `graph_function: ${stringField(executionContract ?? {}, "targetGraphFunction") ?? "n/a"}`,
     `blocking_reason: ${stringField(result.payload, "blockingReason") ?? "none"}`,

@@ -133,10 +133,11 @@ operation.
   governed by `odd_sdlc`, while preserving the generic GTL bootloader section
   installed by `abiogenesis`
 - AC-5a: the installed instruction section makes cold-agent operation explicit:
-  operator `gaps` maps to the installed Spec Method entrypoint, which may be
-  launched locally as `odd-sdlc-ts gaps --workspace .`; operator `start` maps
-  to the same entrypoint, which may be launched locally as
-  `odd-sdlc-ts start --workspace . --target next --until blocked`
+  operator `gaps` maps to the installed ABG command binding with
+  `--scope workspace`; operator `start` maps to the installed ABG command
+  binding over the `odd_sdlc` runtime contract and selected graph-function
+  target. `odd_sdlc` supplies governance, policy overlays, plugins, and read
+  models; it does not publish a product-local orchestration command.
 - AC-5b: instruction-file delivery is marker-governed so reinstall or refresh
   can update the `odd_sdlc` section without deleting unrelated project guidance
 - AC-5c: the install manifest records instruction-file verification for both

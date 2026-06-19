@@ -15,7 +15,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path, { dirname, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
@@ -60,7 +59,6 @@ const DATA_MAPPER_REPAIR_TIMEOUT_ARCHIVE = resolve(
   TEST_RUNS_ROOT,
   "full_external_data_mapper_sandbox/20260511T112004427Z_pid37576"
 );
-const CLI_MAIN = resolve(PACKAGE_ROOT, "build/semantic/code/src/cli/main.js");
 
 const T132_EDGE_ORDER = Object.freeze([
   { name: "Fg_conform_project_authority", target: "project_bootstrap_surface" },
@@ -2220,31 +2218,6 @@ test("T-161 CLI dispatch rejects --output inside the inspected root", () => {
     ]);
     assert.equal(result.status, "error");
     assert.equal(result.exitCode, 2);
-  } finally {
-    rmSync(archiveRoot, { recursive: true, force: true });
-  }
-});
-
-test("T-161 CLI binary prints markdown output via stdout", { skip: !existsSync(CLI_MAIN) }, () => {
-  const archiveRoot = makeTempDir("odd-sdlc-ts-t161-cli-bin-");
-  try {
-    buildSyntheticT132Archive({ rootDir: archiveRoot });
-    const spawned = spawnSync(
-      process.execPath,
-      [
-        CLI_MAIN,
-        "analyze-run",
-        "--run-archive",
-        archiveRoot,
-        "--profile",
-        "hello_world",
-        "--format",
-        "markdown"
-      ],
-      { encoding: "utf8", timeout: 30_000 }
-    );
-    assert.equal(spawned.status, 0, `cli stderr: ${spawned.stderr}`);
-    assert.ok(spawned.stdout.startsWith("# F_D Run Analysis"));
   } finally {
     rmSync(archiveRoot, { recursive: true, force: true });
   }

@@ -22,9 +22,6 @@
       "import": "./build/semantic/code/src/release/index.js"
     }
   },
-  "bin": {
-    "odd-sdlc-ts": "./build/semantic/code/src/cli/main.js"
-  },
   "files": [
     "build/semantic/**",
     "config/**"

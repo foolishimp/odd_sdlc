@@ -8,7 +8,6 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -298,31 +297,6 @@ function freshDataMapperWorkspace() {
   const workspaceRoot = path.join(parentRoot, "data_mapper.test76.ts");
   cpSync(DATA_MAPPER_TEMPLATE_ROOT, workspaceRoot, { recursive: true });
   return workspaceRoot;
-}
-
-function runInstalledOddSdlc(commandPath, args, workspaceRoot) {
-  const run = spawnSync(commandPath, args, {
-    cwd: workspaceRoot,
-    encoding: "utf8",
-    env: {
-      ...process.env,
-      ODD_SDLC_TS_OUTPUT: "json"
-    },
-    maxBuffer: 1024 * 1024 * 10
-  });
-  assert.equal(run.status, 0, run.stderr);
-  const parsed = JSON.parse(run.stdout);
-  assert.equal(parsed.kind, "odd_sdlc_spec_method_result");
-  assert.equal(parsed.status, "ok");
-  return parsed.payload;
-}
-
-function installedOddSdlcCommand(install) {
-  const commandPath = install.commandPaths.find(
-    (candidate) => path.basename(candidate) === "odd-sdlc-ts"
-  );
-  assert(commandPath, "odd-sdlc-ts command path missing");
-  return commandPath;
 }
 
 function makeStart(workspaceRoot) {

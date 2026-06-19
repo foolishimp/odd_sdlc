@@ -108,7 +108,6 @@ test("T-069 initial-state validation fails closed without installed topology", (
   assert.equal(validation.status, "invalid");
   assert(validation.missingPaths.length > 0);
   assert.deepStrictEqual(validation.missingCommands, [
-    "odd-sdlc-ts",
     "abiogenesis-ts",
     "genesis-ts"
   ]);

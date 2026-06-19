@@ -47,7 +47,6 @@ export function oddSdlcBootstrapGovernance(): OddSdlcBootstrapGovernance {
 export interface OddSdlcInstructionFilesInput {
   readonly targetRoot: string;
   readonly productInstallRoot: string;
-  readonly oddSdlcCommandPath: string;
   readonly genesisCommandPath: string | null;
   readonly abiogenesisCommandPath: string | null;
   readonly bootstrapGuidePath: string;
@@ -83,7 +82,6 @@ function buildInstructionContent(input: OddSdlcInstructionFilesInput): string {
   const normalizationRelative = relativeWorkspacePath(input.targetRoot, input.normalizationPath);
   const installManifestRelative = relativeWorkspacePath(input.targetRoot, input.installManifestPath);
   const abgInstallManifestRelative = relativeWorkspacePath(input.targetRoot, input.abgInstallManifestPath);
-  const oddSdlcCommand = relativeWorkspacePath(input.targetRoot, input.oddSdlcCommandPath);
   const genesisCommand = input.genesisCommandPath === null
     ? "node_modules/.bin/genesis-ts"
     : relativeWorkspacePath(input.targetRoot, input.genesisCommandPath);
@@ -146,11 +144,10 @@ function buildInstructionContent(input: OddSdlcInstructionFilesInput): string {
     "- `workspace://specification/requirements/` when present",
     "",
     "## Start Here",
-    `- when the operator says \`gaps\`, run \`${oddSdlcCommand} gaps --workspace .\``,
+    `- when the operator says \`gaps\`, run \`${genesisCommand} gaps --workspace . --scope workspace\``,
     "- `start` is an operator shell over ABG-owned graph execution; do not treat odd_sdlc as a second traversal runtime",
-    `- when the operator says \`start\`, resolve the SDLC domain boundary with \`${oddSdlcCommand} start --workspace . --target next --until blocked --worker process://claude\` or \`${oddSdlcCommand} start --workspace . --target next --until blocked --worker process://codex\`, matching the active worker`,
-    `- for layered execution to convergence, hand control to the ABG command binding \`${genesisCommand} start --workspace . --scope workspace --target graph_function:${FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE} --until converged\`; do not create an odd_sdlc-local start/retry loop`,
-    `- inspect the RC surface with \`${oddSdlcCommand} rc-report\``,
+    `- when the operator says \`start\`, hand control to the ABG command binding \`${genesisCommand} start --workspace . --scope workspace --target graph_function:${FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE} --until blocked\`; do not create an odd_sdlc-local start/retry loop`,
+    `- for layered execution to convergence, use the same ABG command binding with \`--until converged\` only when the active ticket explicitly requires convergence proof`,
     `- ABG command binding: \`${genesisCommand}\``,
     `- ABIogenesis command binding: \`${abiogenesisCommand}\``,
     "- if `start` returns `fp_worker_unattached`, the traversal stopped lawfully because no live worker transport was attached; that is not completion",

@@ -80,12 +80,13 @@ Acceptance criteria:
 - AC-2: the instruction sections explain the target workspace ownership split:
   project-owned specification/source truth, ABG-owned substrate truth, and
   `odd_sdlc`-owned domain install truth
-- AC-3: the instruction sections map operator `gaps` to the installed
-  Spec Method entrypoint, which may be launched locally as
-  `odd-sdlc-ts gaps --workspace .`
-- AC-4: the instruction sections map operator `start` to the installed
-  Spec Method entrypoint, which may be launched locally as
-  `odd-sdlc-ts start --workspace . --target next --until blocked`
+- AC-3: the instruction sections map operator `gaps` to the installed ABG
+  command binding with `--scope workspace` over the installed `odd_sdlc`
+  runtime contract
+- AC-4: the instruction sections map operator `start` to the installed ABG
+  command binding, selected `odd_sdlc` graph-function target, and active
+  runtime contract. `odd_sdlc` must not publish a separate product-local
+  orchestration command for this path.
 - AC-5: instruction sections reference shared method through
   `workspace://.abiogenesis/docs/standards/...`, not through absolute source
   workspace paths
@@ -143,8 +144,9 @@ Acceptance criteria:
   `data_mapper.template` and proves the installed contract in an independent
   target workspace
 - AC-3: proof includes ABG install manifest, ABG installer manifest,
-  `odd_sdlc` product install manifest, command bindings, cold-agent instruction
-  files, method standard references, and command sanity for `gaps` and `start`
+  `odd_sdlc` product install manifest, ABG command bindings, cold-agent
+  instruction files, method standard references, and command sanity for `gaps`
+  and `start`
 - AC-4: live or sandbox UAT claims distinguish installed-command proof from
   source-line unit proof
 - AC-5: proof includes `odd_sdlc` runtime contract binding to the installed ABG
@@ -190,16 +192,16 @@ Acceptance criteria:
 - AC-3: after a constructive worker run, rerunning `gaps` reflects replay or
   admitted runtime truth rather than restarting from the same unchanged first
   edge
-- AC-4: installed command proof is distinct from source-line unit tests and
+- AC-4: installed ABG command proof is distinct from source-line unit tests and
   private harness proof
 - AC-5: the installed operator handoff shall support the agentic coder as the
-  user interface over the same installed Spec Method/ABG contract:
-  `User -> Agentic_Coder_CLI -> Spec Method command intent -> installed odd_sdlc contract -> ABG`
+  user interface over the same installed ABG/`odd_sdlc` contract:
+  `User -> Agentic_Coder_CLI -> ABG command intent -> installed odd_sdlc runtime contract -> ABG`
 - AC-6: the agentic coder CLI shall be treated as the user interface over
   installed product truth, not as a second runtime or hidden controller
-- AC-7: plain shell execution may launch the same installed entrypoint, but it
-  shall not define command law, own retry/reentry, or become compatibility
-  facade truth
+- AC-7: plain shell execution may launch the installed ABG command binding, but
+  it shall not define product command law, own retry/reentry, or become
+  compatibility facade truth
 
 ### REQ-F-ODDSDLC-052 - supplied worker transport triggers governed execution
 
@@ -294,7 +296,7 @@ Acceptance criteria:
 
 - AC-1: the workspace is rebuilt from `data_mapper.template` and populated by
   public ABG and `odd_sdlc` installers
-- AC-2: proof uses installed commands from the target workspace
+- AC-2: proof uses installed ABG commands from the target workspace
 - AC-3: first `gaps` identifies the current open edge
 - AC-4: `start --worker ...` invokes a real worker and materializes at least
   one declared output asset

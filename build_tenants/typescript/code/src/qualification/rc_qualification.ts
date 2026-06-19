@@ -5,7 +5,7 @@
 
 export const ODD_SDLC_TYPESCRIPT_RC_QUALIFICATION_REPORT = Object.freeze({
   kind: "odd_sdlc_typescript_rc_qualification_report",
-  reportId: "odd-sdlc-ts-rc-qualification-20260506",
+  reportId: "odd-sdlc-rc-qualification-20260506",
   releaseClaim: "bounded_odd_native_typescript_rc",
   verdict: "retired_superseded_by_test35_uplift_wave",
   verdictScope:
@@ -89,7 +89,7 @@ export const ODD_SDLC_TYPESCRIPT_RC_QUALIFICATION_REPORT = Object.freeze({
     Object.freeze({
       name: "B-085 current live data_mapper release-depth parity",
       category: "live_rc_blocker",
-      command: "odd-sdlc-ts gaps --workspace .",
+      command: "genesis-ts gaps --workspace . --scope workspace",
       status: "completed_retired",
       evidenceRef:
         ".ai-workspace/tickets/completed/B-085-consume-component-repair-schedule-for-generated-scala-test-compile-failure.md"
@@ -166,7 +166,7 @@ export const ODD_SDLC_TYPESCRIPT_RC_QUALIFICATION_REPORT = Object.freeze({
       pythonEvidence:
         "Python can produce operational release/run evidence inside installed workspaces.",
       typescriptEvidence:
-        "graph catalog publishes prepare_release_surface and operational graph functions; T-059 proves package release-cut artifact and odd-sdlc-ts binary binding.",
+        "graph catalog publishes prepare_release_surface and operational graph functions; T-059 proves package release-cut artifact and no product-local public command binding.",
       status: "bounded_parity",
       gapTicket: null
     }),
