@@ -26,9 +26,9 @@ import {
   installOddSdlcTypescript,
   legacyBlockingReasonCode,
   makeSdlcBlockingReason,
-  invokeOddSdlcSpecMethodCommand,
   sha256Text,
-  sdlcBlockingReasonFromLegacy
+  sdlcBlockingReasonFromLegacy,
+  startOddSdlcWorkspace
 } from "../../build/semantic/code/src/index.js";
 
 function makeWorkspace() {
@@ -362,30 +362,27 @@ test("T-086 rejected install exposes typed blocking reason", async () => {
   assert(readFileSync(path.join(root, "README.md"), "utf8").includes("T-086"));
 });
 
-test("T-086 CLI JSON preserves typed summary blocking reasons", async () => {
+test("T-086 typed start preserves typed summary blocking reasons", async () => {
   const root = makeWorkspace();
-  const result = await invokeOddSdlcSpecMethodCommand([
-    "start",
-    "--workspace",
-    root,
-    "--target",
-    "graph_function:bootstrap_release_self_test",
-    "--until",
-    "blocked",
-    "--worker",
-    "process://node"
-  ]);
+  const result = await startOddSdlcWorkspace({
+    workspaceRoot: root,
+    target: {
+      kind: "graph_function",
+      handle: "bootstrap_release_self_test"
+    },
+    until: "blocked",
+    workerTransport: "process://node"
+  });
 
-  assert.equal(result.status, "ok");
-  assert.equal(result.payload.kind, "sdlc_installed_operator_start_outcome");
-  assert.equal(result.payload.status, "blocked");
-  assert.equal(result.payload.summary.blockingReason, "installed_topology_invalid");
+  assert.equal(result.kind, "sdlc_installed_operator_start_outcome");
+  assert.equal(result.status, "blocked");
+  assert.equal(result.summary.blockingReason, "installed_topology_invalid");
   assert.equal(
-    result.payload.summary.blockingReasons[0].kind,
+    result.summary.blockingReasons[0].kind,
     "sdlc_blocking_reason"
   );
   assert.equal(
-    result.payload.summary.blockingReasons[0].code,
+    result.summary.blockingReasons[0].code,
     "installed_topology_invalid"
   );
 });

@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 import {
   deriveSdlcInstalledQualificationInitialState,
   installOddSdlcTypescript,
-  invokeOddSdlcSpecMethodCommand,
+  startOddSdlcWorkspace,
   writeSdlcInstalledQualificationInitialStateArchive
 } from "../../build/semantic/code/src/index.js";
 import { canonicalDataMapperFixtureRoot } from "../fixtures/data_mapper_fixture.mjs";
@@ -113,26 +113,23 @@ test("T-069 initial-state validation fails closed without installed topology", (
   ]);
 });
 
-test("T-069 CLI worker start blocks before graph execution when install topology is absent", async () => {
+test("T-069 typed worker start blocks before graph execution when install topology is absent", async () => {
   const workspaceRoot = freshDataMapperWorkspace();
-  const started = await invokeOddSdlcSpecMethodCommand([
-    "start",
-    "--workspace",
+  const started = await startOddSdlcWorkspace({
     workspaceRoot,
-    "--target",
-    "graph_function:bootstrap_release_self_test",
-    "--until",
-    "blocked",
-    "--worker",
-    "process://node"
-  ]);
+    target: {
+      kind: "graph_function",
+      handle: "bootstrap_release_self_test"
+    },
+    until: "blocked",
+    workerTransport: "process://node"
+  });
 
-  assert.equal(started.status, "ok");
-  assert.equal(started.payload.status, "blocked");
-  assert.equal(started.payload.summary.blockingReason, "installed_topology_invalid");
-  assert.equal(started.payload.replayEventCountAfter, 0);
+  assert.equal(started.status, "blocked");
+  assert.equal(started.summary.blockingReason, "installed_topology_invalid");
+  assert.equal(started.replayEventCountAfter, 0);
   assert.equal(
-    existsSync(path.join(started.payload.archiveRoot, "initial_state_validation.json")),
+    existsSync(path.join(started.archiveRoot, "initial_state_validation.json")),
     true
   );
 });

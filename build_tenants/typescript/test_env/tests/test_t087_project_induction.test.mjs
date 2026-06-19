@@ -11,7 +11,8 @@ import { fileURLToPath } from "node:url";
 import {
   FG_CONFORM_PROJECT,
   installOddSdlcTypescript,
-  invokeOddSdlcSpecMethodCommand
+  projectOddSdlcWorkspaceGaps,
+  startOddSdlcWorkspace
 } from "../../build/semantic/code/src/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
@@ -87,20 +88,18 @@ test("T-087 routes understructured installed workspace through Fg_conform_projec
   });
   assert.equal(install.kind, "installed");
 
-  const firstGaps = await invokeOddSdlcSpecMethodCommand(["gaps", "--workspace", workspace]);
-  assert.equal(firstGaps.status, "ok");
-  assert.equal(firstGaps.payload.start.executionContract.targetGraphFunction, FG_CONFORM_PROJECT);
-  assert.equal(firstGaps.payload.projection.currentEdge, FG_CONFORM_PROJECT);
-  assert.equal(firstGaps.payload.start.executionContract.basis.resolvedPolicy.defaultRegime, "F_D");
-  assert.equal(firstGaps.payload.start.executionContract.workerAttachment.status, "unattached");
+  const firstGaps = projectOddSdlcWorkspaceGaps({ workspaceRoot: workspace });
+  assert.equal(firstGaps.start.executionContract.targetGraphFunction, FG_CONFORM_PROJECT);
+  assert.equal(firstGaps.projection.currentEdge, FG_CONFORM_PROJECT);
+  assert.equal(firstGaps.start.executionContract.basis.resolvedPolicy.defaultRegime, "F_D");
+  assert.equal(firstGaps.start.executionContract.workerAttachment.status, "unattached");
 
-  const induction = await invokeOddSdlcSpecMethodCommand(["start", "--workspace", workspace]);
-  assert.equal(induction.status, "ok");
-  assert.equal(induction.payload.kind, "sdlc_installed_operator_start_outcome");
-  assert.equal(induction.payload.summary.graphFunctionName, FG_CONFORM_PROJECT);
-  assert.equal(induction.payload.summary.currentEdge, FG_CONFORM_PROJECT);
-  assert.equal(induction.payload.status, "converged");
-  assert.deepStrictEqual(induction.payload.emittedRuntimeEventKinds, [
+  const induction = await startOddSdlcWorkspace({ workspaceRoot: workspace });
+  assert.equal(induction.kind, "sdlc_installed_operator_start_outcome");
+  assert.equal(induction.summary.graphFunctionName, FG_CONFORM_PROJECT);
+  assert.equal(induction.summary.currentEdge, FG_CONFORM_PROJECT);
+  assert.equal(induction.status, "converged");
+  assert.deepStrictEqual(induction.emittedRuntimeEventKinds, [
     "basis_admitted",
     "graph_call_opened",
     "frame_opened",
@@ -137,7 +136,7 @@ test("T-087 routes understructured installed workspace through Fg_conform_projec
     );
   }
   const report = JSON.parse(
-    readFileSync(path.join(induction.payload.archiveRoot, "conform_project_report.json"), "utf8")
+    readFileSync(path.join(induction.archiveRoot, "conform_project_report.json"), "utf8")
   );
   assert.equal(report.status, "passed");
   assert.deepStrictEqual(report.conformanceGaps, []);
@@ -166,11 +165,10 @@ test("T-087 routes understructured installed workspace through Fg_conform_projec
     "project bootstrap must not publish installed runtime control commands as project authority"
   );
 
-  const secondGaps = await invokeOddSdlcSpecMethodCommand(["gaps", "--workspace", workspace]);
-  assert.equal(secondGaps.status, "ok", JSON.stringify(secondGaps.payload));
+  const secondGaps = projectOddSdlcWorkspaceGaps({ workspaceRoot: workspace });
   assert.equal(
-    secondGaps.payload.start.executionContract.targetGraphFunction,
+    secondGaps.start.executionContract.targetGraphFunction,
     "derive_intent_surface"
   );
-  assert.equal(secondGaps.payload.projection.currentEdge, "derive_intent_surface");
+  assert.equal(secondGaps.projection.currentEdge, "derive_intent_surface");
 });

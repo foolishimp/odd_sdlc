@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   installOddSdlcTypescript,
-  invokeOddSdlcSpecMethodCommand
+  startOddSdlcWorkspace
 } from "../../build/semantic/code/src/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
@@ -133,15 +133,13 @@ function writeWorkerScript(workspaceRoot) {
 }
 
 async function startOne(workspace, workerScript) {
-  return invokeOddSdlcSpecMethodCommand([
-    "start",
-    "--workspace",
-    workspace,
-    "--target",
-    "graph_function:derive_design_surface",
-    "--until",
-    "first_traversal",
-    "--worker",
-    `process://node?script=${encodeURIComponent(workerScript)}`
-  ]);
+  return startOddSdlcWorkspace({
+    workspaceRoot: workspace,
+    target: {
+      kind: "graph_function",
+      handle: "derive_design_surface"
+    },
+    until: "first_traversal",
+    workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`
+  });
 }

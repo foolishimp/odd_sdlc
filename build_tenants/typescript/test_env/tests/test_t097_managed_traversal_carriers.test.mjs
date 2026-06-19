@@ -18,7 +18,7 @@ import {
   deriveConformProjectManagedTraversalManifest,
   FG_CONFORM_PROJECT,
   installOddSdlcTypescript,
-  invokeOddSdlcSpecMethodCommand
+  startOddSdlcWorkspace
 } from "../../build/semantic/code/src/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
@@ -83,18 +83,17 @@ test("T-097 archives bootstrap manifest without legacy managed traversal ledger"
     ["prestep", "execute", "postprocess"]
   );
 
-  const induction = await invokeOddSdlcSpecMethodCommand(["start", "--workspace", workspace]);
-  assert.equal(induction.status, "ok");
-  assert.equal(induction.payload.status, "converged");
-  assert.equal(induction.payload.summary.graphFunctionName, FG_CONFORM_PROJECT);
+  const induction = await startOddSdlcWorkspace({ workspaceRoot: workspace });
+  assert.equal(induction.status, "converged");
+  assert.equal(induction.summary.graphFunctionName, FG_CONFORM_PROJECT);
 
   const manifestPath = path.join(
-    induction.payload.archiveRoot,
+    induction.archiveRoot,
     "managed_traversal_manifest.json"
   );
   assert.equal(existsSync(manifestPath), true);
   assert.equal(
-    existsSync(path.join(induction.payload.archiveRoot, "managed_traversal_ledger.json")),
+    existsSync(path.join(induction.archiveRoot, "managed_traversal_ledger.json")),
     false
   );
 

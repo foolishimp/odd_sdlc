@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   installOddSdlcTypescript,
-  invokeOddSdlcSpecMethodCommand
+  startOddSdlcWorkspace
 } from "../../build/semantic/code/src/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
@@ -110,17 +110,15 @@ function withEnv(overrides, callback) {
 }
 
 async function runStart(workspace, worker) {
-  return invokeOddSdlcSpecMethodCommand([
-    "start",
-    "--workspace",
-    workspace,
-    "--target",
-    "graph_function:bootstrap_release_self_test",
-    "--until",
-    "first_traversal",
-    "--worker",
-    worker
-  ]);
+  return startOddSdlcWorkspace({
+    workspaceRoot: workspace,
+    target: {
+      kind: "graph_function",
+      handle: "bootstrap_release_self_test"
+    },
+    until: "first_traversal",
+    workerTransport: worker
+  });
 }
 
 test("T-110 missing worker command projects typed ABG process error instead of generic worker failure", async () => {
@@ -134,16 +132,15 @@ test("T-110 missing worker command projects typed ABG process error instead of g
     () => runStart(workspace, "process://odd-sdlc-t110-missing-worker-command")
   );
 
-  assert.equal(start.status, "ok");
-  assert.equal(start.payload.status, "worker_failed");
-  assert.equal(start.payload.summary.blockingReason, "worker_process_error");
-  assert.equal(start.payload.workerRun.executorProfile, "local-spawn");
-  assert.equal(start.payload.workerRun.outcome.kind, "process_error");
+  assert.equal(start.status, "worker_failed");
+  assert.equal(start.summary.blockingReason, "worker_process_error");
+  assert.equal(start.workerRun.executorProfile, "local-spawn");
+  assert.equal(start.workerRun.outcome.kind, "process_error");
   assert.equal(
-    start.payload.summary.blockingReasons[0].detail.includes("outcome=process_error"),
+    start.summary.blockingReasons[0].detail.includes("outcome=process_error"),
     true
   );
-  assert.notEqual(start.payload.summary.blockingReason, "worker_process_failed");
+  assert.notEqual(start.summary.blockingReason, "worker_process_failed");
 });
 
 test("T-110 timed worker projects ABG hard timeout instead of generic worker failure", async () => {
@@ -172,17 +169,16 @@ test("T-110 timed worker projects ABG hard timeout instead of generic worker fai
     () => runStart(workspace, `process://node?script=${encodeURIComponent(workerPath)}`)
   );
 
-  assert.equal(start.status, "ok");
-  assert.equal(start.payload.status, "worker_failed");
-  assert.equal(start.payload.summary.blockingReasons[0].code, "worker_hard_timeout");
-  assert.equal(start.payload.workerRun.executorProfile, "local-spawn");
-  assert.equal(start.payload.workerRun.outcome.kind, "hard_timeout");
-  assert.equal(start.payload.workerRun.timedOut, true);
+  assert.equal(start.status, "worker_failed");
+  assert.equal(start.summary.blockingReasons[0].code, "worker_hard_timeout");
+  assert.equal(start.workerRun.executorProfile, "local-spawn");
+  assert.equal(start.workerRun.outcome.kind, "hard_timeout");
+  assert.equal(start.workerRun.timedOut, true);
   assert.equal(
-    start.payload.summary.blockingReasons[0].detail.includes("outcome=hard_timeout"),
+    start.summary.blockingReasons[0].detail.includes("outcome=hard_timeout"),
     true
   );
-  assert.notEqual(start.payload.summary.blockingReason, "worker_process_failed");
+  assert.notEqual(start.summary.blockingReason, "worker_process_failed");
 });
 
 test("T-129 installed odd_sdlc run keeps active worker alive past inactivity lease and archives ABG liveness projection", async () => {
@@ -225,18 +221,17 @@ test("T-129 installed odd_sdlc run keeps active worker alive past inactivity lea
     () => runStart(workspace, `process://node?script=${encodeURIComponent(workerPath)}`)
   );
 
-  assert.equal(start.status, "ok");
-  assert.equal(start.payload.workerRun.status, 0);
-  assert.equal(start.payload.workerRun.timedOut, false);
-  assert.notEqual(start.payload.workerRun.outcome.kind, "hard_timeout");
+  assert.equal(start.workerRun.status, 0);
+  assert.equal(start.workerRun.timedOut, false);
+  assert.notEqual(start.workerRun.outcome.kind, "hard_timeout");
   const eventsText = readFileSync(
-    path.join(start.payload.archiveRoot, "worker_process_events.jsonl"),
+    path.join(start.archiveRoot, "worker_process_events.jsonl"),
     "utf8"
   );
   assert.match(eventsText, /runtime_activity_probe_observed/u);
   const liveness = JSON.parse(
     readFileSync(
-      path.join(start.payload.archiveRoot, "runtime_liveness_observer_projection.json"),
+      path.join(start.archiveRoot, "runtime_liveness_observer_projection.json"),
       "utf8"
     )
   );
@@ -251,7 +246,7 @@ test("T-129 installed odd_sdlc run keeps active worker alive past inactivity lea
   );
   const summary = JSON.parse(
     readFileSync(
-      path.join(start.payload.archiveRoot, "worker_process_summary.json"),
+      path.join(start.archiveRoot, "worker_process_summary.json"),
       "utf8"
     )
   );

@@ -570,6 +570,48 @@ Next blocker set:
 - split command grammar and serialization into a quarantined legacy/parser
   surface before deletion
 
+### 2026-06-19 Simple Async Test Caller Cut Result
+
+Cut scope: migrate deterministic unit-test callers that only needed typed
+`gaps` or `start` behavior off `invokeOddSdlcSpecMethodCommand(...)`.
+
+Changed contract:
+
+- T-087, T-096, and T-097 managed traversal tests use
+  `projectOddSdlcWorkspaceGaps(...)` and `startOddSdlcWorkspace(...)`.
+- T-069 and T-086 missing-installed-topology checks use
+  `startOddSdlcWorkspace(...)` and assert the typed blocked outcome directly.
+- T-098 and T-110 worker/start helper paths use `startOddSdlcWorkspace(...)`
+  instead of constructing argv arrays.
+
+Current private-helper metrics after this cut, excluding archived
+`test_env/test_runs` and generated `build/semantic` output:
+
+| Surface | Files | Matches | Delta from typed workspace API cut |
+| --- | ---: | ---: | ---: |
+| `invokeOddSdlcSpecMethodCommand` | 8 | 30 | -7 files / -18 matches |
+| `invokeOddSdlcSpecMethodCommandSync` | 9 | 49 | unchanged |
+| `serializeOddSdlcSpecMethodResult` | 5 | 12 | unchanged |
+| `commandPayload` | 1 | 5 | unchanged |
+
+Focused proof completed:
+
+- `npm run build:semantic` passed.
+- `node --test` over T-069, T-086, T-087, T-096, T-097, and T-110 passed
+  with 17 tests.
+- `node --test test_env/tests/test_t098_requirements_to_design_assurance.test.mjs`
+  passed.
+- focused ESLint passed for the migrated files.
+- `node --check` passed for T-098.
+
+Next blocker set:
+
+- migrate sandbox/scenario helper users or quarantine them as harness-only
+  package API callers
+- classify remaining async helpers in release/install adapter tests as package
+  API proof versus command-parser proof
+- replace or quarantine sync helper users and serializer tests
+
 ### 2026-06-19 Initial CLI-Path Function Audit
 
 Scope: this is a first pass from the public package bin through
