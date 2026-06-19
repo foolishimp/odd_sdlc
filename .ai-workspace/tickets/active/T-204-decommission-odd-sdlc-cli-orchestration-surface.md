@@ -215,6 +215,41 @@ the files, command paths, authority conflicts, migration owner, and proof lane
 for the first deletion cut. A phase may classify code as `delete` or
 `move_to_abg`, but the phase itself does not delete or move code.
 
+The 2026-06-19 audit tables below are historical review evidence, not current
+execution authority. Every file and function must be re-read against the
+post-RC2, post-T-205 source tree before deletion, migration, or survival is
+claimed. The current execution plan is:
+
+1. Freeze and re-baseline the current tree: file count, line count, exports,
+   imports, package bins, test callers, and command/helper call surfaces.
+2. Reevaluate every exported function and every command-reachable internal
+   function from current code, not from the old audit.
+3. Build a call-surface map for `odd-sdlc-ts`, `code/src/cli/main.ts`,
+   `invokeOddSdlcSpecMethodCommand*`, `commandPayload*`,
+   `serializeOddSdlcSpecMethodResult`, `installedStartPayloadFor`, and
+   `startOutcomeForObservedReplay`.
+4. Add drift guards before broad deletion: reject public SDLC orchestration
+   bins, `code/src/cli/` command surfaces, command dispatch exports, and tests
+   that prove traversal/runtime behavior through private SDLC command helpers.
+5. First cut: remove the public CLI bin and `code/src/cli/main.ts` only after
+   direct callers have an accepted target.
+6. Second cut: split `spec_method/entry.ts` into explicit product library,
+   package/release API, and delete/move candidates; delete command grammar,
+   argv parsing, CLI result envelopes, compact serializers, and dispatch.
+7. Third cut: reevaluate `start/*`, `operator/installed_operator.ts`,
+   archive analysis, replay helpers, and runtime event readers function by
+   function. Keep only product plugin implementation and irreducible product
+   carriers/projections.
+8. Fourth cut: delete or isolate analysis/common tooling. It must not remain
+   runtime authority.
+9. At every checkpoint track total source files/lines, unclassified
+   files/lines, `remove_public_cli` lines, `move_to_abg` lines,
+   `temporary_blocker` count, command-helper imports in tests, and package bin
+   count.
+10. Close only when every source file/function is classified, command surfaces
+    are gone, tests use ABG or product library APIs appropriately, and every
+    remaining odd_sdlc source file has positive survival proof.
+
 Each reviewed file receives one of these classifications:
 `gtl_program`, `plugin`, `product_carrier`, `product_projection`,
 `package_or_release_plumbing`, `test_or_live_harness`, `move_to_abg`,
@@ -225,6 +260,132 @@ Each reviewed command receives one of these classifications:
 `test_or_live_harness`, `temporary_blocker`, or `remove`.
 
 ## Audit Tables
+
+### 2026-06-19 Fresh Execution Baseline
+
+Scope: generated from the current post-RC2, post-T-205 source tree before any
+T-204 deletion or migration cut. Archived live-run output under
+`test_env/test_runs` is excluded from caller counts. This baseline supersedes
+the older "about 180 files" estimate for execution tracking, but it does not
+classify files by itself.
+
+| Metric | Current |
+| --- | ---: |
+| Active T-204 worktree source files under `code/src` | 180 |
+| Active T-204 worktree source lines under `code/src` | 98,222 |
+| Source files explicitly touched by the old audit tables | 38 |
+| Lines in files explicitly touched by the old audit tables | 30,164 |
+| Source files still requiring fresh survival classification | 142 |
+| Lines still requiring fresh survival classification | 68,058 |
+| Export declarations under `code/src` | 1,596 |
+| Import statements under `code/src` | 653 |
+| Published package bins | 1 |
+| Published SDLC orchestration bin | `odd-sdlc-ts -> ./build/semantic/code/src/cli/main.js` |
+| Current `code/src/cli` files | 1 |
+
+Current line buckets:
+
+| Area | Lines | Files |
+| --- | ---: | ---: |
+| `operator` | 55,014 | 53 |
+| `graph` | 7,718 | 10 |
+| `analysis` | 5,462 | 15 |
+| `workspace` | 3,403 | 9 |
+| `assurance` | 3,170 | 13 |
+| `spec_method` | 3,110 | 2 |
+| `projection` | 2,511 | 3 |
+| `tickets` | 2,191 | 2 |
+| `start` | 1,857 | 3 |
+| `qualification` | 1,742 | 6 |
+| `contracts` | 1,715 | 5 |
+| `gtl_conformance` | 1,589 | 2 |
+| `shared` | 1,547 | 8 |
+
+Execution watchlists:
+
+| Watchlist | Lines | Files | Tracking rule |
+| --- | ---: | ---: | --- |
+| Hard command surface: `cli/main.ts` plus `spec_method/*` | 3,126 | 3 | Must go to zero or be split into non-command library/package APIs. |
+| Orchestration-heavy surface: CLI, spec_method, start, analysis, projection, workspace, runtime, `operator/installed_operator.ts`, `operator/index.ts`, and `operator/product_materialization/replay.ts` | 29,177 | 38 | Every line must be reclassified before deletion/move/survival. |
+| Operator plugin subtree | 19,949 | 14 | Likely survivor zone, but plugin-vs-runtime authority must still be checked function by function. |
+
+Largest current files to prioritize for function-level review:
+
+| File | Lines | Initial reason to review |
+| --- | ---: | --- |
+| `operator/installed_operator.ts` | 10,937 | Largest runtime/dispatch concentration; likely split between plugin session, product proof, and ABG-owned orchestration. |
+| `operator/plugins/transform/launch_contract.ts` | 6,126 | Plugin handoff surface mixed with launch/materialization authority. |
+| `operator/plugins/evaluate/postflight_checks.ts` | 3,782 | Evaluator/postflight law; likely plugin survivor but must not own generic runtime closure. |
+| `spec_method/entry.ts` | 3,109 | Command grammar, command dispatch, archive replay, gaps, start, install, release, and serializers mixed in one file. |
+| `operator/plugins/transform/result_projection.ts` | 2,541 | Plugin result projection; check ABG result-ingress boundary. |
+| `operator/product_materialization/authority.ts` | 2,470 | Product authority survivor candidate; check launch/runtime ownership. |
+| `tickets/workflow.ts` | 2,190 | Product ticket projection/admission candidate; check command/archive coupling. |
+| `operator/carriers.ts` | 2,183 | Product/plugin carrier survivor candidate; check generic runtime carrier drift. |
+| `operator/traversal_consequence.ts` | 2,138 | Product interpretation over ABG consequence; check no local bind authority. |
+| `projection/query_domain.ts` | 1,833 | Product read-model survivor candidate; keep command-free. |
+
+### 2026-06-19 Fresh Command Caller Baseline
+
+Caller counts below exclude archived `test_env/test_runs` output and count
+current source, tests, sandbox/live scripts, fixtures, and specification text.
+
+| Surface | Files | Matches | Current interpretation |
+| --- | ---: | ---: | --- |
+| `invokeOddSdlcSpecMethodCommand` | 22 | 99 | Broad async command-helper dependency across tests, sandbox, and live harness. |
+| `invokeOddSdlcSpecMethodCommandSync` | 8 | 47 | Sync command-helper dependency concentrated in spec-method, gaps, replay, and archive tests. |
+| `serializeOddSdlcSpecMethodResult` | 6 | 14 | CLI serializer still has test callers. |
+| `odd-sdlc-ts` | 30 | 111 | Public command still appears in package/install/release/qualification/tests/live/fixtures/specs. |
+| `build/semantic/code/src/cli/main.js` | 9 | 10 | Built source CLI path still appears in live and command tests. |
+| `installedStartPayloadFor` | 2 | 3 | Runtime start payload remains in `spec_method/entry.ts`; product-gate test references it. |
+| `startOutcomeForObservedReplay` | 3 | 5 | Replay-aware start selector remains in `spec_method/entry.ts`; tests pin it as drift evidence. |
+| `commandPayload` | 1 | 5 | Internal command dispatcher remains confined to `spec_method/entry.ts`. |
+
+Current first blocker set:
+
+- `build_tenants/typescript/package.json` still publishes
+  `bin.odd-sdlc-ts`.
+- `build_tenants/typescript/code/src/cli/main.ts` still exists.
+- `build_tenants/typescript/code/src/spec_method/entry.ts` still owns
+  command dispatch, command serialization, replay-aware start selection, and
+  installed start payload construction.
+- Direct command-helper tests/harnesses still include
+  `test_t058_spec_method_entrypoint`, `test_t059_install_release_adapter`,
+  `test_t064_installed_operator_ux`, `test_t069_installed_initial_state`,
+  `test_t086_blocking_reason_carriers`, `test_t087_project_induction`,
+  `test_t093_scheduling_phase`, `test_t096_managed_traversal_bootstrap`,
+  `test_t097_managed_traversal_carriers`,
+  `test_t098_requirements_to_design_assurance`,
+  `test_t101_retry_report_rejection_loop`,
+  `test_t110_typed_callout_projection`,
+  `test_t139_public_gaps_read_only_evaluator_view`,
+  `test_t145_replay_visible_closure_authority`,
+  `test_t150_visible_defaults_catalog_lookup`,
+  `test_t158_consequence_admission_regression`,
+  `test_t161_fd_run_analysis_linter`,
+  `test_env/sandbox/scenario_sandbox.mjs`,
+  `test_env/sandbox/test_t087_t091_t096_internal_data_mapper_induction_sandbox.test.mjs`,
+  and `test_env/live/test_t110_live_agent_pty_installed_operator.test.mjs`.
+- Install/release/qualification surfaces still assert or produce
+  `odd-sdlc-ts`: `install/installer.ts`,
+  `qualification/installed_initial_state.ts`,
+  `qualification/rc_qualification.ts`, `release/carriers.ts`, and
+  `release/release_cut.ts`.
+- Specification still contains active `odd-sdlc-ts` command wording in
+  `specification/requirements/08-odd-sdlc-first-slice.md` and
+  `specification/requirements/14-odd-sdlc-installed-product-contract.md`.
+
+Immediate next execution checkpoint:
+
+- Add product-gate tests that reject `bin.odd-sdlc-ts`, `code/src/cli`, and
+  exported command helpers. These should be introduced as failing/expected-red
+  drift guards only when the first deletion cut starts, not during this
+  baseline pass.
+- Re-read `spec_method/entry.ts` function by function and split rows into:
+  delete-now command plumbing, product read-model library API, package/release
+  API, ABG CLI migration blocker, and common tooling candidate.
+- For each direct command-helper caller, choose one migration target before
+  deleting `cli/main.ts`: ABG CLI, product library API, package/release API,
+  or deleted historical test.
 
 ### 2026-06-19 Initial CLI-Path Function Audit
 
