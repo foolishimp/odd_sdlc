@@ -381,6 +381,22 @@ function selectedEdgeAssuranceArchive(records) {
   return closed.at(-1) ?? complete.at(-1) ?? records.at(-1) ?? null;
 }
 
+function retryClosureDecisionSummaries(workspace) {
+  return operatorRunRoots(workspace).flatMap((archiveRoot) => {
+    const closurePath = path.join(archiveRoot, "sdlc_edge_closure_decision.json");
+    const closure = readJsonFile(closurePath);
+    if (closure?.disposition !== "retry") return [];
+    const manifest = readJsonFile(path.join(archiveRoot, "handoff_manifest.json"));
+    return [
+      {
+        edgeName:
+          typeof manifest?.edgeName === "string" ? manifest.edgeName : "(unknown)",
+        archiveRoot
+      }
+    ];
+  });
+}
+
 function filePathFromRef(ref) {
   if (typeof ref !== "string" || ref.length === 0) return null;
   if (ref.startsWith("file://")) {
@@ -924,7 +940,8 @@ export async function runScenarioSandbox(scenario, options = {}) {
 
   const installedWorkspace = await provisionAbgInstalledSandbox({
     archiveRoot: runRoot,
-    scenarioId: scenario.scenarioId
+    scenarioId: scenario.scenarioId,
+    packageSourceRoot: abgPackageSourceRoot
   });
   assertAbgInstalledSandboxEvidence(installedWorkspace);
 
@@ -1229,6 +1246,16 @@ export function assertScenarioExpectations(result, scenario) {
       result,
       expectations.edgeAssuranceArchiveSequencePrefix
     );
+  }
+  if (expectations.forbidRetryClosureDecisions === true) {
+    const retries = retryClosureDecisionSummaries(result.workspace);
+    if (retries.length > 0) {
+      throw new Error(
+        `${scenario.scenarioId}: expected zero retry closure decisions, saw ${retries
+          .map((retry) => `${retry.edgeName} at ${retry.archiveRoot}`)
+          .join("; ")}`
+      );
+    }
   }
   assertLiveFpParallelMaterializationFrontier(
     result,

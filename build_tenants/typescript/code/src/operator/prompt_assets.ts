@@ -27,7 +27,7 @@ export const SDLC_METHOD_AUTHORITY_COMPRESSION_REFS = Object.freeze([
 ] as const);
 
 const SPEC_METHOD_PROMPT_OPENING_LINE =
-  "Make a plan from governing authority, rank the work by contextual closure priority, then work through that priority order: critical behavior, highest-dependency modules, and shared/common-library foundations first.";
+  "Use the smallest governing authority packet that can decide this prompt, then produce the contracted artifact without extra planning or global SDLC reconstruction.";
 
 export const SDLC_PROMPT_FAMILIES = Object.freeze([
   "transform",

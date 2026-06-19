@@ -46,6 +46,8 @@ import {
 } from "../../decomposition_admission.js";import {
   admitTestExecutionSurfaceRegisterFromArtifact
 } from "../../test_execution_surface_register.js";import {
+  admitComponentDepthRegisterFromArtifact
+} from "../../component_depth_register.js";import {
   makeSdlcBlockingReason,
   type SdlcBlockingReason,
   type SdlcBlockingReasonCode
@@ -395,6 +397,152 @@ function declaredTenantToolByproductRulesFromSpecFiles(
       }
     })
   );
+}
+
+type TenantModuleSystem = "esm" | "commonjs";
+
+interface TenantModuleSystemAuthority {
+  readonly moduleSystems: readonly TenantModuleSystem[];
+  readonly evidenceRefs: readonly string[];
+}
+
+function normalizedTenantModuleSystem(
+  value: unknown
+): TenantModuleSystem | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, "");
+  if (
+    normalized === "esm" ||
+    normalized === "esmodule" ||
+    normalized === "esmodules" ||
+    normalized === "ecmascriptmodule" ||
+    normalized === "ecmascriptmodules" ||
+    normalized === "module" ||
+    normalized === "typemodule" ||
+    normalized === "nodeesm"
+  ) {
+    return "esm";
+  }
+  if (
+    normalized === "commonjs" ||
+    normalized === "cjs" ||
+    normalized === "commonjssyntax"
+  ) {
+    return "commonjs";
+  }
+  return null;
+}
+
+function tenantModuleSystemsFromUnknown(
+  value: unknown
+): readonly TenantModuleSystem[] {
+  const direct = normalizedTenantModuleSystem(value);
+  if (direct !== null) {
+    return Object.freeze([direct]);
+  }
+  const record = objectRecord(value);
+  if (record === null) {
+    return Object.freeze([]);
+  }
+  const directKeys = [
+    "moduleSystem",
+    "module_system",
+    "sourceModuleSystem",
+    "source_module_system",
+    "testModuleSystem",
+    "test_module_system",
+    "javascriptModuleSystem",
+    "javascript_module_system"
+  ];
+  const nestedKeys = [
+    "runtime",
+    "executionRuntime",
+    "execution_runtime",
+    "executionEnvironment",
+    "execution_environment",
+    "testingTechStack",
+    "testing_tech_stack",
+    "testTechStack",
+    "test_tech_stack"
+  ];
+  return uniqueSorted([
+    ...directKeys.flatMap((key) =>
+      tenantModuleSystemsFromUnknown(record[key])
+    ),
+    ...nestedKeys.flatMap((key) =>
+      tenantModuleSystemsFromUnknown(record[key])
+    )
+  ]) as readonly TenantModuleSystem[];
+}
+
+function declaredTenantModuleSystemAuthorityForManifest(
+  manifest: SdlcWorkerHandoffManifest
+): TenantModuleSystemAuthority {
+  const specFiles = tenantStackSpecFilesForSelectedOutputRoot({
+    workspaceRoot: manifest.workspaceRoot,
+    selectedOutputRoot: manifest.productMaterialization.selectedOutputRoot
+  });
+  const moduleSystems = uniqueSorted(
+    specFiles.flatMap((filePath) => {
+      const source = textIfFile(filePath);
+      if (source === null) {
+        return [];
+      }
+      try {
+        return tenantModuleSystemsFromUnknown(JSON.parse(source));
+      } catch {
+        return [];
+      }
+    })
+  ) as readonly TenantModuleSystem[];
+  return Object.freeze({
+    moduleSystems,
+    evidenceRefs: Object.freeze(specFiles.map((filePath) => pathToFileURL(filePath).href))
+  });
+}
+
+function materializedJavascriptFileUsesCommonJs(content: string): boolean {
+  return (
+    /(^|[^\w$])require\s*\(/u.test(content) ||
+    /(^|[^\w$])module\.exports\b/u.test(content) ||
+    /(^|[^\w$])exports\.[A-Za-z_$]/u.test(content) ||
+    /(^|[^\w$])exports\s*=/u.test(content)
+  );
+}
+
+function evaluateMaterializedProductModuleSystem(input: {
+  readonly moduleSystemAuthority: TenantModuleSystemAuthority;
+  readonly file: SdlcMaterializedProductFile;
+  readonly content: string;
+  readonly evidenceRefs: readonly string[];
+}): SdlcBlockingReason | null {
+  if (!input.moduleSystemAuthority.moduleSystems.includes("esm")) {
+    return null;
+  }
+  const extension = path.extname(input.file.relativePath).toLowerCase();
+  if (
+    extension !== ".js" &&
+    extension !== ".mjs" &&
+    extension !== ".jsx"
+  ) {
+    return null;
+  }
+  if (!materializedJavascriptFileUsesCommonJs(input.content)) {
+    return null;
+  }
+  return makeSdlcBlockingReason({
+    code: "materialized_product_module_system_mismatch",
+    detail: `${input.file.relativePath}: commonjs syntax under esm module system`,
+    evidenceRefs: [
+      ...input.evidenceRefs,
+      ...input.moduleSystemAuthority.evidenceRefs
+    ]
+  });
 }
 
 
@@ -2837,6 +2985,8 @@ export function evaluateMaterializedProductFiles(input: {
   const requiredProductRoles = new Set(
     effectiveProductMaterializationRequiredRoles(input.manifest)
   );
+  const moduleSystemAuthority =
+    declaredTenantModuleSystemAuthorityForManifest(input.manifest);
   const validRequirementLineageIds = new Set(
     requirementTraceObligationIdsForProductLineage(input.manifest)
   );
@@ -2946,6 +3096,15 @@ export function evaluateMaterializedProductFiles(input: {
         })
       );
     }
+    const moduleSystemMismatch = evaluateMaterializedProductModuleSystem({
+      moduleSystemAuthority,
+      file,
+      content,
+      evidenceRefs: [fileEvidenceRef]
+    });
+    if (moduleSystemMismatch !== null) {
+      input.blockingReasonCarriers.push(moduleSystemMismatch);
+    }
     const requirementTraceObligationIds = canonicalizeRequirementLineageIds({
       manifest: input.manifest,
       obligationIds: file.requirementTraceObligationIds ?? []
@@ -3019,6 +3178,31 @@ export function evaluateMaterializedProductFiles(input: {
       );
     }
   }
+}
+
+
+
+export function evaluateComponentDepthTargetCarrier(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly blockingReasonCarriers: SdlcBlockingReason[];
+}): void {
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: input.manifest.targetAssetType,
+    outputFile: input.manifest.outputFile
+  });
+  if (admission.status === "not_required" || admission.status === "admitted") {
+    return;
+  }
+  input.blockingReasonCarriers.push(
+    makeSdlcBlockingReason({
+      code: "component_depth_register_admission_invalid",
+      detail:
+        admission.blockingReasons.length === 0
+          ? `component_depth_register_admission_${admission.status}`
+          : admission.blockingReasons.join("; "),
+      evidenceRefs: admission.evidenceRefs
+    })
+  );
 }
 
 

@@ -23,6 +23,7 @@ import {
 import {
   evaluateAdrOutputArtifact,
   evaluateExecutionEvidence,
+  evaluateComponentDepthTargetCarrier,
   evaluateCodeBuilderSourceTestFrontier,
   evaluateCodeBuilderValidationLogs,
   evaluateMaterializedProductFiles,
@@ -41,6 +42,7 @@ import {
 } from "../../compute_subworkstreams.js";
 import {
   admittedDesignDepthFpEvaluatorRegisterEvidenceRefs,
+  admitImplementationDesignRegisterForRuntimeEvaluation,
   shouldDeferImplementationDesignRegisterToFpEvaluator
 } from "./design_depth_register.js";
 import type {
@@ -55,26 +57,57 @@ function activeComputeStageBlockingReasonCarriers(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly blockingReasonCarriers: readonly SdlcBlockingReason[];
 }): readonly SdlcBlockingReason[] {
+  const structuralCarrierBlockingReasons = input.blockingReasonCarriers.filter(
+    (reason) =>
+      reason.code === "staged_authority_missing" ||
+      reason.code === "staged_authority_admission_invalid" ||
+      reason.code === "staged_decomposition_rejected" ||
+      reason.code === "design_depth_fp_evaluator_pending" ||
+      reason.code === "design_depth_register_admission_invalid" ||
+      reason.code === "component_depth_register_admission_invalid"
+  );
+  const materializedProductBindingBlockingReasons =
+    input.blockingReasonCarriers.filter(
+      (reason) => reason.code === "materialized_product_module_system_mismatch"
+    );
   if (input.manifest.targetAssetType === "component_code_surface") {
     return Object.freeze(
-      input.blockingReasonCarriers.filter(
-        (reason) =>
-          reason.code === "code_builder_parallel_frontier_missing" ||
-          reason.code === "code_builder_parallel_test_lanes_missing" ||
-          reason.code === "code_builder_validation_command_failed" ||
-          reason.code === "materialized_product_role_policy_mismatch"
-      )
+      [
+        ...structuralCarrierBlockingReasons,
+        ...materializedProductBindingBlockingReasons,
+        ...input.blockingReasonCarriers.filter(
+          (reason) =>
+            reason.code === "code_builder_parallel_frontier_missing" ||
+            reason.code === "code_builder_parallel_test_lanes_missing" ||
+            reason.code === "code_builder_validation_command_failed" ||
+            reason.code === "materialized_product_role_policy_mismatch"
+        )
+      ]
+    );
+  }
+  if (
+    input.manifest.targetAssetType === "component_test_surface" ||
+    input.manifest.targetAssetType === "uat_test_source_surface"
+  ) {
+    return Object.freeze(
+      [
+        ...structuralCarrierBlockingReasons,
+        ...materializedProductBindingBlockingReasons
+      ]
     );
   }
   if (input.manifest.targetAssetType !== "test_execution_result_surface") {
-    return Object.freeze([]);
+    return Object.freeze(structuralCarrierBlockingReasons);
   }
   return Object.freeze(
-    input.blockingReasonCarriers.filter(
-      (reason) =>
-        reason.code === "test_execution_evidence_missing" ||
-        reason.code === "test_execution_evidence_invalid"
-    )
+    [
+      ...structuralCarrierBlockingReasons,
+      ...input.blockingReasonCarriers.filter(
+        (reason) =>
+          reason.code === "test_execution_evidence_missing" ||
+          reason.code === "test_execution_evidence_invalid"
+      )
+    ]
   );
 }
 
@@ -192,6 +225,16 @@ export function evaluateSdlcComputeStage(input: {
     report,
     blockingReasonCarriers
   });
+  evaluateDesignDepthFpEvaluatorTargetCarrier({
+    manifest: input.manifest,
+    blockingReasonCarriers,
+    fpEvaluatorAdmissionEvidenceRefs:
+      input.fpEvaluatorAdmissionEvidenceRefs ?? Object.freeze([])
+  });
+  evaluateComponentDepthTargetCarrier({
+    manifest: input.manifest,
+    blockingReasonCarriers
+  });
   evaluateCodeBuilderSourceTestFrontier({
     manifest: input.manifest,
     blockingReasonCarriers
@@ -240,6 +283,47 @@ export function evaluateSdlcComputeStage(input: {
     blockingReasonCarriers: Object.freeze(blockingReasonCarriers),
     evidenceRefs: Object.freeze(evidenceRefs)
   });
+}
+
+function evaluateDesignDepthFpEvaluatorTargetCarrier(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly blockingReasonCarriers: SdlcBlockingReason[];
+  readonly fpEvaluatorAdmissionEvidenceRefs: readonly string[];
+}): void {
+  if (input.manifest.targetAssetType !== "implementation_design_surface") {
+    return;
+  }
+  if (input.fpEvaluatorAdmissionEvidenceRefs.length === 0) {
+    const ruleOutcomePath = join(
+      input.manifest.archiveRoot,
+      "design_depth_fp_evaluator_rule_outcome.json"
+    );
+    input.blockingReasonCarriers.push(
+      makeSdlcBlockingReason({
+        code: "design_depth_fp_evaluator_pending",
+        detail: "design_depth_fp_evaluator_rule_outcome_missing",
+        evidenceRefs: [pathToFileURL(ruleOutcomePath).href]
+      })
+    );
+    return;
+  }
+  const admission = admitImplementationDesignRegisterForRuntimeEvaluation({
+    manifest: input.manifest,
+    fpEvaluatorAdmissionEvidenceRefs: input.fpEvaluatorAdmissionEvidenceRefs
+  });
+  if (admission.status === "admitted" && admission.register !== null) {
+    return;
+  }
+  input.blockingReasonCarriers.push(
+    makeSdlcBlockingReason({
+      code: "design_depth_register_admission_invalid",
+      detail:
+        admission.blockingReasons.length === 0
+          ? `design_depth_register_admission_${admission.status}`
+          : admission.blockingReasons.join("; "),
+      evidenceRefs: admission.evidenceRefs
+    })
+  );
 }
 
 function obligationAssessmentCounts(
@@ -594,6 +678,7 @@ export function writeSdlcFpEvaluateResult(input: {
   readonly report: SdlcWorkerResultReport;
   readonly postflight: SdlcPostflightResult;
   readonly postflightRef?: string | undefined;
+  readonly relativePath?: string | undefined;
 }): SdlcFpEvaluateResult {
   const result = constructSdlcFpEvaluateResult(input);
   const subworkstreamManifestPath = evaluateComputeSubworkstreamManifestPath(
@@ -608,7 +693,10 @@ export function writeSdlcFpEvaluateResult(input: {
   }
   writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
-    absolutePath: fpEvaluateResultPath(input.manifest),
+    absolutePath:
+      input.relativePath === undefined
+        ? fpEvaluateResultPath(input.manifest)
+        : join(input.manifest.archiveRoot, input.relativePath),
     payload: result
   });
   return result;

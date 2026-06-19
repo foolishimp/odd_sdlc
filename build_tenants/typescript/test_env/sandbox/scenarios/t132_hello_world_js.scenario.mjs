@@ -132,6 +132,7 @@ export function t132HelloWorldJsLiveScenario({
         FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
       ],
       edgeAssuranceArchiveSequencePrefix: T132_HELLO_WORLD_JS_MIN_FP_EDGES,
+      forbidRetryClosureDecisions: true,
       firstHandoffOverlayRef: SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
       executionEvidence: {
         edgeName: FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,

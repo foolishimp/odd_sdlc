@@ -23,7 +23,7 @@ import {
   sdlcSelectedAbgFnCompositionIdentityFromEnginePluginInput
 } from "../../build/semantic/code/src/index.js";
 
-const ABG_RC_VERSION = "4.1.0-rc.1";
+const ABG_RC_VERSION = "4.1.0-rc.2";
 const ABG_RELEASE_SNAPSHOT_REF = ABG_RC_VERSION;
 const ABG_DEPENDENCY_REF = `file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/${ABG_RELEASE_SNAPSHOT_REF}/abiogenesis-typescript-tenant-${ABG_RC_VERSION}.tgz`;
 
@@ -45,10 +45,10 @@ function readJsonAbsolute(filePath) {
 test(`T-180 pins the TypeScript tenant to ABG ${ABG_RC_VERSION}`, () => {
   const packageJson = readPackageJson("package.json");
   const packageLock = readPackageJson("package-lock.json");
-  const latestManifest = readJsonAbsolute(
+  const releaseManifest = readJsonAbsolute(
     path.resolve(
       REPO_ROOT,
-      "../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/latest/release-snapshot-manifest.json"
+      `../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/${ABG_RELEASE_SNAPSHOT_REF}/release-snapshot-manifest.json`
     )
   );
 
@@ -68,9 +68,9 @@ test(`T-180 pins the TypeScript tenant to ABG ${ABG_RC_VERSION}`, () => {
     ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.packageVersion,
     ABG_RC_VERSION
   );
-  assert.equal(latestManifest.releaseIdentity, ABG_RC_VERSION);
-  assert.equal(latestManifest.package.packageVersion, ABG_RC_VERSION);
-  assert.equal(latestManifest.sourceDirty, false);
+  assert.equal(releaseManifest.releaseIdentity, ABG_RC_VERSION);
+  assert.equal(releaseManifest.package.packageVersion, ABG_RC_VERSION);
+  assert.equal(releaseManifest.sourceDirty, false);
 });
 
 test("T-180 selected composition identity is consumed from ABG plugin input", () => {

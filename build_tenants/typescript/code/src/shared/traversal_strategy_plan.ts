@@ -163,7 +163,7 @@ function deriveDefaultEdgeScopeRefs(input: {
   for (const [edgeName, strategy] of Object.entries(input.edgeStrategies)) {
     if (strategy !== "full_breadth") {
       refs[edgeName] = Object.freeze([
-        `schedule://odd_sdlc/${edgeName}/cdme-compiler`
+        `schedule://odd_sdlc/${edgeName}/primary`
       ]);
     }
   }

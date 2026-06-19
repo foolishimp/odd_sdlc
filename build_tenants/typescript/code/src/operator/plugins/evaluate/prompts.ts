@@ -2,7 +2,8 @@
 
 import type {
   SdlcTenantToolEnvironmentProjection,
-  SdlcWorkerHandoffManifest
+  SdlcWorkerHandoffManifest,
+  SdlcWorkerInvocationPackage
 } from "../../carriers.js";
 import {
   SDLC_COMPONENT_CONCERN_ROLES,
@@ -86,7 +87,7 @@ function edgeAuthorityCompressionPromptLines(): readonly string[] {
 }
 
 const ABG_ITERATION_OUTCOME_FOLD_REF =
-  "package:@abiogenesis/typescript-tenant@4.1.0-rc.1#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows";
+  "package:@abiogenesis/typescript-tenant@4.1.0-rc.2#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows";
 
 interface EvaluatePromptLineGroups {
   readonly preAuthorityLines: readonly string[];
@@ -108,6 +109,38 @@ function manifestObligationRefs(
       (obligation) => obligation.obligationId
     )
   );
+}
+
+function uniquePromptRefs(values: readonly string[]): readonly string[] {
+  return Object.freeze(
+    [...new Set(values.filter((value) => value.trim().length > 0))].sort(
+      (left, right) => left.localeCompare(right)
+    )
+  );
+}
+
+type SdlcReviewGradeInvocationScope = Pick<
+  SdlcWorkerInvocationPackage,
+  "kind" | "featureScope" | "inlineObligationIds"
+>;
+
+function reviewGradePromptObligationRefs(
+  manifest: SdlcWorkerHandoffManifest,
+  invocationScope?: SdlcReviewGradeInvocationScope | null | undefined
+): readonly string[] {
+  const fallback = manifestObligationRefs(manifest);
+  if (manifest.featureScope?.mode === "full_breadth") {
+    return fallback;
+  }
+  if (
+    invocationScope === null ||
+    invocationScope === undefined ||
+    invocationScope.kind !== "sdlc_worker_invocation_package" ||
+    invocationScope.featureScope.mode === "full_breadth"
+  ) {
+    return Object.freeze([]);
+  }
+  return uniquePromptRefs(invocationScope.inlineObligationIds);
 }
 
 function evaluationDimension(input: {
@@ -132,6 +165,7 @@ function evaluationGridContractForPrompt(input: {
     "evaluate_design_depth" | "evaluate_review_grade"
   >;
   readonly manifest: SdlcWorkerHandoffManifest;
+  readonly invocationScope?: SdlcReviewGradeInvocationScope | null | undefined;
   readonly sourceAssetRefs: readonly string[];
   readonly targetAssetRefs: readonly string[];
   readonly dimensions: readonly SdlcEvaluationDimensionRef[];
@@ -148,7 +182,10 @@ function evaluationGridContractForPrompt(input: {
   );
   const unitRef =
     `transform-unit://odd-sdlc/${graphRef}/${edgeRef}/${targetRef}`;
-  const obligationRefs = manifestObligationRefs(input.manifest);
+  const obligationRefs =
+    input.promptFamily === "evaluate_review_grade"
+      ? reviewGradePromptObligationRefs(input.manifest, input.invocationScope)
+      : manifestObligationRefs(input.manifest);
   const transformUnit: SdlcTransformUnitRef = Object.freeze({
     kind: "sdlc_transform_unit_ref" as const,
     unitRef,
@@ -218,17 +255,205 @@ function useCompactFusedEvaluationPrompt(
   return profile !== null && obligationCount > 0 && obligationCount <= 8;
 }
 
-function compactObligationPromptLines(
+function isComponentCodeReviewGradeEdge(
+  manifest: SdlcWorkerHandoffManifest
+): boolean {
+  return manifest.targetAssetType === "component_code_surface";
+}
+
+function materializationBindingDimensionApplies(
+  manifest: SdlcWorkerHandoffManifest
+): boolean {
+  return manifest.productMaterialization?.required === true;
+}
+
+function reviewGradePreAuthoritySpecializationLines(
   manifest: SdlcWorkerHandoffManifest
 ): readonly string[] {
-  const obligationRefs = manifestObligationRefs(manifest);
+  if (!isComponentCodeReviewGradeEdge(manifest)) {
+    return Object.freeze([] as const);
+  }
+  return Object.freeze([
+    "- Bind fulfilled component_code_surface findings to concrete product targets and entrypoints. Treat materialization binding as a narrow relation check."
+  ]);
+}
+
+function reviewGradeGeneratedArtifactReadLine(
+  manifest: SdlcWorkerHandoffManifest
+): string {
+  if (materializationBindingDimensionApplies(manifest)) {
+    return "5. generated product files named by worker_result_report.materializedFiles or product_materialization_manifest.files.";
+  }
+  return "5. generated asset artifact named by worker_result_report.outputFile or the handoff manifest outputFile; materializedFiles may be empty on planning surfaces.";
+}
+
+function reviewGradeOptionalObservationFieldLine(
+  manifest: SdlcWorkerHandoffManifest
+): string {
+  const fields = [
+    "stageBoundaryConformance { dimension, status, rationale }",
+    ...(materializationBindingDimensionApplies(manifest)
+      ? ["materializationBindingRelation { dimension, status, rationale }"]
+      : []),
+    "obligationCoverageFold { dimension, coveredCount, totalCount, status, rationale }"
+  ];
+  return `- Optional top-level observation fields, when useful: ${fields.join(", ")}. No other top-level keys are allowed.`;
+}
+
+function reviewGradeFindingFulfillmentBindingLine(
+  manifest: SdlcWorkerHandoffManifest
+): string {
+  if (isComponentCodeReviewGradeEdge(manifest)) {
+    return "- fulfillmentBinding: every fulfilled component_code_surface finding must include it; non-fulfilled findings set it to null";
+  }
+  return `- fulfillmentBinding: null for every finding on this ${manifest.targetAssetType} edge`;
+}
+
+function reviewGradeFulfillmentBindingShapeLines(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  if (!isComponentCodeReviewGradeEdge(manifest)) {
+    return Object.freeze([] as const);
+  }
+  return Object.freeze([
+    "",
+    "fulfillmentBinding shape for fulfilled component_code_surface findings:",
+    "- kind: \"gtl_contract_fulfillment_binding\"",
+    "- obligationRef: exact obligation id for this finding",
+    "- requirementRef: exact obligation id; for non-requirement scoped obligations such as target_asset, source_asset, module, source_set, inline, or aggregate, this may instead be a declared product requirement id carried by that scope",
+    "- productRequirementRef: accepted product requirement ref or exact obligation id when no narrower product-requirement ref exists; when requirementRef uses a carried product requirement for a scoped non-requirement obligation, productRequirementRef must match it",
+    "- designObligationRef: accepted design/depth/component row ref that assigned the obligation",
+    "- componentRef: accepted component/module ref",
+    "- productTargetRef: target carrier or declared product-file target ref",
+    "- outputSurfaceRef: generated source file/API/route/CLI/service ref",
+    "- functionOrEntrypointRef: concrete function, exported API, route, CLI command, service entrypoint, executable script, or equivalent public behavior ref",
+    "- realizationEvidenceRefs: source/runtime evidence refs proving the binding",
+    "- testOrExecutionEvidenceRefs: test, execution, or evaluator evidence refs that hold the binding to account; when downstream test execution has not run on this edge, use evaluator and worker-report evidence refs instead of null",
+    "- evaluatorFindingRef: stable finding ref inside this fulfillmentBinding only; never add evaluatorFindingRef as a root finding key",
+    "- authorityRefs: accepted authority refs used to admit this binding",
+    "- evidenceRefs: evidence refs used to admit this binding",
+    "- bindingRef may be omitted; ABG derives and admits the final bindingRef.",
+    "- Do not emit JSON null inside fulfillmentBinding. For non-requirement scoped obligations with no narrower product requirement, use the exact obligationId for requirementRef and productRequirementRef. For file-target-only requirements with no function/API, use productTargetRef as functionOrEntrypointRef."
+  ]);
+}
+
+function reviewGradeComponentCodeRuleLines(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  if (!isComponentCodeReviewGradeEdge(manifest)) {
+    return Object.freeze([] as const);
+  }
+  return Object.freeze([
+    "- On component_code_surface, mark semantic_not_realized when source-role files are only row-count arithmetic, print-only runners, requirement-comment shells, or other scaffolds that do not implement the admitted module responsibility through a public behavior boundary.",
+    "- For behavior-bearing component_code_surface findings, do not pass fulfillment from component_depth_register rows, manifests, or worker obligation assessments unless the finding is bound to a public source boundary and scenario/build-test/evaluator evidence. If source behavior is absent use semantic_not_realized; if only later test/runtime proof is missing after source behavior is otherwise present, use wrong_stage.",
+    "- Mark wrong_stage for lawful downstream carryover only. Test execution or runtime proof absent on component_code_surface is wrong_stage when source/build_config obligations are otherwise fulfilled and no test/execution product target is declared on this edge.",
+    "- On component_code_surface, inspect every role=source materialized file and declared build/config support before deciding executable or public-boundary evidence is absent.",
+    "- For every component_code_surface fulfilled finding, bind finding.obligationId plus product requirement when available -> design/depth obligation -> component/product target -> function/API/route/CLI/entrypoint -> evidence in fulfillmentBinding.",
+    "- For component_code_surface source_asset, module, target_asset, source_set, inline, or aggregate findings, use the carried product requirement id as requirementRef and productRequirementRef when one is declared for the scope; use the exact obligationId only when no narrower product requirement exists. Still bind the finding to the concrete generated entrypoint/public behavior and evidence.",
+    "- A fulfilled component_code_surface finding with fulfillmentBinding:null is invalid and will be retried, even when the obligation is module-level or source-asset-level carryover.",
+    "- For component_code_surface, compare source files to accepted design-depth componentRealizationRows and fileTargetRows."
+  ]);
+}
+
+function reviewGradePublicBoundaryInspectionLines(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  if (!isComponentCodeReviewGradeEdge(manifest)) {
+    return Object.freeze([] as const);
+  }
+  return Object.freeze([
+    "- For component_code_surface, inspect every role=source materialized file and every declared support/build configuration file before deciding that executable or public-boundary evidence is absent. Never filter public-boundary inspection to one extension family."
+  ]);
+}
+
+function reviewGradeSelfCheckBindingLine(
+  manifest: SdlcWorkerHandoffManifest
+): string {
+  if (isComponentCodeReviewGradeEdge(manifest)) {
+    return "- Re-open the assessment JSON with bounded Read and verify the exact top-level/finding key sets, one finding per reviewed id, no extra obligation ids, non-empty evidence/authority refs, and component_code_surface fulfillment bindings.";
+  }
+  return `- Re-open the assessment JSON with bounded Read and verify the exact top-level/finding key sets, one finding per reviewed id, no extra obligation ids, non-empty evidence/authority refs, and fulfillmentBinding:null on every ${manifest.targetAssetType} finding.`;
+}
+
+function reviewGradeMaterializationRuleLines(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  if (!materializationBindingDimensionApplies(manifest)) {
+    return Object.freeze([] as const);
+  }
+  return Object.freeze([
+    "- Compare worker_result_report.materializedFiles and product_materialization_manifest files to declared product-file targets.",
+    "- Materialized product file rows use relativePath and absolutePath. When inspecting worker_result_report.materializedFiles or product_materialization_manifest.files, treat absolutePath as the filesystem path and relativePath as the workspace/tenant product path; do not require path, file, or outputFile fields on those rows before counting the generated asset as present.",
+    "- If product_materialization_manifest.files[] or worker_result_report.materializedFiles[] contains an existing product-role file with matching obligation lineage, do not mark target_asset, source_asset, module, source_set, inline, aggregate, or requirement findings trace_missing for 'no generated asset named by report or manifest'. Continue evaluating semantic realization and public-boundary binding instead.",
+    "- Mark boundary_collapsed or wrong_stage when worker_result_report.materializedFiles or product_materialization_manifest files list undeclared build/test byproducts or extra product files as materialized product truth.",
+    "- Build outputs, dependency caches, lockfiles, target/, coverage, and transient byproducts are not product fulfillment unless declared product targets."
+  ]);
+}
+
+function reviewGradeTargetAssetRuleLines(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  if (manifest.targetAssetType === "component_test_surface") {
+    return Object.freeze([
+      "- On component_test_surface, do not make admitted test-execution evidence a same-edge blocker when generated tests, lineage, and component-test carrier rows are present. If the only missing evidence is admitted execution_result/runtime_execution proof, mark those requirement findings partial with failureClass wrong_stage and requiredAction naming the later test-execution edge.",
+      "- For component_test_surface, compare generated tests to accepted testcase/test-design authority and source responsibilities."
+    ]);
+  }
+  return Object.freeze([] as const);
+}
+
+function reviewGradeEvaluationDimensions(
+  manifest: SdlcWorkerHandoffManifest
+): readonly SdlcEvaluationDimensionRef[] {
+  return Object.freeze([
+    evaluationDimension({
+      promptFamily: "evaluate_review_grade",
+      dimensionKey: "local-obligation-fulfillment",
+      scope: "cell"
+    }),
+    evaluationDimension({
+      promptFamily: "evaluate_review_grade",
+      dimensionKey: "local-stage-boundary-conformance",
+      scope: "cell"
+    }),
+    ...(materializationBindingDimensionApplies(manifest)
+      ? [
+          evaluationDimension({
+            promptFamily: "evaluate_review_grade",
+            dimensionKey: "materialization-binding-relation",
+            scope: "relation"
+          })
+        ]
+      : []),
+    evaluationDimension({
+      promptFamily: "evaluate_review_grade",
+      dimensionKey: "obligation-coverage-fold",
+      scope: "fold"
+    })
+  ]);
+}
+
+function compactObligationPromptLines(
+  manifest: SdlcWorkerHandoffManifest,
+  coverageTarget: "content_register" | "review_grade_assessment" =
+    "review_grade_assessment",
+  invocationScope?: SdlcReviewGradeInvocationScope | null | undefined
+): readonly string[] {
+  const obligationRefs =
+    coverageTarget === "content_register"
+      ? manifestObligationRefs(manifest)
+      : reviewGradePromptObligationRefs(manifest, invocationScope);
+  const coverageLaw =
+    coverageTarget === "content_register"
+      ? "- Coverage law: obligationRefs above are fold context only for this content register. Do not add reviewedObligationIds, findings, summary, status, or other assessment fields to sdlc_evaluate_content_register; represent semantic judgment only through permitted contentRows/evidenceRefs, and ABG folds coverage/closure from refs."
+      : "- Review coverage law: reviewedObligationIds and findings must cover exactly every obligationRef above and no other obligation ids. Worker-report obligation IDs not listed above are evidence/carryover aliases only.";
   return Object.freeze([
     `- graphFunctionName: ${manifest.graphFunctionName}`,
     `- edgeName: ${manifest.edgeName}`,
     `- targetAssetType: ${manifest.targetAssetType}`,
     `- obligationCount: ${obligationRefs.length}`,
     `- obligationRefs: ${listForPrompt(obligationRefs)}`,
-    "- Review coverage law: reviewedObligationIds and findings must cover every obligationRef above. Do not drop structural obligations such as module:* when requirement rows are fulfilled."
+    coverageLaw
   ]);
 }
 
@@ -263,7 +488,7 @@ function compactDesignDepthPromptLineGroups(input: {
       `- Optional observation-only subworkstream manifest: ${input.subworkstreamManifestPath}`,
       "",
       "Admitted edge packet:",
-      ...compactObligationPromptLines(input.manifest),
+      ...compactObligationPromptLines(input.manifest, "content_register"),
       "",
       "Tenant tool boundary:",
       ...tenantToolBoundaryPromptLines(input.tenantToolEnvironment),
@@ -305,6 +530,7 @@ function compactDesignDepthPromptLineGroups(input: {
       `- selectedRegimeBindingRef: ${input.selectedRegimeBindingRef === null ? "null" : JSON.stringify(input.selectedRegimeBindingRef)}`,
       `- compositionContributionRef: "${input.selectedRegimeBindingRef ?? input.selectedCompositionRef}"`,
       "- sourceBasisRefs[], candidateArtifactRefs[], evidenceRefs[], contentRows[].",
+      "- Top-level key set is exactly kind, registerVersion, stage, ruleRef, ruleRole, computeMeans, authorityFunction, selectedCompositionRef, selectedCompositionDigest, selectedCompositionSelectionRef, selectedRegimeBindingRef, compositionContributionRef, sourceBasisRefs, candidateArtifactRefs, evidenceRefs, contentRows. Do not add reviewedObligationIds, findings, summary, status, or assessment fields to this register.",
       "- contentRows[] entries have exactly kind, rowRef, authorityFunction, carrierFamily, contentKind, payload, sourceBasisRefs, evidenceRefs.",
       `- Preferred contentKind: "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND}". Optional final contentKind: "sdlc_design_depth_register".`,
       "- Forbidden contentKind values in this register include \"sdlc_evaluation_finding\" and any grid/fold finding row. Do not use carrierFamily values outside ProductAssetModel, ObservationSnapshot, GapPressureRow, EdgeFulfillment, EdgeClosureDecision, or NextActionProjection.",
@@ -347,7 +573,7 @@ function compactDesignDepthPromptLineGroups(input: {
       "- For a small product, keep schema/domain/sequence compact: no more than two entities and two operations per module unless authority requires more.",
       "",
       "Self-check before final response:",
-      "- Re-open the content register with bounded Read and verify valid JSON, selected identity preservation, row key sets, all required sections, matching component/file paths, and compact size.",
+      "- Re-open the content register with bounded Read and verify valid JSON, exact top-level key set, selected identity preservation, row key sets, all required sections, matching component/file paths, and compact size.",
       "- Reject and rewrite if any design-depth row contains field/value/sourceRef summary triples or any key outside the exact row contracts above.",
       "- Reject and rewrite if any nested row kind is sdlc_entity_row, sdlc_attribute_row, sdlc_operation_row, or sdlc_sunny_day_step; the accepted nested kinds are sdlc_domain_entity, sdlc_domain_attribute, sdlc_domain_operation, sdlc_entity_state_transition, sdlc_aggregate_domain_entity, and sdlc_sunny_day_sequence_step.",
       "- Rewrite until valid. Final response is one compact line; the content register file is the evaluation truth."
@@ -357,6 +583,7 @@ function compactDesignDepthPromptLineGroups(input: {
 
 function compactReviewGradePromptLineGroups(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
+  readonly invocationScope?: SdlcReviewGradeInvocationScope | null | undefined;
   readonly governanceRef: string;
   readonly governancePath: string;
   readonly constructionBriefPath: string;
@@ -373,14 +600,18 @@ function compactReviewGradePromptLineGroups(input: {
       "Small fused evaluation grid mode:",
       "- Use the typed Evaluation grid contract below as the logical work boundary.",
       "- Decide local obligation fulfillment and local stage-boundary conformance for this transform unit.",
-      "- Bind fulfilled component_code_surface findings to concrete product targets and entrypoints. Treat materialization binding as a narrow relation check.",
+      ...reviewGradePreAuthoritySpecializationLines(input.manifest),
       "- Do not reconstruct global coverage, closure, continuation, or trace policy as a second SDLC. Coverage is a structural fold over refs; ABG owns close/block/redispatch.",
       "- This is semantic evaluation work. Do not rewrite source, tests, design artifacts, reports, ledgers, package files, or framework files.",
       `- The only durable JSON output you may create or modify is the assessment artifact at ${input.assessmentPath}.`,
       `- Optional observation-only subworkstream manifest: ${input.subworkstreamManifestPath}.`,
       "",
       "Admitted edge packet:",
-      ...compactObligationPromptLines(input.manifest),
+      ...compactObligationPromptLines(
+        input.manifest,
+        "review_grade_assessment",
+        input.invocationScope
+      ),
       "",
       "Tenant tool boundary:",
       ...tenantToolBoundaryPromptLines(input.tenantToolEnvironment),
@@ -394,7 +625,7 @@ function compactReviewGradePromptLineGroups(input: {
       `2. construction brief: ${input.constructionBriefPath}`,
       `3. invocation package: ${input.invocationPackagePath}`,
       `4. worker result report: ${input.workerReportPath}`,
-      "5. generated product files named by worker_result_report.materializedFiles or product_materialization_manifest.files.",
+      reviewGradeGeneratedArtifactReadLine(input.manifest),
       "6. accepted design-depth/component refs named by the construction brief when present.",
       "",
       "Reading discipline:",
@@ -410,11 +641,12 @@ function compactReviewGradePromptLineGroups(input: {
       `- edgeName: ${JSON.stringify(input.manifest.edgeName)}`,
       `- targetAssetType: ${JSON.stringify(input.manifest.targetAssetType)}`,
       "- status: \"passed\" or \"blocked\"",
-      "- reviewedObligationIds: for scoped runs where invocationPackage.featureScope.mode is steel_thread or targeted_repair, exactly invocationPackage.inlineObligationIds and no worker aliases; otherwise every admitted obligation id from worker_result_report obligation assessments or invocation package inline obligations.",
+      "- reviewedObligationIds: exactly the obligationRefs in the admitted edge packet above. For scoped runs, this is invocationPackage.inlineObligationIds; do not add worker aliases.",
+      "- worker_result_report.obligationAssessments may support evidence and rationale, but it cannot enlarge review scope or create findings for generated-artifact requirement aliases.",
       "- findings[]: one finding per reviewed obligation id.",
       "- evidenceRefs: refs for assessment, generated assets, accepted authority, and review evidence.",
       "- summary: one compact sentence.",
-      "- Optional top-level observation fields, when useful: stageBoundaryConformance { dimension, status, rationale }, materializationBindingRelation { dimension, status, rationale }, obligationCoverageFold { dimension, coveredCount, totalCount, status, rationale }. No other top-level keys are allowed.",
+      reviewGradeOptionalObservationFieldLine(input.manifest),
       "",
       "Finding shape:",
       "- kind: \"sdlc_review_grade_obligation_finding\"",
@@ -423,10 +655,10 @@ function compactReviewGradePromptLineGroups(input: {
       "- failureClass: null when fulfilled, otherwise trace_missing, semantic_not_realized, boundary_collapsed, wrong_stage, schema_invalid, execution_environment, or test_overlap_missing",
       "- requiredAction: null when fulfilled, otherwise the next concrete work item",
       "- evidenceRefs and acceptedAuthorityRefs: non-empty arrays",
-      "- fulfillmentBinding: null except every fulfilled component_code_surface finding must include it",
+      reviewGradeFindingFulfillmentBindingLine(input.manifest),
       "- repairSurfaceTriage: null when fulfilled; otherwise a sdlc_repair_surface_triage object classifying the lawful repair surface as current_edge_repair, upstream_reentry, downstream_deferred, or external_blocked",
       "- repairSurfaceTriage for upstream_reentry must name repairGraphFunctionRef, repairGraphVectorRef, and repairAssetRef; other dispositions may set those refs to null.",
-      "- rationale: compact reason. No extra finding keys.",
+      "- rationale: compact reason with three clauses: obligation intent paraphrase, artifact semantic review, and verdict. No extra finding keys.",
       "",
       "repairSurfaceTriage shape for non-fulfilled findings:",
       "- kind: \"sdlc_repair_surface_triage\"",
@@ -434,41 +666,25 @@ function compactReviewGradePromptLineGroups(input: {
       "- repairGraphFunctionRef, repairGraphVectorRef, repairAssetRef: non-null only when the lawful repair surface is an upstream graph/vector/asset re-entry",
       "- evidenceRefs: non-empty refs proving this triage",
       "- rationale: compact reason for this repair-surface classification",
-      "",
-      "fulfillmentBinding shape for fulfilled component_code_surface findings:",
-      "- kind: \"gtl_contract_fulfillment_binding\"",
-      "- obligationRef: exact obligation id for this finding.",
-      "- requirementRef: exact obligation id; for non-requirement scoped obligations such as target_asset, source_asset, module, source_set, inline, or aggregate, use the exact obligationId when no narrower product requirement applies.",
-      "- productRequirementRef: accepted product requirement ref or exact obligation id when no narrower product-requirement ref exists; when requirementRef uses a carried product requirement for a scoped non-requirement obligation, productRequirementRef must match it.",
-      "- designObligationRef: accepted design/depth/component row ref that assigned the obligation.",
-      "- componentRef: accepted component/module ref.",
-      "- productTargetRef: target carrier or declared product-file target ref.",
-      "- outputSurfaceRef: generated source file/API/route/CLI/service ref.",
-      "- functionOrEntrypointRef: concrete function, exported API, route, CLI command, service entrypoint, executable script, or equivalent public behavior ref.",
-      "- realizationEvidenceRefs: source/runtime evidence refs proving the binding.",
-      "- testOrExecutionEvidenceRefs: test, execution, or evaluator evidence refs that hold the binding to account; when downstream test execution has not run on this edge, use evaluator and worker-report evidence refs instead of null.",
-      "- evaluatorFindingRef: stable finding ref for this evaluation finding.",
-      "- authorityRefs: accepted authority refs used to admit this binding.",
-      "- evidenceRefs: evidence refs used to admit this binding.",
-      "- bindingRef is optional in your draft; ABG derives and admits the final bindingRef.",
-      "- Do not emit JSON null inside fulfillmentBinding. For non-requirement scoped obligations with no narrower product requirement, use the exact obligationId for requirementRef and productRequirementRef. For file-target-only requirements with no function/API, use productTargetRef as functionOrEntrypointRef.",
+      ...reviewGradeFulfillmentBindingShapeLines(input.manifest),
       "",
       "Review rules:",
       "- File existence, tags, digests, or smoke output are evidence, not proof by themselves.",
+      "- For every finding, first paraphrase the accepted obligation intent from the admitted requirement/design/test/target-carrier authority, then compare the generated artifact's actual semantics against that intent, then state why the artifact fulfills or fails it.",
+      "- A fulfilled finding is invalid when the rationale only cites existence, schema validity, digest, lineage, worker status, or manifest rows without saying what the artifact is supposed to do and how the artifact's content realizes that purpose.",
+      "- For planning surfaces, review the plan as an artifact: decide whether its decisions, rows, cases, schedules, or bindings are sufficient to carry the obligation into the next lawful edge. Do not pass a planning artifact just because it names the next file or requirement.",
       "- SDLC depth is scenario/build-test driven: UAT/scenario authority and build/test observations are primary behavior proof; obligation mapping, carrier rows, lineage tags, and worker fulfilled counts are trace evidence only.",
       "- Mark trace_missing when a generated product file has no lineage in the asset, selected target carrier, worker report, or product materialization manifest.",
       "- Mark semantic_not_realized when behavior is absent, stubbed, placeholder, disconnected from the public boundary, or contradicts tenant stack authority.",
-      "- On component_code_surface, mark semantic_not_realized when source-role files are only row-count arithmetic, print-only runners, requirement-comment shells, or other scaffolds that do not implement the admitted module responsibility through a public behavior boundary.",
-      "- For behavior-bearing component_code_surface findings, do not pass fulfillment from component_depth_register rows, manifests, or worker obligation assessments unless the finding is bound to a public source boundary and scenario/build-test/evaluator evidence. If source behavior is absent use semantic_not_realized; if only later test/runtime proof is missing after source behavior is otherwise present, use wrong_stage.",
+      ...reviewGradeComponentCodeRuleLines(input.manifest),
       "- Mark boundary_collapsed when generated source collapses accepted components back into a coarse facade.",
-      "- Mark wrong_stage for lawful downstream carryover only. Test execution or runtime proof absent on component_code_surface is wrong_stage when source/build_config obligations are otherwise fulfilled and no test/execution product target is declared on this edge.",
-      "- On component_code_surface, inspect every role=source materialized file and declared build/config support before deciding executable or public-boundary evidence is absent.",
-      "- Build outputs, dependency caches, lockfiles, target/, coverage, and transient byproducts are not product fulfillment unless declared product targets.",
+      ...reviewGradeTargetAssetRuleLines(input.manifest),
+      ...reviewGradeMaterializationRuleLines(input.manifest),
       "- If all reviewed obligations are fulfilled, status must be passed and every finding failureClass/requiredAction must be null.",
       "- If any reviewed obligation is partial, blocked, or unassessed, status must be blocked and every non-fulfilled finding must include failureClass and requiredAction. ABG will fold lawful wrong_stage carryover.",
       "",
       "Self-check before final response:",
-      "- Re-open the assessment JSON with bounded Read and verify the exact top-level/finding key sets, one finding per reviewed id, no extra obligation ids, non-empty evidence/authority refs, and component_code_surface fulfillment bindings.",
+      reviewGradeSelfCheckBindingLine(input.manifest),
       "- Rewrite until valid. Final response: reviewStatus=<passed|blocked> reviewed=<n> blocked=<n>."
     ])
   });
@@ -951,6 +1167,7 @@ export function designDepthFpEvaluatorPrompt(input: {
 
 function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
+  readonly invocationScope?: SdlcReviewGradeInvocationScope | null | undefined;
   readonly governanceRef: string;
   readonly governancePath: string;
   readonly constructionBriefPath: string;
@@ -969,6 +1186,7 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
       "",
       "Purpose:",
       "- Review the generated asset against incoming requirements, accepted upstream authority, stage boundary, evidence, and likely failure modes.",
+      ...reviewGradePreAuthoritySpecializationLines(input.manifest),
       "- This is semantic evaluation work. Do not rewrite source, tests, design artifacts, reports, ledgers, or framework files.",
       "- The evaluator is read-only over workspace and product files. Do not use apply_patch, shell redirection, scripts, formatters, build tools, or editor commands to modify any generated asset, source file, test file, design surface, report, ledger, package file, or framework file.",
       `- The only durable JSON output you may create or modify is the assessment artifact at ${input.assessmentPath}.`,
@@ -990,7 +1208,7 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     `2. bounded inspection of construction brief: ${input.constructionBriefPath}`,
     `3. bounded inspection of invocation package: ${input.invocationPackagePath}`,
     `4. bounded inspection of worker result report: ${input.workerReportPath}`,
-    "5. generated asset artifacts named by worker_result_report.materializedFiles; for non-materialized planning surfaces, also inspect the declared outputFile when materializedFiles is empty.",
+    reviewGradeGeneratedArtifactReadLine(input.manifest),
     "6. product_materialization_manifest.json in the same archive when present.",
     "7. accepted design-depth register refs from construction_brief.stagePressure.designDepthEvaluatorRegisterRefs when present.",
     "",
@@ -1012,7 +1230,7 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     "- Do not use /tmp, /private/tmp, $TMPDIR, or outside-workspace paths for temporary probe output. If a future execution-capable profile needs transient stdout/stderr capture, write it under the current operator-run archive or another explicit workspace/run-archive path named in this prompt, then clean it before exit.",
     "- If the executor advertises /tmp as sandbox-writable, ignore that capability for evaluation evidence. Writable does not mean authoritative.",
     "- Derive source inspection from tenant-declared stack authority, materialized file roles, publicBoundary fields, and declared build/run configuration. Do not assume a single source language, file extension family, export syntax, package shape, script field, or function naming convention.",
-    "- For component_code_surface, inspect every role=source materialized file and every declared support/build configuration file before deciding that executable or public-boundary evidence is absent. Never filter public-boundary inspection to one extension family.",
+    ...reviewGradePublicBoundaryInspectionLines(input.manifest),
     "- Public behavior may be a CLI, module main function, route, service class, binary entrypoint, declared framework target, or another tenant-declared runnable boundary. Assess the boundary from admitted product and tenant authority, not from hard-coded sample product helper names.",
     "",
     `Durable assessment artifact to create and validate: ${input.assessmentPath}`,
@@ -1025,14 +1243,15 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     `- edgeName: ${JSON.stringify(input.manifest.edgeName)}`,
     `- targetAssetType: ${JSON.stringify(input.manifest.targetAssetType)}`,
     "- status: \"passed\" or \"blocked\"",
-    "- reviewedObligationIds: for scoped runs where invocationPackage.featureScope.mode is steel_thread or targeted_repair, exactly invocationPackage.inlineObligationIds and no worker aliases; otherwise every obligation id from worker_result_report.obligationAssessments and invocation package inline obligations.",
-    "- reviewedObligationIds must contain only admitted obligation ids from worker_result_report.obligationAssessments[].obligationId, worker_result_report.obligationAssessments[].id, invocationPackage.inlineObligationIds[], invocationPackage.obligationIds[], or invocationPackage.inlineObligations[].obligationId.",
+    "- reviewedObligationIds: exactly the obligationRefs in the admitted edge packet above. For scoped runs, this is invocationPackage.inlineObligationIds; do not add worker aliases.",
+    "- worker_result_report.obligationAssessments may support evidence and rationale, but it cannot enlarge review scope or create findings for generated-artifact requirement aliases.",
+    "- reviewedObligationIds must contain only admitted obligation ids from the admitted edge packet obligationRefs, invocationPackage.inlineObligationIds[], invocationPackage.obligationIds[], or invocationPackage.inlineObligations[].obligationId.",
     "- For scoped runs where invocationPackage.featureScope.mode is steel_thread or targeted_repair, the active review scope is invocationPackage.inlineObligationIds. Treat invocationPackage.requirementTraceObligationIds, traversalIntentPackage.obligationIds, retrieval hint obligation ids, and omitted obligation ids as lineage/evidence context only unless the id is also present in invocationPackage.inlineObligationIds.",
     "- Do not build reviewedObligationIds by recursively collecting every string in JSON. Authority and evidence refs such as workspace://..., file://..., config://..., schema://..., gtl://..., handoff-projection://..., source-digest://..., and review-evidence://... are evidenceRefs or acceptedAuthorityRefs, not obligations and must not become findings.",
     "- findings[]: one sdlc_review_grade_obligation_finding per reviewed obligation id",
     "- evidenceRefs: refs for the assessment, generated assets, accepted authority, and review evidence",
     "- summary: one compact sentence",
-    "- Optional top-level observation fields, when useful: stageBoundaryConformance { dimension, status, rationale }, materializationBindingRelation { dimension, status, rationale }, obligationCoverageFold { dimension, coveredCount, totalCount, status, rationale }.",
+    reviewGradeOptionalObservationFieldLine(input.manifest),
     "- No other top-level keys are allowed.",
     "",
     "Finding shape:",
@@ -1041,12 +1260,12 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     "- fulfillmentStatus: fulfilled, partial, blocked, or unassessed",
     "- failureClass: null when fulfilled, otherwise one of trace_missing, semantic_not_realized, boundary_collapsed, wrong_stage, schema_invalid, execution_environment, test_overlap_missing",
     "- requiredAction: null when fulfilled, otherwise the concrete work item the next transform must complete",
-    "- evidenceRefs: generated asset refs and diagnostic refs used for this judgment",
-    "- acceptedAuthorityRefs: non-empty requirement/design/depth/test/target-carrier authority refs used for this judgment",
-    "- fulfillmentBinding: null unless this finding is a fulfilled component_code_surface finding. On component_code_surface, every fulfilled finding must provide it, including target_asset, source_asset, module, source_set, inline, aggregate, and requirement rows.",
-    "- repairSurfaceTriage: null when fulfilled; otherwise a sdlc_repair_surface_triage object classifying the lawful repair surface as current_edge_repair, upstream_reentry, downstream_deferred, or external_blocked.",
-    "- repairSurfaceTriage for upstream_reentry must name repairGraphFunctionRef, repairGraphVectorRef, and repairAssetRef; other dispositions may set those refs to null.",
-    "- rationale: compact reason for the judgment",
+      "- evidenceRefs: generated asset refs and diagnostic refs used for this judgment",
+      "- acceptedAuthorityRefs: non-empty requirement/design/depth/test/target-carrier authority refs used for this judgment",
+      reviewGradeFindingFulfillmentBindingLine(input.manifest),
+      "- repairSurfaceTriage: null when fulfilled; otherwise a sdlc_repair_surface_triage object classifying the lawful repair surface as current_edge_repair, upstream_reentry, downstream_deferred, or external_blocked.",
+      "- repairSurfaceTriage for upstream_reentry must name repairGraphFunctionRef, repairGraphVectorRef, and repairAssetRef; other dispositions may set those refs to null.",
+      "- rationale: compact reason with three clauses: obligation intent paraphrase, artifact semantic review, and verdict",
     "- No other finding keys are allowed. Do not add helper booleans, carryover flags, scores, sourceAssetCarryover, sourceAssetStatus, confidence, or notes fields.",
     "",
     "repairSurfaceTriage shape for non-fulfilled findings:",
@@ -1055,35 +1274,20 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     "- repairGraphFunctionRef, repairGraphVectorRef, repairAssetRef: non-null only when the lawful repair surface is an upstream graph/vector/asset re-entry",
     "- evidenceRefs: non-empty refs proving this triage",
     "- rationale: compact reason for this repair-surface classification",
+    ...reviewGradeFulfillmentBindingShapeLines(input.manifest),
     "",
-    "fulfillmentBinding shape when required:",
-    "- kind: \"gtl_contract_fulfillment_binding\"",
-    "- obligationRef: exact obligation id for this finding",
-    "- requirementRef: exact obligation id; for non-requirement scoped obligations such as target_asset, source_asset, module, source_set, inline, or aggregate, this may instead be a declared product requirement id carried by that scope",
-    "- productRequirementRef: accepted product requirement ref or exact obligation id when no narrower product-requirement ref exists; when requirementRef uses a carried product requirement for a scoped non-requirement obligation, productRequirementRef must match it",
-    "- designObligationRef: accepted design/depth/component row ref that assigned the obligation",
-    "- componentRef: accepted component/module ref",
-    "- productTargetRef: target carrier or declared product-file target ref",
-    "- outputSurfaceRef: generated source file/API/route/CLI/service ref",
-    "- functionOrEntrypointRef: concrete function, exported API, route, CLI command, service entrypoint, executable script, or equivalent public behavior ref",
-    "- realizationEvidenceRefs: source/runtime evidence refs proving the binding",
-    "- testOrExecutionEvidenceRefs: test, execution, or evaluator evidence refs that hold the binding to account",
-    "- evaluatorFindingRef: stable finding ref for this evaluation finding",
-    "- authorityRefs: accepted authority refs used to admit this binding",
-    "- evidenceRefs: evidence refs used to admit this binding",
-    "- bindingRef may be omitted; ABG derives and admits the final bindingRef.",
-    "- Do not emit JSON null inside fulfillmentBinding. For non-requirement scoped obligations with no narrower product requirement, use the exact obligationId for requirementRef and productRequirementRef. For file-target-only requirements with no function/API, use productTargetRef as functionOrEntrypointRef.",
-    "",
-    "Review rules:",
-    "- A requirement tag, file path, schema-valid report, or passing smoke output is evidence, not proof by itself.",
-    "- SDLC depth is scenario/build-test driven: UAT/scenario authority and build/test observations are primary behavior proof; obligation mapping, carrier rows, lineage tags, and worker fulfilled counts are trace evidence only.",
+      "Review rules:",
+      "- A requirement tag, file path, schema-valid report, or passing smoke output is evidence, not proof by itself.",
+      "- For every finding, first paraphrase the accepted obligation intent from the admitted requirement/design/test/target-carrier authority, then compare the generated artifact's actual semantics against that intent, then state why the artifact fulfills or fails it.",
+      "- A fulfilled finding is invalid when the rationale only cites existence, schema validity, digest, lineage, worker status, or manifest rows without saying what the artifact is supposed to do and how the artifact's content realizes that purpose.",
+      "- For planning surfaces, review the plan as an artifact: decide whether its decisions, rows, cases, schedules, or bindings are sufficient to carry the obligation into the next lawful edge. Do not pass a planning artifact just because it names the next file or requirement.",
+      "- SDLC depth is scenario/build-test driven: UAT/scenario authority and build/test observations are primary behavior proof; obligation mapping, carrier rows, lineage tags, and worker fulfilled counts are trace evidence only.",
     "- Every finding must include at least one acceptedAuthorityRef. Do not emit an empty acceptedAuthorityRefs array for target_asset, source_set, inline, or aggregate findings.",
     "- For target_asset findings, use the construction brief targetCarrierProjection target carrier refs plus the accepted authority files that governed the generated asset.",
     "- Before marking missing public-boundary fulfillment, compare the admitted tenant/worksite authority to all generated source-role files and declared run/build entrypoints. A review helper that only recognizes one implementation language is evaluator failure, not product evidence.",
     "- Mark partial or blocked when an asset exists but does not plausibly implement the accepted responsibility.",
     "- Mark boundary_collapsed when generated source collapses multiple accepted component rows back into a coarse facade.",
     "- Mark semantic_not_realized when requirement tags are present but the behavior is absent, stubbed, placeholder, or not connected to the exported/public boundary.",
-    "- For component_code_surface, mark semantic_not_realized when source-role files are only row-count arithmetic, print-only runners, requirement-comment shells, or other scaffolds that do not implement the admitted module responsibility through a public behavior boundary.",
     "- Mark semantic_not_realized when accepted authority requires executable/script/program behavior but the source only exports a helper or function and has no entrypoint path that runs the product behavior when the file is invoked. A test calling a helper is overlap evidence, not executable-product proof.",
     "- For non-materialized planning surfaces such as intent, requirement, design, schedule, or test-design surfaces, do not mark downstream implementation/runtime obligations semantic_not_realized merely because implementation behavior is absent on the current edge.",
     "- For non-materialized planning surfaces, the declared output file is the generated asset under review. If worker_result_report.materializedFiles is empty, inspect worker_result_report.outputFile or the manifest outputFile before marking trace_missing or semantic_not_realized; materializedFiles=[] is not by itself a missing-asset blocker on these edges.",
@@ -1092,30 +1296,21 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     "- wrong_stage is only for lawful downstream carryover. If the current asset omits the requirement mapping, loses accepted authority, invents an owner, or claims executable fulfillment on the wrong edge, use trace_missing, semantic_not_realized, boundary_collapsed, or schema_invalid instead.",
     "- Requirement lineage is transformer-owned semantic evidence, not a postflight closure shortcut. Inspect worker_result_report.materializedFiles, product_materialization_manifest.files, selected target-carrier materializedFiles, and native file tags/comments where the file format permits them.",
     "- Mark trace_missing when a generated product file is used as fulfillment evidence but carries no lineage in the asset itself, selected target carrier, worker report, or materialization manifest. Do not pass by file existence, digest, or test success alone.",
-    "- For every component_code_surface fulfilled finding, bind finding.obligationId plus product requirement when available -> design/depth obligation -> component/product target -> function/API/route/CLI/entrypoint -> evidence in fulfillmentBinding.",
-    "- For behavior-bearing component_code_surface findings, do not pass fulfillment from component_depth_register rows, manifests, or worker obligation assessments unless the finding is bound to a public source boundary and scenario/build-test/evaluator evidence. If source behavior is absent use semantic_not_realized; if only later test/runtime proof is missing after source behavior is otherwise present, use wrong_stage.",
-    "- For component_code_surface source_asset, module, target_asset, source_set, inline, or aggregate findings, use the carried product requirement id as requirementRef and productRequirementRef when one is declared for the scope; use the exact obligationId only when no narrower product requirement exists. Still bind the finding to the concrete generated entrypoint/public behavior and evidence.",
-    "- A fulfilled component_code_surface finding with fulfillmentBinding:null is invalid and will be retried, even when the obligation is module-level or source-asset-level carryover.",
+    ...reviewGradeComponentCodeRuleLines(input.manifest),
     "- If tenant stack ambiguity was present, verify that the generated artifact or evidence contains a compact stack reconciliation decision before passing stack-dependent product materialization.",
     "- Verify consistency among tenant stack authority, emitted product syntax/files, declared product targets, declared execution commands, and returned execution evidence. This is evaluation only: do not repair generated product files or mutate tenant-stack authority.",
     "- Mark semantic_not_realized or schema_invalid when tenant stack authority contradicts emitted product files, for example declaring one module system while generated source/test syntax requires another. The worker must repair the authority surface or the product files; documenting an override in prose is not enough.",
     "- Do not execute commands unless the active tool list explicitly exposes command execution. When command execution is not available, evaluate declared executable or test execution contracts from admitted execution evidence; if required execution evidence is absent, mark the relevant obligation partial or blocked with execution_environment or semantic_not_realized instead of passing by inspection.",
     "- Mark test_overlap_missing when accepted depth requires test overlap and the generated tests do not exercise the responsibility.",
-    "- On component_code_surface, do not mark downstream test files or declared test-execution-contract proof as test_overlap_missing when the current-edge declared product targets exclude role=test. If source/build_config obligations are fulfilled and the only missing evidence is generated tests or test execution, mark those requirement findings partial with failureClass wrong_stage and requiredAction naming component_test_surface or the later test-execution edge.",
-    "- On component_test_surface, do not make admitted test-execution evidence a same-edge blocker when generated tests, lineage, and component-test carrier rows are present. If the only missing evidence is admitted execution_result/runtime_execution proof, mark those requirement findings partial with failureClass wrong_stage and requiredAction naming the later test-execution edge.",
-    "- For component_code_surface, compare source files to accepted design-depth componentRealizationRows and fileTargetRows.",
-    "- For materialization-required component_code_surface, compare worker_result_report.materializedFiles and product_materialization_manifest files to declared product-file targets.",
-    "- Materialized product file rows use relativePath and absolutePath. When inspecting worker_result_report.materializedFiles or product_materialization_manifest.files, treat absolutePath as the filesystem path and relativePath as the workspace/tenant product path; do not require path, file, or outputFile fields on those rows before counting the generated asset as present.",
-    "- If product_materialization_manifest.files[] or worker_result_report.materializedFiles[] contains an existing source-role file with matching obligation lineage, do not mark target_asset, source_asset, module, source_set, inline, aggregate, or requirement findings trace_missing for 'no generated asset named by report or manifest'. Continue evaluating semantic realization and public-boundary binding instead.",
-    "- Mark boundary_collapsed or wrong_stage when worker_result_report.materializedFiles or product_materialization_manifest files list undeclared build/test byproducts or extra product files as materialized product truth.",
-    "- Build outputs, dependency caches, lockfiles, coverage directories, and transient execution artifacts are not fulfillment proof unless they are declared product targets. Allowed execution byproducts may remain only as byproducts, not as product-file fulfillment evidence.",
-    "- For component_test_surface, compare generated tests to accepted testcase/test-design authority and source responsibilities.",
+    ...reviewGradeTargetAssetRuleLines(input.manifest),
+    ...reviewGradeMaterializationRuleLines(input.manifest),
     "- For every other target asset type, compare the generated asset to incoming obligations, accepted upstream authority, target carrier expectations, stage boundary, and evidence overlap.",
     "- If all reviewed obligations are fulfilled, status must be passed and every finding failureClass/requiredAction must be null.",
     "- If any reviewed obligation is partial, blocked, or unassessed, status must be blocked and every non-fulfilled finding must include failureClass, requiredAction, and repairSurfaceTriage.",
     "- Before final response, re-open the assessment JSON with bounded Read and self-check it. Verify the top-level key set is exactly kind, assessmentVersion, graphFunctionName, edgeName, targetAssetType, status, reviewedObligationIds, findings, evidenceRefs, summary.",
     "- Verify every finding key set is exactly kind, obligationId, fulfillmentStatus, failureClass, requiredAction, evidenceRefs, acceptedAuthorityRefs, fulfillmentBinding, repairSurfaceTriage, rationale.",
     "- Verify every finding.obligationId is present in reviewedObligationIds and every reviewedObligationId came from an admitted obligation-id field, not from an authority/evidence ref string.",
+    reviewGradeSelfCheckBindingLine(input.manifest),
     "- Rewrite until it is valid whole-file JSON with no Markdown fences, comments, trailing prose, or extra keys.",
     "- Final response must be one line: reviewStatus=<passed|blocked> reviewed=<n> blocked=<n>."
     ])
@@ -1124,6 +1319,7 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
 
 export function reviewGradeEdgeFulfillmentPromptProjection(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
+  readonly invocationScope?: SdlcReviewGradeInvocationScope | null | undefined;
   readonly governanceRef: string;
   readonly governancePath: string;
   readonly constructionBriefPath: string;
@@ -1137,6 +1333,7 @@ export function reviewGradeEdgeFulfillmentPromptProjection(input: {
   const evaluationGridContract = evaluationGridContractForPrompt({
     promptFamily: "evaluate_review_grade",
     manifest: input.manifest,
+    invocationScope: input.invocationScope,
     sourceAssetRefs: [
       input.governanceRef,
       input.governancePath,
@@ -1148,28 +1345,7 @@ export function reviewGradeEdgeFulfillmentPromptProjection(input: {
       input.assessmentPath,
       input.subworkstreamManifestPath
     ],
-    dimensions: [
-      evaluationDimension({
-        promptFamily: "evaluate_review_grade",
-        dimensionKey: "local-obligation-fulfillment",
-        scope: "cell"
-      }),
-      evaluationDimension({
-        promptFamily: "evaluate_review_grade",
-        dimensionKey: "local-stage-boundary-conformance",
-        scope: "cell"
-      }),
-      evaluationDimension({
-        promptFamily: "evaluate_review_grade",
-        dimensionKey: "materialization-binding-relation",
-        scope: "relation"
-      }),
-      evaluationDimension({
-        promptFamily: "evaluate_review_grade",
-        dimensionKey: "obligation-coverage-fold",
-        scope: "fold"
-      })
-    ],
+    dimensions: reviewGradeEvaluationDimensions(input.manifest),
     provenanceRefs: [
       "REQ-F-ODDSDLC-088",
       "build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_EVALUATION_GRID_CONTRACT.md",
@@ -1223,6 +1399,7 @@ export function reviewGradeEdgeFulfillmentPromptProjection(input: {
 
 export function reviewGradeEdgeFulfillmentPrompt(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
+  readonly invocationScope?: SdlcReviewGradeInvocationScope | null | undefined;
   readonly governanceRef: string;
   readonly governancePath: string;
   readonly constructionBriefPath: string;

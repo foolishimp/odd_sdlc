@@ -253,6 +253,7 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
   assert.equal(Array.isArray(jsLive.startTargetSequence), false);
   assert.equal(jsLive.continueOnEdgeConverge, true);
   assert.equal(jsLive.stopAfterGraphClose, true);
+  assert.equal(jsLive.expectations.forbidRetryClosureDecisions, true);
   assert.ok(
     jsLive.fixture.sourceFiles.includes(
       "build_tenants/hello_world_javascript/spec/TECH_STACK.json"
@@ -439,6 +440,38 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
   assert.notDeepEqual(
     mindforgeAiAssistantBaselineScenario.expectedGovernanceOutput,
     mindforgeLive.expectedGovernanceOutput
+  );
+});
+
+test("scenario sandbox: zero-retry expectation rejects retry closure archives", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-zero-retry-"));
+  const runRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs/20260619T000000000Z_pid1"
+  );
+  writeJson(path.join(runRoot, "handoff_manifest.json"), {
+    edgeName: "derive_lite_design_adr_surface"
+  });
+  writeJson(path.join(runRoot, "sdlc_edge_closure_decision.json"), {
+    disposition: "retry"
+  });
+
+  assert.throws(
+    () =>
+      assertScenarioExpectations(
+        {
+          scenarioId: "scenario_zero_retry_fixture",
+          workspace,
+          advances: [{ gaps: { payload: {} }, start: { payload: {} } }]
+        },
+        {
+          scenarioId: "scenario_zero_retry_fixture",
+          expectations: {
+            forbidRetryClosureDecisions: true
+          }
+        }
+      ),
+    /expected zero retry closure decisions/u
   );
 });
 

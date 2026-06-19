@@ -76,8 +76,8 @@ function makeWorkspace() {
     [
       "# Requirements",
       "",
-      "REQ-T182-001: Implement a source component that maps accepted design depth.",
-      "REQ-T182-002: Provide tests that overlap the implemented source behavior.",
+      "REQ-T182-001: app-core implements a source component that maps accepted design depth.",
+      "REQ-T182-002: app-core provides tests that overlap the implemented source behavior.",
       ""
     ].join("\n"),
     "utf8"
@@ -97,6 +97,39 @@ function makeWorkspace() {
     "utf8"
   );
   materializeSdlcProjectConformance({ workspaceRoot: root });
+  mkdirSync(path.join(root, "build_tenants/typescript/spec"), { recursive: true });
+  writeFileSync(
+    path.join(root, "build_tenants/typescript/spec/TECH_STACK.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        buildConfigTargets: ["package.json"],
+        moduleLayout: {
+          sourceRoots: ["src"]
+        },
+        executionEnvironment: {
+          hostCachePolicy: "prohibited",
+          workspaceLocalDirectories: [
+            ".ai-workspace/runtime/odd_sdlc/tool-cache/npm",
+            ".ai-workspace/runtime/odd_sdlc/tool-cache/node"
+          ],
+          environmentVariables: {
+            npm_config_cache:
+              "${workspaceRoot}/.ai-workspace/runtime/odd_sdlc/tool-cache/npm"
+          }
+        },
+        testingTechStack: {
+          testRunner: "node:test",
+          testRoots: ["test"],
+          proofCommands: ["npm test"],
+          evidenceFormat: "tap"
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
   return root;
 }
 
@@ -1329,6 +1362,48 @@ test("T-182 admits full review-grade findings and rejects missing or weak assess
   }
 });
 
+test("T-159 review-grade admission rejects root evaluator finding refs on non-code edges", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_test_surface",
+      "t159-root-evaluator-finding-ref"
+    );
+    mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+    writeFileSync(manifest.outputFile, "# Component Test Surface\n", "utf8");
+
+    const base = reviewGradeAssessment(manifest);
+    const malformedRootFinding = {
+      ...base,
+      findings: base.findings.map((finding, index) =>
+        index === 0
+          ? {
+              ...finding,
+              evaluatorFindingRef: `finding://t159/review-grade/${encodeURIComponent(
+                finding.obligationId
+              )}`
+            }
+          : finding
+      )
+    };
+    const outputFile = writeAssessment(manifest, malformedRootFinding);
+    const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest,
+      outputFile
+    });
+
+    assert.equal(admission.status, "rejected");
+    assert.equal(admission.assessment, null);
+    assert.match(
+      admission.blockingReasons.join("\n"),
+      /review_grade_assessment_invalid:review_grade_assessment\.findings\[0\]\.evaluatorFindingRef: unexpected field/u
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
 test("T-150 derives review-grade fulfillment bindings from admitted GTL target carrier truth", () => {
   const workspaceRoot = makeWorkspace();
   try {
@@ -1825,9 +1900,15 @@ test("T-203 scoped review-grade admission uses invocation package inline obligat
         "Only the invocation-package inline obligations are active for this scoped steel-thread review."
     };
     const outputFile = writeAssessment(scopedManifest, scopedAssessment);
+    const invocationScope = {
+      kind: "sdlc_worker_invocation_package",
+      featureScope: scopedManifest.featureScope,
+      inlineObligationIds
+    };
     const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
       manifest: scopedManifest,
-      outputFile
+      outputFile,
+      invocationScope
     });
 
     assert.equal(admission.status, "admitted");
@@ -1841,6 +1922,27 @@ test("T-203 scoped review-grade admission uses invocation package inline obligat
       ),
       false
     );
+    const missingScopedScope = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest: scopedManifest,
+      outputFile,
+      invocationScope: null
+    });
+    assert.equal(missingScopedScope.status, "rejected");
+    assert.ok(
+      missingScopedScope.blockingReasons.includes(
+        "review_grade_invocation_scope_missing"
+      )
+    );
+    const omittedScopedScope = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest: scopedManifest,
+      outputFile
+    });
+    assert.equal(omittedScopedScope.status, "rejected");
+    assert.ok(
+      omittedScopedScope.blockingReasons.includes(
+        "review_grade_invocation_scope_missing"
+      )
+    );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
   }
@@ -1853,7 +1955,11 @@ test("T-203 scoped review-grade prompt makes inline obligations the only review 
 
   assert.match(
     source,
-    /exactly invocationPackage\.inlineObligationIds and no worker aliases/u
+    /reviewedObligationIds: exactly the obligationRefs in the admitted edge packet above\. For scoped runs, this is invocationPackage\.inlineObligationIds; do not add worker aliases/u
+  );
+  assert.match(
+    source,
+    /worker_result_report\.obligationAssessments may support evidence and rationale, but it cannot enlarge review scope or create findings for generated-artifact requirement aliases/u
   );
   assert.match(
     source,
@@ -2857,7 +2963,15 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
     );
     assert.match(
       promptSource,
-      /every fulfilled finding must provide it, including target_asset, source_asset, module/u
+      /every fulfilled component_code_surface finding must include it/u
+    );
+    assert.match(
+      promptSource,
+      /For component_code_surface source_asset, module, target_asset/u
+    );
+    assert.match(
+      promptSource,
+      /A fulfilled component_code_surface finding with fulfillmentBinding:null is invalid/u
     );
     assert.match(
       promptSource,
@@ -2889,7 +3003,7 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
     );
     assert.match(
       promptSource,
-      /for non-materialized planning surfaces, also inspect the declared outputFile when materializedFiles is empty/u
+      /If worker_result_report\.materializedFiles is empty, inspect worker_result_report\.outputFile or the manifest outputFile/u
     );
     assert.match(
       promptSource,
@@ -2905,7 +3019,7 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
     );
     assert.match(
       promptSource,
-      /compare worker_result_report\.materializedFiles and product_materialization_manifest files to declared product-file targets/u
+      /Compare worker_result_report\.materializedFiles and product_materialization_manifest files to declared product-file targets/u
     );
     assert.match(
       promptSource,
@@ -2913,11 +3027,11 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
     );
     assert.match(
       promptSource,
-      /Build outputs, dependency caches, lockfiles, coverage directories, and transient execution artifacts are not fulfillment proof/u
+      /Build outputs, dependency caches, lockfiles, target\/, coverage, and transient byproducts are not product fulfillment unless declared product targets/u
     );
     assert.match(
       promptSource,
-      /Allowed execution byproducts may remain only as byproducts/u
+      /Materialized product file rows use relativePath and absolutePath/u
     );
     assert.match(
       promptSource,

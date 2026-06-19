@@ -241,6 +241,39 @@ function makeWorkspace() {
     "utf8"
   );
   materializeSdlcProjectConformance({ workspaceRoot: root });
+  mkdirSync(path.join(root, "build_tenants/typescript/spec"), { recursive: true });
+  writeFileSync(
+    path.join(root, "build_tenants/typescript/spec/TECH_STACK.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        buildConfigTargets: ["package.json"],
+        moduleLayout: {
+          sourceRoots: ["src"]
+        },
+        executionEnvironment: {
+          hostCachePolicy: "prohibited",
+          workspaceLocalDirectories: [
+            ".ai-workspace/runtime/odd_sdlc/tool-cache/npm",
+            ".ai-workspace/runtime/odd_sdlc/tool-cache/node"
+          ],
+          environmentVariables: {
+            npm_config_cache:
+              "${workspaceRoot}/.ai-workspace/runtime/odd_sdlc/tool-cache/npm"
+          }
+        },
+        testingTechStack: {
+          testRunner: "node:test",
+          testRoots: ["test"],
+          proofCommands: ["npm test"],
+          evidenceFormat: "tap"
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
   return root;
 }
 
@@ -1569,6 +1602,11 @@ test("T-181 F_P evaluator register truth defers transform postflight and validat
     ]);
 
     const before = evaluateSdlcComputeStage({ manifest, report });
+    assert.equal(before.status, "blocked");
+    assert.match(
+      before.blockingReasons.join("\n"),
+      /design_depth_fp_evaluator_pending/u
+    );
     assert.equal(
       before.blockingReasonCarriers.some((reason) =>
         reason.code.startsWith("staged_")
@@ -1608,8 +1646,11 @@ test("T-181 F_P evaluator register truth defers transform postflight and validat
     );
 
     const filesystemOnly = evaluateSdlcComputeStage({ manifest, report });
-    assert.equal(filesystemOnly.status, "passed");
-    assert.deepEqual(filesystemOnly.blockingReasons, []);
+    assert.equal(filesystemOnly.status, "blocked");
+    assert.match(
+      filesystemOnly.blockingReasons.join("\n"),
+      /design_depth_fp_evaluator_pending/u
+    );
     assert.match(
       JSON.stringify(filesystemOnly.blockingReasonCarriers),
       /design_depth_fp_evaluator_register_unadmitted/u
@@ -1630,8 +1671,11 @@ test("T-181 F_P evaluator register truth defers transform postflight and validat
       report,
       fpEvaluatorAdmissionEvidenceRefs
     });
-    assert.equal(missingContentRegister.status, "passed");
-    assert.deepEqual(missingContentRegister.blockingReasons, []);
+    assert.equal(missingContentRegister.status, "blocked");
+    assert.match(
+      missingContentRegister.blockingReasons.join("\n"),
+      /design_depth_register_admission_invalid/u
+    );
     assert.match(
       JSON.stringify(missingContentRegister.blockingReasonCarriers),
       /design_depth_fp_evaluator_register_unadmitted/u
@@ -1881,6 +1925,99 @@ test("T-203 component-code targets admit predecessor evaluator register when rul
           contract.requiredRole === "source"
       ),
       JSON.stringify(invocationPackage.outputContract, null, 2)
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-203 component-code targets admit predecessor evaluator register from persisted rule outcome without runtime events", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const graphFunctionName = "Fg_t203_product";
+    const prior = manifestForEdge({
+      workspaceRoot,
+      runId: "20260523T000000012Z_pid20303",
+      graphFunctionName,
+      edgeName: "derive_lite_design_adr_surface"
+    });
+    writeHandoffFiles(prior);
+    mkdirSync(path.dirname(prior.outputFile), { recursive: true });
+    const priorContent = implementationDesignAdr("fp-live-no-runtime-events");
+    writeFileSync(prior.outputFile, priorContent, "utf8");
+    const priorRegisterPath = designDepthFpEvaluatorRegisterPath(prior);
+    mkdirSync(path.dirname(priorRegisterPath), { recursive: true });
+    writeFileSync(
+      priorRegisterPath,
+      `${JSON.stringify(
+        implementationDesignRegister(
+          "fp-live-no-runtime-events",
+          pathToFileURL(prior.outputFile).href
+        ),
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+    writeDesignDepthFpEvaluatorContentRegister({
+      manifest: prior,
+      registerPath: priorRegisterPath
+    });
+    writeDesignDepthFpEvaluatorRuleOutcomeProof({
+      manifest: prior,
+      registerPath: priorRegisterPath
+    });
+    rmSync(path.join(prior.archiveRoot, "runtime_events.json"), { force: true });
+    writeFileSync(
+      path.join(prior.archiveRoot, "fp_evaluate_result.json"),
+      `${JSON.stringify(fpEvaluateResultPayloadForRegister(priorRegisterPath), null, 2)}\n`,
+      "utf8"
+    );
+    writePriorWorkerResultReport({ manifest: prior, content: priorContent });
+
+    const current = manifestForEdge({
+      workspaceRoot,
+      runId: "20260523T000000013Z_pid20304",
+      graphFunctionName,
+      edgeName: "derive_lite_component_code_surface"
+    });
+    const admission = admitImplementationDesignRegisterForManifest({
+      manifest: current
+    });
+
+    assert.equal(admission.status, "admitted");
+    assert.ok(
+      admission.evidenceRefs.some((ref) =>
+        ref.endsWith("/design_depth_fp_evaluator_rule_outcome.json")
+      ),
+      JSON.stringify(admission.evidenceRefs, null, 2)
+    );
+    assert.equal(
+      admission.evidenceRefs.some((ref) => ref.endsWith("/runtime_events.json")),
+      false
+    );
+
+    const invocationPackage = constructWorkerInvocationPackage({ manifest: current });
+    const expectedSourceTarget = `${current.productMaterialization.selectedOutputRoot}/src/fp-live-no-runtime-events.js`;
+    assert.ok(
+      invocationPackage.outputContract.declaredProductFileTargets.includes(
+        expectedSourceTarget
+      ),
+      JSON.stringify(invocationPackage.outputContract, null, 2)
+    );
+    const constructionBrief = constructWorkerConstructionBrief({
+      manifest: current,
+      constructionBriefPath: path.join(
+        current.archiveRoot,
+        "worker_construction_brief.json"
+      ),
+      invocationPackage
+    });
+    assert.ok(
+      constructionBrief.stagePressure.designDepthEvaluatorRegisterRefs.some((ref) =>
+        ref.endsWith("/design_depth_fp_evaluator_register.json")
+      ),
+      JSON.stringify(constructionBrief.stagePressure, null, 2)
     );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
@@ -2302,6 +2439,8 @@ test("T-181 evaluator artifacts are cataloged operator-run truth", () => {
     "design_depth_fp_evaluator_last_message.txt",
     "design_depth_fp_evaluator_process_started.json",
     "design_depth_fp_evaluator_process_events.jsonl",
+    "pre_fp_evaluator_postflight.json",
+    "pre_fp_evaluate_result.json",
     "fp_evaluator_postflight.json"
   ];
 

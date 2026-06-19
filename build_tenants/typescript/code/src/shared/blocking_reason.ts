@@ -25,6 +25,7 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "context_expected_files_not_materialization_authority",
   "materialized_product_role_policy_mismatch",
   "materialized_product_role_policy_ref_mismatch",
+  "materialized_product_module_system_mismatch",
   "materialized_product_replay_role_policy_missing",
   "materialized_product_requirement_lineage_missing",
   "materialized_product_manifest_replay_kind_mismatch",
@@ -70,6 +71,8 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "design_depth_fp_evaluator_progress_timeout",
   "design_depth_fp_evaluator_process_failed",
   "design_depth_fp_evaluator_rule_blocked",
+  "design_depth_fp_evaluator_pending",
+  "design_depth_register_admission_invalid",
   "review_grade_evaluator_process_failed",
   "review_grade_evaluator_process_timeout",
   "review_grade_evaluator_mutated_input",
@@ -80,7 +83,9 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "installed_topology_invalid",
   "target_unavailable",
   "stale_query_domain",
+  "missing_bind_outcome_after_passed_compute",
   "target_carrier_admission_missing",
+  "component_depth_register_admission_invalid",
   "tenant_stack_authority_missing",
   "tenant_stack_authority_invalid",
   "staged_authority_missing",
@@ -185,6 +190,8 @@ export interface SdlcFdFailureClassification {
 
 const DETAIL_PRESERVING_LEGACY_REASON_CODES = Object.freeze([
   "materialized_product_role_missing",
+  "materialized_product_module_system_mismatch",
+  "component_depth_register_admission_invalid",
   "adr_output_filename_invalid",
   "adr_output_required_field_missing",
   "adr_output_status_invalid",
@@ -216,6 +223,8 @@ const DETAIL_PRESERVING_LEGACY_REASON_CODES = Object.freeze([
   "design_depth_fp_evaluator_progress_timeout",
   "design_depth_fp_evaluator_process_failed",
   "design_depth_fp_evaluator_rule_blocked",
+  "design_depth_fp_evaluator_pending",
+  "design_depth_register_admission_invalid",
   "review_grade_evaluator_process_failed",
   "review_grade_evaluator_process_timeout",
   "review_grade_evaluator_mutated_input",
@@ -264,6 +273,14 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       reasonClass: "contract_violation",
       lawfulReentryPoint: "repair_worker_output",
       message: "Worker output violated the declared handoff contract."
+    });
+  }
+  if (code === "component_depth_register_admission_invalid") {
+    return Object.freeze({
+      reasonClass: "contract_violation",
+      lawfulReentryPoint: "same_edge_retry",
+      message:
+        "Component-depth target carrier could not be admitted as a closed typed carrier."
     });
   }
   if (
@@ -375,6 +392,22 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
         "F_P design-depth evaluator timed out after publishing semantic content-register progress."
     });
   }
+  if (code === "design_depth_fp_evaluator_pending") {
+    return Object.freeze({
+      reasonClass: "assurance",
+      lawfulReentryPoint: "operator_blocked",
+      message:
+        "F_P design-depth evaluator must admit the design-depth target carrier before closure."
+    });
+  }
+  if (code === "design_depth_register_admission_invalid") {
+    return Object.freeze({
+      reasonClass: "contract_violation",
+      lawfulReentryPoint: "triage_gap",
+      message:
+        "Design-depth evaluator target carrier could not be admitted as a closed typed carrier."
+    });
+  }
   if (
     code === "design_depth_fp_evaluator_process_failed" ||
     code === "design_depth_fp_evaluator_rule_blocked" ||
@@ -479,6 +512,13 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       lawfulReentryPoint: "same_edge_retry",
       message:
         "Code-builder source/test frontier evidence is incomplete for the selected traversal."
+    });
+  }
+  if (code === "missing_bind_outcome_after_passed_compute") {
+    return Object.freeze({
+      reasonClass: "missing_evidence",
+      lawfulReentryPoint: "inspect_worker_archive",
+      message: "Passed compute facts were archived without an admitted traversal bind outcome."
     });
   }
   if (

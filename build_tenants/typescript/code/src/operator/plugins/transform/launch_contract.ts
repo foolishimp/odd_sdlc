@@ -56,6 +56,7 @@ import {
 } from "../../worker_tool_profile.js";import {
   outcomeDirectivesForWorker
 } from "./prompt_edge_policy.js";import {
+  assertSdlcProductMaterializationLaunchable,
   reconcileSdlcProductMaterializationAuthority
 } from "../../product_materialization/authority.js";import {
   MATERIALIZED_PRODUCT_FILE_ROLES,
@@ -77,8 +78,8 @@ import {
 
 export { sha256Text } from "../../../shared/digest.js";
 export { pathIsInside } from "../../../shared/path.js";import {
-  designDepthFpEvaluatorRegisterPath,
-  predecessorDesignDepthFpEvaluatorRegisterPaths
+  admittedDesignDepthFpEvaluatorRegisterEvidenceRefs,
+  designDepthFpEvaluatorRegisterPath
 } from "../evaluate/design_depth_register.js";import {
   canonicalSdlcPriorGapReasonCode,
   makeSdlcBlockingReason
@@ -4547,6 +4548,10 @@ export function constructWorkerInvocationPackage(input: {
   const retryRepairInstructions = retryRepairInstructionsForContext(input.manifest);
   const productMaterializationAuthority =
     reconcileSdlcProductMaterializationAuthority(input.manifest);
+  assertSdlcProductMaterializationLaunchable({
+    manifest: input.manifest,
+    authority: productMaterializationAuthority
+  });
   const productFileTargets =
     productMaterializationAuthority.declaredProductFileTargets;
   const workCategoryGovernance = selectSdlcWorkCategoryGovernance(input.manifest);
@@ -4810,9 +4815,7 @@ export function constructWorkerConstructionBrief(input: {
   const designDepthEvaluatorRegisterRefs = promptSourceRefs(
     workerFacingRefs(
       input.manifest,
-      predecessorDesignDepthFpEvaluatorRegisterPaths(input.manifest).map(
-        (filePath) => pathToFileURL(filePath).href
-      )
+      admittedDesignDepthFpEvaluatorRegisterEvidenceRefs(input.manifest)
     )
   );
   const base = Object.freeze({
@@ -5497,7 +5500,7 @@ function currentEvaluatedGapPromptLines(
     "",
     "Current evaluated gaps:",
     "- These are your current evaluated gaps for this retry. This is your work queue: work through it until the queue is empty or every remaining row is explicitly blocked with evidence.",
-    "- Rank retry work by contextual closure priority before editing: critical behavior, highest-dependency modules, common-library foundations, and repeated/common failure rows first.",
+    "- Use the listed blocker rows as the retry authority packet; repair the contracted artifact surface before inspecting broader SDLC context.",
     "- Repair these concrete evaluator blockers before adding new scope.",
     `- gapDossierRef: ${workerFacingRef(manifest, dossier.currentGapDossierRef)}`,
     `- evaluated edge=${dossier.edgeName}; target=${dossier.targetAssetType}; retryEligible=${dossier.retryEligible}; reasonCount=${promptReasons.length}; rawReasonCount=${dossier.reasons.length}`,
@@ -5563,6 +5566,10 @@ function promptForHandoffSections(
   );
   const productMaterializationAuthority =
     reconcileSdlcProductMaterializationAuthority(manifest);
+  assertSdlcProductMaterializationLaunchable({
+    manifest,
+    authority: productMaterializationAuthority
+  });
   const tenantToolEnvironment = tenantToolEnvironmentProjectionFor(manifest);
   const tenantToolBoundaryLines =
     tenantToolEnvironment.disabledTools.length === 0

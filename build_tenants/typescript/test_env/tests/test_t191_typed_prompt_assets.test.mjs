@@ -68,7 +68,7 @@ const requirementsSource = readFileSync(
   "utf8"
 );
 const SPEC_METHOD_PROMPT_OPENING_LINE =
-  "Make a plan from governing authority, rank the work by contextual closure priority, then work through that priority order: critical behavior, highest-dependency modules, and shared/common-library foundations first.";
+  "Use the smallest governing authority packet that can decide this prompt, then produce the contracted artifact without extra planning or global SDLC reconstruction.";
 const packageJson = JSON.parse(
   readFileSync(
     fileURLToPath(new URL("../../package.json", import.meta.url)),
@@ -105,7 +105,7 @@ function basicPromptSection(textLines, overrides = {}) {
 test("T-191 consumes the released ABI 4 GTL prompt surface", () => {
   assert.match(
     packageJson.dependencies["@abiogenesis/typescript-tenant"],
-    /4\.1\.0-rc\.1/u
+    /4\.1\.0-rc\.2/u
   );
   assert.match(promptAssetSource, /constructAssetSurface/u);
   assert.match(promptAssetSource, /constructNode/u);

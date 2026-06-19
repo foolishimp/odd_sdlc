@@ -669,6 +669,8 @@ export function outcomeDirectivesForWorker(
   );
   const workerAuthoredTargetCarrierProtocol =
     workerAuthoredTargetCarrierProtocolRequired(manifest);
+  const componentDepthDirective = compactComponentDepthDirective(manifest);
+  const markdownOutputDirectiveAllowed = componentDepthDirective === null;
   const targetCarrierProtocolDirectives =
     workerAuthoredTargetCarrierProtocol
       ? [
@@ -704,7 +706,8 @@ export function outcomeDirectivesForWorker(
         ]
       : [
           `Write output artifact: ${workerFacingPath(manifest, manifest.outputFile)}.`,
-          ...(manifest.outputFile.toLowerCase().endsWith(".md")
+          ...(markdownOutputDirectiveAllowed &&
+          manifest.outputFile.toLowerCase().endsWith(".md")
             ? [
                 "Markdown output artifact: read listed refs first, use bounded targeted edits for existing files, and cite stable refs instead of copied authority text."
               ]
@@ -931,7 +934,7 @@ export function outcomeDirectivesForWorker(
     compactTestDesignDirective(manifest),
     compactTestExecutionSurfaceDirective(manifest),
     compactWorkspaceSpecSurfaceDirective(manifest),
-    compactComponentDepthDirective(manifest),
+    componentDepthDirective,
     compactExecutionEvidenceDirective(manifest),
     compactScheduleDirective(manifest)
   ]) {

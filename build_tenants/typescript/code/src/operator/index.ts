@@ -237,8 +237,10 @@ export {
 } from "./plugins/transform/launch_contract.js";
 
 export {
+  assertSdlcProductMaterializationLaunchable,
   declaredProductFileTargets,
-  reconcileSdlcProductMaterializationAuthority
+  reconcileSdlcProductMaterializationAuthority,
+  sdlcProductMaterializationLaunchBlocker
 } from "./product_materialization/authority.js";
 
 export {

@@ -11,6 +11,8 @@ import {
 import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  GTL_PROGRAM_BIND_ADMISSION_STRENGTH_COMPATIBILITY_REF,
+  GTL_PROGRAM_OBLIGATION_DELTA_FAMILY_VALUES,
   GTL_PROGRAM_T153_FEATURE_KINDS,
   GTL_PROGRAM_T153_FEATURE_OWNER_CLASSIFICATIONS,
   admitGtlProgramConformanceInput,
@@ -29,9 +31,12 @@ import type {
   GtlProgramComputeCompositionRow,
   GtlProgramComputeStageBindingRow,
   GtlProgramFeatureCoverageManifest,
+  GtlProgramObligationDeltaFamily,
   GtlProgramPluginResultInterfaceRow,
   GtlProgramRuntimeBindingRow,
   GtlProgramT153FeatureKind,
+  GtlProgramTargetCarrierRow,
+  GtlProgramTraversalBindConservationRow,
   EnginePluginContract,
   Module,
   Regime
@@ -58,7 +63,6 @@ import {
   reviewGradeEdgeFulfillmentRuleContract,
   ticketWorkflowFdRuleContract
 } from "../operator/plugins/plugin_contracts.js";
-
 const PACKAGE_ROOT_FROM_BUILD = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../../../../.."
@@ -500,6 +504,14 @@ function uniqueRows<T>(
   return Object.freeze(unique);
 }
 
+function graphVectorRowIdentityKey(input: {
+  readonly graphFunctionId: string;
+  readonly graphId: string;
+  readonly graphVectorId: string;
+}): string {
+  return `${input.graphFunctionId}:${input.graphId}:${input.graphVectorId}`;
+}
+
 function operatorDeclarationRows(vectorRows: readonly MaterializedGraphVectorRow[]) {
   return Object.freeze(
     vectorRows.flatMap((row) =>
@@ -613,7 +625,7 @@ function computeCompositionRows(vectorRows: readonly MaterializedGraphVectorRow[
           });
         })
     ),
-    (row) => row.compositionRef
+    (row) => `${row.hostRef}:${row.compositionRef}`
   );
 }
 
@@ -925,6 +937,95 @@ function pluginResultInterfaceRows(
         maySelectTraversal: false as const,
         mayCloseTraversal: false as const,
         mayOwnIterationLoop: false as const
+      });
+    })
+  );
+}
+
+const ODD_SDLC_OBLIGATION_DELTA_FAMILIES:
+  readonly GtlProgramObligationDeltaFamily[] =
+    GTL_PROGRAM_OBLIGATION_DELTA_FAMILY_VALUES;
+
+function traversalBindConservationRows(input: {
+  readonly vectorRows: readonly MaterializedGraphVectorRow[];
+  readonly targetCarrierContracts: readonly GtlProgramTargetCarrierRow[];
+  readonly computeCompositions: readonly GtlProgramComputeCompositionRow[];
+  readonly computeStageBindings: readonly GtlProgramComputeStageBindingRow[];
+}): readonly GtlProgramTraversalBindConservationRow[] {
+  const targetCarrierByIdentity = new Map<string, GtlProgramTargetCarrierRow>();
+  for (const targetCarrier of input.targetCarrierContracts) {
+    const key = graphVectorRowIdentityKey(targetCarrier);
+    if (targetCarrierByIdentity.has(key)) {
+      throw new TypeError(
+        `${targetCarrier.graphFunctionId}/${targetCarrier.graphVectorId}: duplicate target-carrier row for traversal bind conservation`
+      );
+    }
+    targetCarrierByIdentity.set(key, targetCarrier);
+  }
+  const stageBindingRefsByVectorId = new Map<string, readonly string[]>();
+  for (const composition of input.computeCompositions) {
+    const stageBindingRefs = input.computeStageBindings
+      .filter((row) => row.compositionRef === composition.compositionRef)
+      .map((row) => row.stageBindingRef)
+      .sort();
+    stageBindingRefsByVectorId.set(composition.hostRef, Object.freeze(stageBindingRefs));
+  }
+  return Object.freeze(
+    input.vectorRows.map((row) => {
+      const targetCarrier = targetCarrierByIdentity.get(
+        graphVectorRowIdentityKey({
+          graphFunctionId: row.graphFunction.id,
+          graphId: row.graph.id,
+          graphVectorId: row.vector.id
+        })
+      );
+      if (targetCarrier === undefined) {
+        throw new TypeError(
+          `${row.graphFunction.name}/${row.vector.name}: missing target-carrier row for traversal bind conservation`
+        );
+      }
+      const refBase =
+        `odd-sdlc/${stringForRef(row.graphFunction.name)}` +
+        `/${stringForRef(row.vector.name)}`;
+      return Object.freeze({
+        conservationRef:
+          `bind-conservation://odd-sdlc/typescript/${refBase}`,
+        graphFunctionRef: row.graphFunction.name,
+        graphRef: row.graph.name,
+        graphVectorRef: row.vector.name,
+        graphFunctionId: row.graphFunction.id,
+        graphId: row.graph.id,
+        graphVectorId: row.vector.id,
+        intentLineageRefs: Object.freeze([
+          `intent-lineage://odd-sdlc/typescript/${refBase}/input`,
+          `lineage://odd-sdlc/typescript/${refBase}/authority`
+        ]),
+        targetCarrierBindingRefs: Object.freeze([
+          targetCarrier.targetCarrierContractRef
+        ]),
+        materializationBindingRefs: Object.freeze([
+          targetCarrier.materializationPolicyRef
+        ]),
+        carriedObligationRefs: Object.freeze([
+          `obligation://odd-sdlc/typescript/${refBase}/target-contract`
+        ]),
+        residualPressureRefs: Object.freeze([
+          `pressure://odd-sdlc/typescript/${refBase}/open-obligation`
+        ]),
+        stagedAuthorityRefs:
+          stageBindingRefsByVectorId.get(row.vector.id) ?? Object.freeze([]),
+        admissionStrengthRefs: Object.freeze([
+          GTL_PROGRAM_BIND_ADMISSION_STRENGTH_COMPATIBILITY_REF
+        ]),
+        downstreamTerminalPressureRefs: Object.freeze([
+          `terminal-pressure://odd-sdlc/typescript/${refBase}/terminal`
+        ]),
+        allowedObligationDeltaFamilies: ODD_SDLC_OBLIGATION_DELTA_FAMILIES,
+        evidenceRefs: Object.freeze([
+          "workspace://build_tenants/typescript/code/src/gtl_conformance/program.ts",
+          "REQ-L-GTL3-CONTRACT-LAW-API-017",
+          "REQ-R-ABG3-FN-COMP-023"
+        ])
       });
     })
   );
@@ -1359,6 +1460,12 @@ export function constructCurrentSdlcGtlProgramConformanceInput(
   });
   const pluginResultInterfaces =
     pluginResultInterfaceRows(computeStageBindings);
+  const traversalBindConservation = traversalBindConservationRows({
+    vectorRows,
+    targetCarrierContracts,
+    computeCompositions,
+    computeStageBindings
+  });
   const hookBoundaries = hookBoundaryRows(vectorRows);
   const selectionBoundaries = Object.freeze([]);
   const jobBindings = jobBindingRows(module);
@@ -1416,6 +1523,7 @@ export function constructCurrentSdlcGtlProgramConformanceInput(
     promptAssets,
     pluginContracts,
     pluginResultInterfaces,
+    traversalBindConservation,
     sourceIdentitySurfaces,
     sameObjectProofs,
     operatorDeclarations,

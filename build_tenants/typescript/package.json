@@ -199,6 +199,6 @@
     "typescript": "6.0.3"
   },
   "dependencies": {
-    "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.1.0-rc.1/abiogenesis-typescript-tenant-4.1.0-rc.1.tgz"
+    "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.1.0-rc.2/abiogenesis-typescript-tenant-4.1.0-rc.2.tgz"
   }
 }

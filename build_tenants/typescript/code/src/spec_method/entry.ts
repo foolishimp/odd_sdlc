@@ -1342,6 +1342,12 @@ function selectedNextGraphFunctionFromArchive(input: {
     const ledgerPath = path.join(archiveRoot, "sdlc_edge_fulfillment_ledger.json");
     const closureRecord = jsonRecordFromFile(closurePath);
     const ledgerRecord = jsonRecordFromFile(ledgerPath);
+    const missingBindOutcome = missingBindOutcomeAfterPassedComputeDiagnostic({
+      archiveRoot
+    });
+    if (missingBindOutcome !== null) {
+      return missingBindOutcome;
+    }
     const decision = edgeClosureDecisionFromArchive(archiveRoot);
     if (
       decision === null ||
@@ -1531,6 +1537,101 @@ function archiveRefForRoot(archiveRoot: string): string {
   return pathToFileURL(archiveRoot).href;
 }
 
+function archiveFileRef(input: {
+  readonly archiveRoot: string;
+  readonly fileName: string;
+}): string {
+  return pathToFileURL(path.join(input.archiveRoot, input.fileName)).href;
+}
+
+function archiveRecordHasKind(input: {
+  readonly archiveRoot: string;
+  readonly fileName: string;
+  readonly kind: string;
+}): boolean {
+  return (
+    jsonRecordFromFile(path.join(input.archiveRoot, input.fileName))?.["kind"] ===
+    input.kind
+  );
+}
+
+function archivePostflightPassed(archiveRoot: string): boolean {
+  const record = jsonRecordFromFile(path.join(archiveRoot, "postflight.json"));
+  return (
+    record?.["kind"] === "sdlc_operator_postflight_result" &&
+    stringField(record, "status") === "passed"
+  );
+}
+
+function archiveFpEvaluatePassed(archiveRoot: string): boolean {
+  const record = jsonRecordFromFile(path.join(archiveRoot, "fp_evaluate_result.json"));
+  return (
+    record?.["kind"] === "sdlc_fp_evaluate_result" &&
+    stringField(record, "status") === "passed"
+  );
+}
+
+function missingBindOutcomeAfterPassedComputeDiagnostic(input: {
+  readonly archiveRoot: string;
+  readonly edgeFulfillmentLedger?: SdlcRequirementFulfillmentEdgeLedgerSource | null;
+  readonly edgeClosureDecision?: SdlcRequirementFulfillmentClosureSource | null;
+  readonly nextActionProjection?: SdlcRequirementFulfillmentNextActionSource | null;
+}): SelectedNextGraphFunctionArchiveDiagnostic | null {
+  const edgeFulfillmentLedger =
+    input.edgeFulfillmentLedger === undefined
+      ? edgeFulfillmentLedgerFromArchive(input.archiveRoot)
+      : input.edgeFulfillmentLedger;
+  const edgeClosureDecision =
+    input.edgeClosureDecision === undefined
+      ? edgeClosureDecisionFromArchive(input.archiveRoot)
+      : input.edgeClosureDecision;
+  const nextActionProjection =
+    input.nextActionProjection === undefined
+      ? nextActionProjectionFromArchive(input.archiveRoot)
+      : input.nextActionProjection;
+  if (
+    edgeFulfillmentLedger !== null &&
+    edgeClosureDecision !== null &&
+    nextActionProjection !== null
+  ) {
+    return null;
+  }
+  const hasPassedComputeFacts =
+    archiveRecordHasKind({
+      archiveRoot: input.archiveRoot,
+      fileName: "worker_result_report.json",
+      kind: "odd_sdlc.worker_result_report"
+    }) &&
+    archivePostflightPassed(input.archiveRoot) &&
+    archiveFpEvaluatePassed(input.archiveRoot);
+  if (!hasPassedComputeFacts) {
+    return null;
+  }
+  return Object.freeze({
+    kind: "diagnostic" as const,
+    code: "missing_bind_outcome_after_passed_compute" as const,
+    detail:
+      "operator archive contains passed worker/postflight/F_P evaluation facts without the required traversal consequence triple",
+    evidenceRefs: Object.freeze(
+      [
+        "worker_result_report.json",
+        "postflight.json",
+        "fp_evaluate_result.json",
+        edgeFulfillmentLedger === null ? "sdlc_edge_fulfillment_ledger.json" : null,
+        edgeClosureDecision === null ? "sdlc_edge_closure_decision.json" : null,
+        nextActionProjection === null ? "sdlc_next_action_projection.json" : null
+      ]
+        .filter((fileName): fileName is string => fileName !== null)
+        .map((fileName) =>
+          archiveFileRef({
+            archiveRoot: input.archiveRoot,
+            fileName
+          })
+        )
+    )
+  });
+}
+
 function missingTraversalConsequenceArtifactRefs(input: {
   readonly archiveRoot: string;
   readonly edgeFulfillmentLedger: SdlcRequirementFulfillmentEdgeLedgerSource | null;
@@ -1548,7 +1649,12 @@ function missingTraversalConsequenceArtifactRefs(input: {
     missing.push("sdlc_next_action_projection.json");
   }
   return Object.freeze(
-    missing.map((fileName) => pathToFileURL(path.join(input.archiveRoot, fileName)).href)
+    missing.map((fileName) =>
+      archiveFileRef({
+        archiveRoot: input.archiveRoot,
+        fileName
+      })
+    )
   );
 }
 
@@ -1571,6 +1677,16 @@ function requirementFulfillmentForGaps(input: {
     const edgeFulfillmentLedger = edgeFulfillmentLedgerFromArchive(archiveRoot);
     const edgeClosureDecision = edgeClosureDecisionFromArchive(archiveRoot);
     const nextActionProjection = nextActionProjectionFromArchive(archiveRoot);
+    const missingBindOutcome = missingBindOutcomeAfterPassedComputeDiagnostic({
+      archiveRoot,
+      edgeFulfillmentLedger,
+      edgeClosureDecision,
+      nextActionProjection
+    });
+    if (missingBindOutcome !== null) {
+      missingArtifactRefs.push(...missingBindOutcome.evidenceRefs);
+      continue;
+    }
     if (
       edgeFulfillmentLedger === null ||
       edgeClosureDecision === null ||

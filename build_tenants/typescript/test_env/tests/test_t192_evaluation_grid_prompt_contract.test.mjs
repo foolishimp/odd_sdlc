@@ -1,7 +1,14 @@
 // Validates: T-192 (evaluation grid prompt contract)
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync
+} from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   constructSdlcEvaluationGridContract
@@ -34,10 +41,28 @@ const promptAssetSource = readFileSync(
   "utf8"
 );
 
-function minimalManifest(targetAssetType = "component_code_surface") {
+function edgeNameForTargetAssetType(targetAssetType) {
+  switch (targetAssetType) {
+    case "component_test_surface":
+      return "derive_component_test_surface";
+    case "test_design_surface":
+      return "derive_test_design_surface";
+    case "implementation_design_surface":
+      return "derive_implementation_design_surface";
+    default:
+      return "derive_component_code_surface";
+  }
+}
+
+function minimalManifest(targetAssetType = "component_code_surface", overrides = {}) {
+  const {
+    edgeName = edgeNameForTargetAssetType(targetAssetType),
+    graphFunctionName = edgeName,
+    ...remainingOverrides
+  } = overrides;
   return {
-    graphFunctionName: "derive_component_code_surface",
-    edgeName: "derive_component_code_surface",
+    graphFunctionName,
+    edgeName,
     targetAssetType,
     inputAssetTypes: ["implementation_design_surface"],
     outputFile: "build_tenants/rust_hello_service/src/main.rs",
@@ -46,13 +71,31 @@ function minimalManifest(targetAssetType = "component_code_surface") {
         { obligationId: "requirement:req_t192_001" },
         { obligationId: "requirement:req_t192_002" }
       ]
-    }
+    },
+    ...remainingOverrides
   };
 }
 
-function compactManifest(targetAssetType = "component_code_surface") {
+function materializationContract(required = true) {
   return {
-    ...minimalManifest(targetAssetType),
+    kind: "sdlc_product_materialization_contract",
+    required,
+    activeTenant: "t192_tenant",
+    selectedOutputRoot: "build_tenants/t192_tenant",
+    tenantRoot: "/tmp/t192_tenant",
+    relativePathBasis: "tenant_root",
+    declaredModuleNames: ["t192_tenant"],
+    buildExecutionContract: "undeclared",
+    testExecutionContract: "node --test",
+    manifestFile: "product_materialization_manifest.json",
+    requiredRoles: required ? ["source"] : [],
+    executionShards: []
+  };
+}
+
+function compactManifest(targetAssetType = "component_code_surface", overrides = {}) {
+  return {
+    ...minimalManifest(targetAssetType, overrides),
     proportionalityProfile: {
       kind: "sdlc_compute_proportionality_profile",
       profileRef: "profile://t192/compact",
@@ -90,7 +133,9 @@ function designDepthProjection() {
 
 function reviewGradeProjection() {
   return reviewGradeEdgeFulfillmentPromptProjection({
-    manifest: minimalManifest("component_code_surface"),
+    manifest: minimalManifest("component_code_surface", {
+      productMaterialization: materializationContract(true)
+    }),
     governanceRef: "config://test/review-grade",
     governancePath: "config/work-category-governance/coding_build.md",
     constructionBriefPath: "worker_construction_brief.json",
@@ -139,7 +184,7 @@ test("T-192 evaluation grid rejects global coverage as a local cell", () => {
         "evaluation-finding://odd-sdlc/t192/global-coverage"
       ],
       abgOutcomeFoldRef:
-        "package:@abiogenesis/typescript-tenant@4.1.0-rc.1#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows",
+        "package:@abiogenesis/typescript-tenant@4.1.0-rc.2#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows",
       provenanceRefs: ["REQ-F-ODDSDLC-088"]
     }),
     /not cell dimensions/u
@@ -174,7 +219,9 @@ test("T-192 evaluator prompt sidecars carry fused logical grids", () => {
 test("T-192 small admitted handoffs render compact fused-grid prompts", () => {
   const broadReview = reviewGradeProjection();
   const compactReview = reviewGradeEdgeFulfillmentPromptProjection({
-    manifest: compactManifest("component_code_surface"),
+    manifest: compactManifest("component_code_surface", {
+      productMaterialization: materializationContract(true)
+    }),
     governanceRef: "config://test/review-grade",
     governancePath: "config/work-category-governance/coding_build.md",
     constructionBriefPath: "worker_construction_brief.json",
@@ -204,15 +251,29 @@ test("T-192 small admitted handoffs render compact fused-grid prompts", () => {
   });
 
   assert(compactReview.promptText.length < broadReview.promptText.length);
-  assert(compactReview.promptText.length < 20000);
+  assert(compactReview.promptText.length < 24000);
   assert(compactDesign.promptText.length < 25000);
   assert.match(compactReview.promptText, /Small fused evaluation grid mode:/u);
   assert.match(compactDesign.promptText, /Small fused evaluation grid mode:/u);
+  assert.match(compactReview.promptText, /fulfillmentBinding shape for fulfilled component_code_surface findings/u);
+  assert.match(compactReview.promptText, /evaluatorFindingRef: stable finding ref inside this fulfillmentBinding only/u);
   assert.doesNotMatch(
     compactReview.promptText,
     /carrier selection, authority compression, trace binding/u
   );
   assert.match(compactReview.promptText, /ABG will fold lawful wrong_stage carryover/u);
+  assert.doesNotMatch(
+    compactDesign.promptText,
+    /Review coverage law: reviewedObligationIds and findings must cover/u
+  );
+  assert.match(
+    compactDesign.promptText,
+    /Do not add reviewedObligationIds, findings, summary, status, or other assessment fields to sdlc_evaluate_content_register/u
+  );
+  assert.match(
+    compactDesign.promptText,
+    /Top-level key set is exactly kind, registerVersion, stage, ruleRef, ruleRole, computeMeans, authorityFunction/u
+  );
   assert.match(compactDesign.promptText, /payload.section is one of/u);
   assert.match(compactDesign.promptText, /Do not write EvaluationFinding rows/u);
   assert.match(compactDesign.promptText, /Forbidden contentKind values/u);
@@ -268,6 +329,151 @@ test("T-192 small admitted handoffs render compact fused-grid prompts", () => {
     compactDesign.promptText,
     /Reject and rewrite if any design-depth row contains field\/value\/sourceRef summary triples/u
   );
+});
+
+test("T-192 review-grade prompt schema is projected by edge profile", () => {
+  const componentTestReview = reviewGradeEdgeFulfillmentPromptProjection({
+    manifest: compactManifest("component_test_surface", {
+      productMaterialization: materializationContract(true)
+    }),
+    governanceRef: "config://test/review-grade",
+    governancePath: "config/work-category-governance/unit_test_build.md",
+    constructionBriefPath: "worker_construction_brief.json",
+    invocationPackagePath: "worker_invocation_package.json",
+    workerReportPath: "worker_result_report.json",
+    assessmentPath: "review_grade_edge_fulfillment_assessment.json",
+    subworkstreamManifestPath: "evaluate_compute_subworkstream_manifest.json",
+    tenantToolEnvironment: null
+  });
+  const testDesignReview = reviewGradeEdgeFulfillmentPromptProjection({
+    manifest: compactManifest("test_design_surface", {
+      productMaterialization: materializationContract(false)
+    }),
+    governanceRef: "config://test/review-grade",
+    governancePath: "config/work-category-governance/unit_test_build.md",
+    constructionBriefPath: "worker_construction_brief.json",
+    invocationPackagePath: "worker_invocation_package.json",
+    workerReportPath: "worker_result_report.json",
+    assessmentPath: "review_grade_edge_fulfillment_assessment.json",
+    subworkstreamManifestPath: "evaluate_compute_subworkstream_manifest.json",
+    tenantToolEnvironment: null
+  });
+
+  assert.doesNotMatch(componentTestReview.promptText, /evaluatorFindingRef/u);
+  assert.doesNotMatch(
+    componentTestReview.promptText,
+    /fulfillmentBinding shape for fulfilled component_code_surface findings/u
+  );
+  assert.doesNotMatch(componentTestReview.promptText, /component_code_surface/u);
+  assert.match(componentTestReview.promptText, /component_test_surface/u);
+  assert.match(componentTestReview.promptText, /materializationBindingRelation/u);
+  assert(
+    componentTestReview.invocationAsset.evaluationGridContract.evaluationDimensions.some(
+      (row) => row.dimensionRef.includes("materialization-binding-relation")
+    )
+  );
+
+  assert.doesNotMatch(testDesignReview.promptText, /evaluatorFindingRef/u);
+  assert.doesNotMatch(testDesignReview.promptText, /component_code_surface/u);
+  assert.doesNotMatch(testDesignReview.promptText, /materializationBindingRelation/u);
+  assert.doesNotMatch(
+    testDesignReview.promptText,
+    /generated product files named by worker_result_report\.materializedFiles/u
+  );
+  assert.match(
+    testDesignReview.promptText,
+    /generated asset artifact named by worker_result_report\.outputFile/u
+  );
+  assert.equal(
+    testDesignReview.invocationAsset.evaluationGridContract.evaluationDimensions.some(
+      (row) => row.dimensionRef.includes("materialization-binding-relation")
+    ),
+    false
+  );
+});
+
+test("T-192 scoped review prompt closes obligation refs over invocation package", () => {
+  const archiveRoot = mkdtempSync(
+    path.join(tmpdir(), "odd-sdlc-t192-review-scope-")
+  );
+  try {
+    writeFileSync(
+      path.join(archiveRoot, "worker_invocation_package.json"),
+      JSON.stringify(
+        {
+          kind: "sdlc_worker_invocation_package",
+          inlineObligationIds: [
+            "target_asset:component_test_surface",
+            "requirement:t132_hello_world_single_tenant.bootstrap.req_t132_001"
+          ]
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+    const projection = reviewGradeEdgeFulfillmentPromptProjection({
+      manifest: compactManifest("component_test_surface", {
+        archiveRoot,
+        featureScope: {
+          mode: "steel_thread"
+        },
+        productMaterialization: materializationContract(true),
+        traversalObligationContext: {
+          obligations: [
+            { obligationId: "target_asset:component_test_surface" },
+            {
+              obligationId:
+                "requirement:t132_hello_world_single_tenant.bootstrap.req_t132_001"
+            },
+            {
+              obligationId:
+                "requirement:t132_hello_world_single_tenant.build_tenants_hello_world_javascript_design_adrs_adr_003_test_design_surface.req_t132_001"
+            }
+          ]
+        }
+      }),
+      invocationScope: {
+        kind: "sdlc_worker_invocation_package",
+        featureScope: {
+          mode: "steel_thread"
+        },
+        inlineObligationIds: [
+          "target_asset:component_test_surface",
+          "requirement:t132_hello_world_single_tenant.bootstrap.req_t132_001"
+        ]
+      },
+      governanceRef: "config://test/review-grade",
+      governancePath: "config/work-category-governance/unit_test_build.md",
+      constructionBriefPath: "worker_construction_brief.json",
+      invocationPackagePath: "worker_invocation_package.json",
+      workerReportPath: "worker_result_report.json",
+      assessmentPath: "review_grade_edge_fulfillment_assessment.json",
+      subworkstreamManifestPath: "evaluate_compute_subworkstream_manifest.json",
+      tenantToolEnvironment: null
+    });
+
+    assert.match(projection.promptText, /obligationCount: 2/u);
+    assert.match(projection.promptText, /target_asset:component_test_surface/u);
+    assert.match(
+      projection.promptText,
+      /requirement:t132_hello_world_single_tenant\.bootstrap\.req_t132_001/u
+    );
+    assert.doesNotMatch(
+      projection.promptText,
+      /build_tenants_hello_world_javascript_design_adrs_adr_003_test_design_surface/u
+    );
+    assert.match(
+      projection.promptText,
+      /reviewedObligationIds and findings must cover exactly every obligationRef above and no other obligation ids/u
+    );
+    assert.match(
+      projection.promptText,
+      /cannot enlarge review scope or create findings for generated-artifact requirement aliases/u
+    );
+  } finally {
+    rmSync(archiveRoot, { recursive: true, force: true });
+  }
 });
 
 test("T-192 prompt constructors are section-first, not rendered-text slices", () => {

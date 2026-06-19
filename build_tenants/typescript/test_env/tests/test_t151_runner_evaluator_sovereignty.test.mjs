@@ -399,6 +399,120 @@ function writeImplementationDesignAuthority(workspaceRoot) {
   );
 }
 
+function writeTestDesignAuthority(workspaceRoot) {
+  const outputFile = path.join(
+    workspaceRoot,
+    "build_tenants/scala_spark/design/adrs/ADR-003-test-design-surface.md"
+  );
+  const requirementIds = [
+    "requirement:t151_runner_sovereignty.stage_01_fixture.req_t151_001"
+  ];
+  const testCase = {
+    kind: "sdlc_test_case_row",
+    testCaseRef: "TC-T151-001",
+    caseKind: "positive",
+    executionLane: "integration",
+    sourceDesignObligationRefs: requirementIds,
+    testcaseAuthorityRefs: requirementIds,
+    expectedBehavior: "core value is transformed"
+  };
+  mkdirSync(dirname(outputFile), { recursive: true });
+  writeFileSync(
+    outputFile,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_test_design_register",
+        registerVersion: "ts-test-design-v1",
+        targetAssetType: "test_design_surface",
+        designConsumptionRows: [
+          {
+            kind: "sdlc_design_consumption_contract",
+            contractRef: "design-consumption://t151/test",
+            sourceDesignObligationRefs: requirementIds,
+            authorityBasisRefs: ["fixture://t151/test-design"],
+            consumerGraphFunctionRefs: [
+              "derive_component_test_surface",
+              "prepare_test_execution_surface",
+              "derive_test_execution_result_surface"
+            ]
+          }
+        ],
+        uatTestcaseRows: [testCase],
+        testcaseAuthorityRows: [testCase],
+        testStackProfileRows: [
+          {
+            kind: "sdlc_test_stack_profile_row",
+            stackRef: "stack://t151/scala-sbt-test",
+            frameworkRef: "framework://scalatest",
+            buildTool: "sbt"
+          }
+        ],
+        testModuleRows: [
+          {
+            kind: "sdlc_test_module_row",
+            moduleName: "generated-tests",
+            moduleRef: "module://t151/generated-tests",
+            testRoot: "src/test/scala"
+          }
+        ],
+        testComponentTopologyRows: [
+          {
+            kind: "sdlc_test_component_topology_row",
+            testClassId: "CoreSpec",
+            relativePath: "src/test/scala/generated/CoreSpec.scala",
+            testcaseIds: ["TC-T151-001"],
+            componentIds: ["generated-core"],
+            requirementIds,
+            shardId: "unit"
+          }
+        ],
+        testDataBindings: [
+          {
+            kind: "sdlc_test_data_binding",
+            testDataRef: "test-data://t151/core",
+            testCaseRef: "TC-T151-001",
+            inputFixtureRefs: ["fixture://t151/none"],
+            generationPolicyRef: "generation-policy://t151/static",
+            expectedResultRef: "expected://t151/core",
+            sourceDesignObligationRefs: requirementIds
+          }
+        ],
+        expectedResultBindings: [
+          {
+            kind: "sdlc_expected_result_binding",
+            expectedResultRef: "expected://t151/core",
+            testCaseRef: "TC-T151-001",
+            assertionRefs: ["assertion://t151/core"],
+            expectedResultSummary: "core value is transformed",
+            verificationPolicyRef: "verification-policy://t151/core"
+          }
+        ],
+        uatIntegrationBindings: [
+          {
+            kind: "sdlc_uat_integration_binding",
+            uatTestCaseRef: "TC-T151-001",
+            integrationTestCaseRef: "TC-T151-001",
+            executionLane: "integration"
+          }
+        ],
+        testExecutionScheduleRows: [
+          {
+            kind: "sdlc_test_execution_schedule_row",
+            scheduleRef: "schedule://t151/core",
+            testCaseRefs: ["TC-T151-001"],
+            command: "sbt test",
+            frameworkRef: "framework://scalatest",
+            shardId: "unit"
+          }
+        ]
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+}
+
 function makeWorkspace() {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t151-"));
   mkdirSync(path.join(root, "specification/requirements"), { recursive: true });
@@ -442,7 +556,13 @@ function makeWorkspace() {
       {
         kind: "sdlc_tenant_technology_stack_description",
         language: "Scala",
-        buildTool: "sbt"
+        buildTool: "sbt",
+        sourceFiles: ["src/main/scala/generated/Core.scala"],
+        testingTechStack: {
+          testRunner: "sbt test",
+          testRoots: ["src/test"],
+          testTargets: ["src/test/scala/generated/CoreSpec.scala"]
+        }
       },
       null,
       2
@@ -841,6 +961,7 @@ test("T-151 first_traversal returns the first admitted non-close consequence", a
 
 test("T-151 component-test trace_missing review pressure writes retry closure", async () => {
   const workspace = makeWorkspace();
+  writeTestDesignAuthority(workspace);
   const start = makeStart(workspace, "derive_component_test_surface");
   const workerScript = writeTraceMissingComponentTestWorkerScript(workspace);
 
@@ -891,6 +1012,7 @@ test("T-151 lawful wrong_stage review carryover is closure-visible evidence", as
   assert(outcome.traversalConsequence);
   assert.equal(outcome.traversalConsequence.edgeClosureDecision.disposition, "close");
   assert.equal(existsSync(path.join(outcome.archiveRoot, "review_grade_edge_fulfillment_rule_outcome.json")), true);
+  assert.equal(existsSync(path.join(outcome.archiveRoot, "review_grade_postflight.json")), false);
   assert.equal(
     outcome.traversalConsequence.edgeFulfillmentLedger.admissionRefs.includes(
       reviewRuleOutcomeRef

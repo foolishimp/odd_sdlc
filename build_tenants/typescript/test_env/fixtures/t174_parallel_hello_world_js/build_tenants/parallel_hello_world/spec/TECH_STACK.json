@@ -7,12 +7,26 @@
   },
   "buildTool": "node",
   "packageManager": "npm",
+  "executionEnvironment": {
+    "hostCachePolicy": "prohibited",
+    "workspaceLocalDirectories": [],
+    "environmentVariables": {}
+  },
+  "sourceFiles": [
+    "src/hello.js",
+    "src/world.js",
+    "src/index.js"
+  ],
   "buildConfigTargets": [
     "package.json"
   ],
   "testingTechStack": {
     "testRunner": "node",
     "testCommand": "node --test test/hello.test.js test/world.test.js",
+    "testTargets": [
+      "test/hello.test.js",
+      "test/world.test.js"
+    ],
     "testBuildConfigTargets": [
       "package.json"
     ],

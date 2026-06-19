@@ -236,6 +236,76 @@ function writePostCloseNextActionArchive(workspace, input = {}) {
   );
 }
 
+function writePassedComputeWithoutBindArchive(workspace, input = {}) {
+  const archiveRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs",
+    input.name ?? "20260510T000200000Z_pid3"
+  );
+  mkdirSync(archiveRoot, { recursive: true });
+  const graphFunctionName =
+    input.graphFunctionName ?? "derive_component_code_surface";
+  writeFileSync(
+    path.join(archiveRoot, "worker_result_report.json"),
+    `${JSON.stringify(
+      {
+        kind: "odd_sdlc.worker_result_report",
+        graphFunctionName,
+        edgeName: graphFunctionName,
+        targetAssetType: "component_code_surface",
+        outputFile: path.join(workspace, "build_tenants/typescript/src/index.ts"),
+        materializedFiles: [],
+        materializationDiagnostics: [],
+        executionEvidence: null,
+        executionEvidenceErrors: [],
+        obligationAssessments: []
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  writeFileSync(
+    path.join(archiveRoot, "postflight.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_operator_postflight_result",
+        status: "passed",
+        blockingReasons: [],
+        blockingReasonCarriers: [],
+        evidenceRefs: []
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  writeFileSync(
+    path.join(archiveRoot, "fp_evaluate_result.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_fp_evaluate_result",
+        status: "passed",
+        postflightStatus: "passed",
+        blockingReasons: [],
+        evidenceRefs: [],
+        obligationAssessmentCounts: {
+          total: 0,
+          fulfilled: 0,
+          partial: 0,
+          blocked: 0,
+          unassessed: 0,
+          extra: 0
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  return archiveRoot;
+}
+
 test("T-058 Spec Method catalog command reads graph catalog without workspace mutation", () => {
   const result = invokeOddSdlcSpecMethodCommandSync(["catalog"]);
 
@@ -477,6 +547,31 @@ test("T-160 archived next traversal rejects inconsistent predecessor overlay bin
   assert.match(
     result.payload.start.detail,
     /overlayBindingRef does not match its admitted closure\/ledger binding/
+  );
+});
+
+test("T-205 passed compute archive without bind outcome fails closed", () => {
+  const workspace = makeConformantWorkspace();
+  writePassedComputeWithoutBindArchive(workspace);
+
+  const result = invokeOddSdlcSpecMethodCommandSync([
+    "gaps",
+    "--workspace",
+    workspace
+  ]);
+
+  assert.equal(result.status, "ok");
+  assert.equal(
+    result.payload.blockingReason,
+    "missing_bind_outcome_after_passed_compute"
+  );
+  assert.match(
+    result.payload.start.detail,
+    /passed worker\/postflight\/F_P evaluation facts without the required traversal consequence triple/u
+  );
+  assert.match(
+    JSON.stringify(result.payload.start.evidenceRefs),
+    /sdlc_edge_closure_decision\.json/u
   );
 });
 

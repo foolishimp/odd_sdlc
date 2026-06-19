@@ -1618,6 +1618,7 @@ function tenantStackTargetAppliesToCurrentMaterialization(input: {
   }
   return (
     input.manifest.targetAssetType === "component_test_surface" ||
+    input.manifest.targetAssetType === "uat_test_source_surface" ||
     productMaterializationRequiresTestExecutionEvidence(input.manifest)
   );
 }
@@ -1947,6 +1948,21 @@ function productAuthorityTargetMatchesIncludedModule(input: {
   readonly selectedOutputRoot: string;
   readonly includedModuleNames: readonly string[];
 }): boolean {
+  const selectedOutputRoot = normalizedSelectedOutputRoot(input.selectedOutputRoot);
+  const targetPath = input.target.path.replace(/\\/gu, "/").replace(/\/+$/u, "");
+  const selectedOutputRootParts = selectedOutputRoot
+    .split("/")
+    .filter((part) => part.length > 0);
+  const selectedOutputRootModuleName =
+    selectedOutputRootParts[selectedOutputRootParts.length - 1] ?? "";
+  if (
+    selectedOutputRootModuleName.length > 0 &&
+    input.includedModuleNames.includes(selectedOutputRootModuleName) &&
+    (targetPath === selectedOutputRoot ||
+      targetPath.startsWith(`${selectedOutputRoot}/`))
+  ) {
+    return true;
+  }
   const relativeTarget = targetRelativeToSelectedOutputRoot({
     targetPath: input.target.path,
     selectedOutputRoot: input.selectedOutputRoot
@@ -2020,7 +2036,10 @@ function targetsForCurrentMaterializationEdge(input: {
         }) &&
         (input.manifest.targetAssetType !== "component_code_surface" ||
           target.requiredRole !== "test") &&
-        (input.manifest.targetAssetType !== "component_test_surface" ||
+        (!(
+          input.manifest.targetAssetType === "component_test_surface" ||
+          input.manifest.targetAssetType === "uat_test_source_surface"
+        ) ||
           target.requiredRole === "test" ||
           target.requiredRole === "build_config")
     )
@@ -2237,6 +2256,82 @@ export function declaredProductFileTargets(
 ): readonly string[] {
   return reconcileSdlcProductMaterializationAuthority(manifest)
     .declaredProductFileTargets;
+}
+
+function productMaterializationAuthorityNeedsTenantStackRepair(
+  authority: Pick<SdlcProductMaterializationAuthorityReconciliation, "reasonRefs">
+): boolean {
+  return (
+    !authority.reasonRefs.includes("declared_product_file_targets_missing") &&
+    (authority.reasonRefs.includes("tenant_stack_authority_missing") ||
+      authority.reasonRefs.includes("tenant_stack_authority_invalid"))
+  );
+}
+
+export function sdlcProductMaterializationLaunchBlocker(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly authority?: SdlcProductMaterializationAuthorityReconciliation | undefined;
+}): string | null {
+  if (!input.manifest.productMaterialization.required) {
+    return null;
+  }
+  const authority =
+    input.authority ??
+    reconcileSdlcProductMaterializationAuthority(input.manifest);
+  const missingRequiredRoles =
+    input.manifest.productMaterialization.requiredRoles.filter(
+      (role) =>
+        !authority.declaredProductTargetContracts.some(
+          (target) => target.requiredRole === role
+        )
+    );
+  if (missingRequiredRoles.length > 0) {
+    if (productMaterializationAuthorityNeedsTenantStackRepair(authority)) {
+      return null;
+    }
+    if (
+      input.manifest.targetAssetType === "component_code_surface" &&
+      missingRequiredRoles.length === 1 &&
+      missingRequiredRoles[0] === "source"
+    ) {
+      return "component_code_source_materialization_targets_missing";
+    }
+    if (authority.declaredProductFileTargets.length === 0) {
+      return `${input.manifest.targetAssetType}_materialization_targets_missing`;
+    }
+    return `${input.manifest.targetAssetType}_${missingRequiredRoles.join("_")}_materialization_targets_missing`;
+  }
+  if (authority.declaredProductFileTargets.length === 0) {
+    return `${input.manifest.targetAssetType}_materialization_targets_missing`;
+  }
+  return null;
+}
+
+export function assertSdlcProductMaterializationLaunchable(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly authority?: SdlcProductMaterializationAuthorityReconciliation | undefined;
+}): void {
+  const authority =
+    input.authority ??
+    reconcileSdlcProductMaterializationAuthority(input.manifest);
+  const blocker = sdlcProductMaterializationLaunchBlocker({
+    manifest: input.manifest,
+    authority
+  });
+  if (blocker === null) {
+    return;
+  }
+  throw new TypeError(
+    [
+      `sdlc_product_materialization_launch_blocked:${blocker}`,
+      `edge=${input.manifest.edgeName}`,
+      `target=${input.manifest.targetAssetType}`,
+      `status=${authority.status}`,
+      `requiredRoles=${input.manifest.productMaterialization.requiredRoles.join(",") || "none"}`,
+      `declaredProductFileTargets=${authority.declaredProductFileTargets.join(",") || "none"}`,
+      `reasonRefs=${authority.reasonRefs.join(",") || "none"}`
+    ].join("; ")
+  );
 }
 
 export function effectiveProductMaterializationRequiredRoles(

@@ -30,7 +30,8 @@ import {
   type SdlcComponentTopologyRow,
   type SdlcRequirementFunctionFulfillmentBinding,
   type SdlcWorkerObligationAssessment,
-  type SdlcWorkerHandoffManifest
+  type SdlcWorkerHandoffManifest,
+  type SdlcWorkerInvocationPackage
 } from "./carriers.js";
 import {
   isSdlcLiveFpParallelMaterializationFrontier
@@ -55,6 +56,11 @@ const REVIEW_GRADE_PROMPT_NULL_BINDING_REF_PREFIX =
 
 const LIVE_FP_PARALLEL_MATERIALIZATION_FRONTIER_FILE =
   "sdlc_live_fp_parallel_materialization_frontier.json";
+
+export type SdlcReviewGradeInvocationScope = Pick<
+  SdlcWorkerInvocationPackage,
+  "kind" | "featureScope" | "inlineObligationIds"
+>;
 
 export interface SdlcReviewGradeReadOnlyInputFileState {
   readonly path: string;
@@ -124,13 +130,6 @@ export function snapshotReviewGradeReadOnlyInputFiles(input: {
     kind: "sdlc_review_grade_read_only_input_snapshot" as const,
     files: Object.freeze(paths.map(readOnlyInputFileState))
   });
-}
-
-function objectRecord(input: unknown): Record<string, unknown> | null {
-  if (typeof input !== "object" || input === null || Array.isArray(input)) {
-    return null;
-  }
-  return Object.fromEntries(Object.entries(input));
 }
 
 function readOnlyInputFileStateChanged(input: {
@@ -1534,50 +1533,33 @@ function canonicalizeReviewAssessmentFulfillmentBindings(input: {
   });
 }
 
-function expectedReviewObligationIdsForManifest(
-  manifest: SdlcWorkerHandoffManifest
-): readonly string[] {
-  const fallback = manifest.traversalObligationContext.obligations.map(
+function expectedReviewObligationIdsForManifest(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly invocationScope?: SdlcReviewGradeInvocationScope | null | undefined;
+}): readonly string[] {
+  const fallback = input.manifest.traversalObligationContext.obligations.map(
     (obligation) => obligation.obligationId
   );
-  if (manifest.featureScope.mode === "full_breadth") {
+  if (input.manifest.featureScope.mode === "full_breadth") {
     return Object.freeze(fallback);
   }
-  const invocationPackagePath = join(
-    manifest.archiveRoot,
-    "worker_invocation_package.json"
-  );
-  if (!existsSync(invocationPackagePath) || !statSync(invocationPackagePath).isFile()) {
-    return Object.freeze(fallback);
+  if (input.invocationScope === undefined) {
+    return Object.freeze([]);
   }
-  try {
-    const candidate: unknown = JSON.parse(readFileSync(invocationPackagePath, "utf8"));
-    const record = objectRecord(candidate);
-    if (record === null) {
-      return Object.freeze(fallback);
-    }
-    const kind = parseNonEmptyString(
-      record["kind"],
-      "ReviewGrade.workerInvocationPackage.kind"
-    );
-    if (kind !== "sdlc_worker_invocation_package") {
-      return Object.freeze(fallback);
-    }
-    const inlineObligationIds = parseStringList(
-      record["inlineObligationIds"],
-      "ReviewGrade.workerInvocationPackage.inlineObligationIds"
-    );
-    return inlineObligationIds.length === 0
-      ? Object.freeze(fallback)
-      : uniqueSorted(inlineObligationIds);
-  } catch {
-    return Object.freeze(fallback);
+  if (
+    input.invocationScope === null ||
+    input.invocationScope.kind !== "sdlc_worker_invocation_package" ||
+    input.invocationScope.featureScope.mode === "full_breadth"
+  ) {
+    return Object.freeze([]);
   }
+  return uniqueSorted(input.invocationScope.inlineObligationIds);
 }
 
 function assessmentValidationErrors(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly assessment: SdlcReviewGradeEdgeFulfillmentAssessment;
+  readonly invocationScope?: SdlcReviewGradeInvocationScope | null | undefined;
 }): readonly string[] {
   const errors: string[] = [];
   const { manifest, assessment } = input;
@@ -1590,8 +1572,20 @@ function assessmentValidationErrors(input: {
   if (assessment.targetAssetType !== manifest.targetAssetType) {
     errors.push("review_grade_target_asset_mismatch");
   }
-  const expectedReviewObligationIds =
-    expectedReviewObligationIdsForManifest(manifest);
+  const expectedReviewObligationIds = expectedReviewObligationIdsForManifest({
+    manifest,
+    invocationScope: input.invocationScope
+  });
+  if (manifest.featureScope.mode !== "full_breadth") {
+    if (input.invocationScope === null || input.invocationScope === undefined) {
+      errors.push("review_grade_invocation_scope_missing");
+    } else if (
+      input.invocationScope !== undefined &&
+      expectedReviewObligationIds.length === 0
+    ) {
+      errors.push("review_grade_invocation_scope_empty");
+    }
+  }
   const declared = new Set(expectedReviewObligationIds);
   const declaredRequirementRefs = new Set(
     manifest.traversalObligationContext.obligations
@@ -1715,6 +1709,7 @@ function assessmentValidationErrors(input: {
 export function admitReviewGradeEdgeFulfillmentAssessmentFromArtifact(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly outputFile: string;
+  readonly invocationScope?: SdlcReviewGradeInvocationScope | null | undefined;
 }): SdlcReviewGradeEdgeFulfillmentAdmission {
   const evidenceRefs = Object.freeze([pathToFileURL(input.outputFile).href]);
   if (!reviewGradeEdgeFulfillmentAssessmentRequired(input.manifest)) {
@@ -1757,7 +1752,8 @@ export function admitReviewGradeEdgeFulfillmentAssessmentFromArtifact(input: {
     });
     const errors = assessmentValidationErrors({
       manifest: input.manifest,
-      assessment
+      assessment,
+      invocationScope: input.invocationScope
     });
     if (errors.length > 0) {
       return Object.freeze({

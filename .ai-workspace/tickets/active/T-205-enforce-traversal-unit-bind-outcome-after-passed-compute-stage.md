@@ -17,10 +17,12 @@ re_entry_point: design
 priority: critical
 triaged_at: 2026-06-18
 created_at: 2026-06-18
-updated_at: 2026-06-18
+updated_at: 2026-06-19
 governance_scope: GTL/ABG traversal unit law, ODD_METHOD, odd_sdlc runtime boundary
 source_documents:
-  - /Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/active/T-159-formalize-traversal-unit-and-consequence-bind-boundary.md
+  - /Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/T-159-formalize-traversal-unit-and-consequence-bind-boundary.md
+  - /Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.1.0-rc.2/release-snapshot-manifest.json
+  - /Users/jim/src/apps/abiogenesis/docs/ABIOGENESIS_RC_RELEASE_NOTE.md
   - .ai-workspace/tickets/completed/T-203-factor-code-builder-graph-function-for-uat-test-generation-and-ticket-reentry.md
   - .ai-workspace/tickets/active/T-204-decommission-odd-sdlc-cli-orchestration-surface.md
 related_tickets:
@@ -31,7 +33,7 @@ related_tickets:
   - .ai-workspace/tickets/completed/T-197-reconcile-product-boundary-and-remove-authority-leakage.md
   - .ai-workspace/tickets/completed/T-203-factor-code-builder-graph-function-for-uat-test-generation-and-ticket-reentry.md
   - .ai-workspace/tickets/active/T-204-decommission-odd-sdlc-cli-orchestration-surface.md
-  - /Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/active/T-159-formalize-traversal-unit-and-consequence-bind-boundary.md
+  - /Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/T-159-formalize-traversal-unit-and-consequence-bind-boundary.md
 affected_boundary:
   - /Users/jim/src/apps/abiogenesis GTL compiler/validator traversalUnitProjection
   - /Users/jim/src/apps/abiogenesis ABG runtime/interpreter bind enforcement
@@ -73,13 +75,13 @@ evaluation_criteria:
   - ABG runtime emits exactly one bind-boundary outcome for each admitted passed compute stage
   - runtime fails closed with a typed invariant violation when passed worker/postflight/evaluator evidence exists but no closure/bind carrier can be produced
   - odd_sdlc product gates reject archives that contain passed postflight/F_P evaluation for a traversable edge but lack `sdlc_edge_closure_decision.json` and the corresponding ABG traversal transition/bind projection
-  - the Rust hello live scenario reaches the component-code handoff or fails with a typed traversal-unit invariant, never a silent pending run after a passed design edge
+  - the odd_sdlc hello-world live scenario converges cleanly, or fails closed with a typed traversal-unit invariant instead of a silent pending run after a passed edge
 proof_surface:
   - ABIogenesis compiler negative tests for missing successful-result bind law
   - ABG runtime/interpreter negative test for passed compute facts without one traversal-unit result
   - odd_sdlc product gate over archive shape and traversalUnitProjection consumption
   - replay/analyze-run diagnostic that classifies this archive as `missing_bind_outcome_after_passed_compute`
-  - rerun of Rust hello live scenario after enforcement
+  - rerun of odd_sdlc hello-world live scenario after RC2 migration
 live_evidence:
   archive: build_tenants/typescript/test_env/test_runs/scenario_t164_rust_hello_service_lite_live/20260618T015230354Z_pid21090
   operator_run: .ai-workspace/runtime/odd_sdlc/operator-runs/20260618T015355673Z_pid21090
@@ -183,15 +185,249 @@ odd_sdlc responsibilities:
   visible as `missing_bind_outcome_after_passed_compute`;
 - avoid adding a local continuation controller as the fix.
 
+## ABI RC2 Migration Lessons
+
+The ABG T-159 frozen odd_sdlc fixture exposed product-side fixes that must move
+to real odd_sdlc before the RC2 proof is meaningful:
+
+- consume `@abiogenesis/typescript-tenant@4.1.0-rc.2` from the immutable release
+  snapshot tarball, not a mutable local ABI source checkout;
+- build review-grade prompt scope from the admitted worker invocation package
+  projection and fail closed when scoped invocation scope is missing, rather
+  than reparsing raw archive JSON inside the prompt constructor;
+- preserve semantic/graph status coherence: downstream-stage pressure may be
+  accepted only when the assessment status is passed, and the accepted outcome
+  must carry residual pressure refs;
+- key traversal-bind target-carrier joins by graph function, graph, and vector
+  identity instead of array position;
+- dedupe composition rows by `hostRef + compositionRef`, not composition ref
+  alone;
+- fail fast when design-depth or component-depth target carriers are required
+  but cannot be admitted after a passed compute stage;
+- keep materialized-product module-system mismatches as active postflight
+  blockers;
+- generalize materialization launch blocking across all required product roles,
+  with tenant-stack repair as the explicit exception;
+- keep pressure refs and obligation refs separate in carriers and prompts;
+- prove the migration with a clean odd_sdlc hello-world live run, not only the
+  ABI frozen fixture.
+
+## T-132 Live Proof - 2026-06-19
+
+Clean live run:
+
+```text
+build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260619T043423837Z_pid72626
+```
+
+Result:
+
+```text
+npm run test:t132:hello-world-live
+tests 1
+pass 1
+fail 0
+duration_ms 1858437.7805
+```
+
+The installed operator converged at:
+
+```text
+workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260619T050521295Z_pid72626/run.json
+status = converged
+currentEdge = null
+nextLawfulAction = disposition://close
+admittedSemantic.edgeConverged = true
+```
+
+Stage summary:
+
+```text
+conform_project                       0.00  converged
+derive_lite_design_adr_surface       5.44  close
+derive_lite_component_code_surface   6.59  review passed, close
+derive_lite_test_design_surface      3.03  review passed, close
+derive_lite_component_test_surface   9.28  review blocked only by downstream_deferred execution pressure; accepted and closed
+derive_lite_uat_test_source_surface  4.04  review passed, close
+prepare_test_execution_surface       0.00  close
+derive_test_execution_result_surface 0.01  close, terminal convergence
+```
+
+Additional RC2 migration fix proven by this run:
+
+- `uat_test_source_surface` is a testing materialization edge. Its authority
+  must admit `testingTechStack.testTargets`, filter current product targets to
+  test/build-config roles, and fail before worker launch when required
+  materialized roles have no declared product target.
+- T-132 and T-174 fixture tenant stacks now declare execution-environment,
+  source-file, and test-target authority explicitly so live proof does not
+  depend on inferred product targets.
+- Product materialization launch blocking is generalized across required roles,
+  with tenant-stack repair as the explicit exception.
+
+Review correction:
+
+- This archive proves RC2 traversal convergence, but it is not sufficient by
+  itself for T-205 closure. The standard `postflight.json` surface remained a
+  preliminary blocked design-depth F_P state while `fp_evaluator_postflight.json`,
+  `fp_evaluate_result.json`, and `sdlc_edge_closure_decision.json` closed the
+  edge as passed. That created rival archive truth surfaces.
+- The runtime now writes preliminary design-depth postflight truth to
+  `pre_fp_evaluator_postflight.json` and reserves standard `postflight.json` for
+  the final effective postflight state.
+- The T-205 product gate now classifies passed worker/postflight/F_P evaluation
+  facts without the traversal consequence triple as
+  `missing_bind_outcome_after_passed_compute`.
+- Review-grade scope authority now flows from one admitted invocation-scope
+  carrier into both prompt projection and admission. Missing scoped invocation
+  package data blocks before evaluator launch.
+
+Focused regression proof after review correction:
+
+```text
+npm run build:semantic
+passed
+
+git diff --check
+passed
+
+node --test --test-name-pattern "T-205 passed compute archive without bind outcome fails closed" test_env/tests/test_t058_spec_method_entrypoint.test.mjs
+tests 1
+pass 1
+fail 0
+
+node --test test_env/tests/test_t064_installed_operator_ux.test.mjs test_env/tests/test_t181_fp_evaluator_design_register.test.mjs test_env/tests/test_t182_fp_review_grade_edge_fulfillment.test.mjs test_env/tests/test_t151_runner_evaluator_sovereignty.test.mjs
+tests 71
+pass 71
+fail 0
+```
+
+Converged live proof after review correction and prompt contradiction fix.
+This is not a zero-retry clean proof because the first design worker attempt
+hit an external provider `500 Internal server error` and closed as retry:
+
+```text
+npm run test:scenario:t132-hello-world-js-live
+tests 1
+pass 1
+fail 0
+duration_ms 1703537.844208
+archive: build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260619T084905254Z_pid16123
+```
+
+The first design worker in this run hit an external provider `500 Internal
+server error`. The runner classified that attempt as retry, not pass. The retry
+then completed and all later stages closed. This proves lawful retry
+classification for provider transport failure and successful convergence after
+retry; it does not prove a zero-retry hello-world run.
+
+Final stage timing and archive consistency:
+
+| Stage | Worker min.sec | Eval/review min.sec | Prompt words | Status | Closure | Prompt consistency |
+|---|---:|---:|---:|---|---|---|
+| conform_project |  |  |  | converged |  | not a worker prompt |
+| derive_lite_design_adr_surface | 0.39 |  | 1565 | worker provider error | retry | external provider failure; not a clean-run pass |
+| derive_lite_design_adr_surface | 1.37 | 4.16 | 1703 | passed | close | consistent; final postflight/F_P agree |
+| derive_lite_component_code_surface | 1.41 | 5.08 | 2191 | passed | close | fixed: whole-file JSON carrier, no Markdown directive |
+| derive_lite_test_design_surface | 1.17 | 2.25 | 1356 | passed | close | consistent; review-grade overwork remains |
+| derive_lite_component_test_surface | 1.57 | 2.58 | 1907 | passed | close | consistent; whole-file JSON carrier |
+| derive_lite_uat_test_source_surface | 1.54 | 2.17 | 1503 | passed | close | consistent; whole-file JSON carrier |
+| prepare_test_execution_surface |  |  | 855 | passed | close | deterministic framework edge |
+| derive_test_execution_result_surface |  |  | 879 | converged | close | deterministic framework edge |
+
+Additional correction from the fresh run:
+
+- `component_code_surface` prompts no longer combine the generic Markdown output
+  directive with the component-depth target-carrier law. The live prompt for
+  `20260619T085707272Z_pid16123` has `Markdown output artifact = false` and
+  `Emit a whole-file JSON component_depth_register = true`.
+- Component-depth admission remains strict. JSON inside Markdown fences is still
+  rejected for target-carrier surfaces; the product prompt now emits the lawful
+  whole-file carrier instead of weakening admission.
+- The T-132 live descriptor now sets `forbidRetryClosureDecisions: true`, and
+  the scenario harness fails the proof if any operator run emits
+  `sdlc_edge_closure_decision.disposition = retry`. This prevents a
+  convergence-after-retry archive from being reported as a clean proof.
+- Regression proof:
+
+```text
+node --test --test-name-pattern "component-code transform prompt|T-205 component-depth carrier prompt" test_env/tests/test_t118_worker_invocation_package.test.mjs
+tests 2
+pass 2
+fail 0
+
+node --test --test-name-pattern "hello-world live descriptors|zero-retry expectation" test_env/sandbox/test_scenario_sandbox.test.mjs
+tests 2
+pass 2
+fail 0
+```
+
+## Review Correction - Launch And Scope Fail-Fast
+
+The follow-up review found two valid remaining fail-fast gaps:
+
+- Product-materialization launch blockers still escaped the live installed
+  dispatch path as uncaught exceptions because `writeHandoffFiles(manifest)`
+  could throw before worker/report/postflight failure wrappers ran. The operator
+  now catches that pre-worker contract violation, writes
+  `worker_launch_postflight.json`, final `postflight.json`, `gap_dossier.json`,
+  `sdlc_edge_closure_decision.json`, and `sdlc_next_action_projection.json`, and
+  returns a blocked dispatch outcome with `workerRun = null`.
+- Scoped review-grade admission still had an exported fail-open path when
+  callers omitted `invocationScope`. Scoped manifests now treat both omitted and
+  explicit-null invocation scope as `review_grade_invocation_scope_missing`.
+
+The behavioral regression exposed one more authority bug while proving the
+launch path: `worker_launch_postflight.json` was missing from the authoritative
+operator-run artifact catalog. The catalog now admits that artifact as
+`sdlc_operator_postflight_result`.
+
+Focused proof:
+
+```text
+npm run build:semantic
+passed
+
+node --test --test-name-pattern "T-205 installed dispatch archives product-materialization launch blockers|T-143 empty component-code source target authority fails before F_P launch" test_env/tests/test_t143_product_materialization_authority_targets.test.mjs
+tests 2
+pass 2
+fail 0
+
+node --test --test-name-pattern "T-203 scoped review-grade admission uses invocation package inline obligations" test_env/tests/test_t182_fp_review_grade_edge_fulfillment.test.mjs
+tests 1
+pass 1
+fail 0
+
+node --test --test-name-pattern "hello-world live descriptors|zero-retry expectation" test_env/sandbox/test_scenario_sandbox.test.mjs
+tests 2
+pass 2
+fail 0
+
+node --test --test-name-pattern "operator artifact catalog includes design-depth evaluator archive surfaces|operator-run artifact catalog" test_env/tests/test_t181_fp_evaluator_design_register.test.mjs test_env/tests/test_t175_source_truth_migration.test.mjs
+tests 2
+pass 2
+fail 0
+```
+
 ## Initial Work Items
 
 - [ ] Add an ABIogenesis compiler negative test for a graph vector with
       successful compute output but no bind outcome family.
 - [ ] Add an ABG runtime negative test for passed worker/postflight/evaluator
       facts without exactly one traversal-unit result.
-- [ ] Add an odd_sdlc archive diagnostic/product gate that classifies the
+- [x] Add an odd_sdlc archive diagnostic/product gate that classifies the
       captured live archive as `missing_bind_outcome_after_passed_compute`.
-- [ ] Trace the live runner path between `fp_evaluate_result.status = passed`
+- [x] Migrate odd_sdlc to the ABI RC2 tarball snapshot and remove the temporary
+      local ABI source dependency.
+- [x] Port the ABI frozen-fixture prompt scope, bind carrier, materialization,
+      and fail-fast postflight fixes into real odd_sdlc.
+- [x] Convert product-materialization launch blockers on the installed dispatch
+      path into archived blocked outcomes instead of uncaught exceptions.
+- [x] Fail closed when scoped review-grade admission is called without an
+      invocation-scope carrier.
+- [x] Trace the live runner path between `fp_evaluate_result.status = passed`
       and closure/bind emission for `derive_lite_design_adr_surface`.
-- [ ] Rerun the Rust hello live scenario after enforcement and require either
-      component-code handoff or typed traversal-unit invariant failure.
+- [ ] Rerun the odd_sdlc hello-world live scenario after RC2 migration and
+      require clean zero-retry convergence or typed traversal-unit invariant
+      failure. The 20260619T084905254Z_pid16123 archive converged after one
+      provider-transport retry and is not sufficient for this checkbox.

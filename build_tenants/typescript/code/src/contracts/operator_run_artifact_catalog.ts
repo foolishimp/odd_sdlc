@@ -189,6 +189,17 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     admissionRef: "admission://odd-sdlc/operator-run/fp-evaluate-result"
   }),
   row({
+    artifactRef: "operator-run-artifact://pre-fp-evaluate-result",
+    relativePath: "pre_fp_evaluate_result.json",
+    carrierKind: "sdlc_fp_evaluate_result",
+    role: "authority_admission",
+    sourceOwner: "installed_operator",
+    requiredForPresentEdge: false,
+    requiredWhen: "implementation_design_surface_present",
+    malformedGapTracked: false,
+    admissionRef: "admission://odd-sdlc/operator-run/pre-fp-evaluate-result"
+  }),
+  row({
     artifactRef: "operator-run-artifact://evaluate-compute-subworkstream-manifest",
     relativePath: "evaluate_compute_subworkstream_manifest.json",
     carrierKind: "sdlc_compute_subworkstream_manifest",
@@ -449,6 +460,27 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     requiredForPresentEdge: false,
     malformedGapTracked: true,
     admissionRef: "admission://odd-sdlc/operator-run/fp-evaluator-postflight"
+  }),
+  row({
+    artifactRef: "operator-run-artifact://pre-fp-evaluator-postflight",
+    relativePath: "pre_fp_evaluator_postflight.json",
+    carrierKind: "sdlc_operator_postflight_result",
+    role: "authority_admission",
+    sourceOwner: "installed_operator",
+    requiredForPresentEdge: false,
+    requiredWhen: "implementation_design_surface_present",
+    malformedGapTracked: true,
+    admissionRef: "admission://odd-sdlc/operator-run/pre-fp-evaluator-postflight"
+  }),
+  row({
+    artifactRef: "operator-run-artifact://worker-launch-postflight",
+    relativePath: "worker_launch_postflight.json",
+    carrierKind: "sdlc_operator_postflight_result",
+    role: "authority_admission",
+    sourceOwner: "installed_operator",
+    requiredForPresentEdge: false,
+    malformedGapTracked: true,
+    admissionRef: "admission://odd-sdlc/operator-run/worker-launch-postflight"
   }),
   row({
     artifactRef: "operator-run-artifact://postflight",

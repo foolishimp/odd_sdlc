@@ -18,6 +18,7 @@ import {
 import {
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+  ODD_SDLC_DEFAULT_TRAVERSAL_STRATEGY_PLAN,
   ODD_SDLC_STEEL_THREAD_AFTER_REQUIREMENTS_TRAVERSAL_STRATEGY_PLAN,
   SDLC_ABG_ATTACHED_FP_MAX_RETRY_ATTEMPTS,
   constructSdlcGtlModule,
@@ -72,6 +73,41 @@ function makeWorkspace() {
     ].join("\n"),
     "utf8"
   );
+  mkdirSync(path.join(root, "build_tenants/scala_spark/spec"), {
+    recursive: true
+  });
+  writeFileSync(
+    path.join(root, "build_tenants/scala_spark/spec/TECH_STACK.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        buildConfigTargets: ["build.sbt", "project/"],
+        moduleLayout: {
+          sourceRoots: ["cdme-compiler/src", "cdme-accounting/src"]
+        },
+        executionEnvironment: {
+          hostCachePolicy: "prohibited",
+          workspaceLocalDirectories: [
+            ".ai-workspace/runtime/odd_sdlc/tool-cache/sbt",
+            ".ai-workspace/runtime/odd_sdlc/tool-cache/coursier"
+          ],
+          environmentVariables: {
+            SBT_OPTS:
+              "-Dsbt.boot.directory=${workspaceRoot}/.ai-workspace/runtime/odd_sdlc/tool-cache/sbt"
+          }
+        },
+        testingTechStack: {
+          testRunner: "sbt",
+          testRoots: ["src/test"],
+          proofCommands: ["sbt test"],
+          evidenceFormat: "sbt-test"
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
   return root;
 }
 
@@ -81,6 +117,23 @@ const conformedProject = Object.freeze({
   declaredModuleNames: Object.freeze(["cdme-compiler", "cdme-accounting"]),
   buildExecutionContract: "sbt package",
   testExecutionContract: "sbt test"
+});
+
+test("T-123 default steel-thread scope refs are product-neutral", () => {
+  const refs =
+    ODD_SDLC_DEFAULT_TRAVERSAL_STRATEGY_PLAN.edgeScopeRefs?.[
+      FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+    ] ?? [];
+
+  assert.deepStrictEqual(refs, [
+    `schedule://odd_sdlc/${FG_DERIVE_LITE_COMPONENT_CODE_SURFACE}/primary`
+  ]);
+  assert.equal(
+    Object.values(ODD_SDLC_DEFAULT_TRAVERSAL_STRATEGY_PLAN.edgeScopeRefs ?? {})
+      .flat()
+      .some((ref) => ref.includes("cdme-compiler")),
+    false
+  );
 });
 
 function retryContext() {

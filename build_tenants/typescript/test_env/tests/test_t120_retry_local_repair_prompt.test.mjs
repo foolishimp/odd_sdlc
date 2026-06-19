@@ -40,6 +40,30 @@ function writeConstraints(root) {
     ].join("\n"),
     "utf8"
   );
+  mkdirSync(path.join(root, "build_tenants/scala_spark/spec"), {
+    recursive: true
+  });
+  writeFileSync(
+    path.join(root, "build_tenants/scala_spark/spec/TECH_STACK.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        buildConfigTargets: ["build.sbt"],
+        moduleLayout: {
+          sourceRoots: ["retry-core/src/main/scala"]
+        },
+        testingTechStack: {
+          testRunner: "sbt test",
+          testRoots: ["retry-core/src/test/scala"],
+          testBuildConfigTargets: ["build.sbt"],
+          proofCommands: ["sbt test"]
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
 }
 
 function workspaceRoot() {
@@ -1114,7 +1138,7 @@ test("T-164 retry prompt uses review-grade blocked findings as the repair work q
   const invocationPackage = JSON.parse(readFileSync(files.invocationPackagePath, "utf8"));
   assert.match(
     prompt,
-    /Rank retry work by contextual closure priority before editing: critical behavior, highest-dependency modules, common-library foundations, and repeated\/common failure rows first\./u
+    /Use the listed blocker rows as the retry authority packet; repair the contracted artifact surface before inspecting broader SDLC context\./u
   );
   const workQueue = prompt.match(
     /- blocked requirement obligations:\n(?<rows>(?:  - .+\n)+)- retry coverage contract:/u

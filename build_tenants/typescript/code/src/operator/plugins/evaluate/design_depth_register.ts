@@ -408,15 +408,6 @@ function selectedFpEvaluateResultEvidenceRefs(input: {
     ) {
       return Object.freeze([]);
     }
-    const admittedEnvelopeEvidenceRefs =
-      admittedPluginResultEnvelopeEvidenceRefsForRegisterPath({
-        registerPath: input.registerPath,
-        compositionRef,
-        compositionDigest
-      });
-    if (admittedEnvelopeEvidenceRefs.length === 0) {
-      return Object.freeze([]);
-    }
     const evaluationRuleOutcomeEvidenceRefs =
       persistedEvaluationRuleOutcomeEvidenceRefs({
         registerPath: input.registerPath
@@ -437,6 +428,12 @@ function selectedFpEvaluateResultEvidenceRefs(input: {
     if (admittedContentRegisterEvidenceRefs.length === 0) {
       return Object.freeze([]);
     }
+    const admittedEnvelopeEvidenceRefs =
+      admittedPluginResultEnvelopeEvidenceRefsForRegisterPath({
+        registerPath: input.registerPath,
+        compositionRef,
+        compositionDigest
+      });
     return uniqueSorted([
       contentRegisterRef,
       registerRef,

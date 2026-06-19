@@ -7,10 +7,21 @@
   },
   "buildTool": "node",
   "packageManager": "npm",
+  "executionEnvironment": {
+    "hostCachePolicy": "prohibited",
+    "workspaceLocalDirectories": [],
+    "environmentVariables": {}
+  },
+  "sourceFiles": [
+    "src/hello.js"
+  ],
   "buildConfigTargets": [],
   "testingTechStack": {
     "testRunner": "node:test",
     "testCommand": "node --test test/hello.test.js",
+    "testTargets": [
+      "test/hello.test.js"
+    ],
     "testBuildConfigTargets": [],
     "evidenceFormat": "process-exit-plus-stdout"
   },

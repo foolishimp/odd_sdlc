@@ -221,7 +221,7 @@ test("T-197 design ratifies owner partition assets before Wave 1 code", () => {
     "### Decommission Register",
     "### W-105 Construct-Site Sufficiency Inventory",
     "ABG route / dependency",
-    "ABI 4.1.0-rc.1",
+    "ABI 4.1.0-rc.2",
     "runtime continuation transition projection refs",
     "22/22 edge-contract tests and 1/1 Rust-service sandbox proof",
     "must-not-name-governed-target",
@@ -774,7 +774,10 @@ test("T-197 H5/H7 keep prompt pressure policy off tenant command grammar", () =>
   assert.doesNotMatch(reviewPromptSource, /npm test execution/u);
   assert.match(promptPolicySource, /text\.includes\("component_test_surface"\)/u);
   assert.match(promptPolicySource, /text\.includes\("execution evidence"\)/u);
-  assert.match(reviewPromptSource, /declared test-execution-contract proof/u);
+  assert.match(
+    reviewPromptSource,
+    /evaluate declared executable or test execution contracts from admitted execution evidence/u
+  );
 });
 
 test("T-197 H6 keeps repair reentry diagnostics tenant-declared", () => {

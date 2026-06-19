@@ -142,6 +142,7 @@ import type {
   SdlcTraversalHopSelection,
   SdlcTraversalStrategyDecision,
   SdlcTraversalOutcomeClass,
+  SdlcWorkerInvocationPackage,
   SdlcWorkerTransportContract
 } from "./carriers.js";
 import {
@@ -509,6 +510,51 @@ function jsonRecord(value: unknown): Readonly<Record<string, unknown>> | null {
 
 function isStringList(value: unknown): value is readonly string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+}
+
+function isSdlcFeatureScopeMode(
+  value: unknown
+): value is SdlcWorkerInvocationPackage["featureScope"]["mode"] {
+  return (
+    value === "steel_thread" ||
+    value === "targeted_repair" ||
+    value === "full_breadth"
+  );
+}
+
+function readWorkerInvocationPackageScope(
+  filePath: string
+): Pick<
+  SdlcWorkerInvocationPackage,
+  "kind" | "featureScope" | "inlineObligationIds"
+> | null {
+  if (!existsSync(filePath) || !statSync(filePath).isFile()) {
+    return null;
+  }
+  try {
+    const payload = jsonRecord(JSON.parse(readFileSync(filePath, "utf8")));
+    const featureScope = jsonRecord(payload?.["featureScope"]);
+    if (
+      payload === null ||
+      featureScope === null ||
+      payload["kind"] !== "sdlc_worker_invocation_package" ||
+      payload["packageVersion"] !== "ts-invocation-v1" ||
+      !isSdlcFeatureScopeMode(featureScope["mode"]) ||
+      !isStringList(payload["inlineObligationIds"])
+    ) {
+      return null;
+    }
+    return Object.freeze({
+      kind: "sdlc_worker_invocation_package" as const,
+      featureScope: Object.freeze({
+        ...featureScope,
+        mode: featureScope["mode"]
+      }) as SdlcWorkerInvocationPackage["featureScope"],
+      inlineObligationIds: Object.freeze([...payload["inlineObligationIds"]])
+    });
+  } catch {
+    return null;
+  }
 }
 
 function isSdlcPostflightStatus(
@@ -4575,6 +4621,11 @@ function stateWithBlockedDesignDepthFpEvaluatorOutcome(input: {
     relativePath: "design_depth_fp_evaluator_postflight.json",
     payload: postflight
   });
+  writeSdlcSystemArtifact({
+    archiveRoot: input.state.manifest.archiveRoot,
+    relativePath: "postflight.json",
+    payload: postflight
+  });
   if (input.state.workerReport !== null) {
     writeSdlcFpEvaluateResult({
       manifest: input.state.manifest,
@@ -4770,6 +4821,52 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
     input.manifest.archiveRoot,
     "review_grade_edge_fulfillment_prompt.md"
   );
+  const invocationScope = readWorkerInvocationPackageScope(invocationPackagePath);
+  if (input.manifest.featureScope.mode !== "full_breadth" && invocationScope === null) {
+    const diagnosticRefs = uniqueSorted([
+      pathToFileURL(manifestPath).href,
+      pathToFileURL(invocationPackagePath).href
+    ]);
+    const postflight = reviewGradePostflight({
+      manifest: input.manifest,
+      code: "review_grade_assessment_invalid",
+      details: ["review_grade_invocation_scope_missing"],
+      evidenceRefs: diagnosticRefs
+    });
+    writeSdlcSystemArtifact({
+      archiveRoot: input.manifest.archiveRoot,
+      relativePath: "review_grade_postflight.json",
+      payload: postflight
+    });
+    writePostflightGapDossier({
+      manifest: input.manifest,
+      gapDossier: constructPostflightGapDossier({
+        manifest: input.manifest,
+        postflight
+      })
+    });
+    const residualPressureRefs = Object.freeze([
+      `pressure://odd-sdlc/review-grade/${manifestRefSegment(input.manifest)}/review_grade_invocation_scope_missing`
+    ]);
+    return constructEvaluationRuleOutcome({
+      status: "blocked",
+      ruleRef: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
+      ruleRole: "semantic_judgment",
+      computeMeans: "F_P",
+      evidenceRefs: diagnosticRefs,
+      residualPressureRefs,
+      diagnosticRefs,
+      selectedCompositionRef: input.pluginInput.selectedCompositionRef,
+      selectedCompositionDigest: input.pluginInput.selectedCompositionDigest,
+      selectedCompositionSelectionRef:
+        input.pluginInput.selectedCompositionSelectionRef,
+      selectedRegimeBindingRef: input.pluginInput.selectedRegimeBindingRef,
+      compositionContributionRef:
+        input.pluginInput.selectedRegimeBindingRef ??
+        input.pluginInput.selectedCompositionRef,
+      reason: "review_grade_invocation_scope_missing"
+    });
+  }
   writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     absolutePath: subworkstreamManifestPath,
@@ -4782,6 +4879,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
   });
   const reviewGradePromptProjection = reviewGradeEdgeFulfillmentPromptProjection({
     manifest: input.manifest,
+    invocationScope,
     governanceRef: workCategoryGovernance.configRef,
     governancePath: join(input.manifest.workspaceRoot, workCategoryGovernance.workerPath),
     constructionBriefPath,
@@ -5074,7 +5172,8 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
   }
   const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
     manifest: input.manifest,
-    outputFile: assessmentPath
+    outputFile: assessmentPath,
+    invocationScope
   });
   if (admission.status !== "admitted" || admission.assessment === null) {
     const postflight = reviewGradePostflight({
@@ -5143,6 +5242,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       ruleRole: "semantic_judgment",
       computeMeans: "F_P",
       evidenceRefs: uniqueSorted([...evidenceRefs, ...admission.evidenceRefs]),
+      residualPressureRefs: downstreamPressureRefs,
       diagnosticRefs: downstreamPressureRefs,
       findingRefs: Object.freeze([
         `finding://odd-sdlc/${manifestRefSegment(input.manifest)}/evaluate/review-grade-edge-fulfillment/downstream-stage-pressure`
@@ -5570,7 +5670,10 @@ function reviewGradeResidualPressureRefsForState(
   }
   const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
     manifest: state.manifest,
-    outputFile: assessmentPath
+    outputFile: assessmentPath,
+    invocationScope: readWorkerInvocationPackageScope(
+      join(state.manifest.archiveRoot, "worker_invocation_package.json")
+    )
   });
   if (admission.status !== "admitted" || admission.assessment === null) {
     return uniqueSorted(
@@ -5637,7 +5740,10 @@ function reviewGradeResidualPressureCarriersForState(
   }
   const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
     manifest: state.manifest,
-    outputFile: assessmentPath
+    outputFile: assessmentPath,
+    invocationScope: readWorkerInvocationPackageScope(
+      join(state.manifest.archiveRoot, "worker_invocation_package.json")
+    )
   });
   if (admission.status !== "admitted" || admission.assessment === null) {
     return closureResidualPressureCarriersForRefs({
@@ -5799,6 +5905,7 @@ async function runSdlcPostTransformDiagnosticFlow(input: {
   readonly edgeAccountingRow: SdlcExecutiveEdgeAccountingRow | null;
   readonly eventSink: (event: RuntimeEvent) => void;
   readonly postflightRelativePath: string;
+  readonly fpEvaluateResultRelativePath?: string | undefined;
   readonly writeMaterializationManifest: boolean;
   readonly fpEvaluatorAdmissionEvidenceRefs?: readonly string[] | undefined;
 }): Promise<{
@@ -5843,7 +5950,8 @@ async function runSdlcPostTransformDiagnosticFlow(input: {
     postflight,
     postflightRef: pathToFileURL(
       join(input.state.manifest.archiveRoot, input.postflightRelativePath)
-    ).href
+    ).href,
+    relativePath: input.fpEvaluateResultRelativePath
   });
   await writeTraversalSelectionAudit({
     basis: input.basis,
@@ -5896,8 +6004,14 @@ async function refreshDesignDepthStateFromFpEvaluatorRegister(input: {
     edgeAccountingRow: input.edgeAccountingRow,
     eventSink: input.eventSink,
     postflightRelativePath: "fp_evaluator_postflight.json",
+    fpEvaluateResultRelativePath: "fp_evaluate_result.json",
     writeMaterializationManifest: false,
     fpEvaluatorAdmissionEvidenceRefs: input.fpEvaluatorAdmissionEvidenceRefs
+  });
+  writeSdlcSystemArtifact({
+    archiveRoot: input.state.manifest.archiveRoot,
+    relativePath: "postflight.json",
+    payload: diagnostics.postflight
   });
   return Object.freeze({
     ...input.state,
@@ -9063,7 +9177,75 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
       const beforeMaterialization = snapshotProductMaterializationRoot(
         manifest.productMaterialization
       );
-      const handoffFiles = writeHandoffFiles(manifest);
+      let handoffFiles: ReturnType<typeof writeHandoffFiles>;
+      try {
+        handoffFiles = writeHandoffFiles(manifest);
+      } catch (error: unknown) {
+        mkdirSync(manifest.archiveRoot, { recursive: true });
+        const reason =
+          error instanceof Error ? error.message : String(error);
+        const evidenceRefs = Object.freeze([
+          pathToFileURL(manifest.archiveRoot).href
+        ]);
+        const carrier = makeSdlcBlockingReason({
+          code: "worker_launch_failed",
+          detail: reason,
+          lawfulReentryPoint: "operator_blocked",
+          reasonClass: "contract_violation",
+          evidenceRefs
+        });
+        const postflight = Object.freeze({
+          kind: "sdlc_operator_postflight_result" as const,
+          status: "blocked" as const,
+          blockingReasons: Object.freeze([legacyBlockingReasonCode(carrier)]),
+          blockingReasonCarriers: Object.freeze([carrier]),
+          evidenceRefs
+        });
+        writeSdlcSystemArtifact({
+          archiveRoot: manifest.archiveRoot,
+          relativePath: "worker_launch_postflight.json",
+          payload: postflight
+        });
+        writeSdlcSystemArtifact({
+          archiveRoot: manifest.archiveRoot,
+          relativePath: "postflight.json",
+          payload: postflight
+        });
+        const gapDossier = constructPostflightGapDossier({
+          manifest,
+          postflight
+        });
+        writePostflightGapDossier({ manifest, gapDossier });
+        const current: SdlcAbgOwnedFpDispatchState = {
+          status: "blocked",
+          manifest,
+          selectedComposition,
+          workerRun: null,
+          workerReport: null,
+          postflight,
+          assuranceSatisfaction: null,
+          gapDossier,
+          hookOutcome: null,
+          blockingReason: postflight.blockingReasons.join(","),
+          blockingReasonCarriers: postflight.blockingReasonCarriers,
+          currentEdge: pluginInput.edge
+        };
+        const consequence = publishDispatchState(current);
+        return constructFpDispatchOutcome({
+          status: "blocked",
+          resultRef: gapDossier.currentGapDossierRef,
+          attachedResultArtifact: runtimeFailureArtifact({
+            failureClass: "contract_failure",
+            detail: reason
+          }),
+          evidenceRefs: uniqueSorted([
+            ...postflight.evidenceRefs,
+            gapDossier.currentGapDossierRef,
+            consequence.nextActionProjection.nextActionProjectionRef
+          ]),
+          reason: postflight.blockingReasons.join(",")
+        });
+      }
       writeFrontDoorTraversalSelectionAudit({
         basis,
         manifest,
@@ -9134,7 +9316,14 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
           eventSink: (event) => {
             emitRuntimeEvent(event);
           },
-          postflightRelativePath: "postflight.json",
+          postflightRelativePath:
+            manifest.targetAssetType === "implementation_design_surface"
+              ? "pre_fp_evaluator_postflight.json"
+              : "postflight.json",
+          fpEvaluateResultRelativePath:
+            manifest.targetAssetType === "implementation_design_surface"
+              ? "pre_fp_evaluate_result.json"
+              : "fp_evaluate_result.json",
           writeMaterializationManifest: true
         });
         const postflight = diagnostics.postflight;
@@ -9880,7 +10069,13 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
         );
         const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
           manifest: dispatchState.current.manifest,
-          outputFile: assessmentPath
+          outputFile: assessmentPath,
+          invocationScope: readWorkerInvocationPackageScope(
+            join(
+              dispatchState.current.manifest.archiveRoot,
+              "worker_invocation_package.json"
+            )
+          )
         });
         if (admission.status === "admitted" && admission.assessment !== null) {
           const workerReport = workerReportWithReviewGradeAssessment({

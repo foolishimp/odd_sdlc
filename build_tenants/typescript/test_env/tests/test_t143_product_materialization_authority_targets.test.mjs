@@ -13,23 +13,34 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
+  FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+  admitSdlcProjectConstraints,
+  assertSdlcProductMaterializationLaunchable,
   buildPostTransformWorkerResultReport,
+  conformProjectProfileFromConstraintsText,
+  constructSdlcGtlModule,
   constructWorkerInvocationPackage,
   declaredProductFileTargets,
+  deriveSdlcWorkspaceIngressReport,
   deriveWorkerHandoffManifest,
+  executeInstalledOperatorStart,
   evaluateSdlcComputeStage,
   hookContractByEdgeName,
   observeProductMaterializationDelta,
   promptForHandoff,
+  projectSdlcQueryDomain,
+  projectSdlcWorkerAttachment,
+  publicStartOnce,
   readWorkerResultReport,
   reconcileSdlcProductMaterializationAuthority,
   sha256Text,
   sdlcOperatorRuntimePolicy,
   sdlcOperatorRuntimePolicyConfigPath,
+  sdlcProductMaterializationLaunchBlocker,
   sdlcWorkspaceLocalToolEnvironment,
   snapshotProductMaterializationRoot,
   writeHandoffFiles,
@@ -292,7 +303,9 @@ function workspaceWithSingularDeclaredProductFileAuthority() {
       "  hello_world_javascript:",
       "    output_dir: build_tenants/hello_world_javascript",
       "    language: JavaScript",
-      "    test_runner: node"
+      "    test_runner: node",
+      "    module_structure:",
+      "      - hello_world_javascript"
     ].join("\n"),
     "utf8"
   );
@@ -470,7 +483,54 @@ function materializationManifest(
   });
 }
 
-function steelThreadEnvelope(edgeName = FG_MATERIALIZE_DECLARED_PRODUCT_ASSET) {
+function launchBlockerRuntimeStart(workspaceRoot) {
+  const module = constructSdlcGtlModule();
+  const constraintsText = readFileSync(
+    path.join(workspaceRoot, ".ai-workspace/context/project_constraints.yml"),
+    "utf8"
+  );
+  const ingressReport = deriveSdlcWorkspaceIngressReport({
+    workspaceRootUri: pathToFileURL(workspaceRoot).href,
+    projectConstraints: admitSdlcProjectConstraints({
+      projectSlug: "t205_launch_blocker",
+      activeTenant: "scala_spark",
+      selectedOutputRoot: "build_tenants/scala_spark",
+      ambiguityRiskAppetite: "medium",
+      capabilityContracts: ["transport_contract"]
+    }),
+    sourceInputs: []
+  });
+  const queryDomain = projectSdlcQueryDomain({ module, ingressReport });
+  const conformedProject = conformProjectProfileFromConstraintsText({
+    workspaceRoot,
+    constraintsText
+  });
+  const start = publicStartOnce({
+    request: {
+      kind: "sdlc_public_start_request",
+      workspaceRoot,
+      target: {
+        kind: "graph_function",
+        handle: "derive_component_code_surface"
+      },
+      until: "first_traversal",
+      defaultRegime: "F_P"
+    },
+    module,
+    queryDomain,
+    conformedProject,
+    workerAttachment: projectSdlcWorkerAttachment({
+      transportContract: "process://node"
+    })
+  });
+  assert.equal(start.kind, "sdlc_public_start_projected");
+  return start;
+}
+
+function steelThreadEnvelope(
+  edgeName = FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+  moduleName = "cdme-compiler"
+) {
   return {
     kind: "traversal_attempt_envelope",
     envelopeRef: "abg://envelope/t143-steel-thread",
@@ -485,7 +545,7 @@ function steelThreadEnvelope(edgeName = FG_MATERIALIZE_DECLARED_PRODUCT_ASSET) {
     backendProfileRef: "backend:t143-steel-thread",
     actorInvocationId: "actor:t143-steel-thread",
     selectedScheduleItemRefs: [
-      `schedule://odd_sdlc/${edgeName}/cdme-compiler`
+      `schedule://odd_sdlc/${edgeName}/${moduleName}`
     ],
     orderingConstraintRefs: [],
     phaseGateRefs: [],
@@ -731,6 +791,17 @@ test("T-172 tenant stack authority missing blocks executable materialization adm
 
 test("T-180 tenant stack repair routes to canonical tenant spec authority", () => {
   const workspace = workspaceWithModuleTargetProductAuthority();
+  writeFileSync(
+    path.join(workspace, "specification/PRODUCT.md"),
+    `${readFileSync(path.join(workspace, "specification/PRODUCT.md"), "utf8")}${[
+      "",
+      "## Expected Product Files",
+      "",
+      "- `build_tenants/scala_spark/cdme-compiler/src` (role: `source`)",
+      ""
+    ].join("\n")}`,
+    "utf8"
+  );
   rmSync(path.join(workspace, "build_tenants/scala_spark/spec"), {
     recursive: true,
     force: true
@@ -749,6 +820,13 @@ test("T-180 tenant stack repair routes to canonical tenant spec authority", () =
   assert.equal(
     reconciliation.reasonRefs.includes("tenant_stack_authority_missing"),
     true
+  );
+  assert.equal(
+    sdlcProductMaterializationLaunchBlocker({
+      manifest,
+      authority: reconciliation
+    }),
+    null
   );
   assert.equal(
     allowedWriteRoots.includes("build_tenants/scala_spark/spec"),
@@ -937,6 +1015,46 @@ test("T-172 combined tenant stack keeps implementation role when testing shares 
       "build_tenants/hello_world_javascript/package.json"
     ),
     true
+  );
+});
+
+test("T-143 T-132 fixture declares UAT test source materialization target", () => {
+  const workspace = fileURLToPath(
+    new URL("../fixtures/t132_hello_world_single_tenant", import.meta.url)
+  );
+  const manifest = materializationManifest(
+    workspace,
+    FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE
+  );
+  const reconciliation = reconcileSdlcProductMaterializationAuthority(manifest);
+
+  assert.equal(reconciliation.status, "passed");
+  assert.deepEqual(reconciliation.declaredProductFileTargets, [
+    "build_tenants/hello_world_javascript/test/hello.test.js"
+  ]);
+  assert.deepEqual(
+    reconciliation.declaredProductTargetContracts.map((target) => [
+      target.path,
+      target.requiredRole
+    ]),
+    [["build_tenants/hello_world_javascript/test/hello.test.js", "test"]]
+  );
+  assert.equal(
+    reconciliation.reasonRefs.includes("tenant_stack_authority_invalid"),
+    false
+  );
+  assert.equal(
+    sdlcProductMaterializationLaunchBlocker({
+      manifest,
+      authority: reconciliation
+    }),
+    null
+  );
+  assert.doesNotThrow(() =>
+    assertSdlcProductMaterializationLaunchable({
+      manifest,
+      authority: reconciliation
+    })
   );
 });
 
@@ -1200,6 +1318,50 @@ test("T-143 steel-thread materialization scopes product targets to included modu
   assert.doesNotMatch(prompt, /cdme-executor\/src/u);
 });
 
+test("T-159 steel-thread materialization keeps single-tenant selected-root source targets", () => {
+  const workspace = workspaceWithDeclaredSourceFileAuthority();
+  const baseManifest = materializationManifest(
+    workspace,
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+    steelThreadEnvelope(
+      FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+      "hello_world_javascript"
+    )
+  );
+  const manifest = {
+    ...baseManifest,
+    featureScope: {
+      ...baseManifest.featureScope,
+      mode: "steel_thread",
+      scopeRef:
+        "scope://odd_sdlc/component-code-surface/steel-thread/hello-world-javascript",
+      includedModuleNames: ["hello_world_javascript"],
+      deferredModuleNames: []
+    }
+  };
+  const reconciliation = reconcileSdlcProductMaterializationAuthority(manifest);
+  const invocationPackage = constructWorkerInvocationPackage({ manifest });
+  const prompt = promptForHandoff(manifest);
+
+  assert.equal(manifest.featureScope.mode, "steel_thread");
+  assert.deepEqual(manifest.featureScope.includedModuleNames, [
+    "hello_world_javascript"
+  ]);
+  assert.equal(reconciliation.status, "passed");
+  assert.deepEqual(reconciliation.declaredProductFileTargets, [
+    "build_tenants/hello_world_javascript/src/hello.js"
+  ]);
+  assert.deepEqual(
+    invocationPackage.outputContract.declaredProductFileTargets,
+    reconciliation.declaredProductFileTargets
+  );
+  assert.match(
+    prompt,
+    /Declared product file targets: build_tenants\/hello_world_javascript\/src\/hello\.js/u
+  );
+  assert.doesNotMatch(prompt, /Declared product file targets: none/u);
+});
+
 test("T-143 handoff preparation does not create file targets as directories", () => {
   const workspace = workspaceWithModuleTargetProductAuthority();
   const manifest = materializationManifest(
@@ -1232,8 +1394,12 @@ test("T-143 handoff preparation does not create file targets as directories", ()
 });
 
 test("T-143 handoff preparation tolerates existing shared build file", () => {
-  const workspace = workspaceWithoutProductTargets();
-  const manifest = materializationManifest(workspace, FG_MATERIALIZE_DECLARED_PRODUCT_ASSET);
+  const workspace = workspaceWithModuleTargetProductAuthority();
+  const manifest = materializationManifest(
+    workspace,
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+    steelThreadEnvelope()
+  );
   const buildFile = path.join(workspace, "build_tenants/scala_spark/build.sbt");
   mkdirSync(path.dirname(buildFile), { recursive: true });
   writeFileSync(buildFile, "ThisBuild / scalaVersion := \"2.13.12\"\n", "utf8");
@@ -1373,23 +1539,115 @@ test("T-143 context expected-file targets are observation beside product authori
   );
 });
 
-test("T-143 empty product target authority is visible to F_P without FD role gating", () => {
+test("T-143 empty component-code source target authority fails before F_P launch", () => {
   const manifest = materializationManifest(workspaceWithoutProductTargets());
   const reconciliation = reconcileSdlcProductMaterializationAuthority(manifest);
-  const invocationPackage = constructWorkerInvocationPackage({ manifest });
-  const prompt = promptForHandoff(manifest);
 
   assert.equal(reconciliation.status, "missing");
   assert.equal(
-    invocationPackage.productMaterializationAuthority.status,
-    "missing"
+    sdlcProductMaterializationLaunchBlocker({
+      manifest,
+      authority: reconciliation
+    }),
+    "component_code_source_materialization_targets_missing"
   );
   assert.deepEqual(
-    invocationPackage.productMaterializationAuthority.declaredProductTargetContracts,
+    reconciliation.declaredProductTargetContracts,
     []
   );
-  assert.match(prompt, /Product authority reconciliation: missing/u);
-  assert.match(prompt, /derive the product topology/u);
+  assert.throws(
+    () =>
+      assertSdlcProductMaterializationLaunchable({
+        manifest,
+        authority: reconciliation
+      }),
+    /sdlc_product_materialization_launch_blocked:component_code_source_materialization_targets_missing/u
+  );
+  assert.throws(
+    () => constructWorkerInvocationPackage({ manifest }),
+    /sdlc_product_materialization_launch_blocked:component_code_source_materialization_targets_missing/u
+  );
+  assert.throws(
+    () => promptForHandoff(manifest),
+    /sdlc_product_materialization_launch_blocked:component_code_source_materialization_targets_missing/u
+  );
+});
+
+test("T-205 installed dispatch archives product-materialization launch blockers", async () => {
+  const workspaceRoot = workspaceWithoutProductTargets();
+  try {
+    const start = launchBlockerRuntimeStart(workspaceRoot);
+    const outcome = await executeInstalledOperatorStart({
+      workspaceRoot,
+      start,
+      workerTransport: "process://node",
+      replayEvents: []
+    });
+
+    assert.equal(outcome.status, "blocked");
+    assert.equal(outcome.manifest.edgeName, "derive_component_code_surface");
+    assert.equal(outcome.workerRun, null);
+    assert.equal(outcome.postflight.status, "blocked");
+    assert.deepEqual(outcome.postflight.blockingReasons, ["worker_launch_failed"]);
+    assert.equal(
+      existsSync(path.join(outcome.archiveRoot, "worker_run.json")),
+      false
+    );
+    assert.equal(
+      existsSync(path.join(outcome.archiveRoot, "worker_launch_postflight.json")),
+      true
+    );
+    assert.equal(existsSync(path.join(outcome.archiveRoot, "postflight.json")), true);
+    assert.equal(existsSync(path.join(outcome.archiveRoot, "gap_dossier.json")), true);
+    assert.equal(
+      existsSync(path.join(outcome.archiveRoot, "sdlc_edge_closure_decision.json")),
+      true
+    );
+    assert.equal(
+      existsSync(path.join(outcome.archiveRoot, "sdlc_next_action_projection.json")),
+      true
+    );
+
+    const gapDossier = JSON.parse(
+      readFileSync(path.join(outcome.archiveRoot, "gap_dossier.json"), "utf8")
+    );
+    assert.equal(gapDossier.reasons[0].blockingReason.reasonClass, "contract_violation");
+    assert.match(
+      gapDossier.reasons[0].blockingReason.detail,
+      /component_code_source_materialization_targets_missing/u
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-143 tenant-stack repair does not mask missing component-code source targets", () => {
+  const manifest = materializationManifest(workspaceWithoutProductTargets());
+  const reconciliation = reconcileSdlcProductMaterializationAuthority(manifest);
+  const ambiguousAuthority = {
+    ...reconciliation,
+    status: "ambiguous",
+    reasonRefs: [
+      "declared_product_file_targets_missing",
+      "tenant_stack_authority_invalid"
+    ]
+  };
+
+  assert.equal(
+    sdlcProductMaterializationLaunchBlocker({
+      manifest,
+      authority: ambiguousAuthority
+    }),
+    "component_code_source_materialization_targets_missing"
+  );
+  assert.throws(
+    () =>
+      assertSdlcProductMaterializationLaunchable({
+        manifest,
+        authority: ambiguousAuthority
+      }),
+    /sdlc_product_materialization_launch_blocked:component_code_source_materialization_targets_missing/u
+  );
 });
 
 test("T-143 component-code materialization leaves execution evidence to downstream evaluator", () => {
@@ -1646,12 +1904,45 @@ test("T-143 component-code transform artifact execution evidence is diagnostic-o
           passedCount: 1,
           failedCount: 0,
           shardEvidence: []
-        },
-        null,
-        2
-      ),
-      "```"
-    ].join("\n"),
+	        },
+	        null,
+	        2
+	      ),
+	      "```",
+	      "",
+	      "## Target Carrier",
+	      "",
+	      JSON.stringify(
+	        {
+	          kind: "sdlc_component_depth_register",
+	          registerVersion: "ts-component-depth-v1",
+	          targetAssetType: "component_code_surface",
+	          componentTopologyRows: [],
+	          componentRealizationRows: [
+	            {
+	              kind: "sdlc_component_realization_row",
+	              componentId: "hello-world-rust",
+	              moduleName: "hello_world_rust",
+	              relativePath: "src/main.rs",
+	              publicBoundary: "main",
+	              trancheId: "tranche:hello-world-rust",
+	              firstProductFileToChange: "src/main.rs",
+	              upstreamComponentIds: [],
+	              requirementIds: ["REQ-RUST-HELLO-WORLD-001"],
+	              sourceAssetRefs: ["fixture://t143/rust-hello"]
+	            }
+	          ],
+	          testComponentTopologyRows: [],
+	          componentTestRows: [],
+	          componentTestQualificationRows: [],
+	          componentExecutionFailureRegister: null,
+	          componentRepairSchedule: null,
+	          releaseDepthParity: null
+	        },
+	        null,
+	        2
+	      )
+	    ].join("\n"),
     "utf8"
   );
   writeMaterializedProductFile(

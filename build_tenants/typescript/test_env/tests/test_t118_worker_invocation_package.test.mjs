@@ -742,9 +742,7 @@ test("T-118 composite design-depth prompt does not duplicate carrier-shape evalu
 });
 
 test("T-118 component-code transform prompt publishes component concern-role enum", () => {
-  const files = writeHandoffFiles(
-    manifestForWorkspaceSpecSurface("derive_component_code_surface")
-  );
+  const files = writeHandoffFiles(manifestWithDeclaredProductFileTargets());
   const invocationPackage = JSON.parse(
     readFileSync(files.invocationPackagePath, "utf8")
   );
@@ -758,6 +756,24 @@ test("T-118 component-code transform prompt publishes component concern-role enu
     directives,
     /use "other" for simple executable entrypoints or glue/u
   );
+});
+
+test("T-205 component-depth carrier prompt does not also request Markdown output", () => {
+  const files = writeHandoffFiles(manifestWithDeclaredProductFileTargets());
+  const invocationPackage = JSON.parse(
+    readFileSync(files.invocationPackagePath, "utf8")
+  );
+  const directives = invocationPackage.outcomeDirectives.join("\n");
+
+  assert.match(
+    directives,
+    /Emit a whole-file JSON component_depth_register selected target-carrier envelope/u
+  );
+  assert.match(
+    directives,
+    /Do not wrap the component_depth_register carrier in Markdown fences/u
+  );
+  assert.doesNotMatch(directives, /Markdown output artifact/u);
 });
 
 test("T-157 product materialization prompt leaves execution evidence to evaluator surfaces", () => {

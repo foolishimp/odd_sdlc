@@ -124,11 +124,12 @@ function runInstalledCommandProbe(outcome, archiveRoot) {
 export async function provisionAbgInstalledSandbox(input) {
   mkdirSync(input.archiveRoot, { recursive: true });
   const targetRoot = path.join(input.archiveRoot, "abg_installed_workspace");
+  const packageSourceRoot = input.packageSourceRoot ?? ABG_TYPESCRIPT_ROOT;
   const outcome = await installAbiogenesisTypescript({
     targetRoot: {
       rootPath: targetRoot
     },
-    packageSourceRoot: ABG_TYPESCRIPT_ROOT,
+    packageSourceRoot,
     installedPackageName: `odd-sdlc-${sanitizeInstallName(input.scenarioId)}`
   });
 

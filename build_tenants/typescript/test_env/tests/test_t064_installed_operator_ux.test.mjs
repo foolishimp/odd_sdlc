@@ -925,6 +925,12 @@ test("T-159 assurance rejection rewrites F_P evaluate result as blocked", async 
   const postflight = JSON.parse(
     readFileSync(path.join(start.payload.archiveRoot, "postflight.json"), "utf8")
   );
+  const preliminaryPostflight = JSON.parse(
+    readFileSync(
+      path.join(start.payload.archiveRoot, "pre_fp_evaluator_postflight.json"),
+      "utf8"
+    )
+  );
   const designDepthPostflight = JSON.parse(
     readFileSync(
       path.join(start.payload.archiveRoot, "design_depth_fp_evaluator_postflight.json"),
@@ -932,7 +938,8 @@ test("T-159 assurance rejection rewrites F_P evaluate result as blocked", async 
     )
   );
   assert.equal(evaluateResult.kind, "sdlc_fp_evaluate_result");
-  assert.equal(postflight.status, "passed");
+  assert.equal(preliminaryPostflight.status, "blocked");
+  assert.equal(postflight.status, "blocked");
   assert.equal(designDepthPostflight.status, "blocked");
   assert.equal(evaluateResult.status, "blocked");
   assert.equal(evaluateResult.postflightStatus, "blocked");
