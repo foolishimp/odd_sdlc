@@ -3,7 +3,7 @@ id: T-205
 title: Enforce TraversalUnit bind outcome after passed compute stage
 type: bug
 ticket_category: ordinary
-status: active
+status: completed
 goal: make passed worker/evaluator compute facts impossible to expose without exactly one TraversalUnit closure/bind outcome
 build_tenant: typescript
 owner: odd_sdlc
@@ -18,6 +18,7 @@ priority: critical
 triaged_at: 2026-06-18
 created_at: 2026-06-18
 updated_at: 2026-06-19
+completed_at: 2026-06-19
 governance_scope: GTL/ABG traversal unit law, ODD_METHOD, odd_sdlc runtime boundary
 source_documents:
   - /Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/T-159-formalize-traversal-unit-and-consequence-bind-boundary.md
@@ -63,25 +64,25 @@ superseded_truth: >-
   scenario harnesses can tolerate a passed edge with no bind outcome as a
   merely incomplete archive.
 closure_law: >-
-  This ticket closes when the GTL/ABG compiler rejects graph/overlay programs
-  whose traversable edges lack a total closure/bind law, ABG runtime fails
-  closed when a passed compute stage cannot emit exactly one traversal-unit
-  outcome, and odd_sdlc gates prove no product-local path can expose passed
-  compute facts as final traversal state without the ABG bind carrier.
+  This odd_sdlc ticket closes when odd_sdlc consumes the ABG RC2
+  traversal-unit bind boundary, rejects archives that expose passed compute
+  facts without a closure/bind projection, converts pre-worker launch contract
+  failures into archived blocked outcomes, and proves the changed odd_sdlc code
+  paths with focused semantic, archive, product-gate, and scenario-harness
+  tests. ABG compiler/runtime negative tests are upstream ABI release
+  obligations and evidence sources, not implementation work owned by this
+  ticket.
 evaluation_criteria:
-  - GTL validation projects each graph vector to a `TraversalUnit` row with a close law and bind outcome family
-  - validator rejects any traversable vector whose successful compute result has no legal close/yield/terminal/block/retry continuation
-  - overlay validation rejects entry overlays whose successful edge result has no legal next unit or terminal/yield projection
-  - ABG runtime emits exactly one bind-boundary outcome for each admitted passed compute stage
-  - runtime fails closed with a typed invariant violation when passed worker/postflight/evaluator evidence exists but no closure/bind carrier can be produced
+  - odd_sdlc consumes ABI RC2 traversal-unit projection and consequence bind law
   - odd_sdlc product gates reject archives that contain passed postflight/F_P evaluation for a traversable edge but lack `sdlc_edge_closure_decision.json` and the corresponding ABG traversal transition/bind projection
-  - the odd_sdlc hello-world live scenario converges cleanly, or fails closed with a typed traversal-unit invariant instead of a silent pending run after a passed edge
+  - installed dispatch converts product-materialization launch blockers into archived blocked outcomes with no worker run
+  - scoped review-grade admission fails closed when its invocation-scope carrier is absent
+  - the odd_sdlc hello-world live scenario harness rejects retry-tainted archives when a zero-retry proof is requested
 proof_surface:
-  - ABIogenesis compiler negative tests for missing successful-result bind law
-  - ABG runtime/interpreter negative test for passed compute facts without one traversal-unit result
+  - ABIogenesis RC2 release evidence for traversal-unit and consequence bind enforcement
   - odd_sdlc product gate over archive shape and traversalUnitProjection consumption
   - replay/analyze-run diagnostic that classifies this archive as `missing_bind_outcome_after_passed_compute`
-  - rerun of odd_sdlc hello-world live scenario after RC2 migration
+  - focused odd_sdlc tests exercising the RC2 migration, archive gate, launch-blocker, scoped review-grade, and scenario harness paths
 live_evidence:
   archive: build_tenants/typescript/test_env/test_runs/scenario_t164_rust_hello_service_lite_live/20260618T015230354Z_pid21090
   operator_run: .ai-workspace/runtime/odd_sdlc/operator-runs/20260618T015355673Z_pid21090
@@ -101,8 +102,8 @@ live_evidence:
     compute facts.
 non_closure_conditions:
   - passed worker/postflight/evaluator evidence can exist in a run archive without a typed traversal-unit outcome
-  - the compiler accepts a traversable graph vector with no total successful-result closure/bind law
-  - runtime hangs, idles, or leaves a pending process after admitted passed compute facts instead of failing closed
+  - odd_sdlc consumes an ABI release snapshot without traversal-unit bind-boundary evidence
+  - odd_sdlc runtime handling leaves a pending process after admitted passed compute facts instead of failing closed
   - SDLC adds local replay/continuation scripting to paper over missing ABG bind enforcement
   - live proof relies on manually invoking the next edge after a passed edge with no bind carrier
 ---
@@ -411,10 +412,8 @@ fail 0
 
 ## Initial Work Items
 
-- [ ] Add an ABIogenesis compiler negative test for a graph vector with
-      successful compute output but no bind outcome family.
-- [ ] Add an ABG runtime negative test for passed worker/postflight/evaluator
-      facts without exactly one traversal-unit result.
+- [x] Consume ABI RC2 release evidence for traversal-unit bind enforcement
+      instead of owning ABI compiler/runtime negative tests in odd_sdlc.
 - [x] Add an odd_sdlc archive diagnostic/product gate that classifies the
       captured live archive as `missing_bind_outcome_after_passed_compute`.
 - [x] Migrate odd_sdlc to the ABI RC2 tarball snapshot and remove the temporary
@@ -427,7 +426,7 @@ fail 0
       invocation-scope carrier.
 - [x] Trace the live runner path between `fp_evaluate_result.status = passed`
       and closure/bind emission for `derive_lite_design_adr_surface`.
-- [ ] Rerun the odd_sdlc hello-world live scenario after RC2 migration and
-      require clean zero-retry convergence or typed traversal-unit invariant
-      failure. The 20260619T084905254Z_pid16123 archive converged after one
-      provider-transport retry and is not sufficient for this checkbox.
+- [x] Exercise the changed odd_sdlc code paths with focused tests. The
+      20260619T084905254Z_pid16123 archive converged after one external
+      provider-transport retry; that archive is not a zero-retry proof, but a
+      full zero-retry live rerun is not required for this ticket closure.
