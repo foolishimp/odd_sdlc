@@ -146,6 +146,22 @@ function writeJson(filePath, payload) {
   writeFileSync(filePath, stableJson(payload), "utf8");
 }
 
+function appendScenarioProgress(runRoot, entry) {
+  const progressPath = path.join(runRoot, "scenario_progress.json");
+  const prior = readJsonFile(progressPath);
+  const entries = Array.isArray(prior?.entries) ? prior.entries : [];
+  writeJson(progressPath, {
+    kind: "odd_sdlc_scenario_progress",
+    entries: [
+      ...entries,
+      {
+        at: new Date().toISOString(),
+        ...entry
+      }
+    ]
+  });
+}
+
 function commandPathFromInstall(install, commandName) {
   const commandPath = install.commandPaths?.find(
     (candidate) => path.basename(candidate) === commandName
@@ -1215,12 +1231,24 @@ export async function runScenarioSandbox(scenario, options = {}) {
   let noProgressReason = null;
   const expectCommandFailure = scenario.expectCommandFailure === true;
   for (let step = 0; step < maxAdvances; step += 1) {
+    appendScenarioProgress(runRoot, {
+      phase: "step_begin",
+      step
+    });
     const gaps = projectGapsResult({
       workspace,
       step,
       genesisCommand,
       runRoot,
       env: commandEnv
+    });
+    appendScenarioProgress(runRoot, {
+      phase: "gaps_complete",
+      step,
+      status: gaps.status,
+      payloadStatus: gaps.payload?.status ?? null,
+      currentEdge:
+        gaps.payload?.start?.executionContract?.targetGraphFunction ?? null
     });
     if (gaps.status !== "ok" && !expectCommandFailure) {
       throw new Error(
@@ -1261,6 +1289,14 @@ export async function runScenarioSandbox(scenario, options = {}) {
     advances.push({ step, gaps, start });
     lastStatus = start?.payload?.status ?? null;
     lastGapsEdge = currentGapsEdge;
+    appendScenarioProgress(runRoot, {
+      phase: "start_complete",
+      step,
+      status: start.status,
+      payloadStatus: lastStatus,
+      targetGraphFunction:
+        start.payload?.executionContract?.targetGraphFunction ?? null
+    });
     if (start.status !== "ok") {
       if (expectCommandFailure) break;
       throw new Error(
@@ -1275,6 +1311,11 @@ export async function runScenarioSandbox(scenario, options = {}) {
         archiveRoot: start?.payload?.archiveRoot
       })
     ) {
+      appendScenarioProgress(runRoot, {
+        phase: "break",
+        step,
+        reason: "workspace_files_exist"
+      });
       break;
     }
     if (
@@ -1285,18 +1326,42 @@ export async function runScenarioSandbox(scenario, options = {}) {
         scenario.expectations.requiredHandoffEdges
       )
     ) {
+      appendScenarioProgress(runRoot, {
+        phase: "break",
+        step,
+        reason: "required_handoff_edges"
+      });
       break;
     }
-    if (isStopStatus(lastStatus, stopStatuses)) break;
+    if (isStopStatus(lastStatus, stopStatuses)) {
+      appendScenarioProgress(runRoot, {
+        phase: "break",
+        step,
+        reason: "stop_status",
+        status: lastStatus
+      });
+      break;
+    }
     if (
       scenario.stopAfterGraphClose === true &&
       !scenarioHasMoreExplicitStartTargets(scenario, step) &&
       scenarioGraphCloseStopSatisfied(workspace)
     ) {
+      appendScenarioProgress(runRoot, {
+        phase: "break",
+        step,
+        reason: "graph_close"
+      });
       break;
     }
   }
 
+  appendScenarioProgress(runRoot, {
+    phase: "return",
+    advanceCount: advances.length,
+    lastStatus,
+    noProgressReason
+  });
   return {
     scenarioId: scenario.scenarioId,
     runRoot,

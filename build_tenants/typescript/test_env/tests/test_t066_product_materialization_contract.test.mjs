@@ -27,66 +27,100 @@ import path, { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
-  admitComponentDepthRegisterFromArtifact,
   admitSdlcProjectConstraints,
-  buildPostTransformWorkerResultReport,
-  constructWorkerInvocationPackage,
-  constructPostflightGapDossier,
-  constructSdlcFpEvaluateResult,
-  constructSdlcEdgeFulfillmentLedger,
   constructSdlcGtlModule,
   constructSdlcHookContractCatalog,
-  constructSdlcNextActionProjection,
-  constructorResultFromWorkerOutput,
-  declaredProductFileTargets,
-  admitSdlcEdgeEvidence,
   deriveComponentDepthAssuranceLedger,
   deriveShallowRealizationAssuranceLedger,
-  deriveSdlcEdgeAssuranceCloseDecision,
-  deriveSdlcEdgeClosureDecision,
-  deriveSdlcEdgeObligations,
-  deriveSdlcOperatorAssuranceGate,
-  deriveSdlcEdgeResidualPressure,
-  deriveSdlcEdgeFulfillmentCountsFromAssessments,
-  deriveSdlcPostCloseOverlayContinuationActionInput,
-  deriveSdlcProductLineageYieldResumeBasis,
   deriveSdlcWorkspaceIngressReport,
   deriveSdlcConformProjectProfileFromWorkspace,
-  deriveSdlcSelectedAbgFnCompositionIdentity,
   deriveSdlcProjectConstraintsFromWorkspace,
   deriveSdlcSourceInput,
-  deriveWorkerHandoffManifest,
-  executeInstalledOperatorStart,
-  edgeAssuranceEvidenceCandidatesFor,
   FG_CONFORM_PROJECT_AUTHORITY,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
-  evaluateSdlcComputeStage,
   FG_CONFORM_PROJECT,
   hookContractByEdgeName,
   installOddSdlcTypescript,
   materializeSdlcProjectConformance,
   makeSdlcBlockingReason,
-  measureSdlcEdgeGain,
   evalSdlcGapFromReplay,
-  normalizePostCloseContinuationVectorIndex,
-  projectSdlcQueryDomain,
-  projectSdlcWorkerAttachment,
-  publicStartOnce,
-  readOddSdlcRuntimeEvents,
-  readWorkerResultReport,
-  reconcileSdlcProductMaterializationAuthority,
-  resolveSdlcEdgeGainClosureContract,
-  sdlcAssessmentCarriesRequirementForDownstreamClosure,
-  sdlcWorkerAssessmentCarriesRequirementTransformationSet,
-  sha256Text,
-  snapshotProductMaterializationRoot,
-  sourceAssetAuthorityRefsFromAbgOutputAuthorityProjections,
-  writeHandoffFiles,
-  writeDeclaredEdgeProjectionOutput,
-  writeProductMaterializationManifest
+  projectSdlcQueryDomain
 } from "../../build/semantic/code/src/index.js";
+import {
+  admitComponentDepthRegisterFromArtifact
+} from "../../build/semantic/code/src/operator/component_depth_register.js";
+import {
+  deriveSdlcOperatorAssuranceGate
+} from "../../build/semantic/code/src/operator/assurance_gate.js";
+import {
+  deriveSdlcSelectedAbgFnCompositionIdentity
+} from "../../build/semantic/code/src/operator/composition_identity.js";
+import {
+  admitSdlcEdgeEvidence,
+  deriveSdlcEdgeAssuranceCloseDecision,
+  deriveSdlcEdgeObligations,
+  deriveSdlcEdgeResidualPressure,
+  measureSdlcEdgeGain,
+  resolveSdlcEdgeGainClosureContract
+} from "../../build/semantic/code/src/operator/edge_gain_closure.js";
+import {
+  readOddSdlcRuntimeEvents
+} from "../../build/semantic/code/src/operator/event_store.js";
+import {
+  deriveSdlcPostCloseOverlayContinuationActionInput,
+  deriveSdlcProductLineageYieldResumeBasis,
+  edgeAssuranceEvidenceCandidatesFor,
+  executeInstalledOperatorStart,
+  normalizePostCloseContinuationVectorIndex,
+  sdlcAssessmentCarriesRequirementForDownstreamClosure,
+  sdlcWorkerAssessmentCarriesRequirementTransformationSet
+} from "../../build/semantic/code/src/operator/installed_operator.js";
+import {
+  declaredProductFileTargets,
+  reconcileSdlcProductMaterializationAuthority
+} from "../../build/semantic/code/src/operator/product_materialization/authority.js";
+import {
+  writeProductMaterializationManifest
+} from "../../build/semantic/code/src/operator/product_materialization/manifest.js";
+import {
+  snapshotProductMaterializationRoot
+} from "../../build/semantic/code/src/operator/product_materialization/observation.js";
+import {
+  constructPostflightGapDossier
+} from "../../build/semantic/code/src/operator/postflight/gap_dossier.js";
+import {
+  constructSdlcFpEvaluateResult,
+  evaluateSdlcComputeStage
+} from "../../build/semantic/code/src/operator/plugins/evaluate/postflight.js";
+import {
+  constructorResultFromWorkerOutput
+} from "../../build/semantic/code/src/operator/plugins/consequence/constructor_projection.js";
+import {
+  writeDeclaredEdgeProjectionOutput
+} from "../../build/semantic/code/src/operator/plugins/consequence/edge_projection.js";
+import {
+  constructWorkerInvocationPackage,
+  deriveWorkerHandoffManifest,
+  sourceAssetAuthorityRefsFromAbgOutputAuthorityProjections,
+  writeHandoffFiles
+} from "../../build/semantic/code/src/operator/plugins/transform/launch_contract.js";
+import {
+  buildPostTransformWorkerResultReport,
+  readWorkerResultReport
+} from "../../build/semantic/code/src/operator/plugins/transform/result_projection.js";
+import {
+  constructSdlcEdgeFulfillmentLedger,
+  constructSdlcNextActionProjection,
+  deriveSdlcEdgeClosureDecision,
+  deriveSdlcEdgeFulfillmentCountsFromAssessments
+} from "../../build/semantic/code/src/operator/traversal_consequence.js";
+import {
+  projectSdlcWorkerAttachment,
+  publicStartOnce
+} from "../../build/semantic/code/src/start/public_start.js";
+import { sha256Text } from "../../build/semantic/code/src/shared/digest.js";
 import { canonicalDataMapperFixtureRoot } from "../fixtures/data_mapper_fixture.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
@@ -131,6 +165,23 @@ function makeWorkspace() {
   materializeSdlcProjectConformance({ workspaceRoot: root });
   writeAdmittedStagedAuthoritySurfaces(root);
   return root;
+}
+
+function writeDeclaredProductTargets(workspaceRoot) {
+  writeFileSync(
+    path.join(workspaceRoot, "specification/PRODUCT.md"),
+    [
+      "# Product",
+      "",
+      "## Declared Product Files",
+      "",
+      "- `build_tenants/scala_spark/src/main/scala/cdme/Core.scala`",
+      "- `build_tenants/scala_spark/src/test/scala/cdme/CoreSpec.scala`",
+      "- `build_tenants/scala_spark/cdme-core/src/main/scala/cdme/Core.scala`",
+      "- `build_tenants/scala_spark/cdme-core/src/test/scala/cdme/CoreSpec.scala`"
+    ].join("\n"),
+    "utf8"
+  );
 }
 
 function makeExecutionWorkspace() {
@@ -8213,6 +8264,7 @@ test("B-085 archive retry preserves targeted execution shard scope", () => {
 
 test("T-159 component-depth prompts pin the top-level register envelope on first attempt", () => {
   const workspace = makeWorkspace();
+  writeDeclaredProductTargets(workspace);
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const cases = [
     {
@@ -8397,6 +8449,7 @@ test("T-159 component-depth prompts pin the top-level register envelope on first
 
 test("T-100 component-test postflight admits materialized tests before execution discoverability proof", () => {
   const workspace = makeWorkspace();
+  writeDeclaredProductTargets(workspace);
   declareScalaSbtTestRunner(workspace);
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const tenantRoot = path.join(workspace, "build_tenants/scala_spark");

@@ -19,10 +19,7 @@ import {
 
 import {
   admitSdlcProjectConstraints,
-  constructSdlcEdgeFulfillmentLedger,
   constructSdlcGtlModule,
-  constructSdlcNextActionProjection,
-  deriveSdlcEdgeClosureDecision,
   deriveSdlcGapDossier,
   deriveSdlcSourceInput,
   deriveSdlcWorkspaceIngressReport,
@@ -32,6 +29,11 @@ import {
   projectSdlcRequirementFulfillmentPublicViewFromPriorProjection,
   projectSdlcQueryDomain
 } from "../../build/semantic/code/src/index.js";
+import {
+  constructSdlcEdgeFulfillmentLedger,
+  constructSdlcNextActionProjection,
+  deriveSdlcEdgeClosureDecision
+} from "../../build/semantic/code/src/operator/traversal_consequence.js";
 
 function workspaceGaps(workspaceRoot) {
   return projectOddSdlcWorkspaceGaps({ workspaceRoot });

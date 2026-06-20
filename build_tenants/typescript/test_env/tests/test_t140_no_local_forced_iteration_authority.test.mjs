@@ -13,12 +13,16 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
-  deriveSdlcEdgeFulfillmentCountsFromAssessments,
   deriveSdlcWorkerRetryContextFromPostActionProjection,
   deriveSdlcWorkerRetryContextFromTraversalConsequence,
   mergeSdlcWorkerRetryContextWithRuntimeGapRegister,
-  sdlcWorkerRetryContextFromAbgRetryContext,
   sdlcRequirementObligationBelongsToDownstreamComponentSurface,
+  sdlcWorkerRetryContextFromAbgRetryContext
+} from "../../build/semantic/code/src/operator/installed_operator.js";
+import {
+  deriveSdlcEdgeFulfillmentCountsFromAssessments
+} from "../../build/semantic/code/src/operator/traversal_consequence.js";
+import {
   sdlcBlockingReasonFromLegacy
 } from "../../build/semantic/code/src/index.js";
 

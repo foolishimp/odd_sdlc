@@ -261,7 +261,7 @@ test("T-150 explicit priority schemes do not silently inherit domain defaults", 
   assert(dossier.rankingReasonRefs.includes("priority-rule://t150/custom"));
 });
 
-test("T-150 archive next-action lookup requires a published catalog ref", () => {
+test("T-150 workspace gaps reports incomplete archive consequence on read-only surface", () => {
   const workspace = makeConformantWorkspace();
   writeArchiveNextAction(
     workspace,
@@ -269,12 +269,17 @@ test("T-150 archive next-action lookup requires a published catalog ref", () => 
   );
 
   const result = projectOddSdlcWorkspaceGaps({ workspaceRoot: workspace });
+  const diagnostic = result.archiveDiagnostics.find(
+    (entry) => entry.code === "traversal_consequence_artifacts_missing"
+  );
 
-  assert.equal(result.blockingReason, "unknown_graph_function_boundary_ref");
-  assert(
-    result.blockingReasonCarriers.some(
-      (reason) => reason.code === "unknown_graph_function_boundary_ref"
-    ),
-    JSON.stringify(result, null, 2)
+  assert(diagnostic, JSON.stringify(result, null, 2));
+  assert.equal(
+    result.requirementFulfillment.archiveRehydration.status,
+    "no_archive_with_consequence_triple"
+  );
+  assert.match(
+    JSON.stringify(diagnostic.evidenceRefs),
+    /sdlc_edge_fulfillment_ledger\.json/u
   );
 });

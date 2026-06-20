@@ -15,12 +15,14 @@ import {
   assertCurrentSdlcGtlProgramConformance,
   admitSdlcProjectConstraints,
   constructCurrentSdlcGtlProgramConformanceInput,
-  deriveSdlcInstalledOperatorStatusFromAbgTerminal,
   deriveSdlcSourceInput,
   deriveSdlcWorkspaceIngressReport,
   typecheckCurrentSdlcGtlProgram,
   typecheckSdlcGtlProgramConformanceInput
 } from "../../build/semantic/code/src/index.js";
+import {
+  deriveSdlcInstalledOperatorStatusFromAbgTerminal
+} from "../../build/semantic/code/src/operator/installed_operator.js";
 
 const PACKAGE_ROOT = process.cwd();
 const REPO_ROOT = path.resolve(PACKAGE_ROOT, "../..");
@@ -553,6 +555,9 @@ test("T-197 A2 keeps SDLC start as shell over one admitted ABG boundary", () => 
   const entry = repoFile(
     "build_tenants/typescript/code/src/workspace_api/entry.ts"
   );
+  const abgRuntimeBinding = repoFile(
+    "build_tenants/typescript/code/src/operator/abg_runtime_binding.ts"
+  );
   const operatorIndex = repoFile(
     "build_tenants/typescript/code/src/operator/index.ts"
   );
@@ -569,21 +574,35 @@ test("T-197 A2 keeps SDLC start as shell over one admitted ABG boundary", () => 
   const design = repoFile(
     "build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_STAGED_COMPUTE_BOUNDARY.md"
   );
-  const installedStartPayload = sourceFunction(entry, "installedStartPayloadFor");
   const instructions = repoFile(
     "build_tenants/typescript/code/src/install/instruction_files.ts"
   );
 
   assert.match(product, /control remains in ABG until ABG exits/u);
   assert.match(product, /must not implement a product-local loop/u);
-  assert.match(installedStartPayload, /\bexecuteInstalledOperatorStart\(/u);
+  assert.match(
+    abgRuntimeBinding,
+    /\bcreateOddSdlcAbgRuntimeBindingPlugins\b/u
+  );
+  assert.match(abgRuntimeBinding, /\bpublicStartOnce\(/u);
+  assert.match(
+    abgRuntimeBinding,
+    /\bcreateSdlcInstalledOperatorAbgPluginSession\(/u
+  );
+  assert.doesNotMatch(entry, /\bexecuteInstalledOperatorStart\b/u);
+  assert.doesNotMatch(entry, /\bpublicStartOnce\b/u);
+  assert.doesNotMatch(entry, /\bstartOddSdlcWorkspace\b/u);
+  assert.doesNotMatch(entry, /\bprojectOddSdlcWorkspaceStart\b/u);
+  assert.doesNotMatch(operatorIndex, /\bexecuteInstalledOperatorStart\b/u);
+  assert.doesNotMatch(abgRuntimeBinding, /\bprocess\.argv\b/u);
+  assert.doesNotMatch(abgRuntimeBinding, /\bwhile\s*\(/u);
   assert.doesNotMatch(
-    installedStartPayload,
+    abgRuntimeBinding,
     /\bexecuteInstalledOperatorStartWithReentry\b/u
   );
-  assert.doesNotMatch(installedStartPayload, /\brefreshReplayState\b/u);
+  assert.doesNotMatch(abgRuntimeBinding, /\brefreshReplayState\b/u);
   assert.doesNotMatch(
-    installedStartPayload,
+    abgRuntimeBinding,
     /\binstalledStartShouldContinueForRequestedUntil\b/u
   );
   assert.doesNotMatch(
@@ -601,13 +620,21 @@ test("T-197 A2 keeps SDLC start as shell over one admitted ABG boundary", () => 
   assert.doesNotMatch(runtimePolicy, /\binstalledRetryReentryAttemptLimits\b/u);
   assert.doesNotMatch(runtimePolicyConfig, /"installedReentry"/u);
   assert.match(design, /A2 \| `executeInstalledOperatorStartWithReentry` formerly owned/u);
-  assert.match(design, /SDLC-local loop deleted/u);
-  assert.match(design, /one admitted `executeInstalledOperatorStart\(\.\.\.\)` boundary/u);
+  assert.match(design, /residual installed-operator control code remains under T-204 audit/u);
+  assert.match(design, /product plugin\/session adapters with explicit survival proof/u);
   assert.doesNotMatch(design, /loop may only call the installed-start boundary/u);
   assert.doesNotMatch(design, /operator-facing retry\/reentry shell/u);
   assert.match(
     instructions,
-    /\$\{genesisCommand\} start --workspace \. --scope workspace --target graph_function:\$\{FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE\} --until converged/u
+    /\$\{genesisCommand\} start --workspace \. --scope workspace --target graph_function:\$\{FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE\} --until blocked/u
+  );
+  assert.match(
+    instructions,
+    /--until converged/u
+  );
+  assert.match(
+    instructions,
+    /explicitly requires convergence proof/u
   );
   assert.match(
     instructions,

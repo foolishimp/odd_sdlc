@@ -26,7 +26,7 @@ re_entry_point: product
 priority: critical
 triaged_at: 2026-06-17
 created_at: 2026-06-17
-updated_at: 2026-06-19
+updated_at: 2026-06-20
 activated_at: 2026-06-17
 governance_scope: STDO Method, ODD_METHOD, ABG/GTL substrate boundary
 source_documents:
@@ -1750,3 +1750,126 @@ Line movement note:
   and `test_env/workspace_start_harness.mjs`.
   The net cut is still materially negative because the old
   `spec_method/entry.ts` command surface was removed.
+
+## 2026-06-20 Follow-Up: Current One-Surface Checkpoint
+
+Current corrections to the earlier deletion-cut notes:
+
+- `workspace_api/` currently exports
+  `projectOddSdlcWorkspaceQueryDomain`, `projectOddSdlcWorkspaceGaps`,
+  `projectOddSdlcWorkspaceTickets`, and `admitOddSdlcWorkspaceTicket`.
+- `projectOddSdlcWorkspaceGaps` is read-only product projection support. It does
+  not call `publicStartOnce`, construct a traversal request, dispatch workers,
+  or choose next actions.
+- `projectOddSdlcWorkspaceStart`, `startOddSdlcWorkspace`, and
+  `test_env/workspace_start_harness.mjs` are not current surviving surfaces.
+- `operator/index.ts` no longer re-exports `executeInstalledOperatorStart`.
+  Tests that still prove installed-operator internals must import the owning
+  internal module directly or migrate to ABG CLI/runtime-binding proof.
+- semantic build now runs `clean:semantic` first. `prepack` runs the clean
+  semantic build plus `guard:pack-no-command-artifacts`, preventing stale
+  compiled `cli` or `spec_method` artifacts from entering the package.
+
+Source inventory:
+
+- current TypeScript source count: 180 files.
+- inventory artifact:
+  `.ai-workspace/comments/codex/20260620T000000Z_T204_source_survival_inventory.md`.
+- classification counts:
+  - `gtl_program`: 10
+  - `plugin`: 24
+  - `product_carrier`: 43
+  - `product_projection`: 53
+  - `test_or_release_plumbing`: 25
+  - `move_to_abg`: 25
+- this is not closure. Rows marked `move_to_abg` or `survival_pending` remain
+  T-204 debt, especially `analysis/*`, `effects/*`, `start/*`,
+  `operator/event_store.ts`, `operator/installed_operator.ts`, and the pending
+  ABG/product split in `operator/traversal_consequence.ts`.
+
+Validation at this checkpoint:
+
+- passed: `npm run build:semantic`
+- passed: `npm run guard:pack-no-command-artifacts`
+- passed: `npm pack --dry-run --json` after clean build/guard; no stale
+  `cli` or `spec_method` build artifacts are packed.
+- passed: T-139/T-140/T-197/T-203 focused proof lane,
+  61 tests after updating the A2 source guard to the T-204 split.
+- passed: T-066 prompt-specific proof for component-depth envelope directives,
+  including ESM component-test guidance and required
+  `componentTestRows[].componentIds`.
+- not complete: broad T-066 legacy materialization assertions still expose
+  current target-carrier/postflight law drift under the stricter launch and
+  component-depth carrier checks. Treat those as follow-up materialization-law
+  migration, not a reason to restore command/start surfaces.
+
+## 2026-06-20 Functional One-Surface Proof Checkpoint
+
+Current functional split:
+
+- public SDLC command/control is gone: no package bin, no `./spec-method`
+  export, no root `spec_method` export, no `code/src/cli`, no
+  `spec_method/entry.ts`, and no surviving command helper/serializer symbols in
+  source or tests.
+- `workspace_api/` is a commandless product read-model API for query-domain,
+  gaps, tickets, and ticket admission. The gaps API projects archive diagnostics
+  and requirement fulfillment, including the T-205
+  `missing_bind_outcome_after_passed_compute` diagnostic, without dispatching
+  traversal.
+- ABG CLI owns the hello-world live start loop. The live sandbox drives starts
+  through installed `genesis-ts`; odd_sdlc contributes product plugins,
+  carriers, prompts, policy, and read-model projections.
+- package publishing is guarded: semantic build cleans stale output first and
+  `prepack` runs semantic build plus `guard:pack-no-command-artifacts`.
+
+Clean live proof:
+
+- archive:
+  `build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260620T010934978Z_pid13932`
+- command/test result:
+  `node --test --test-name-pattern "T-132 JavaScript hello-world live build loop" test_env/sandbox/test_scenario_sandbox.test.mjs`
+  passed with 1/1 tests in 1,588,069 ms.
+- scenario progress:
+
+| Step | Target graph function | Status | Step time |
+| ---: | --- | --- | ---: |
+| 0 | `Fg_conform_project` | converged | 0.02 |
+| 1 | `derive_lite_design_adr_surface` | converged | 4.56 |
+| 2 | `derive_lite_component_code_surface` | converged | 7.58 |
+| 3 | `derive_lite_test_design_surface` | converged | 3.30 |
+| 4 | `derive_lite_component_test_surface` | converged | 5.39 |
+| 5 | `derive_lite_uat_test_source_surface` | converged | 4.12 |
+| 6 | `prepare_test_execution_surface` | converged | 0.02 |
+| 7 | `derive_test_execution_result_surface` | converged | 0.02 |
+
+Final progress record: `advanceCount: 8`, `lastStatus: converged`,
+`noProgressReason: null`, break reason `required_handoff_edges`.
+
+Final checkpoint validation:
+
+- passed: `npm run build:semantic`
+- passed: `npm run guard:pack-no-command-artifacts`
+- passed: `npm pack --dry-run --ignore-scripts --json`; 371 entries, no packed
+  `build/semantic/code/src/cli/**` or
+  `build/semantic/code/src/spec_method/**` artifacts.
+- passed: `npm run test:t132`
+- passed: T-058 workspace API/split proof, 6/6 tests.
+- passed: T-150 visible defaults/gaps archive diagnostics, 4/4 tests.
+- passed: T-139/T-140/T-197/T-203 focused proof lane, 61/61 tests.
+- passed: T-066 prompt-specific component-depth prompt proof, 1/1 tests.
+- passed: `git diff --check`
+- scans: no `projectOddSdlcWorkspaceStart`, `startOddSdlcWorkspace`,
+  `invokeOddSdlcSpecMethodCommand`, `serializeOddSdlcSpecMethodResult`, or
+  `commandPayload` matches in `code/src` or `build/semantic/code/src`; no
+  semantic `cli` or `spec_method` files are present.
+
+Status:
+
+- The functional one-surface split is proven for this checkpoint: ABG owns
+  live command/control and odd_sdlc does not expose a replacement start/gaps
+  surface.
+- T-204 remains active under the strict shrink/closure law. The source
+  inventory still classifies 25 files as `move_to_abg` or
+  `survival_pending`, especially `analysis/*`, `effects/*`, `start/*`,
+  `operator/event_store.ts`, `operator/installed_operator.ts`, and the final
+  ABG/product fold in `operator/traversal_consequence.ts`.

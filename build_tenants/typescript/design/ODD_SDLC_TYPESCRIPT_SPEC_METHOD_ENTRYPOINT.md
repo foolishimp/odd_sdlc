@@ -26,15 +26,16 @@ not package law as a command module and is not an operator surface.
 | Carrier | Owner | Notes |
 | --- | --- | --- |
 | ABG operator command intent | ABG CLI / installed ABG binding | only command/control ingress for installed `gaps` and `start` |
-| `OddSdlcWorkspaceTraversalInput` | `workspace_api/` | typed package API input for product start/gap projections; no command discriminant |
-| workspace ticket APIs | `workspace_api/`, `tickets/` | typed ticket projection/admission APIs |
+| workspace projection inputs | `workspace_api/` | typed package API input for query-domain, read-only gaps, and ticket read models; no start command discriminant |
+| workspace ticket APIs | `workspace_api/`, `tickets/` | typed ticket projection/admission APIs; no traversal dispatch |
 | gaps evaluator priority edge | product policy projection | domain-policy input projected through ABG construction priority carriers, not a command option authority |
 | workspace source snapshots | product projection API | read-only filesystem admission into `deriveSdlcSourceInput` |
 | project constraints fallback | product projection API | admission default when imported workspace has no project constraints file |
 | graph catalog | `graph/` | entrypoint reads only |
 | query-domain projection | `projection/` | entrypoint reads only |
-| public start outcome | `start/` | entrypoint reads only |
-| installed operator start | `operator/installed_operator.ts` | ABG-owned traversal and retry/reentry boundary |
+| ABG runtime binding plugins | `operator/abg_runtime_binding.ts` | product plugin factory consumed by ABG runtime; no public start/gaps API |
+| public start execution-contract projection | `start/` | internal plugin-support adapter under T-204 survival audit; not exported as package command/control |
+| installed operator plugin session | `operator/installed_operator.ts` | internal plugin session support under T-204 survival audit; generic control code must move to ABG or carry survival proof |
 | RC qualification report | `qualification/` | entrypoint reads only |
 
 ## Structural Carrier Diagram
@@ -47,9 +48,9 @@ operator intent
           -> workspace/deriveSdlcWorkspaceIngressReport
           -> graph/constructSdlcGtlModule
           -> projection/projectSdlcQueryDomain
-          -> start/publicStartOnce
-          -> operator/executeInstalledOperatorStart
-          -> projection/deriveSdlcGapDossier
+          -> operator/createOddSdlcAbgRuntimeBindingPlugins
+              -> start/publicStartOnce (internal execution-contract adapter)
+              -> operator/createSdlcInstalledOperatorAbgPluginSession
           -> runtime/deriveOddSdlcConstructionEvaluatorReport
           -> qualification/describeOddSdlcTypescriptRcQualification
   -> ABG-owned runtime/archive truth plus odd_sdlc read models
@@ -63,10 +64,11 @@ resolves product policy, plugins, runtime binding, and read-model projection.
 
 | Module | Classification | Owns | Does Not Own |
 | --- | --- | --- | --- |
-| `workspace_api/` | Typed product API | commandless workspace start/gap/ticket package APIs over admitted product carriers | argv admission, process exit, command serialization, retry/reentry control |
-| `workspace_api/entry.ts` | Workspace API implementation host | commandless typed workspace projection realization behind `workspace_api/` | argv admission, command dispatch, package law, operator command/control |
+| `workspace_api/` | Typed product API | commandless query-domain, read-only gaps, and ticket package APIs over admitted product carriers | start dispatch, gaps dispatch, argv admission, process exit, command serialization, retry/reentry control |
+| `workspace_api/entry.ts` | Workspace API implementation host | commandless typed workspace read-model realization behind `workspace_api/` | argv admission, command dispatch, package law, operator command/control |
 | `cli/main.ts` | Retired process launcher | nothing; file is absent under T-204 | command semantics, retry/reentry, traversal law |
-| `operator/installed_operator.ts` | Installed ABG boundary | installed start execution, ABG plugin dispatch, typed retry/reentry projection, archives | user-interface grammar |
+| `operator/abg_runtime_binding.ts` | ABG plugin binding | construct product plugin set for ABG-owned runtime execution | loop, retry budget, terminal command status, CLI grammar |
+| `operator/installed_operator.ts` | Internal plugin/session support under audit | product worker dispatch, prompt/policy projection, archive carriers required by plugins | public command/control surface; generic traversal loop or replay controller without survival proof |
 
 ## Product API Surfaces
 
@@ -75,19 +77,25 @@ resolves product policy, plugins, runtime binding, and read-model projection.
 `projection/` reads workspace authority surfaces, derives ingress, constructs
 the TypeScript GTL module, and projects the query domain.
 
-`workspace_api/projectOddSdlcWorkspaceGaps` derives a read-only gap dossier from
-ABG replay/start truth. Domain priority customization is typed product policy
-that is converted into ABG construction priority carriers. It does not choose or
-dispatch traversal.
+`workspace_api/projectOddSdlcWorkspaceQueryDomain` derives the product query
+domain from admitted workspace source, GTL declarations, project conformance,
+and project constraints. It does not read replay, dispatch traversal, or choose
+next actions.
 
-`workspace_api/projectOddSdlcWorkspaceStart` admits commandless start projection
-input and reads replay-visible next-action truth. It returns a projected start
-carrier only; installed operator command/control must enter through ABG CLI.
+`workspace_api/projectOddSdlcWorkspaceGaps` derives a read-only gap dossier and
+requirement-fulfillment projection from workspace authority plus archived
+consequence evidence. It does not call `publicStartOnce`, construct a traversal
+request, dispatch workers, or choose next actions.
 
-Dispatching workspace starts are not exported as package API. Source tests that
-exercise installed-operator internals may compose the projection with
-`executeInstalledOperatorStart` through `test_env/workspace_start_harness.mjs`;
-live proof paths must enter through ABG CLI.
+`workspace_api/projectOddSdlcWorkspaceTickets` and
+`workspace_api/admitOddSdlcWorkspaceTicket` expose product ticket projection and
+admission helpers. They do not own installed start/gaps behavior.
+
+Dispatching workspace starts and gaps are not exported as package API. Source
+tests that prove operator command/control must enter through ABG CLI or ABG
+runtime binding probes; product tests may import internal product modules only
+to prove product carriers, prompts, projections, and plugins. A test harness
+must not recreate dispatching `start` or `gaps` as an odd_sdlc package surface.
 
 `install`, `release-cut`, `release-snapshot`, and `rc-report` remain typed
 package/projection APIs. They do not own traversal or retry policy and must not
@@ -121,12 +129,14 @@ prove:
 - root package exports do not re-export `spec_method/entry.ts`
 - root package exports do not export a dispatching `startOddSdlcWorkspace`
   workspace API
-- typed workspace APIs do not construct the retired spec-method request carrier
-  or carry a `command` discriminator
+- typed workspace APIs do not export start functions, dispatch gaps, construct
+  the retired spec-method request carrier, or carry a `command` discriminator
 - `workspace_api/entry.ts` contains no retry loop or retry context synthesis
 - product gap priority policy is admitted as product policy and ranked by ABG
   construction priority projection
 - invalid, duplicate, unknown, and already-closed priority selectors fail closed
-- installed retry/reentry control is owned by `operator/installed_operator.ts`
+- internal `start/` and `operator/installed_operator.ts` code is classified as
+  plugin support, moved to ABG, or rejected as product-local control debt before
+  T-204 closes
 - focused tests run and remain available for operator review before ticket
   closure

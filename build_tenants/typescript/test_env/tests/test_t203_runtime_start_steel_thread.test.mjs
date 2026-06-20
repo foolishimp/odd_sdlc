@@ -9,21 +9,31 @@ import {
 } from "@abiogenesis/typescript-tenant";
 
 import {
-  admitSdlcRuntimeTraversalSelections,
   admitSdlcProjectConstraints,
-  admitSdlcPublicStartRequest,
-  conformProjectProfileFromConstraintsText,
-  constructRuntimeSteelThreadSelectionFromDependencyWindow,
   constructSdlcGtlModule,
-  deriveSdlcFeatureScope,
   deriveSdlcWorkspaceIngressReport,
-  deriveWorkerHandoffManifest,
   hookContractByEdgeName,
-  projectSdlcQueryDomain,
-  projectSdlcWorkerAttachment,
-  publicStartOnce,
-  sdlcTraversalObligationInFeatureScope
+  projectSdlcQueryDomain
 } from "../../build/semantic/code/src/index.js";
+import {
+  constructRuntimeSteelThreadSelectionFromDependencyWindow
+} from "../../build/semantic/code/src/operator/decomposition_admission.js";
+import {
+  deriveSdlcFeatureScope,
+  sdlcTraversalObligationInFeatureScope
+} from "../../build/semantic/code/src/operator/feature_scope.js";
+import {
+  deriveWorkerHandoffManifest
+} from "../../build/semantic/code/src/operator/plugins/transform/launch_contract.js";
+import {
+  admitSdlcPublicStartRequest,
+  admitSdlcRuntimeTraversalSelections,
+  projectSdlcWorkerAttachment,
+  publicStartOnce
+} from "../../build/semantic/code/src/start/public_start.js";
+import {
+  conformProjectProfileFromConstraintsText
+} from "../../build/semantic/code/src/workspace/project_profile.js";
 
 function runtimeSteelThreadSelection(overrides = {}) {
   return Object.freeze({

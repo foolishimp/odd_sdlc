@@ -26,8 +26,11 @@
     "node": ">=20"
   },
   "scripts": {
-    "build:semantic": "tsc -p tsconfig.semantic-strict.json && npm run preflight:gtl",
+    "clean:semantic": "rm -rf build/semantic",
+    "build:semantic": "npm run clean:semantic && tsc -p tsconfig.semantic-strict.json && npm run preflight:gtl",
     "preflight:gtl": "node -e \"import('./build/semantic/code/src/index.js').then((m) => { m.assertCurrentSdlcGtlProgramConformance(); })\"",
+    "guard:pack-no-command-artifacts": "node test_env/guards/pack_no_command_artifacts.mjs",
+    "prepack": "node -e \"const fs=require('node:fs');const cp=require('node:child_process');if(!fs.existsSync('tsconfig.semantic-strict.json'))process.exit(0);for(const args of [['run','build:semantic'],['run','guard:pack-no-command-artifacts']]){const r=cp.spawnSync('npm',args,{stdio:'inherit'});if(r.status!==0)process.exit(r.status??1);}\"",
     "lint:semantic": "eslint --max-warnings=0 \"code/src/**/*.ts\"",
     "lint:test-harness": "eslint --max-warnings=0 \"test_env/{tests,sandbox,live}/**/*.mjs\"",
     "guard:data-mapper-boundary": "node --test test_env/tests/test_t188_data_mapper_live_boundary_guard.test.mjs",

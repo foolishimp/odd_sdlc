@@ -9,18 +9,38 @@ import {
 } from "node:fs";
 import path, { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import {
+  admitExecutionBasis,
+  admitResolvedPolicyIdentity,
+  admitResolvedRuntimeIdentity,
+  admitStartIntent
+} from "@abiogenesis/typescript-tenant";
+import { isPlainRecord } from "../admission/index.js";
 import { constructSdlcGtlModule } from "../graph/index.js";
 import { assertCurrentSdlcGtlProgramConformance } from "../gtl_conformance/index.js";
-import { projectSdlcQueryDomain } from "../projection/index.js";
+import {
+  constructSdlcRequirementFulfillmentArchiveRehydration,
+  deriveSdlcGapDossier,
+  projectSdlcQueryDomain,
+  projectSdlcRequirementFulfillmentPublicViewFromPriorProjection,
+  withSdlcRequirementFulfillmentArchiveRehydration,
+  type SdlcRequirementFulfillmentAssessmentPublicInput,
+  type SdlcRequirementFulfillmentClosureSource,
+  type SdlcRequirementFulfillmentEdgeLedgerSource,
+  type SdlcRequirementFulfillmentNextActionSource,
+  type SdlcRequirementFulfillmentPublicProjection
+} from "../projection/index.js";
 import { parseClosedRecord, parseNonEmptyString } from "../shared/validation.js";
 import { admitSdlcTicketExecutionContract } from "../tickets/index.js";
 import {
+  deriveSdlcConformProjectProfileFromWorkspace,
   deriveSdlcConformProjectReportFromWorkspace,
   deriveSdlcConformProjectReportFromWorkspaces,
   deriveSdlcProjectConstraintsFromWorkspace,
   deriveSdlcSourceInput,
   deriveSdlcWorkspaceIngressReport,
   type SdlcConformProjectReport,
+  type SdlcConformProjectProfile,
   type SdlcProjectConstraints,
   type SdlcSourceInput,
   type SdlcWorkspaceIngressReport
@@ -50,7 +70,17 @@ interface OddSdlcWorkspaceApiContext {
   readonly workspaceRoot: string;
   readonly outputWorkspaceRoot: string;
   readonly ingressReport: SdlcWorkspaceIngressReport;
+  readonly conformedProject: SdlcConformProjectProfile;
   readonly conformanceReport: SdlcConformProjectReport;
+}
+
+export interface SdlcWorkspaceGapArchiveDiagnostic {
+  readonly kind: "sdlc_workspace_gap_archive_diagnostic";
+  readonly code:
+    | "missing_bind_outcome_after_passed_compute"
+    | "traversal_consequence_artifacts_missing";
+  readonly archiveRef: string;
+  readonly evidenceRefs: readonly string[];
 }
 
 const DEFAULT_SOURCE_PATHS = Object.freeze([
@@ -304,6 +334,7 @@ function workspaceContext(
     workspaceRoot: root,
     outputWorkspaceRoot: outputRoot,
     ingressReport,
+    conformedProject: deriveSdlcConformProjectProfileFromWorkspace(root),
     conformanceReport:
       outputRoot === root
         ? deriveSdlcConformProjectReportFromWorkspace(root)
@@ -322,6 +353,476 @@ function queryDomainFor(
     module: constructSdlcGtlModule(),
     ingressReport: context.ingressReport,
     projectConformance: context.conformanceReport
+  });
+}
+
+function jsonRecordFromFile(filePath: string): Readonly<Record<string, unknown>> | null {
+  if (!existsSync(filePath) || !statSync(filePath).isFile()) {
+    return null;
+  }
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(filePath, "utf8"));
+    return isPlainRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function stringField(
+  record: Readonly<Record<string, unknown>>,
+  key: string
+): string | null {
+  const value = record[key];
+  return typeof value === "string" ? value : null;
+}
+
+function numberField(
+  record: Readonly<Record<string, unknown>>,
+  key: string
+): number | null {
+  const value = record[key];
+  return typeof value === "number" ? value : null;
+}
+
+function stringArrayField(
+  record: Readonly<Record<string, unknown>>,
+  key: string
+): readonly string[] {
+  const value = record[key];
+  if (!Array.isArray(value)) {
+    return Object.freeze([]);
+  }
+  return Object.freeze(
+    value.filter((entry): entry is string => typeof entry === "string")
+  );
+}
+
+function childRecord(
+  record: Readonly<Record<string, unknown>>,
+  key: string
+): Readonly<Record<string, unknown>> | null {
+  const value = record[key];
+  return isPlainRecord(value) ? value : null;
+}
+
+function operatorRunArchiveRootsNewestFirst(
+  context: OddSdlcWorkspaceApiContext
+): readonly string[] {
+  const operatorRunRoot = path.join(
+    context.outputWorkspaceRoot,
+    context.conformedProject.runtimeLayout.operatorRunRoot
+  );
+  if (!existsSync(operatorRunRoot) || !statSync(operatorRunRoot).isDirectory()) {
+    return Object.freeze([]);
+  }
+  return Object.freeze(
+    readdirSync(operatorRunRoot)
+      .map((entry) => path.join(operatorRunRoot, entry))
+      .filter((entryPath) => statSync(entryPath).isDirectory())
+      .sort((left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs)
+  );
+}
+
+function edgeFulfillmentCountsFromRecord(
+  record: Readonly<Record<string, unknown>>
+): SdlcRequirementFulfillmentEdgeLedgerSource["counts"] | null {
+  const counts = childRecord(record, "counts");
+  if (counts === null) {
+    return null;
+  }
+  const expected = numberField(counts, "expected");
+  const fulfilled = numberField(counts, "fulfilled");
+  const partial = numberField(counts, "partial");
+  const blocked = numberField(counts, "blocked");
+  const unfulfilled = numberField(counts, "unfulfilled");
+  const missing = numberField(counts, "missing");
+  const extra = numberField(counts, "extra");
+  if (
+    expected === null ||
+    fulfilled === null ||
+    partial === null ||
+    blocked === null ||
+    unfulfilled === null ||
+    missing === null ||
+    extra === null
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    expected,
+    fulfilled,
+    partial,
+    blocked,
+    unfulfilled,
+    missing,
+    extra
+  });
+}
+
+function edgeFulfillmentLedgerFromArchive(
+  archiveRoot: string
+): SdlcRequirementFulfillmentEdgeLedgerSource | null {
+  const record = jsonRecordFromFile(
+    path.join(archiveRoot, "sdlc_edge_fulfillment_ledger.json")
+  );
+  if (record?.["kind"] !== "sdlc_edge_fulfillment_ledger") {
+    return null;
+  }
+  const ledgerRef = stringField(record, "ledgerRef");
+  const ledgerVersionRef = stringField(record, "ledgerVersionRef");
+  const counts = edgeFulfillmentCountsFromRecord(record);
+  if (ledgerRef === null || ledgerVersionRef === null || counts === null) {
+    return null;
+  }
+  return Object.freeze({
+    ledgerRef,
+    ledgerVersionRef,
+    counts
+  });
+}
+
+function edgeClosureDispositionFromRecord(
+  record: Readonly<Record<string, unknown>>
+): SdlcRequirementFulfillmentClosureSource["disposition"] | null {
+  const disposition = stringField(record, "disposition");
+  return disposition === "close" ||
+    disposition === "yield" ||
+    disposition === "retry" ||
+    disposition === "repair" ||
+    disposition === "re-enter" ||
+    disposition === "reprice" ||
+    disposition === "block"
+    ? disposition
+    : null;
+}
+
+function edgeClosureDecisionFromArchive(
+  archiveRoot: string
+): SdlcRequirementFulfillmentClosureSource | null {
+  const record = jsonRecordFromFile(
+    path.join(archiveRoot, "sdlc_edge_closure_decision.json")
+  );
+  if (record?.["kind"] !== "sdlc_edge_closure_decision") {
+    return null;
+  }
+  const decisionRef = stringField(record, "decisionRef");
+  const disposition = edgeClosureDispositionFromRecord(record);
+  if (decisionRef === null || disposition === null) {
+    return null;
+  }
+  return Object.freeze({
+    decisionRef,
+    disposition
+  });
+}
+
+function nextActionProjectionFromArchive(
+  archiveRoot: string
+): SdlcRequirementFulfillmentNextActionSource | null {
+  const record = jsonRecordFromFile(
+    path.join(archiveRoot, "sdlc_next_action_projection.json")
+  );
+  if (record?.["kind"] !== "sdlc_next_action_projection") {
+    return null;
+  }
+  const nextActionProjectionRef = stringField(record, "nextActionProjectionRef");
+  const selectedActionRef = stringField(record, "selectedActionRef");
+  if (nextActionProjectionRef === null) {
+    return null;
+  }
+  return Object.freeze({
+    nextActionProjectionRef,
+    selectedActionRef
+  });
+}
+
+function archiveRefForRoot(archiveRoot: string): string {
+  return pathToFileURL(archiveRoot).href;
+}
+
+function archiveFileRef(input: {
+  readonly archiveRoot: string;
+  readonly fileName: string;
+}): string {
+  return pathToFileURL(path.join(input.archiveRoot, input.fileName)).href;
+}
+
+function archiveRecordHasKind(input: {
+  readonly archiveRoot: string;
+  readonly fileName: string;
+  readonly kind: string;
+}): boolean {
+  return (
+    jsonRecordFromFile(path.join(input.archiveRoot, input.fileName))?.["kind"] ===
+    input.kind
+  );
+}
+
+function archivePostflightPassed(archiveRoot: string): boolean {
+  const record = jsonRecordFromFile(path.join(archiveRoot, "postflight.json"));
+  return (
+    record?.["kind"] === "sdlc_operator_postflight_result" &&
+    stringField(record, "status") === "passed"
+  );
+}
+
+function archiveFpEvaluatePassed(archiveRoot: string): boolean {
+  const record = jsonRecordFromFile(path.join(archiveRoot, "fp_evaluate_result.json"));
+  return (
+    record?.["kind"] === "sdlc_fp_evaluate_result" &&
+    stringField(record, "status") === "passed"
+  );
+}
+
+function missingBindOutcomeAfterPassedComputeRefs(input: {
+  readonly archiveRoot: string;
+  readonly edgeFulfillmentLedger: SdlcRequirementFulfillmentEdgeLedgerSource | null;
+  readonly edgeClosureDecision: SdlcRequirementFulfillmentClosureSource | null;
+  readonly nextActionProjection: SdlcRequirementFulfillmentNextActionSource | null;
+}): readonly string[] {
+  if (
+    input.edgeFulfillmentLedger !== null &&
+    input.edgeClosureDecision !== null &&
+    input.nextActionProjection !== null
+  ) {
+    return Object.freeze([]);
+  }
+  const hasPassedComputeFacts =
+    archiveRecordHasKind({
+      archiveRoot: input.archiveRoot,
+      fileName: "worker_result_report.json",
+      kind: "odd_sdlc.worker_result_report"
+    }) &&
+    archivePostflightPassed(input.archiveRoot) &&
+    archiveFpEvaluatePassed(input.archiveRoot);
+  if (!hasPassedComputeFacts) {
+    return Object.freeze([]);
+  }
+  return Object.freeze(
+    [
+      "worker_result_report.json",
+      "postflight.json",
+      "fp_evaluate_result.json",
+      input.edgeFulfillmentLedger === null
+        ? "sdlc_edge_fulfillment_ledger.json"
+        : null,
+      input.edgeClosureDecision === null
+        ? "sdlc_edge_closure_decision.json"
+        : null,
+      input.nextActionProjection === null
+        ? "sdlc_next_action_projection.json"
+        : null
+    ]
+      .filter((fileName): fileName is string => fileName !== null)
+      .map((fileName) =>
+        archiveFileRef({
+          archiveRoot: input.archiveRoot,
+          fileName
+        })
+      )
+  );
+}
+
+function missingTraversalConsequenceArtifactRefs(input: {
+  readonly archiveRoot: string;
+  readonly edgeFulfillmentLedger: SdlcRequirementFulfillmentEdgeLedgerSource | null;
+  readonly edgeClosureDecision: SdlcRequirementFulfillmentClosureSource | null;
+  readonly nextActionProjection: SdlcRequirementFulfillmentNextActionSource | null;
+}): readonly string[] {
+  const missing: string[] = [];
+  if (input.edgeFulfillmentLedger === null) {
+    missing.push("sdlc_edge_fulfillment_ledger.json");
+  }
+  if (input.edgeClosureDecision === null) {
+    missing.push("sdlc_edge_closure_decision.json");
+  }
+  if (input.nextActionProjection === null) {
+    missing.push("sdlc_next_action_projection.json");
+  }
+  return Object.freeze(
+    missing.map((fileName) =>
+      archiveFileRef({
+        archiveRoot: input.archiveRoot,
+        fileName
+      })
+    )
+  );
+}
+
+function assessmentStatusFromRecord(
+  record: Readonly<Record<string, unknown>>
+): SdlcRequirementFulfillmentAssessmentPublicInput["fulfillmentStatus"] | null {
+  const status = stringField(record, "fulfillmentStatus");
+  return status === "fulfilled" ||
+    status === "partial" ||
+    status === "blocked" ||
+    status === "unassessed"
+    ? status
+    : null;
+}
+
+function requirementAssessmentsFromArchive(
+  archiveRoot: string
+): readonly SdlcRequirementFulfillmentAssessmentPublicInput[] {
+  const report = jsonRecordFromFile(path.join(archiveRoot, "worker_result_report.json"));
+  const assessments = report?.["obligationAssessments"];
+  if (!Array.isArray(assessments)) {
+    return Object.freeze([]);
+  }
+  return Object.freeze(
+    assessments.flatMap((assessment): SdlcRequirementFulfillmentAssessmentPublicInput[] => {
+      if (!isPlainRecord(assessment)) {
+        return [];
+      }
+      const obligationId = stringField(assessment, "obligationId");
+      const fulfillmentStatus = assessmentStatusFromRecord(assessment);
+      if (obligationId === null || fulfillmentStatus === null) {
+        return [];
+      }
+      return [
+        Object.freeze({
+          obligationId,
+          fulfillmentStatus,
+          evidenceRefs: stringArrayField(assessment, "evidenceRefs"),
+          blockingReasons: stringArrayField(assessment, "blockingReasons")
+        })
+      ];
+    })
+  );
+}
+
+function requirementFulfillmentForGaps(input: {
+  readonly context: OddSdlcWorkspaceApiContext;
+  readonly sourceProjection: SdlcRequirementFulfillmentPublicProjection;
+}): {
+  readonly projection: SdlcRequirementFulfillmentPublicProjection;
+  readonly archiveDiagnostics: readonly SdlcWorkspaceGapArchiveDiagnostic[];
+} {
+  const archiveRoots = operatorRunArchiveRootsNewestFirst(input.context);
+  if (archiveRoots.length === 0) {
+    return Object.freeze({
+      projection: withSdlcRequirementFulfillmentArchiveRehydration({
+        projection: input.sourceProjection,
+        archiveRehydration: constructSdlcRequirementFulfillmentArchiveRehydration({
+          status: "no_operator_runs"
+        })
+      }),
+      archiveDiagnostics: Object.freeze([])
+    });
+  }
+  const archiveDiagnostics: SdlcWorkspaceGapArchiveDiagnostic[] = [];
+  const scannedArchiveRefs = Object.freeze(archiveRoots.map(archiveRefForRoot));
+  const missingArtifactRefs: string[] = [];
+  for (const archiveRoot of archiveRoots) {
+    const archiveRef = archiveRefForRoot(archiveRoot);
+    const edgeFulfillmentLedger = edgeFulfillmentLedgerFromArchive(archiveRoot);
+    const edgeClosureDecision = edgeClosureDecisionFromArchive(archiveRoot);
+    const nextActionProjection = nextActionProjectionFromArchive(archiveRoot);
+    const missingBindOutcomeRefs = missingBindOutcomeAfterPassedComputeRefs({
+      archiveRoot,
+      edgeFulfillmentLedger,
+      edgeClosureDecision,
+      nextActionProjection
+    });
+    if (missingBindOutcomeRefs.length > 0) {
+      missingArtifactRefs.push(...missingBindOutcomeRefs);
+      archiveDiagnostics.push(
+        Object.freeze({
+          kind: "sdlc_workspace_gap_archive_diagnostic" as const,
+          code: "missing_bind_outcome_after_passed_compute" as const,
+          archiveRef,
+          evidenceRefs: missingBindOutcomeRefs
+        })
+      );
+      continue;
+    }
+    if (
+      edgeFulfillmentLedger === null ||
+      edgeClosureDecision === null ||
+      nextActionProjection === null
+    ) {
+      const missingTraversalRefs = missingTraversalConsequenceArtifactRefs({
+        archiveRoot,
+        edgeFulfillmentLedger,
+        edgeClosureDecision,
+        nextActionProjection
+      });
+      missingArtifactRefs.push(...missingTraversalRefs);
+      archiveDiagnostics.push(
+        Object.freeze({
+          kind: "sdlc_workspace_gap_archive_diagnostic" as const,
+          code: "traversal_consequence_artifacts_missing" as const,
+          archiveRef,
+          evidenceRefs: missingTraversalRefs
+        })
+      );
+      continue;
+    }
+    return Object.freeze({
+      projection: projectSdlcRequirementFulfillmentPublicViewFromPriorProjection({
+        sourceProjection: input.sourceProjection,
+        assessments: requirementAssessmentsFromArchive(archiveRoot),
+        edgeFulfillmentLedger,
+        edgeClosureDecision,
+        nextActionProjection,
+        sourceRegisterRef: `requirement-fulfillment-public://odd-sdlc/${encodeURIComponent(archiveRoot)}`,
+        archiveRehydration: constructSdlcRequirementFulfillmentArchiveRehydration({
+          status: "rehydrated",
+          archiveRef,
+          scannedArchiveRefs,
+          missingArtifactRefs
+        })
+      }),
+      archiveDiagnostics: Object.freeze([...archiveDiagnostics])
+    });
+  }
+  return Object.freeze({
+    projection: withSdlcRequirementFulfillmentArchiveRehydration({
+      projection: input.sourceProjection,
+      archiveRehydration: constructSdlcRequirementFulfillmentArchiveRehydration({
+        status: "no_archive_with_consequence_triple",
+        scannedArchiveRefs,
+        missingArtifactRefs
+      })
+    }),
+    archiveDiagnostics: Object.freeze([...archiveDiagnostics])
+  });
+}
+
+function gapsReadModelBasis(input: {
+  readonly context: OddSdlcWorkspaceApiContext;
+  readonly module: ReturnType<typeof constructSdlcGtlModule>;
+}) {
+  return admitExecutionBasis({
+    startIntent: admitStartIntent({
+      scope: {
+        kind: "workspace",
+        workspaceRoot: input.context.workspaceRoot,
+        moduleName: input.module.name
+      },
+      target: {
+        kind: "graph_function",
+        handle: "bootstrap_release_self_test"
+      },
+      until: "blocked"
+    }),
+    module: input.module,
+    runtimeIdentity: admitResolvedRuntimeIdentity({
+      workerId: "worker://odd-sdlc/typescript/read-model",
+      backendId: "backend://node",
+      buildId: "build://odd-sdlc/typescript/read-model",
+      resolvedRuntimeRef: "runtime://abiogenesis/typescript"
+    }),
+    resolvedPolicy: admitResolvedPolicyIdentity({
+      resolvedPolicyBundleRef: "policy://odd-sdlc/workspace-gaps/read-model",
+      defaultRegime: "F_P",
+      dispatchRef: "dispatch://odd-sdlc/workspace-gaps/read-model",
+      approvalSubjectRef: null
+    }),
+    runId: "run://odd-sdlc/workspace-gaps/read-model",
+    workKey: "wk://odd-sdlc/workspace-gaps/read-model",
+    frameId: null,
+    frameLineageId: null
   });
 }
 
@@ -345,6 +846,43 @@ export function projectOddSdlcWorkspaceQueryDomain(input: {
       admitWorkspaceProjectionInput(input, "OddSdlcWorkspaceQueryDomainInput")
     )
   );
+}
+
+export function projectOddSdlcWorkspaceGaps(input: {
+  readonly workspaceRoot: string;
+  readonly outputWorkspaceRoot?: string | null;
+}): {
+  readonly dossier: ReturnType<typeof deriveSdlcGapDossier>;
+  readonly archiveDiagnostics: readonly SdlcWorkspaceGapArchiveDiagnostic[];
+  readonly requirementFulfillment: SdlcRequirementFulfillmentPublicProjection;
+} {
+  const context = workspaceContext(
+    admitWorkspaceProjectionInput(input, "OddSdlcWorkspaceGapsInput")
+  );
+  const module = constructSdlcGtlModule();
+  assertCurrentSdlcGtlProgramConformance();
+  const queryDomain = projectSdlcQueryDomain({
+    module,
+    ingressReport: context.ingressReport,
+    projectConformance: context.conformanceReport
+  });
+  const requirementFulfillment = requirementFulfillmentForGaps({
+    context,
+    sourceProjection: queryDomain.requirementFulfillment
+  });
+  const dossier = deriveSdlcGapDossier({
+    basis: gapsReadModelBasis({ context, module }),
+    events: Object.freeze([]),
+    triageInput: "workspace_api:gaps_read_model",
+    evidenceRefs: ["workspace-api://odd-sdlc/gaps-read-model"],
+    requirementFulfillment: requirementFulfillment.projection,
+    domainDefaults: queryDomain.domainDefaults
+  });
+  return Object.freeze({
+    dossier,
+    archiveDiagnostics: requirementFulfillment.archiveDiagnostics,
+    requirementFulfillment: requirementFulfillment.projection
+  });
 }
 
 export function admitOddSdlcWorkspaceTicket(input: {
