@@ -132,6 +132,28 @@ function statusFromPayloads(payload, archivePayloads) {
   return typeof payload?.status === "string" ? payload.status : "blocked";
 }
 
+function parseAbgCliStdout(stdout) {
+  const text = (stdout ?? "").trim();
+  if (text.length === 0) {
+    return {
+      status: "missing",
+      payload: {}
+    };
+  }
+  try {
+    return {
+      status: "parsed",
+      payload: JSON.parse(text)
+    };
+  } catch (error) {
+    return {
+      status: "invalid",
+      payload: {},
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
 export async function executeOddSdlcWorkspaceStartViaAbgCliForTest(input) {
   const workspaceRoot = input.workspaceRoot;
   const replayEventCountBefore = eventCount(workspaceRoot);
@@ -174,8 +196,17 @@ export async function executeOddSdlcWorkspaceStartViaAbgCliForTest(input) {
       error: result.error?.message ?? null
     });
   }
-  const stdout = (result.stdout ?? "").trim();
-  const payload = stdout.length > 0 ? JSON.parse(stdout) : {};
+  const parsedStdout = parseAbgCliStdout(result.stdout);
+  if (
+    parsedStdout.status !== "parsed" &&
+    result.status !== 0 &&
+    result.status !== 4
+  ) {
+    throw new Error(
+      `ABG CLI start failed without parseable stdout: status=${String(result.status)} signal=${String(result.signal)} parse=${parsedStdout.status}`
+    );
+  }
+  const payload = parsedStdout.payload;
   const archivePayloads = readArchivePayloads(archiveRoot);
   const status = statusFromPayloads(payload, archivePayloads);
   const blockingReasons =
@@ -190,8 +221,17 @@ export async function executeOddSdlcWorkspaceStartViaAbgCliForTest(input) {
     archivePayloads.manifest?.graphFunctionName ??
     null;
   return Object.freeze({
-    kind: "sdlc_installed_operator_start_outcome",
+    kind: "odd_sdlc_abg_cli_start_test_projection",
     status,
+    abgCli: Object.freeze({
+      command: genesisCommand,
+      args: Object.freeze([...args]),
+      processStatus: result.status,
+      processSignal: result.signal,
+      processError: result.error?.message ?? null,
+      stdoutParseStatus: parsedStdout.status,
+      stdoutParseError: parsedStdout.error ?? null
+    }),
     summary: Object.freeze({
       workspaceRoot: archivePayloads.manifest?.workspaceRoot ?? workspaceRoot,
       graphFunctionName,

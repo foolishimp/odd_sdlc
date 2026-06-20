@@ -13,16 +13,18 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
+  deriveComponentDepthAssuranceLedger,
+  hookContractByEdgeName
+} from "../../build/semantic/code/src/index.js";
+import {
   admitComponentDepthRegisterFromArtifact,
   componentRepairReentryPlansForGapDossier,
   constructPostflightGapDossier,
-  deriveComponentDepthAssuranceLedger,
   deriveSdlcOperatorAssuranceGate,
   deriveWorkerHandoffManifest,
-  hookContractByEdgeName,
   sha256Text,
   writeDeclaredEdgeProjectionOutput
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
 
 function workspace() {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t115-"));

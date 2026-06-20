@@ -7,13 +7,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  SDLC_ASSURANCE_CLOSED_FD_MECHANICS_CLASS_REF,
   deriveComponentDepthAssuranceLedger,
   deriveSemanticConvergenceAssuranceLedger,
-  deriveSdlcOperatorAssuranceGate,
   foldSdlcAssuranceLedgers,
-  makeSdlcAssuranceLedger
+  makeSdlcAssuranceLedger,
+  SDLC_ASSURANCE_CLOSED_FD_MECHANICS_CLASS_REF
 } from "../../build/semantic/code/src/index.js";
+import {
+  deriveSdlcOperatorAssuranceGate
+} from "../../build/semantic/code/src/operator/index.js";
 
 function tmpFile(prefix, name, content) {
   const root = mkdtempSync(join(tmpdir(), prefix));

@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import {
   constructSdlcDecompositionTraceRegister,
   evaluateSdlcDecompositionTraceClosure
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
 
 function child(overrides = {}) {
   return {

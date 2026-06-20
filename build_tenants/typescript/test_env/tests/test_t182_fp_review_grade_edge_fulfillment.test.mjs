@@ -15,38 +15,41 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
-  admitSdlcEdgeEvidence,
-  REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE,
-  admitReviewGradeEdgeFulfillmentAssessmentFromArtifact,
-  buildPostTransformWorkerResultReport,
   constructSdlcGtlModule,
   constructSdlcProductGraphContractCatalog,
   constructSdlcTargetCarrierRegistry,
   constructSdlcTraversalOverlayCatalog,
+  hookContractByEdgeName,
+  isSdlcOperatorRunArtifactRequiredForContext,
+  materializeSdlcProjectConformance,
+  requireSdlcProductGraphContractRow,
+  SDLC_EDGE_GAIN_CLOSURE_CONTRACTS,
+  SDLC_OPERATOR_RUN_ARTIFACT_CATALOG,
+  SDLC_PRODUCT_GRAPH_EDGE_POLICY_ROWS,
+  sdlcTargetCarrierContractRef,
+  sdlcTargetCarrierOutputKind
+} from "../../build/semantic/code/src/index.js";
+import {
+  admitReviewGradeEdgeFulfillmentAssessmentFromArtifact,
+  admitSdlcEdgeEvidence,
+  buildPostTransformWorkerResultReport,
   deriveSdlcEdgeAssuranceCloseDecision,
   deriveSdlcEdgeObligations,
   deriveSdlcEdgeResidualPressure,
   deriveWorkerHandoffManifest,
-  hookContractByEdgeName,
-  isSdlcOperatorRunArtifactRequiredForContext,
-  materializeSdlcProjectConformance,
   measureSdlcEdgeGain,
-  requireSdlcProductGraphContractRow,
+  REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE,
   reviewGradeEdgeFulfillmentAssessmentPressureRefs,
   reviewGradeEdgeFulfillmentAssessmentRequired,
   reviewGradeEdgeFulfillmentOpenPressureRefs,
   reviewGradeFindingsAreDownstreamStagePressure,
   reviewGradeReadOnlyInputMutationReasons,
-  snapshotReviewGradeReadOnlyInputFiles,
-  snapshotProductMaterializationRoot,
-  SDLC_EDGE_GAIN_CLOSURE_CONTRACTS,
-  SDLC_OPERATOR_RUN_ARTIFACT_CATALOG,
   sdlcFpEvaluateOpenObligationPressureRefs,
-  SDLC_PRODUCT_GRAPH_EDGE_POLICY_ROWS,
-  sdlcTargetCarrierContractRef,
-  sdlcTargetCarrierOutputKind,
+  snapshotProductMaterializationRoot,
+  snapshotReviewGradeReadOnlyInputFiles,
   writeHandoffFiles
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
+
 import {
   admitImplementationDesignRegisterCandidateForManifest,
   admitImplementationDesignRegisterForManifest,

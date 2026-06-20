@@ -22,7 +22,6 @@ import {
   admitSdlcRequirementProofClaim,
   advanceSdlcOperationalTransitionOnce,
   bindSdlcRoute,
-  buildOddSdlcSandboxRunArchive,
   classifySdlcGapObservation,
   constructSdlcGtlModule,
   deriveSdlcGapDossier,
@@ -37,11 +36,14 @@ import {
   projectSdlcQueryDomain,
   projectSdlcRepairFrontier,
   projectSdlcRequirementClosureRegister,
-  renderOddSdlcSandboxPostmortem,
   routeSdlcTicketWorkItem,
-  runSdlcHookTurn,
-  summarizeOddSdlcSandboxRunArchive
+  runSdlcHookTurn
 } from "../../build/semantic/code/src/index.js";
+import {
+  buildOddSdlcSandboxRunArchive,
+  renderOddSdlcSandboxPostmortem,
+  summarizeOddSdlcSandboxRunArchive
+} from "../../build/semantic/code/src/qualification/sandbox_proof.js";
 import {
   assertAbgInstalledSandboxEvidence,
   provisionAbgInstalledSandbox

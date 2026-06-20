@@ -7,13 +7,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  constructSdlcEdgeFulfillmentLedger,
   deriveCapabilityAssuranceLedger,
   deriveComponentDepthAssuranceLedger,
-  deriveSdlcEdgeClosureDecision,
-  deriveSdlcOperatorAssuranceGate,
   foldSdlcAssuranceLedgers
 } from "../../build/semantic/code/src/index.js";
+import {
+  constructSdlcEdgeFulfillmentLedger,
+  deriveSdlcEdgeClosureDecision,
+  deriveSdlcOperatorAssuranceGate
+} from "../../build/semantic/code/src/operator/index.js";
 
 function tmpRoot(prefix) {
   return mkdtempSync(join(tmpdir(), prefix));

@@ -203,7 +203,8 @@ test(
       });
       writeJson(path.join(archiveRoot, "start_result.json"), start);
 
-      assert.equal(start.kind, "sdlc_installed_operator_start_outcome");
+      assert.equal(start.kind, "odd_sdlc_abg_cli_start_test_projection");
+      assert.equal(start.abgCli.stdoutParseStatus, "parsed");
       assert.equal(start.status, "worker_invoked");
       assert.equal(start.workerRun.executorProfile, "pty-terminal");
       assert.equal(start.workerRun.streamModel, "terminal-transcript");

@@ -18,10 +18,12 @@ import {
 } from "@abiogenesis/typescript-tenant";
 
 import {
-  ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT,
   constructOddSdlcAbiogenesisExecutionBasis,
-  sdlcSelectedAbgFnCompositionIdentityFromEnginePluginInput
+  ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT
 } from "../../build/semantic/code/src/index.js";
+import {
+  sdlcSelectedAbgFnCompositionIdentityFromEnginePluginInput
+} from "../../build/semantic/code/src/operator/index.js";
 
 const ABG_RC_VERSION = "4.1.0-rc.2";
 const ABG_RELEASE_SNAPSHOT_REF = ABG_RC_VERSION;

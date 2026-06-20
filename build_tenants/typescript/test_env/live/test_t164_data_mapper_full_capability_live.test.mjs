@@ -242,19 +242,20 @@ test("T-164 full data_mapper live runner keeps SBT caches inside sandbox workspa
   assert.match(runner, /`graph_function:\$\{TARGET_GRAPH_FUNCTION\}`/u);
   assert.match(runner, /isOverlayStartTarget\(startTarget\)/u);
   assert.match(runner, /abgStartArgs\(startTarget/u);
-  assert.match(runner, /"first_traversal"/u);
-  assert.match(runner, /odd-sdlc-start-first-traversal/u);
-  assert.match(runner, /abg_cli_overlay_start_first_traversal/u);
+  assert.match(runner, /"converged"/u);
+  assert.match(runner, /abg_cli_start_until_converged/u);
+  assert.match(runner, /overlay start targets require ABG CLI target-carrier support/u);
   assert.match(runner, /isSuccessfulSdlcTraversalStart/u);
   assert.match(runner, /status === "worker_invoked"/u);
   assert.match(runner, /closureDisposition === "close"/u);
-  assert.match(runner, /ODD_SDLC_TS_DATA_MAPPER_MAX_ADVANCES/u);
   assert.match(runner, /DATA_MAPPER_DETAIL_ZOOM_EDGES/u);
   assert.match(runner, /overlayZoomGraphFunctionRefs/u);
   assert.match(runner, /detailZoomStopSatisfied\(workspace\)/u);
-  assert.match(runner, /sdlcOverlayStartLoop/u);
+  assert.doesNotMatch(runner, /sdlcOverlayStartLoop/u);
+  assert.doesNotMatch(runner, /nextGraphFunctionStartTargetFromStart/u);
+  assert.doesNotMatch(runner, /first_traversal/u);
   assert.match(runner, /args: abgStartArgs\(`graph_function:\$\{FG_CONFORM_PROJECT\}`\)/u);
-  assert.match(runner, /args: abgStartArgs\(START_TARGET\)/u);
+  assert.match(runner, /startTarget: START_TARGET/u);
   assert.match(runner, /command: genesisCommand/u);
   const promptPolicy = readFileSync(
     path.join(

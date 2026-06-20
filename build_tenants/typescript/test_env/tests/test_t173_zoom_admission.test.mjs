@@ -7,7 +7,7 @@ import {
   deriveSdlcDecompositionSummary,
   deriveSdlcTraversalHopSelection,
   SDLC_DEFAULT_DECOMPOSITION_SUMMARY_THRESHOLDS
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
 
 function row(overrides = {}) {
   return {

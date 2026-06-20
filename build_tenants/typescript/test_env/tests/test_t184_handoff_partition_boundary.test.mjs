@@ -27,18 +27,21 @@ import {
 } from "@abiogenesis/typescript-tenant";
 
 import {
-  appendOddSdlcRuntimeEvents,
-  constructPostflightGapDossier,
   constructSdlcGtlModule,
   constructSdlcTargetCarrierRegistry,
+  hookContractByEdgeName,
+  SDLC_T172_FULL_TRAVERSAL_EDGE_ACCOUNTING
+} from "../../build/semantic/code/src/index.js";
+import {
+  appendOddSdlcRuntimeEvents,
+  constructPostflightGapDossier,
   constructWorkerProcessFailurePostflight,
   deriveWorkerHandoffManifest,
-  hookContractByEdgeName,
   readOddSdlcRuntimeEventsSync,
   SDLC_COMPONENT_DEPTH_REGISTER_CONTRACT_TRACE,
-  SDLC_T172_FULL_TRAVERSAL_EDGE_ACCOUNTING,
   sdlcEdgeOutputPolicyForTargetAssetType
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
+
 import {
   consequenceProjectionPluginContract,
   designDepthFpEvaluatorRuleContract,
@@ -646,7 +649,11 @@ test("T-184 operator summary separates obligation review from semantic admission
   assert.match(installedOperatorSource, /closureDecision\.disposition/u);
   assert.match(
     installedOperatorSource,
-    /ledger\.targetCarrierAdmissionStatus === "admitted"[\s\S]*ledger\.targetCarrierAdmissionStatus === "not_required"/u
+    /targetCarrierAdmissionStatus: edgeGain\.targetCarrierAdmissionStatus/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /edgeAssuranceCloseDecision\.disposition/u
   );
 });
 

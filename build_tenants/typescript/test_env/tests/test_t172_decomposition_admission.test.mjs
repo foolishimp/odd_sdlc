@@ -4,11 +4,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  SDLC_DEFAULT_DECOMPOSITION_SUMMARY_THRESHOLDS,
   deriveSdlcDecompositionSummary,
   deriveSdlcStagedImplementationTopologyAuthority,
+  SDLC_DEFAULT_DECOMPOSITION_SUMMARY_THRESHOLDS,
   selectSdlcDependencyMapTraversal
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
 
 function row(overrides = {}) {
   return {

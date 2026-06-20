@@ -12,15 +12,17 @@ import {
 } from "@abiogenesis/typescript-tenant";
 
 import {
-  constructSdlcEdgeFulfillmentLedger,
   constructSdlcGtlModule,
   deriveOddSdlcEvaluateNextReport,
+  FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+} from "../../build/semantic/code/src/index.js";
+import {
+  constructSdlcEdgeFulfillmentLedger,
   deriveSdlcEdgeClosureDecision,
   deriveSdlcEdgeFulfillmentCountsFromAssessments,
   deriveSdlcPostProductMaterializationActionInput,
-  deriveSdlcPublishedProductMaterializationAction,
-  FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
-} from "../../build/semantic/code/src/index.js";
+  deriveSdlcPublishedProductMaterializationAction
+} from "../../build/semantic/code/src/operator/index.js";
 
 const DATA_MAPPER_TARGET_BINDING =
   "target-binding://odd-sdlc/component_code_surface";

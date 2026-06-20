@@ -5,11 +5,11 @@ import assert from "node:assert/strict";
 
 import {
   constructSdlcConstructionIntent,
-  constructSdlcWorksiteEvidence,
   constructSdlcEdgeFulfillmentLedger,
-  deriveSdlcEdgeClosureDecision,
-  constructSdlcNextActionProjection
-} from "../../build/semantic/code/src/index.js";
+  constructSdlcNextActionProjection,
+  constructSdlcWorksiteEvidence,
+  deriveSdlcEdgeClosureDecision
+} from "../../build/semantic/code/src/operator/index.js";
 
 const INTENT_EVENT_REFS = ["event://t136/intent/source"];
 const PRODUCT_ASSET_MODEL_REF = "product-asset-model://t136/current";

@@ -13,26 +13,20 @@ import { materializeGraphFunction } from "@abiogenesis/typescript-tenant";
 
 import {
   admitSdlcProjectConstraints,
-  constructSdlcOverlayBinding,
   conformProjectProfileFromConstraintsText,
-  constructSdlcEdgeFulfillmentLedger,
   constructSdlcGtlModule,
-  constructSdlcNextActionProjection,
-  constructSdlcOverlaySegmentCompletion,
+  constructSdlcOverlayBinding,
   constructSdlcTraversalOverlayCatalog,
-  deriveWorkerHandoffManifest,
-  deriveSdlcPostActionOverlayReentryActionInput,
-  deriveSdlcEdgeClosureDecision,
   deriveSdlcWorkspaceIngressReport,
   FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE,
   FG_CONFORM_PROJECT,
   FG_DECOMPOSE_DEPTH_BETWEEN_NODES,
-  FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
   FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
   FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
+  FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
   FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
   FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
   FG_PREPARE_TEST_EXECUTION_SURFACE,
@@ -40,7 +34,6 @@ import {
   hookContractByEdgeName,
   projectSdlcQueryDomain,
   publicSdlcOverlayStartTargets,
-  sdlcTraversalOverlayFailureReentryRoute,
   SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF,
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
   SDLC_DEEP_SDLC_TRAVERSAL_OVERLAY_REF,
@@ -48,8 +41,18 @@ import {
   SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
   SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF,
   SDLC_TICKET_WORKFLOW_OVERLAY_REF,
+  sdlcTraversalOverlayFailureReentryRoute,
   withSdlcOverlayBindingPostActionEvidence
 } from "../../build/semantic/code/src/index.js";
+import {
+  constructSdlcEdgeFulfillmentLedger,
+  constructSdlcNextActionProjection,
+  constructSdlcOverlaySegmentCompletion,
+  deriveSdlcEdgeClosureDecision,
+  deriveSdlcPostActionOverlayReentryActionInput,
+  deriveWorkerHandoffManifest
+} from "../../build/semantic/code/src/operator/index.js";
+
 import {
   admitSdlcPublicStartRequest,
   projectSdlcWorkerAttachment,
@@ -1349,34 +1352,24 @@ test("T-160 public start consumes overlay catalog rather than query-domain start
   assert.equal(evaluateBody.includes("input.queryDomain.startTargets"), false);
 });
 
-test("T-160 workspace API replay preserves overlay target identity", () => {
+test("T-160 workspace API keeps overlay replay out of commandless gaps read model", () => {
   const source = readFileSync(
     new URL("../../code/src/workspace_api/entry.ts", import.meta.url),
     "utf8"
   );
-  const startOutcomeBody = source.slice(
-    source.indexOf("function startOutcomeFor("),
-    source.indexOf("function selectedActionRequiresFreshTargetTraversal")
-  );
-  const replayBody = source.slice(
-    source.indexOf("function startOutcomeForObservedReplay"),
-    source.indexOf("function replayEventsForBasis")
-  );
 
-  assert.match(startOutcomeBody, /request\.target\.kind === "graph_function"/);
-  assert.match(startOutcomeBody, /handle: replayNextAction\.nextGraphFunctionRef/);
-  assert.doesNotMatch(
-    startOutcomeBody,
-    /request\.target\.kind === "graph_function"\s*\|\|\s*request\.target\.kind === "overlay"/
-  );
-  assert.match(replayBody, /input\.request\.target\.kind === "overlay"/);
+  assert.match(source, /export function projectOddSdlcWorkspaceGaps/);
+  assert.match(source, /function gapsReadModelBasis/);
   assert.match(
-    replayBody,
-    /overlayRef: selectedNextGraphFunction\.overlayRef/
+    source,
+    /target:\s*\{\s*kind: "graph_function",\s*handle: "bootstrap_release_self_test"/u
   );
+  assert.doesNotMatch(source, /function startOutcomeFor\(/);
+  assert.doesNotMatch(source, /function startOutcomeForObservedReplay/);
+  assert.doesNotMatch(source, /request\.target\.kind === "overlay"/);
 });
 
-test("T-160 cross-graph repair reentry does not replay already-closed target basis", () => {
+test("T-160 cross-graph repair reentry is not replayed by workspace API", () => {
   const source = readFileSync(
     new URL("../../code/src/workspace_api/entry.ts", import.meta.url),
     "utf8"
@@ -1386,18 +1379,12 @@ test("T-160 cross-graph repair reentry does not replay already-closed target bas
     "utf8"
   );
 
-  assert.match(source, /function selectedActionRequiresFreshTargetTraversal/);
-  assert.match(source, /function startOutcomeRequiresFreshTargetTraversal/);
-  assert.match(source, /decision\.disposition !== "repair"/);
-  assert.match(source, /selectedActionRef\?\.includes\("\/post_repair_reentry\/"\)/);
-  assert.match(source, /selectedActionRef\?\.includes\("\/post_repair\/"\)/);
-  assert.match(source, /selectedActionRef\?\.includes\("\/post_close_overlay_continuation\/"\)/);
-  assert.match(source, /completedGraphFunctionName/);
-  assert.match(source, /startOutcomeRequiresFreshTargetTraversal\(start\)/);
-  assert.match(source, /EMPTY_RUNTIME_EVENTS/);
+  assert.doesNotMatch(source, /function selectedActionRequiresFreshTargetTraversal/);
+  assert.doesNotMatch(source, /function startOutcomeRequiresFreshTargetTraversal/);
+  assert.doesNotMatch(source, /completedGraphFunctionName/);
+  assert.doesNotMatch(source, /EMPTY_RUNTIME_EVENTS/);
   assert.match(operatorSource, /function postActionArchiveRefFromSelectedActionRef/);
   assert.match(operatorSource, /function decodedArchiveRefForScope/);
-  assert.match(operatorSource, /function replayEventsWithoutDuplicateVectorClosures/);
-  assert.match(operatorSource, /replayEventVectorClosureKey/);
-  assert.match(operatorSource, /projected\.priorGapDossiers\.some/);
+  assert.doesNotMatch(operatorSource, /function replayEventsWithoutDuplicateVectorClosures/);
+  assert.doesNotMatch(operatorSource, /replayEventVectorClosureKey/);
 });

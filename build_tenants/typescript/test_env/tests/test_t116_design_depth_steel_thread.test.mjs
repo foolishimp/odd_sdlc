@@ -13,10 +13,12 @@ import path from "node:path";
 
 import {
   BOOTSTRAP_RELEASE_FUNCTION_CATALOG,
-  admitDesignDepthRegisterFromArtifact,
   deriveDesignCompletenessAssuranceLedger,
   hookContractByEdgeName
 } from "../../build/semantic/code/src/index.js";
+import {
+  admitDesignDepthRegisterFromArtifact
+} from "../../build/semantic/code/src/operator/index.js";
 
 const attribute = Object.freeze({
   kind: "sdlc_domain_attribute",

@@ -12,7 +12,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   constructSdlcEvaluationGridContract
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
+
 import {
   designDepthFpEvaluatorPromptProjection,
   reviewGradeEdgeFulfillmentPromptProjection

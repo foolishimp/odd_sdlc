@@ -9,15 +9,17 @@ import { pathToFileURL } from "node:url";
 
 import {
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+  hookContractByEdgeName
+} from "../../build/semantic/code/src/index.js";
+import {
   constructWorkerInvocationPackage,
   deriveWorkerHandoffManifest,
   evaluateSdlcComputeStage,
-  hookContractByEdgeName,
   promptForHandoff,
   readWorkerResultReport,
   reconcileSdlcProductMaterializationAuthority,
   sha256Text
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
 
 function writeConstraints(workspaceRoot, input = {}) {
   mkdirSync(path.join(workspaceRoot, ".ai-workspace/context"), { recursive: true });

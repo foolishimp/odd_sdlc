@@ -95,7 +95,8 @@ test("T-087 routes understructured installed workspace through Fg_conform_projec
   assert.equal(firstGaps.dossier.choosesNextTraversal, false);
 
   const induction = await executeOddSdlcWorkspaceStartViaAbgCliForTest({ workspaceRoot: workspace });
-  assert.equal(induction.kind, "sdlc_installed_operator_start_outcome");
+  assert.equal(induction.kind, "odd_sdlc_abg_cli_start_test_projection");
+  assert.equal(induction.abgCli.stdoutParseStatus, "parsed");
   assert.equal(induction.summary.graphFunctionName, FG_CONFORM_PROJECT);
   assert.equal(induction.summary.currentEdge, FG_CONFORM_PROJECT);
   assert.equal(induction.status, "converged");

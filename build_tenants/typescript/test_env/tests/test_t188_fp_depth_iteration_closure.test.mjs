@@ -8,14 +8,14 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
-  componentRepairReentryPlansForGapDossier,
   componentDepthResidualPressureRefs,
+  componentRepairReentryPlansForGapDossier,
   constructSdlcEdgeFulfillmentLedger,
   deriveSdlcEdgeAssuranceCloseDecision,
   deriveSdlcEdgeClosureDecision,
   deriveSdlcEdgeFulfillmentCountsFromAssessments,
   sdlcFpEvaluateOpenObligationPressureRefs
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
 
 const evaluatorPromptSource = readFileSync(
   fileURLToPath(

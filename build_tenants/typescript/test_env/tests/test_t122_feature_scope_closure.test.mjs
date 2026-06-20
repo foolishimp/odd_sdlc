@@ -15,12 +15,14 @@ import path from "node:path";
 
 import {
   deriveDesignCompletenessAssuranceLedger,
+  foldSdlcAssuranceLedgers,
+  hookContractByEdgeName
+} from "../../build/semantic/code/src/index.js";
+import {
   deriveSdlcFeatureScope,
   deriveWorkerHandoffManifest,
-  foldSdlcAssuranceLedgers,
-  hookContractByEdgeName,
   sdlcTraversalObligationInFeatureScope
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
 
 const compilerAttribute = Object.freeze({
   kind: "sdlc_domain_attribute",

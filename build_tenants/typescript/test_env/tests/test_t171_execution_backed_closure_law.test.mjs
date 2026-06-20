@@ -4,15 +4,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  SDLC_EDGE_GAIN_CLOSURE_CONTRACTS
+} from "../../build/semantic/code/src/index.js";
+import {
   admitSdlcEdgeEvidence,
   constructSdlcEdgeFulfillmentLedger,
   deriveSdlcEdgeAssuranceCloseDecision,
   deriveSdlcEdgeClosureDecision,
   deriveSdlcEdgeObligations,
   deriveSdlcEdgeResidualPressure,
-  measureSdlcEdgeGain,
-  SDLC_EDGE_GAIN_CLOSURE_CONTRACTS
-} from "../../build/semantic/code/src/index.js";
+  measureSdlcEdgeGain
+} from "../../build/semantic/code/src/operator/index.js";
 
 function contractByEdge(edgeRef) {
   const contract = SDLC_EDGE_GAIN_CLOSURE_CONTRACTS.find(

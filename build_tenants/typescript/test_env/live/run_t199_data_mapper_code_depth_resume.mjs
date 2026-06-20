@@ -21,9 +21,11 @@ import {
   FG_CONFORM_PROJECT,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
-  admitComponentDepthRegisterFromArtifact,
   installOddSdlcTypescript
 } from "../../build/semantic/code/src/index.js";
+import {
+  admitComponentDepthRegisterFromArtifact
+} from "../../build/semantic/code/src/operator/component_depth_register.js";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(SCRIPT_DIR, "../..");

@@ -12,18 +12,21 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_PATH,
-  DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_REF,
-  SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND,
-  SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS,
+  deriveSdlcConformProjectProfileFromWorkspace,
+  hookContractByEdgeName
+} from "../../build/semantic/code/src/index.js";
+import {
   admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity,
   constructDesignDepthDraftFragmentContentRegisterUpdate,
-  designDepthRegisterPayloadFromEvaluateContentRegister,
-  deriveSdlcConformProjectProfileFromWorkspace,
   deriveWorkerHandoffManifest,
-  hookContractByEdgeName,
+  DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_PATH,
+  DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_REF,
+  designDepthRegisterPayloadFromEvaluateContentRegister,
+  SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND,
+  SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS,
   writeDesignDepthDraftFragmentContentRegisterUpdate
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
+
 import {
   designDepthFpEvaluatorPrompt,
   reviewGradeEdgeFulfillmentPrompt
@@ -959,6 +962,28 @@ test("T-187 review-grade evaluator prompt matches the active tool-list contract"
       environmentVariableNames: []
     }
   });
+  const componentTestPrompt = reviewGradeEdgeFulfillmentPrompt({
+    manifest: {
+      graphFunctionName: "derive_component_test_surface",
+      edgeName: "derive_component_test_surface",
+      targetAssetType: "component_test_surface"
+    },
+    governanceRef: "config://test",
+    governancePath: "config/work-category-governance/unit_test_build.md",
+    constructionBriefPath: "worker_construction_brief.json",
+    invocationPackagePath: "worker_invocation_package.json",
+    workerReportPath: "worker_result_report.json",
+    assessmentPath: "review_grade_edge_fulfillment_assessment.json",
+    subworkstreamManifestPath: "evaluate_compute_subworkstream_manifest.json",
+    tenantToolEnvironment: {
+      kind: "sdlc_tenant_tool_environment_projection",
+      sourceRefs: [],
+      disabledTools: [],
+      allowedTools: [],
+      workspaceLocalDirectories: [],
+      environmentVariableNames: []
+    }
+  });
 
   assert.equal(maxLineLength(prompt) <= 1000, true);
   assert.match(prompt, /Tool-profile contract: obey the active tool list/u);
@@ -969,12 +994,16 @@ test("T-187 review-grade evaluator prompt matches the active tool-list contract"
     /On component_code_surface, do not mark downstream test files or declared test-execution-contract proof as test_overlap_missing/u
   );
   assert.match(
-    prompt,
-    /On component_test_surface, do not make admitted test-execution evidence a same-edge blocker/u
+    componentTestPrompt,
+    /On component_test_surface, admitted execution_result\/runtime_execution proof is not same-edge authority/u
+  );
+  assert.match(
+    componentTestPrompt,
+    /mark that requirement fulfilled even if later test-execution evidence is absent/u
   );
   assert.match(
     prompt,
-    /mark those requirement findings partial with failureClass wrong_stage/u
+    /Mark wrong_stage for lawful downstream carryover only/u
   );
   assert.match(prompt, /must set limit <=80/u);
   assert.doesNotMatch(prompt, /short local script/u);

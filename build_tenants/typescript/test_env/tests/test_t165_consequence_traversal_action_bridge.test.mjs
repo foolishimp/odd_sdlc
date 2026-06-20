@@ -30,7 +30,7 @@ import {
   constructSdlcWorksiteEvidence,
   deriveSdlcEdgeClosureDecision,
   deriveSdlcTraversalStrategyDecision
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
 
 function scalarEntry(key, value) {
   return Object.freeze({

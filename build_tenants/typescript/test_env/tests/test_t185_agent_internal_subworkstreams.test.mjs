@@ -13,6 +13,10 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
+  hookContractByEdgeName,
+  materializeSdlcProjectConformance
+} from "../../build/semantic/code/src/index.js";
+import {
   admitComputeSubworkstreamManifest,
   admitWorkerResultReport,
   computeSubworkstreamSelectedEdgeRef,
@@ -22,13 +26,12 @@ import {
   deriveSdlcSelectedAbgFnCompositionIdentity,
   deriveWorkerHandoffManifest,
   evaluateSdlcComputeStage,
-  hookContractByEdgeName,
-  materializeSdlcProjectConformance,
   promptForHandoff,
   SDLC_EVALUATE_COMPUTE_SUBWORKSTREAM_MANIFEST_FILE,
   sha256Text,
   writeHandoffFiles
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
+
 import {
   reviewGradeEdgeFulfillmentPrompt
 } from "../../build/semantic/code/src/operator/plugins/evaluate/prompts.js";

@@ -11,7 +11,7 @@ import {
   admitWorkerTransport,
   processLaunchForWorker,
   selectedWorkerExecutorProfile
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(__dirname, "../..");

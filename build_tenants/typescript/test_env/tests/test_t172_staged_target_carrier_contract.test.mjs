@@ -17,19 +17,21 @@ import { pathToFileURL } from "node:url";
 import { materializeGraphFunction } from "@abiogenesis/typescript-tenant";
 
 import {
-  constructWorkerInvocationPackage,
   constructSdlcGtlModule,
   constructSdlcTargetCarrierRows,
+  hookContractByEdgeName,
+  materializeSdlcProjectConformance
+} from "../../build/semantic/code/src/index.js";
+import {
+  constructWorkerInvocationPackage,
   deriveSdlcStagedConstructionAuditCarriers,
   deriveWorkerHandoffManifest,
   evaluateSdlcComputeStage,
-  hookContractByEdgeName,
-  materializeSdlcProjectConformance,
   reconcileSdlcProductMaterializationAuthority,
   resolveSdlcEdgeGainClosureContract,
   sha256Text,
   writeHandoffFiles
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
 
 function makeWorkspace({ trivialProduct = false } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t172-staged-"));

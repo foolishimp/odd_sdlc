@@ -4,13 +4,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  assertSdlcTraversalConsequenceReplayable,
   constructSdlcConstructionIntent,
-  constructSdlcWorksiteEvidence,
   constructSdlcEdgeFulfillmentLedger,
-  deriveSdlcEdgeClosureDecision,
   constructSdlcNextActionProjection,
-  assertSdlcTraversalConsequenceReplayable
-} from "../../build/semantic/code/src/index.js";
+  constructSdlcWorksiteEvidence,
+  deriveSdlcEdgeClosureDecision
+} from "../../build/semantic/code/src/operator/index.js";
 
 const INTENT_EVENT_REFS = ["event://t138/intent/source"];
 const PRODUCT_ASSET_MODEL_REF = "product-asset-model://t138/current";

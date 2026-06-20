@@ -16,6 +16,11 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
+  hookContractByEdgeName,
+  materializeSdlcProjectConformance,
+  typecheckCurrentSdlcGtlProgram
+} from "../../build/semantic/code/src/index.js";
+import {
   compileSdlcFeatureDependencyDagToAbgFrontier,
   constructSdlcLiveFpParallelMaterializationFrontier,
   deriveSdlcFeatureDependencyDagFromMaps,
@@ -24,16 +29,14 @@ import {
   deriveSdlcTestDependencyMapFromImplementationDependencyMap,
   deriveSdlcUatTestDependencyMapFromTestDependencyMap,
   deriveWorkerHandoffManifest,
-  hookContractByEdgeName,
   isSdlcLiveFpParallelMaterializationFrontier,
-  materializeSdlcProjectConformance,
   normalizeSdlcLiveFpParallelMaterializationTarget,
   resolveSdlcLiveFpParallelBatchSize,
-  selectSdlcDependencyMapTraversal,
   sdlcLiveParallelMaterializationTargetKey,
-  typecheckCurrentSdlcGtlProgram,
+  selectSdlcDependencyMapTraversal,
   writeHandoffFiles
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
+
 import {
   constructBranchExecutionPolicy,
   deriveDependencyFrontierProjection,

@@ -21,42 +21,44 @@ import {
 
 import {
   admitSdlcProjectConstraints,
-  admitSdlcEdgeEvidence,
   assertSdlcEdgeGainClosureContractsRegistered,
   assertSdlcOverlayEdgeGainClosureContracts,
-  assertTraversalIntentPackagePressure,
-  composeSdlcPathGain,
-  constructSdlcEdgeFulfillmentLedger,
   constructSdlcGtlModule,
-  constructSdlcNextActionProjection,
   constructSdlcTraversalOverlayCatalog,
-  constructWorkerBrief,
-  constructWorkerInvocationPackage,
   deriveSdlcGapDossier,
-  deriveSdlcEdgeAssuranceCloseDecision,
-  deriveSdlcEdgeClosureDecision,
-  deriveSdlcEdgeFulfillmentCountsFromAssessments,
-  deriveSdlcEdgeObligations,
-  deriveSdlcEdgeResidualPressure,
   deriveSdlcWorkspaceIngressReport,
-  deriveWorkerHandoffManifest,
-  digestSdlcEdgeGainClosureContract,
   evalSdlcGapFromReplay,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   hookContractByEdgeName,
   indexSdlcEdgeGainClosureContracts,
   materializeSdlcProjectConformance,
-  measureSdlcEdgeGain,
   projectSdlcEdgeAssuranceReadModel,
   projectSdlcQueryDomain,
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
   SDLC_EDGE_GAIN_CLOSURE_CATEGORY_TEMPLATES,
   SDLC_EDGE_GAIN_CLOSURE_CONTRACTS,
   SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
-  SDLC_TICKET_WORKFLOW_OVERLAY_REF,
+  SDLC_TICKET_WORKFLOW_OVERLAY_REF
+} from "../../build/semantic/code/src/index.js";
+import {
+  admitSdlcEdgeEvidence,
+  assertTraversalIntentPackagePressure,
+  composeSdlcPathGain,
+  constructSdlcEdgeFulfillmentLedger,
+  constructSdlcNextActionProjection,
+  constructWorkerBrief,
+  constructWorkerInvocationPackage,
+  deriveSdlcEdgeAssuranceCloseDecision,
+  deriveSdlcEdgeClosureDecision,
+  deriveSdlcEdgeFulfillmentCountsFromAssessments,
+  deriveSdlcEdgeObligations,
+  deriveSdlcEdgeResidualPressure,
+  deriveWorkerHandoffManifest,
+  digestSdlcEdgeGainClosureContract,
+  measureSdlcEdgeGain,
   sdlcEdgeAssuranceContractRef,
   withAdditionalSdlcEdgeResidualPressureRefs
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
 
 function overlayByRef(catalog, overlayRef) {
   const overlay = catalog.overlays.find((candidate) => candidate.overlayRef === overlayRef);

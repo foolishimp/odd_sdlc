@@ -494,8 +494,26 @@ function parsePackEntry(input: unknown): NpmPackEntry {
   });
 }
 
+function npmPackJsonPayload(stdout: string): string {
+  const trimmed = stdout.trim();
+  if (trimmed.startsWith("[")) {
+    return trimmed;
+  }
+  const lines = stdout.split(/\r?\n/u);
+  const jsonStartIndex = lines.findIndex((line) => line.trimStart().startsWith("["));
+  if (jsonStartIndex >= 0) {
+    return lines.slice(jsonStartIndex).join("\n").trim();
+  }
+  const firstBracket = stdout.indexOf("[");
+  const lastBracket = stdout.lastIndexOf("]");
+  if (firstBracket >= 0 && lastBracket > firstBracket) {
+    return stdout.slice(firstBracket, lastBracket + 1).trim();
+  }
+  return trimmed;
+}
+
 function parsePackOutput(stdout: string): NpmPackEntry {
-  const parsed: unknown = JSON.parse(stdout);
+  const parsed: unknown = JSON.parse(npmPackJsonPayload(stdout));
   if (!Array.isArray(parsed) || parsed.length !== 1) {
     throw new TypeError("npm pack --json: expected one package entry");
   }

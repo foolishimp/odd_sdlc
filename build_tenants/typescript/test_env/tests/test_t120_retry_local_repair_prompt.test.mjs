@@ -14,13 +14,15 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
-  compactSdlcPriorGapDossiersForRetryContext,
-  deriveWorkerHandoffManifest,
   hookContractByEdgeName,
   materializeSdlcProjectConformance,
-  sdlcBlockingReasonFromLegacy,
-  writeHandoffFiles
+  sdlcBlockingReasonFromLegacy
 } from "../../build/semantic/code/src/index.js";
+import {
+  compactSdlcPriorGapDossiersForRetryContext,
+  deriveWorkerHandoffManifest,
+  writeHandoffFiles
+} from "../../build/semantic/code/src/operator/index.js";
 
 function writeConstraints(root) {
   mkdirSync(path.join(root, ".ai-workspace/context"), { recursive: true });

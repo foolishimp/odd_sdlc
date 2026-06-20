@@ -15,11 +15,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import {
-  deriveWorkerHandoffManifest,
   hookContractByEdgeName,
-  materializeSdlcProjectConformance,
-  writeHandoffFiles
+  materializeSdlcProjectConformance
 } from "../../build/semantic/code/src/index.js";
+import {
+  deriveWorkerHandoffManifest,
+  writeHandoffFiles
+} from "../../build/semantic/code/src/operator/index.js";
 
 function makeWorkspace() {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t099-"));

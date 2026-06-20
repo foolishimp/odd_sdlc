@@ -13,19 +13,22 @@ import path from "node:path";
 
 import {
   admitSdlcProjectConstraints,
-  buildPostTransformWorkerResultReport,
   conformProjectProfileFromConstraintsText,
-  constructSdlcEdgeFulfillmentLedger,
   constructSdlcGtlModule,
-  deriveSdlcEdgeClosureDecision,
-  deriveSdlcEdgeFulfillmentCountsFromAssessments,
   deriveSdlcWorkspaceIngressReport,
-  deriveWorkerHandoffManifest,
   hookContractByEdgeName,
   materializeSdlcProjectConformance,
-  projectSdlcQueryDomain,
-  snapshotProductMaterializationRoot
+  projectSdlcQueryDomain
 } from "../../build/semantic/code/src/index.js";
+import {
+  buildPostTransformWorkerResultReport,
+  constructSdlcEdgeFulfillmentLedger,
+  deriveSdlcEdgeClosureDecision,
+  deriveSdlcEdgeFulfillmentCountsFromAssessments,
+  deriveWorkerHandoffManifest,
+  snapshotProductMaterializationRoot
+} from "../../build/semantic/code/src/operator/index.js";
+
 import {
   admitSdlcPublicStartRequest,
   projectSdlcWorkerAttachment,

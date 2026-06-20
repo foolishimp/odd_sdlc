@@ -21,15 +21,17 @@ import {
   deriveSdlcConformProjectProfileFromWorkspace,
   deriveSdlcConformProjectReportFromWorkspace,
   deriveSdlcProjectConstraintsFromWorkspace,
-  deriveWorkerHandoffManifest,
-  declaredProductFileTargets,
   FG_CONFORM_PROJECT,
   hookContractByEdgeName,
   materializeSdlcProjectConformance,
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
-  SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
-  writeHandoffFiles
+  SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
 } from "../../build/semantic/code/src/index.js";
+import {
+  declaredProductFileTargets,
+  deriveWorkerHandoffManifest,
+  writeHandoffFiles
+} from "../../build/semantic/code/src/operator/index.js";
 
 function makeWorkspace(name, constraintsText) {
   const root = mkdtempSync(path.join(tmpdir(), `${name}-`));

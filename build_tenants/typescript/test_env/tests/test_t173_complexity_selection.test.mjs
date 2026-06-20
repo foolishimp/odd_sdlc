@@ -17,16 +17,19 @@ import {
   admitSdlcProjectConstraints,
   conformProjectProfileFromConstraintsText,
   constructSdlcGtlModule,
-  deriveSdlcDecompositionSummary,
-  deriveSdlcTraversalHopSelection,
   deriveSdlcWorkspaceIngressReport,
   FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
   FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
   projectSdlcQueryDomain,
-  SDLC_DEFAULT_DECOMPOSITION_SUMMARY_THRESHOLDS,
   SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
   SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
 } from "../../build/semantic/code/src/index.js";
+import {
+  deriveSdlcDecompositionSummary,
+  deriveSdlcTraversalHopSelection,
+  SDLC_DEFAULT_DECOMPOSITION_SUMMARY_THRESHOLDS
+} from "../../build/semantic/code/src/operator/index.js";
+
 import {
   analyzeSdlcFdRunArchive,
   renderSdlcFdRunAnalysisMarkdown

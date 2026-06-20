@@ -199,70 +199,38 @@ test("T-188 data_mapper live harness worker binding comes from runtime policy", 
   assert.match(resumeSource, /ODD_SDLC_TEST_ONLY_MINIMUM_OPERATOR_TIMEOUT_MS/u);
 });
 
-test("T-203 data_mapper detail live harness consumes admitted next actions and UAT detail edge", () => {
+test("T-203 data_mapper detail live harness leaves continuation to ABG CLI", () => {
   const runnerSource = readFileSync(
     path.join(PACKAGE_ROOT, "test_env/live/run_full_external_data_mapper_sandbox.mjs"),
     "utf8"
   );
-  assert.match(runnerSource, /function nextGraphFunctionStartTargetFromStart/u);
   assert.match(runnerSource, /function runtimeTraversalSelectionEnabled/u);
   assert.match(runnerSource, /function startClosureDisposition/u);
   assert.match(runnerSource, /function isSameEdgeRetryStart/u);
-  assert.match(runnerSource, /function shouldContinueSameEdgeRetry/u);
-  assert.match(
-    runnerSource,
-    /function graphFunctionStartTargetFromPostCloseOverlayActionRef/u
-  );
-  assert.match(runnerSource, /const marker = "\/post_close_overlay_continuation\/"/u);
-  assert.match(runnerSource, /startNextLawfulAction\(start\)/u);
-  assert.match(runnerSource, /nextActionProjection\.nextGraphFunctionRef/u);
-  assert.match(runnerSource, /nextGraphFunctionStartTargetFromStart\(\s*start,\s*currentStartTarget\s*\)/u);
-  assert.match(runnerSource, /overlayStopDisposition === "overlay_segment_complete"/u);
-  assert.match(runnerSource, /post_close_next_eligible_overlay/u);
-  assert.match(runnerSource, /post_close_overlay_continuation/u);
-  assert.match(runnerSource, /nextActionProjection\.nextEligibleOverlayRefs/u);
-  assert.match(
-    runnerSource,
-    /return `graph_function:\$\{nextGraphFunctionRef\}`/u
-  );
-  assert.match(
-    runnerSource,
-    /return `graph_function:\$\{nextGraphFunctionRef\}`;/
-  );
-  assert.match(
-    runnerSource,
-    /selectedPostCloseOverlayStartTarget \?\? `graph_function:\$\{nextGraphFunctionRef\}`/u
-  );
-  assert.match(runnerSource, /return currentStartTarget;/u);
-  assert.match(runnerSource, /currentStartTarget = nextStartTarget/u);
   assert.match(runnerSource, /function runStartAbgCli/u);
   assert.match(runnerSource, /command: input\.installedCommand/u);
   assert.match(runnerSource, /args: abgStartArgs\(abgTarget, input\.until\)/u);
   assert.match(
     runnerSource,
-    /isOverlayStartTarget\(START_TARGET\) \|\|\s*runtimeTraversalSelectionEnabled\(\)/u
-  );
-  assert.match(
-    runnerSource,
-    /const start = runStartAbgCli\(\{/u
+    /start: runStartAbgCli\(\{[\s\S]*startTarget: START_TARGET[\s\S]*until: "converged"/u
   );
   assert.match(runnerSource, /blockingReason === "retry_budget_exhausted"/u);
   assert.match(runnerSource, /return closureDisposition === "retry";/u);
   assert.match(runnerSource, /reason\?\.lawfulReentryPoint === "same_edge_retry"/u);
-  assert.match(runnerSource, /DATA_MAPPER_RETRY_YIELD_ATTEMPT_WINDOW/u);
-  assert.match(runnerSource, /const retryContinuation = shouldContinueSameEdgeRetry\(start\);/u);
   assert.match(runnerSource, /const requiredTicketIntakeFiles = \[/u);
   assert.match(runnerSource, /"review_grade_edge_fulfillment_assessment\.json"/u);
   assert.match(
     runnerSource,
     /requiredTicketIntakeFiles\.some\([\s\S]*return null;[\s\S]*ticket-intake-terminal-gap/u
   );
-  assert.match(
-    runnerSource,
-    /const nextStartTarget = retryContinuation\s*\?\s*null\s*:\s*nextGraphFunctionStartTargetFromStart/su
-  );
-  assert.match(runnerSource, /if \(retryContinuation\) \{\s*continue;\s*\}/u);
-  assert.match(runnerSource, /sdlc_overlay_next_action_missing/u);
+  assert.doesNotMatch(runnerSource, /function nextGraphFunctionStartTargetFromStart/u);
+  assert.doesNotMatch(runnerSource, /function shouldContinueSameEdgeRetry/u);
+  assert.doesNotMatch(runnerSource, /function graphFunctionStartTargetFromPostCloseOverlayActionRef/u);
+  assert.doesNotMatch(runnerSource, /nextActionProjection\.nextGraphFunctionRef/u);
+  assert.doesNotMatch(runnerSource, /currentStartTarget = nextStartTarget/u);
+  assert.doesNotMatch(runnerSource, /DATA_MAPPER_RETRY_YIELD_ATTEMPT_WINDOW/u);
+  assert.doesNotMatch(runnerSource, /const retryContinuation = shouldContinueSameEdgeRetry\(start\);/u);
+  assert.doesNotMatch(runnerSource, /sdlc_overlay_next_action_missing/u);
   assert.match(runnerSource, /derive_uat_test_source_surface/u);
   assert.doesNotMatch(
     runnerSource,
@@ -347,27 +315,11 @@ test("T-188 explicit graph-function resume is not hijacked by overlay replay", (
     path.join(PACKAGE_ROOT, "code/src/workspace_api/entry.ts"),
     "utf8"
   );
-  const start = source.indexOf("function selectedArchiveMatchesRequestedStart");
-  const end = source.indexOf("function startOutcomeForObservedReplay");
-  assert.notEqual(start, -1);
-  assert.notEqual(end, -1);
-  const body = source.slice(start, end);
-  assert.match(
-    body,
-    /input\.request\.target\.handle === input\.selected\.graphFunctionName/u
-  );
-  assert.match(
-    body,
-    /input\.request\.target\.handle === input\.selected\.completedGraphFunctionName/u
-  );
-  assert.doesNotMatch(
-    body,
-    /selectedOverlay\.graphFunctionRefs\.includes/u
-  );
-  assert.doesNotMatch(
-    body,
-    /requestedGraphFunction/u
-  );
+  assert.match(source, /export function projectOddSdlcWorkspaceGaps/u);
+  assert.doesNotMatch(source, /function selectedArchiveMatchesRequestedStart/u);
+  assert.doesNotMatch(source, /function startOutcomeForObservedReplay/u);
+  assert.doesNotMatch(source, /selectedOverlay\.graphFunctionRefs\.includes/u);
+  assert.doesNotMatch(source, /requestedGraphFunction/u);
 });
 
 test("T-188 repo-local agent instructions carry the data_mapper live-run boundary", () => {

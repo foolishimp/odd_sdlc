@@ -16,28 +16,30 @@ import path from "node:path";
 import { materializeGraphFunction } from "@abiogenesis/typescript-tenant";
 
 import {
-  SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
-  assertSdlcTestPipelineGraphCorrelation,
-  constructSdlcEdgeFulfillmentLedger,
   constructSdlcGraphFunctionCatalog,
   constructSdlcGtlModule,
-  constructSdlcOverlaySegmentCompletion,
-  constructSdlcTestPipelineCoAffirmationLedger,
   constructSdlcTraversalOverlayCatalog,
-  deriveSdlcPostCloseNextEligibleOverlayActionInput,
-  deriveSdlcPostCloseOverlayContinuationActionInput,
-  deriveSdlcEdgeClosureDecision,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
   FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
   FG_GRAPH_CODE_BUILDER,
-  constructWorkerInvocationPackage,
-  deriveWorkerHandoffManifest,
   hookContractByEdgeName,
   materializeSdlcProjectConformance,
+  SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
   sdlcTraversalOverlayAllowsProductConvergence,
   sdlcTraversalOverlayNextGraphContinuation
 } from "../../build/semantic/code/src/index.js";
+import {
+  assertSdlcTestPipelineGraphCorrelation,
+  constructSdlcEdgeFulfillmentLedger,
+  constructSdlcOverlaySegmentCompletion,
+  constructSdlcTestPipelineCoAffirmationLedger,
+  constructWorkerInvocationPackage,
+  deriveSdlcEdgeClosureDecision,
+  deriveSdlcPostCloseNextEligibleOverlayActionInput,
+  deriveSdlcPostCloseOverlayContinuationActionInput,
+  deriveWorkerHandoffManifest
+} from "../../build/semantic/code/src/operator/index.js";
 
 function catalogEntry(catalog, name) {
   const entry = catalog.functions.find((candidate) => candidate.name === name);

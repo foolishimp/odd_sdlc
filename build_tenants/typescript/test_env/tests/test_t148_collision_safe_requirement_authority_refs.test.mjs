@@ -5,13 +5,15 @@ import assert from "node:assert/strict";
 
 import {
   admitSdlcProjectConstraints,
-  deriveSdlcEdgeFulfillmentCountsFromAssessments,
   deriveSdlcLineageLedger,
   deriveSdlcSourceInput,
   deriveSdlcWorkspaceIngressReport,
   projectSdlcRequirementClosureRegister,
   projectSdlcRequirementFulfillmentPublicView
 } from "../../build/semantic/code/src/index.js";
+import {
+  deriveSdlcEdgeFulfillmentCountsFromAssessments
+} from "../../build/semantic/code/src/operator/index.js";
 
 function sourceInput(relativePath, content) {
   return deriveSdlcSourceInput({

@@ -8,10 +8,12 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import {
-  constructWorkerInvocationPackage,
-  deriveWorkerHandoffManifest,
   hookContractByEdgeName
 } from "../../build/semantic/code/src/index.js";
+import {
+  constructWorkerInvocationPackage,
+  deriveWorkerHandoffManifest
+} from "../../build/semantic/code/src/operator/index.js";
 
 import {
   DATA_MAPPER_LITE_FIXTURE_ROOT,

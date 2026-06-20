@@ -14,11 +14,8 @@ import { pathToFileURL } from "node:url";
 import {
   admitSdlcProjectConstraints,
   admitSdlcTicketExecutionContract,
-  assertTraversalIntentPackagePressure,
   conformProjectProfileFromConstraintsText,
-  constructSdlcEdgeFulfillmentLedger,
   constructSdlcGtlModule,
-  deriveWorkerHandoffManifest,
   deriveSdlcWorkspaceIngressReport,
   hookContractByEdgeName,
   projectSdlcQueryDomain,
@@ -26,6 +23,12 @@ import {
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
   sdlcTicketExecutionContractRefs
 } from "../../build/semantic/code/src/index.js";
+import {
+  assertTraversalIntentPackagePressure,
+  constructSdlcEdgeFulfillmentLedger,
+  deriveWorkerHandoffManifest
+} from "../../build/semantic/code/src/operator/index.js";
+
 import {
   admitSdlcPublicStartRequest,
   projectSdlcWorkerAttachment,

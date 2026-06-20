@@ -17,11 +17,13 @@ import { fileURLToPath } from "node:url";
 
 import {
   BOOTSTRAP_RELEASE_FUNCTION_CATALOG,
-  deriveWorkerHandoffManifest,
   hookContractByEdgeName,
   installOddSdlcTypescript,
   SDLC_HOOK_TARGET_POLICY
 } from "../../build/semantic/code/src/index.js";
+import {
+  deriveWorkerHandoffManifest
+} from "../../build/semantic/code/src/operator/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");

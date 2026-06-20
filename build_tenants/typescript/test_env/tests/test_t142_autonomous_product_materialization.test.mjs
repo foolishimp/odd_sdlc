@@ -11,17 +11,19 @@ import {
 } from "@abiogenesis/typescript-tenant";
 
 import {
-  FG_CONFORM_PROJECT_AUTHORITY,
-  FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
-  constructSdlcConstructionIntent,
-  constructSdlcEdgeFulfillmentLedger,
   constructSdlcGtlModule,
-  constructSdlcNextActionProjection,
   deriveComponentDepthAssuranceLedger,
   deriveOddSdlcEvaluateNextReport,
+  FG_CONFORM_PROJECT_AUTHORITY,
+  FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+} from "../../build/semantic/code/src/index.js";
+import {
+  constructSdlcConstructionIntent,
+  constructSdlcEdgeFulfillmentLedger,
+  constructSdlcNextActionProjection,
   deriveSdlcEdgeClosureDecision,
   deriveSdlcEdgeFulfillmentCountsFromAssessments
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
 
 function executionBasis() {
   const module = constructSdlcGtlModule();

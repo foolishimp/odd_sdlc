@@ -2087,3 +2087,108 @@ Status:
 - No contradictory prompt was found in the live run. The remaining runtime-cost
   trend is review-grade overwork, especially component-code materialization
   binding language and raw sidecar/package discovery pressure.
+
+## 2026-06-20 One-Surface Review Follow-Up Checkpoint
+
+Review-response fixes in this cut:
+
+- renamed the ABG CLI test start wrapper output from the retired local
+  `sdlc_installed_operator_start_outcome` facade to
+  `odd_sdlc_abg_cli_start_test_projection`; the wrapper now records explicit
+  ABG CLI process and stdout-parse facts and throws when a failed ABG CLI call
+  has no parseable output.
+- removed the full data-mapper live harness local continuation loop:
+  `sdlcOverlayStartLoop`, next-target reconstruction from
+  `nextActionProjection`, retry-window progression, and first-traversal
+  advance selection are gone. The harness now performs one installed
+  `genesis-ts start --until converged` call and refuses overlay/runtime
+  selection inputs that would require ABG target-carrier support not present on
+  this harness path.
+- removed the stale T-053 live use of `publicStartOnce`; that live test now
+  records ABG command-binding evidence and keeps its external worker/result
+  admission proof separate from installed traversal control.
+- moved remaining stale test imports off the root product barrel for internal
+  helpers (`admitComponentDepthRegisterFromArtifact` and sandbox archive proof
+  helpers) instead of re-exporting those internals.
+- restored the component-code review-grade prompt rule:
+  downstream test files and declared test-execution-contract proof are not
+  `test_overlap_missing` on `component_code_surface`.
+- fixed release-snapshot `npm pack --json` parsing when lifecycle hook output
+  precedes the JSON array.
+
+Validation for this checkpoint:
+
+- passed: `npm run build:semantic`
+- passed: `git diff --check`
+- passed: root-barrel stale import scan; `missing-root-import-files=0`
+- passed: T-058/T-059 install-release/pack lane, 12/12 tests, including
+  `guard:pack-no-command-artifacts`
+- passed: T-197/T-203/T-164/T-053 focused boundary lane, 38/40 tests with the
+  two live tests skipped by environment flags
+- passed: T-188 data-mapper live boundary guard, 2/2 focused tests
+- passed: T-160 workspace API overlay/read-model focused guard, 2/2 tests
+- passed: T-184/T-187 focused prompt and operator-summary guards after rebuild
+- passed: T-128 ABG CLI start wrapper process-failure proof and T-204 installed
+  operator absence proof, 4/4 focused tests
+- broad sequential semantic suite result:
+  `node --test --test-concurrency=1 test_env/tests/*.test.mjs` produced
+  1022/1065 passed and 43 failed in 384,051 ms. The remaining failures are the
+  known product-materialization/tenant-role fixture cluster plus one liveness
+  timing assertion; they are not public command-surface regressions and are not
+  solved by restoring a local start/control path.
+
+Status:
+
+- The reviewed one-surface issues are fixed at the active proof boundary:
+  no public CLI/spec-method/start/gaps surface, no local installed executor,
+  no live data-mapper continuation loop, no old ABG CLI test outcome facade,
+  and no stale root-barrel imports for removed internals.
+- Strict T-204 closure still requires executing the existing
+  `move_to_abg`/`survival_pending` inventory for generic `analysis/*`,
+  `effects/*`, `start/*`, `operator/event_store.ts`, the remaining internal
+  plugin-support split in `operator/installed_operator.ts`, and the final
+  ABG/product fold in `operator/traversal_consequence.ts`.
+
+## 2026-06-20 Fresh Hello-World Live Proof After One-Surface Follow-Up
+
+Fresh clean live proof after the review follow-up cut:
+
+- archive:
+  `build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260620T101802962Z_pid88477`
+- command/test result:
+  `npm run test:t132:hello-world-live` passed with 1/1 tests in
+  1,739,203 ms.
+- direct tenant verification:
+  `node --test test/hello.test.js` from generated
+  `build_tenants/hello_world_javascript` passed 1/1 tests in 56 ms.
+- final progress record: `advanceCount: 8`, `lastStatus: converged`,
+  `noProgressReason: null`, break reason `required_handoff_edges`.
+
+| Step | Target graph function | Status | Step time |
+| ---: | --- | --- | ---: |
+| 0 | `Fg_conform_project` | converged | 0.02 |
+| 1 | `derive_lite_design_adr_surface` | converged | 6.02 |
+| 2 | `derive_lite_component_code_surface` | converged | 6.27 |
+| 3 | `derive_lite_test_design_surface` | converged | 4.04 |
+| 4 | `derive_lite_component_test_surface` | converged | 7.26 |
+| 5 | `derive_lite_uat_test_source_surface` | converged | 4.46 |
+| 6 | `prepare_test_execution_surface` | converged | 0.02 |
+| 7 | `derive_test_execution_result_surface` | converged | 0.02 |
+
+Archive consistency check:
+
+- every operator run has `postflight.status = passed`, zero blocking reasons,
+  `fp_evaluate_result.status = passed`,
+  `sdlc_edge_closure_decision.disposition = close`, and
+  `sdlc_next_action_projection.json` present.
+- review-grade assessments passed where present:
+  component-code 4 findings, test-design 2 findings, component-test 5
+  findings, UAT test source 5 findings.
+
+Status:
+
+- The one-surface follow-up is now hello-world live-proven. ABG-owned
+  `genesis-ts start --until converged` drove every stage; no odd_sdlc local
+  executor, command wrapper, or data-mapper continuation loop was restored.
+- This does not close the physical shrink inventory; strict T-204 closure still
+  requires moving/deleting the remaining `move_to_abg` rows.

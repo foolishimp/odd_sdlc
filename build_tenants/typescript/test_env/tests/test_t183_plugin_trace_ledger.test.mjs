@@ -61,13 +61,14 @@ test("T-183 installed SDLC supplies only the selected transform/evaluate/consequ
   assert.doesNotMatch(pluginSetSource, /consequenceTasks/u);
 });
 
-test("T-183 generic generated assets cannot enter default F_D closure", () => {
+test("T-183 generic generated assets cannot enter local default F_D closure", () => {
   const source = readRepoFile(
     "build_tenants/typescript/code/src/operator/installed_operator.ts"
   );
-  assert.match(source, /if \(transition\.kind === "fd_advance"\)/u);
-  assert.match(source, /transition\.edge !== FG_CONFORM_PROJECT/u);
-  assert.match(source, /unsupported_fd_transition/u);
+  assert.doesNotMatch(source, /if \(transition\.kind === "fd_advance"\)/u);
+  assert.doesNotMatch(source, /transition\.edge !== FG_CONFORM_PROJECT/u);
+  assert.doesNotMatch(source, /unsupported_fd_transition/u);
+  assert.doesNotMatch(source, /runEngineIterateAsync/u);
   assert.match(source, /reviewGradeResidualPressureRefsForState/u);
   assert.match(source, /fpEvaluationCloseDispositionForState/u);
   assert.match(source, /admitReviewGradeEdgeFulfillmentAssessmentFromArtifact/u);

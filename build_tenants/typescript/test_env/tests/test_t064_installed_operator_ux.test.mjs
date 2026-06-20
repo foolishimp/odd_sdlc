@@ -521,7 +521,8 @@ test("T-128 installed start returns worker_failed envelope after process failure
     workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`
   });
 
-  assert.equal(start.kind, "sdlc_installed_operator_start_outcome");
+  assert.equal(start.kind, "odd_sdlc_abg_cli_start_test_projection");
+  assert.equal(start.abgCli.stdoutParseStatus, "parsed");
   assert.equal(start.status, "worker_failed");
   assert.equal("loop" in start, false);
   assert.equal(start.workerRun.status, 7);

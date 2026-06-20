@@ -134,25 +134,20 @@ function writeWorkerReport(workspace, input) {
 
 function runTargetedGaps(workspace) {
   return projectOddSdlcWorkspaceGaps({
-    workspaceRoot: workspace,
-    target: {
-      kind: "graph_function",
-      handle: FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
-    }
+    workspaceRoot: workspace
   });
 }
 
 function authorityFields(result) {
   return Object.freeze({
-    startTarget: result.start.executionContract.targetGraphFunction,
-    projectionStatus: result.projection.status,
-    projectionCurrentEdge: result.projection.currentEdge,
     dossierStatus: result.dossier.status,
     dossierEdge: result.dossier.edge,
     bestActionRef: result.dossier.bestActionRef,
     bestGraphFunctionRef: result.dossier.bestGraphFunctionRef,
     nextActionProjectionRef: result.dossier.nextActionProjectionRef,
-    nextLawfulActions: result.dossier.nextLawfulActions
+    nextLawfulActions: result.dossier.nextLawfulActions,
+    requirementClosureDisposition:
+      result.requirementFulfillment.edgeClosureDisposition
   });
 }
 
@@ -162,18 +157,15 @@ test("T-145 archive-only terminal closure cannot converge public gaps", () => {
 
   const result = runTargetedGaps(workspace);
 
-  assert.equal(result.projection.status, "open");
-  assert.equal(
-    result.projection.currentEdge,
-    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
-  );
-  assert.equal(result.projection.nextVectorIndex, 0);
-  assert.deepEqual(result.projection.closedVectorIndexes, []);
   assert.equal(result.dossier.status, "open");
-  assert.equal(result.dossier.edge, FG_MATERIALIZE_DECLARED_PRODUCT_ASSET);
+  assert.notEqual(result.dossier.edge, FG_MATERIALIZE_DECLARED_PRODUCT_ASSET);
   assert.equal(
-    result.dossier.bestGraphFunctionRef,
-    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+    result.requirementFulfillment.archiveRehydration.status,
+    "rehydrated"
+  );
+  assert.equal(
+    result.requirementFulfillment.edgeClosureDisposition,
+    "close"
   );
   assert.equal(
     result.dossier.rankingReasonRefs.some((ref) =>

@@ -9,14 +9,16 @@ import { fileURLToPath } from "node:url";
 import { deriveRuntimeAggregateProjection } from "@abiogenesis/typescript-tenant";
 
 import {
-  SDLC_BLOCKING_REASON_REENTRY_POINTS,
   constructOddSdlcAbiogenesisExecutionBasis,
+  makeSdlcBlockingReason,
+  SDLC_BLOCKING_REASON_REENTRY_POINTS
+} from "../../build/semantic/code/src/index.js";
+import {
   deriveSdlcClosureStateTransition,
   makeSdlcClosureResidualPressureCarrier,
-  makeSdlcBlockingReason,
   sdlcClosureStateBucketForLawfulReentryPoint,
   syntheticGapDossierFromClosureRefs
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(__dirname, "../..");

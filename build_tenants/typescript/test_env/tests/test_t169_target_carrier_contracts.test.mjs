@@ -17,30 +17,32 @@ import {
 } from "@abiogenesis/typescript-tenant";
 
 import {
-  admitSdlcEdgeEvidence,
   admitSdlcTargetCarrierCandidate,
-  assertTraversalIntentPackagePressure,
-  constructSdlcEdgeFulfillmentLedger,
   constructSdlcGtlModule,
   constructSdlcTargetCarrierRows,
+  hookContractByEdgeName,
+  materializeSdlcProjectConformance,
+  missingSdlcTargetCarrierAdmission,
+  projectSdlcEdgeAssuranceReadModel,
+  projectSdlcTargetCarrierReadModel,
+  SDLC_EDGE_GAIN_CLOSURE_CONTRACTS,
+  sdlcTargetCarrierCandidate
+} from "../../build/semantic/code/src/index.js";
+import {
+  admitSdlcEdgeEvidence,
+  assertTraversalIntentPackagePressure,
+  constructSdlcEdgeFulfillmentLedger,
   deriveSdlcEdgeAssuranceCloseDecision,
   deriveSdlcEdgeClosureDecision,
   deriveSdlcEdgeObligations,
   deriveSdlcEdgeResidualPressure,
   deriveWorkerHandoffManifest,
   digestSdlcEdgeGainClosureContract,
-  hookContractByEdgeName,
-  materializeSdlcProjectConformance,
   measureSdlcEdgeGain,
-  missingSdlcTargetCarrierAdmission,
-  projectSdlcEdgeAssuranceReadModel,
-  projectSdlcTargetCarrierReadModel,
   resolveSdlcEdgeGainClosureContract,
-  SDLC_EDGE_GAIN_CLOSURE_CONTRACTS,
   sdlcEdgeAssuranceContractRef,
-  sdlcTargetCarrierCandidate,
   writeHandoffFiles
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
 
 function makeWorkspace() {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t169-"));

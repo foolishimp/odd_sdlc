@@ -7,7 +7,8 @@ import assert from "node:assert/strict";
 
 import {
   selectSdlcDependencyMapTraversal
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
+
 import {
   constructBranchExecutionPolicy,
   constructBranchRef,

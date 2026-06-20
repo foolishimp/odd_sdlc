@@ -13,12 +13,8 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
-  admitComponentDepthRegisterFromArtifact,
-  admitDesignDepthRegisterFromArtifact,
-  admitPostflightGapDossier,
   admitSdlcConstructorResult,
   admitSdlcProjectConstraints,
-  constructPostflightGapDossier,
   deriveAmbiguityAssuranceLedger,
   deriveCapabilityAssuranceLedger,
   deriveComponentDepthAssuranceLedger,
@@ -26,25 +22,31 @@ import {
   deriveMaterializationAssuranceLedger,
   deriveObligationCarryAssuranceLedger,
   deriveRequirementFulfillmentAssuranceLedger,
+  deriveSdlcConformProjectProfileFromWorkspace,
   deriveSemanticConvergenceAssuranceLedger,
   deriveShallowRealizationAssuranceLedger,
-  deriveSdlcConformProjectProfileFromWorkspace,
-  deriveSdlcFeatureScope,
-  deriveSdlcOperatorAssuranceGate,
-  deriveSdlcTraversalStrategyDecision,
-  deriveWorkerHandoffManifest,
   evaluateSdlcHookPostflight,
   evaluateSdlcHookPreflight,
-  evaluateSdlcComputeStage,
   hookContractByEdgeName,
   minimalSdlcHookInvocationForContract,
   projectConstraintsFromConformProjectProfile,
   runSdlcHookTurn,
+  sdlcBlockingReasonFromLegacy
+} from "../../build/semantic/code/src/index.js";
+import {
+  admitComponentDepthRegisterFromArtifact,
+  admitDesignDepthRegisterFromArtifact,
+  admitPostflightGapDossier,
+  constructPostflightGapDossier,
+  deriveSdlcFeatureScope,
+  deriveSdlcOperatorAssuranceGate,
+  deriveSdlcTraversalStrategyDecision,
+  deriveWorkerHandoffManifest,
+  evaluateSdlcComputeStage,
   readWorkerResultReport,
-  sdlcBlockingReasonFromLegacy,
   sha256Text,
   writeHandoffFiles
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
 
 function workspace(input = {}) {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-b086-"));

@@ -11,16 +11,18 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import {
-  admitComponentDepthRegisterFromArtifact,
   deriveComponentDepthAssuranceLedger,
-  deriveWorkerHandoffManifest,
   hookContractByEdgeName,
   materializeSdlcProjectConformance,
-  promptForHandoff,
   sdlcTargetCarrierContractRef,
-  sdlcTargetCarrierOutputKind,
-  sha256Text
+  sdlcTargetCarrierOutputKind
 } from "../../build/semantic/code/src/index.js";
+import {
+  admitComponentDepthRegisterFromArtifact,
+  deriveWorkerHandoffManifest,
+  promptForHandoff,
+  sha256Text
+} from "../../build/semantic/code/src/operator/index.js";
 
 function makeWorkspace() {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t113-workspace-"));

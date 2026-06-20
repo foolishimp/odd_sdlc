@@ -21,12 +21,10 @@ import { performance } from "node:perf_hooks";
 import {
   admitSdlcConstructorResult,
   admitSdlcProjectConstraints,
-  constructSdlcGtlModule,
   deriveSdlcSourceInput,
   deriveSdlcWorkspaceIngressReport,
   hookContractByEdgeName,
   minimalSdlcHookInvocationForContract,
-  projectSdlcQueryDomain,
   runSdlcHookTurn
 } from "../../build/semantic/code/src/index.js";
 import {
@@ -36,10 +34,6 @@ import {
 import { liveTestArchiveRoot } from "./archive_root.mjs";
 import { liveOperatorRuntimePolicy } from "./operator_runtime_policy.mjs";
 import { canonicalDataMapperFixtureRoot } from "../fixtures/data_mapper_fixture.mjs";
-import {
-  projectSdlcWorkerAttachment,
-  publicStartOnce
-} from "../../build/semantic/code/src/start/index.js";
 
 const RUNTIME_POLICY = liveOperatorRuntimePolicy();
 const LIVE_ENABLED = process.env["ODD_SDLC_TS_LIVE_FP"] === "1";
@@ -291,24 +285,14 @@ test(
     assertAbgInstalledSandboxEvidence(installedWorkspace);
 
     const ingress = deriveIngress(sources);
-    const module = constructSdlcGtlModule();
-    const queryDomain = projectSdlcQueryDomain({ module, ingressReport: ingress });
-    const start = publicStartOnce({
-      request: {
-        kind: "sdlc_public_start_request",
-        workspaceRoot,
-        target: { kind: "graph_function", handle: "bootstrap_release_self_test" },
-        until: "blocked",
-        defaultRegime: "F_P"
-      },
-      module,
-      queryDomain,
-      workerAttachment: projectSdlcWorkerAttachment({
-        transportContract: `process://${WORKER_COMMAND}`
-      })
-    });
-    assert.equal(start.kind, "sdlc_public_start_projected");
-    assert.equal(start.status, "dispatch_required");
+    const abgCommandBinding = {
+      kind: "odd_sdlc_t053_abg_command_binding_evidence",
+      command: installedWorkspace.commandProbe.command,
+      probeStatus: installedWorkspace.commandProbe.status,
+      packageName: installedWorkspace.packageName,
+      runtimeRef: installedWorkspace.runtimeIdentity.resolvedRuntimeRef
+    };
+    assert.equal(abgCommandBinding.probeStatus, 0);
 
     const workerRun = runLiveWorker({
       archiveRoot,
@@ -338,7 +322,7 @@ test(
     const elapsedMs = performance.now() - startedAt;
     const eventSequence = [
       "abg_installed_workspace",
-      "public_start_projected",
+      "abg_command_binding_ready",
       "external_fp_worker_dispatched",
       "worker_result_file_observed",
       "constructor_result_admitted",
@@ -363,11 +347,12 @@ test(
         importedRequirementAuthorities: ingress.importedRequirementAuthorities.length,
         ambiguityRegister: ingress.ambiguityRegister
       },
-      startStatus: start.status,
+      commandBindingStatus: "ready",
       resultDigest: constructorResult.outputIdentity.digest,
       hookPostflightStatus: hookOutcome.postflight?.status ?? null
     };
     writeJson(path.join(archiveRoot, "run.json"), archive);
+    writeJson(path.join(archiveRoot, "abg_command_binding.json"), abgCommandBinding);
     writeJson(path.join(archiveRoot, "worker_report.json"), workerReport);
     writeJson(path.join(archiveRoot, "hook_outcome.json"), hookOutcome);
     writeJson(path.join(archiveRoot, "constructor_result.json"), constructorResult);

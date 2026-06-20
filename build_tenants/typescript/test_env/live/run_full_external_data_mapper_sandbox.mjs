@@ -62,14 +62,6 @@ const TARGET_GRAPH_FUNCTION =
 const START_TARGET =
   process.env["ODD_SDLC_TS_DATA_MAPPER_START_TARGET"] ??
   `graph_function:${TARGET_GRAPH_FUNCTION}`;
-const DATA_MAPPER_MAX_ADVANCES = Number.parseInt(
-  process.env["ODD_SDLC_TS_DATA_MAPPER_MAX_ADVANCES"] ?? "80",
-  10
-);
-const DATA_MAPPER_RETRY_YIELD_ATTEMPT_WINDOW = Number.parseInt(
-  process.env["ODD_SDLC_TS_DATA_MAPPER_RETRY_YIELD_ATTEMPT_WINDOW"] ?? "10",
-  10
-);
 const DATA_MAPPER_STOP_AFTER_DETAIL_ZOOM =
   process.env["ODD_SDLC_TS_DATA_MAPPER_STOP_AFTER_DETAIL_ZOOM"] !== "false";
 const DATA_MAPPER_EXERCISE_TERMINAL_GAP_TICKETS =
@@ -667,30 +659,6 @@ function isOverlayStartTarget(startTarget) {
   return startTarget.startsWith("overlay:");
 }
 
-function graphFunctionStartTargetFromPostCloseOverlayActionRef(actionRef) {
-  if (typeof actionRef !== "string" || actionRef.length === 0) {
-    return null;
-  }
-  const marker = "/post_close_overlay_continuation/";
-  const markerIndex = actionRef.indexOf(marker);
-  if (markerIndex < 0) {
-    return null;
-  }
-  const remainder = actionRef.slice(markerIndex + marker.length);
-  const nextGraphFunctionRef = remainder.split("/")[0] ?? "";
-  if (nextGraphFunctionRef.length === 0) {
-    return null;
-  }
-  if (nextGraphFunctionRef.startsWith("graph_function:")) {
-    return nextGraphFunctionRef;
-  }
-  return `graph_function:${nextGraphFunctionRef}`;
-}
-
-function startNextLawfulAction(start) {
-  return start?.summary?.nextLawfulAction ?? start?.nextLawfulAction ?? null;
-}
-
 function runtimeTraversalSelectionEnabled() {
   return DATA_MAPPER_RUNTIME_TRAVERSAL_STRATEGY.length > 0;
 }
@@ -707,70 +675,6 @@ function abgStartArgs(startTarget, until = "converged") {
     "--until",
     until
   ];
-}
-
-function startLabelForTarget(startTarget) {
-  return isOverlayStartTarget(startTarget) ||
-    runtimeTraversalSelectionEnabled()
-    ? "odd-sdlc-start-first-traversal"
-    : "abg-start-until-converged";
-}
-
-function nextGraphFunctionStartTargetFromStart(start, currentStartTarget) {
-  const postCloseOverlayActionStartTarget =
-    graphFunctionStartTargetFromPostCloseOverlayActionRef(startNextLawfulAction(start));
-  const nextActionProjection =
-    start?.traversalConsequence?.nextActionProjection ??
-    start?.nextActionProjection ??
-    start?.start?.executionContract?.nextActionProjection ??
-    null;
-  if (nextActionProjection?.choosesNextTraversal !== true) {
-    return postCloseOverlayActionStartTarget;
-  }
-  const selectedPostCloseOverlayStartTarget =
-    graphFunctionStartTargetFromPostCloseOverlayActionRef(
-      nextActionProjection.selectedActionRef
-    );
-  if (
-    nextActionProjection.overlayStopDisposition === "overlay_segment_complete" &&
-    typeof nextActionProjection.selectedActionRef === "string" &&
-    nextActionProjection.selectedActionRef.includes(
-      "post_close_next_eligible_overlay"
-    ) &&
-    Array.isArray(nextActionProjection.nextEligibleOverlayRefs)
-  ) {
-    const nextEligibleOverlayRef = nextActionProjection.nextEligibleOverlayRefs
-      .find((ref) => typeof ref === "string" && ref.startsWith("overlay://"));
-    if (nextEligibleOverlayRef !== undefined) {
-      return nextEligibleOverlayRef;
-    }
-  }
-  const nextGraphFunctionRef = nextActionProjection.nextGraphFunctionRef;
-  if (typeof nextGraphFunctionRef !== "string" || nextGraphFunctionRef.length === 0) {
-    return selectedPostCloseOverlayStartTarget ?? postCloseOverlayActionStartTarget;
-  }
-  if (
-    nextGraphFunctionRef.startsWith("graph_function:") ||
-    nextGraphFunctionRef.startsWith("overlay:") ||
-    nextGraphFunctionRef.startsWith("asset:")
-  ) {
-    return nextGraphFunctionRef;
-  }
-  if (
-    typeof nextActionProjection.selectedActionRef === "string" &&
-    nextActionProjection.selectedActionRef.includes(
-      "post_close_overlay_continuation"
-    )
-  ) {
-    return selectedPostCloseOverlayStartTarget ?? `graph_function:${nextGraphFunctionRef}`;
-  }
-  if (
-    isOverlayStartTarget(currentStartTarget) ||
-    graphFunctionFromStartTarget(currentStartTarget) !== null
-  ) {
-    return currentStartTarget;
-  }
-  return null;
 }
 
 function summaryStepFromStart(phase, start) {
@@ -837,7 +741,7 @@ function isLawfulAbgGapStop(start) {
 function terminalReasonFromStart(start) {
   if (
     start?.kind === "sdlc_installed_operator_start_cli_projection" ||
-    start?.kind === "sdlc_installed_operator_start_outcome"
+    start?.kind === "odd_sdlc_abg_cli_start_test_projection"
   ) {
     const status = start.status ?? start.summary?.status ?? null;
     if (status === "converged") {
@@ -894,13 +798,6 @@ function isSameEdgeRetryStart(start) {
   }
   return startBlockingReasons(start).some(
     (reason) => reason?.lawfulReentryPoint === "same_edge_retry"
-  );
-}
-
-function shouldContinueSameEdgeRetry(start) {
-  return (
-    startBlockingReason(start) !== "retry_budget_exhausted" &&
-    isSameEdgeRetryStart(start)
   );
 }
 
@@ -1149,122 +1046,6 @@ function isSuccessfulSdlcTraversalStart(start) {
   );
 }
 
-async function sdlcOverlayStartLoop(input) {
-  if (!Number.isInteger(DATA_MAPPER_MAX_ADVANCES) || DATA_MAPPER_MAX_ADVANCES < 1) {
-    throw new TypeError("ODD_SDLC_TS_DATA_MAPPER_MAX_ADVANCES must be a positive integer");
-  }
-  if (
-    !Number.isInteger(DATA_MAPPER_RETRY_YIELD_ATTEMPT_WINDOW) ||
-    DATA_MAPPER_RETRY_YIELD_ATTEMPT_WINDOW < 1
-  ) {
-    throw new TypeError(
-      "ODD_SDLC_TS_DATA_MAPPER_RETRY_YIELD_ATTEMPT_WINDOW must be a positive integer"
-    );
-  }
-  const starts = [];
-  let terminalStart = null;
-  let terminalReason = "sdlc_overlay_max_advances_reached";
-  let lastTraversalProgressKey = null;
-  let sameTraversalProgressKeyAfterClose = 0;
-  let currentStartTarget = input.startTarget;
-  for (let step = 0; step < DATA_MAPPER_MAX_ADVANCES; step += 1) {
-    const label = `odd-sdlc-start-first-traversal-${String(step + 1).padStart(3, "0")}`;
-    const start = runStartAbgCli({
-      label,
-      installedCommand: input.installedCommand,
-      workspace: input.workspace,
-      startTarget: currentStartTarget,
-      until: "first_traversal",
-      env: input.env,
-      archiveRoot: input.archiveRoot,
-      acceptedStatuses: Object.freeze([0, 4])
-    });
-    starts.push(compactStartForSummary(start));
-    input.summary.steps.push(summaryStepFromStart(`sdlc-overlay-start-${step + 1}`, start));
-    input.summary.sdlcOverlayStarts = starts;
-    input.summary.observedDetailZoomEdges = observedDetailZoomEdges(input.workspace);
-    writeJson(path.join(input.archiveRoot, "run_summary.json"), input.summary);
-    terminalStart = start;
-
-    const retryContinuation = shouldContinueSameEdgeRetry(start);
-    const nextStartTarget = retryContinuation
-      ? null
-      : nextGraphFunctionStartTargetFromStart(start, currentStartTarget);
-
-    if (detailZoomStopSatisfied(input.workspace)) {
-      terminalReason = "sdlc_reported_detail_zoom_edges";
-      break;
-    }
-
-    if (
-      !isSuccessfulSdlcTraversalStart(start) &&
-      !retryContinuation &&
-      nextStartTarget === null
-    ) {
-      terminalReason = terminalReasonFromStart(start);
-      break;
-    }
-
-    if (releaseProofStopSatisfied(input.workspace)) {
-      terminalReason = "sdlc_release_proof_converged";
-      break;
-    }
-
-    const graphFunctionName =
-      start?.summary?.graphFunctionName ??
-      start?.start?.executionContract?.targetGraphFunction ??
-      graphFunctionFromStartTarget(start?.resolved_target) ??
-      null;
-    const traversalProgressKey = [
-      graphFunctionName,
-      start?.summary?.currentEdge ?? start?.edge ?? null,
-      start?.summary?.nextLawfulAction ?? null
-    ]
-      .filter((value) => typeof value === "string" && value.length > 0)
-      .join(":");
-    if (
-      traversalProgressKey.length > 0 &&
-      traversalProgressKey === lastTraversalProgressKey
-    ) {
-      sameTraversalProgressKeyAfterClose += 1;
-      if (
-        sameTraversalProgressKeyAfterClose >=
-        DATA_MAPPER_RETRY_YIELD_ATTEMPT_WINDOW
-      ) {
-        terminalReason = `sdlc_retry_yield_window_exhausted:${traversalProgressKey}`;
-        break;
-      }
-    } else {
-      sameTraversalProgressKeyAfterClose = 0;
-    }
-    lastTraversalProgressKey = traversalProgressKey;
-
-    if (retryContinuation) {
-      continue;
-    }
-
-    if (nextStartTarget !== null) {
-      currentStartTarget = nextStartTarget;
-    } else if (isSuccessfulSdlcTraversalStart(start)) {
-      terminalReason = "sdlc_overlay_next_action_missing";
-      break;
-    }
-  }
-  if (terminalStart === null) {
-    throw new Error("overlay start loop produced no starts");
-  }
-  if (terminalReason === "sdlc_overlay_max_advances_reached") {
-    throw new Error(
-      `overlay start loop exhausted ${DATA_MAPPER_MAX_ADVANCES} advances before terminal or detail zoom stop`
-    );
-  }
-  return Object.freeze({
-    start: terminalStart,
-    starts,
-    terminalReason
-  });
-}
-
 async function main() {
   if (runtimeTraversalSelectionEnabled()) {
     throw new Error(
@@ -1291,10 +1072,7 @@ async function main() {
   };
   const summary = {
     kind: "odd_sdlc_full_external_data_mapper_sandbox_run",
-    commandBinding: isOverlayStartTarget(START_TARGET) ||
-      runtimeTraversalSelectionEnabled()
-      ? "abg_cli_overlay_start_first_traversal"
-      : "abg_cli_start_until_converged",
+    commandBinding: "abg_cli_start_until_converged",
     archiveRoot,
     workspace,
     templateRoot: DATA_MAPPER_TEMPLATE_ROOT,
@@ -1312,8 +1090,6 @@ async function main() {
     },
     startTarget: START_TARGET,
     targetGraphFunction: TARGET_GRAPH_FUNCTION,
-    maxAdvances: DATA_MAPPER_MAX_ADVANCES,
-    retryYieldAttemptWindow: DATA_MAPPER_RETRY_YIELD_ATTEMPT_WINDOW,
     stopAfterDetailZoomEdges: DATA_MAPPER_STOP_AFTER_DETAIL_ZOOM,
     exerciseTerminalGapTickets: DATA_MAPPER_EXERCISE_TERMINAL_GAP_TICKETS,
     requiredDetailZoomEdges: DATA_MAPPER_DETAIL_ZOOM_EDGES,
@@ -1360,29 +1136,20 @@ async function main() {
   summary.abgConformProject = conformStart;
   writeJson(path.join(archiveRoot, "run_summary.json"), summary);
 
-  const startResult = isOverlayStartTarget(START_TARGET) ||
-    runtimeTraversalSelectionEnabled()
-      ? await sdlcOverlayStartLoop({
-        startTarget: START_TARGET,
-        installedCommand: genesisCommand,
-        workspace,
-        env: baseEnv,
-        archiveRoot,
-        summary
-      })
-    : Object.freeze({
-        start: runCommand({
-          label: startLabelForTarget(START_TARGET),
-          command: genesisCommand,
-          args: abgStartArgs(START_TARGET),
-          cwd: workspace,
-          env: baseEnv,
-          archiveRoot,
-          acceptedStatuses: Object.freeze([0, 4])
-        }),
-        starts: Object.freeze([]),
-        terminalReason: null
-      });
+  const startResult = Object.freeze({
+    start: runStartAbgCli({
+      label: "abg-start-until-converged",
+      installedCommand: genesisCommand,
+      workspace,
+      startTarget: START_TARGET,
+      until: "converged",
+      env: baseEnv,
+      archiveRoot,
+      acceptedStatuses: Object.freeze([0, 4])
+    }),
+    starts: Object.freeze([]),
+    terminalReason: null
+  });
   const start = startResult.start;
   summary.steps.push(summaryStepFromStart("abg-start", start));
   summary.abgStart = compactStartForSummary(start);

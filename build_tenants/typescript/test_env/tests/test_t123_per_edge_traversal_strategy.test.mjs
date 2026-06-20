@@ -16,18 +16,20 @@ import {
 } from "@abiogenesis/typescript-tenant";
 
 import {
-  FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
-  FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
-  ODD_SDLC_DEFAULT_TRAVERSAL_STRATEGY_PLAN,
-  ODD_SDLC_STEEL_THREAD_AFTER_REQUIREMENTS_TRAVERSAL_STRATEGY_PLAN,
-  SDLC_ABG_ATTACHED_FP_MAX_RETRY_ATTEMPTS,
   constructSdlcGtlModule,
   constructSdlcHookContractCatalog,
+  FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+  FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+  hookContractByEdgeName
+} from "../../build/semantic/code/src/index.js";
+import {
   deriveSdlcTraversalStrategyDecision,
   deriveWorkerHandoffManifest,
-  hookContractByEdgeName,
-  promptForHandoff
-} from "../../build/semantic/code/src/index.js";
+  ODD_SDLC_DEFAULT_TRAVERSAL_STRATEGY_PLAN,
+  ODD_SDLC_STEEL_THREAD_AFTER_REQUIREMENTS_TRAVERSAL_STRATEGY_PLAN,
+  promptForHandoff,
+  SDLC_ABG_ATTACHED_FP_MAX_RETRY_ATTEMPTS
+} from "../../build/semantic/code/src/operator/index.js";
 
 function makeWorkspace() {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t123-"));

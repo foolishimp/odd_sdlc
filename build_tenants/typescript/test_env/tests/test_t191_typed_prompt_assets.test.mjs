@@ -6,14 +6,15 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { admitAssetSurface } from "@abiogenesis/typescript-tenant";
 import {
+  constructSdlcPromptInvocationProjection,
   SDLC_METHOD_AUTHORITY_COMPRESSION_REFS,
   SDLC_PROMPT_AUTHORITY_POLICY_ROWS,
   SDLC_PROMPT_BOUNDED_FALLBACK_AUTHORITY_KIND_REFS,
   SDLC_PROMPT_NORMAL_AUTHORITY_KIND_REFS,
-  constructSdlcPromptInvocationProjection,
   sdlcPromptAuthorityCompressionFallbackPreconditionRef,
   sdlcPromptSectionFromLines
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
+
 import {
   designDepthFpEvaluatorPromptProjection,
   reviewGradeEdgeFulfillmentPromptProjection

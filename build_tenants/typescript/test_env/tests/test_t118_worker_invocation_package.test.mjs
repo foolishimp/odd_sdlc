@@ -14,13 +14,15 @@ import path from "node:path";
 
 import {
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
-  deriveWorkerHandoffManifest,
   hookContractByEdgeName,
-  materializeSdlcProjectConformance,
+  materializeSdlcProjectConformance
+} from "../../build/semantic/code/src/index.js";
+import {
+  deriveWorkerHandoffManifest,
   sha256Text,
   stableOperatorJson,
   writeHandoffFiles
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
 
 function writeConstraints(root) {
   mkdirSync(path.join(root, ".ai-workspace/context"), { recursive: true });

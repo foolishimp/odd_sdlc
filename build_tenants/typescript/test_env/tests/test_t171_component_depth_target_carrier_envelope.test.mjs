@@ -13,7 +13,7 @@ import path from "node:path";
 import {
   admitComponentDepthRegisterFromArtifact,
   admitTestDesignRegisterFromArtifact
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
 
 function writeArtifact(content) {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t171-component-envelope-"));

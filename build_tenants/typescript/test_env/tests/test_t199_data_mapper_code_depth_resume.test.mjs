@@ -80,7 +80,7 @@ function assertNonEmptyArray(payload, fieldName) {
   );
 }
 
-test("T-199 code-depth resume runner uses copied prior graph state and direct codegen", () => {
+test("T-199 code-depth resume runner uses copied prior graph state and ABG CLI codegen", () => {
   const runner = readFileSync(
     path.join(PACKAGE_ROOT, "test_env/live/run_t199_data_mapper_code_depth_resume.mjs"),
     "utf8"
@@ -90,7 +90,9 @@ test("T-199 code-depth resume runner uses copied prior graph state and direct co
   assert.match(runner, /copySeedWorkspace/u);
   assert.match(runner, /collectWorkspacePreconditions/u);
   assert.match(runner, /copiedWorkspaceInstalledPackageName/u);
-  assert.match(runner, /installedSpecPayload/u);
+  assert.match(runner, /installPayload/u);
+  assert.match(runner, /installedAbgCommandFromInstallPayload/u);
+  assert.match(runner, /genesis-ts/u);
   assert.match(runner, /pruneSandboxNoise/u);
   assert.match(runner, /SANDBOX_NOISE_DIR_NAMES/u);
   assert.match(runner, /pruneCodegenOutputs/u);

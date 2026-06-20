@@ -8,12 +8,12 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
-  constructSdlcFpEvaluateResult,
   constructSdlcEdgeFulfillmentLedger,
+  constructSdlcFpEvaluateResult,
   constructSdlcNextActionProjection,
   deriveSdlcEdgeClosureDecision,
   deriveSdlcSelectedAbgFnCompositionIdentity
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
 
 const PACKAGE_ROOT = process.cwd();
 const REPO_ROOT = path.resolve(PACKAGE_ROOT, "../..");

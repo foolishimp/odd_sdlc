@@ -16,7 +16,7 @@ import {
   processLaunchForWorker,
   selectedWorkerExecutorProfile,
   stdinForWorker
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
 
 function makeFixture(promptText) {
   const dir = mkdtempSync(join(tmpdir(), "b070-"));
