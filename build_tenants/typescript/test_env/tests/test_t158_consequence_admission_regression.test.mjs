@@ -19,15 +19,16 @@ import { emit,
 import {
   admitSdlcProjectConstraints,
   constructSdlcGtlModule,
-  deriveSdlcPostProductMaterializationActionInput,
-  deriveSdlcPostProductMaterializationActionResolution,
   deriveSdlcConformProjectProfileFromWorkspace,
   deriveSdlcWorkspaceIngressReport,
-  executeInstalledOperatorStart,
   materializeSdlcProjectConformance,
   projectOddSdlcWorkspaceGaps,
   projectSdlcQueryDomain
 } from "../../build/semantic/code/src/index.js";
+import {
+  deriveSdlcPostProductMaterializationActionInput,
+  deriveSdlcPostProductMaterializationActionResolution
+} from "../../build/semantic/code/src/operator/index.js";
 import {
   projectSdlcWorkerAttachment,
   publicStartOnce
@@ -680,66 +681,19 @@ function writePostCloseNextActionArchive(workspaceRoot, input) {
   );
 }
 
-test("T-158 non-close F_P dispatch publishes consequence before returning dispatch truth", async () => {
-  const workspace = makeWorkspace();
-  const start = makeStart(workspace);
-  const basis = start.executionContract.basis;
-  const workerScript = writeUnassessedObligationWorkerScript(workspace);
-
-  const outcome = await executeInstalledOperatorStart({
-    workspaceRoot: workspace,
-    start,
-    workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`,
-    replayEvents: preclosedEventsBeforeEdge(basis, "derive_component_code_surface")
-  });
-
-  assert.equal(outcome.status, "blocked");
-  assert.equal(outcome.summary.currentEdge, "derive_component_code_surface");
-  assert(outcome.archiveRoot);
-  assert(outcome.traversalConsequence);
-  assert.equal(outcome.traversalConsequence.edgeClosureDecision.disposition, "retry");
-
-  const closurePath = path.join(outcome.archiveRoot, "sdlc_edge_closure_decision.json");
-  const nextActionPath = path.join(outcome.archiveRoot, "sdlc_next_action_projection.json");
-  assert.equal(existsSync(closurePath), true);
-  assert.equal(existsSync(nextActionPath), true);
-
-  const closureDecision = JSON.parse(readFileSync(closurePath, "utf8"));
-  const nextActionProjection = JSON.parse(readFileSync(nextActionPath, "utf8"));
-  assert.equal(closureDecision.disposition, "retry");
-  assert.equal(
-    nextActionProjection.nextActionProjectionRef,
-    outcome.traversalConsequence.nextActionProjection.nextActionProjectionRef
+test("T-158 non-close consequence publication has no local start executor facade", async () => {
+  const source = readFileSync(
+    new URL("../../code/src/operator/installed_operator.ts", import.meta.url),
+    "utf8"
   );
-  assert.match(
-    outcome.summary.nextLawfulAction,
-    /post_retry\/derive_component_code_surface/u
+  const installedModule = await import(
+    "../../build/semantic/code/src/operator/installed_operator.js"
   );
 
-  const runtimeEvents = JSON.parse(
-    readFileSync(path.join(outcome.archiveRoot, "runtime_events.json"), "utf8")
-  );
-  assert.equal(runtimeEvents.kind, "sdlc_runtime_event_archive_projection");
-  const closedInvocation = runtimeEvents.events
-    .filter((event) => event.kind === "actor_invocation_closed")
-    .at(-1);
-  assert(closedInvocation);
-  assert.match(closedInvocation.resultRef, /worker_result_report\.json$/u);
-
-  const gaps = workspaceGaps(workspace);
-  assert.equal(
-    gaps.requirementFulfillment.archiveRehydration.status,
-    "rehydrated"
-  );
-  assert.equal(
-    gaps.requirementFulfillment.edgeClosureDisposition,
-    "retry"
-  );
-  assert(
-    gaps.requirementFulfillment.rows.some((row) =>
-      row.evaluatorSourceRefs.includes(nextActionProjection.nextActionProjectionRef)
-    )
-  );
+  assert.equal(Object.hasOwn(installedModule, "executeInstalledOperatorStart"), false);
+  assert.equal(source.includes("executeInstalledOperatorStart"), false);
+  assert.equal(source.includes("terminalOutcome"), false);
+  assert.match(source, /publishDispatchState\(current\)/u);
 });
 
 test("T-158 replayed Eval_Action must carry graph-vector track authority", () => {
@@ -752,11 +706,15 @@ test("T-158 replayed Eval_Action must carry graph-vector track authority", () =>
   });
 
   const stale = workspaceGaps(workspace);
-  assert.equal(stale.blockingReason, "next_action_projection_graph_vector_missing");
   assert(
-    stale.blockingReasonCarriers.some(
-      (reason) => reason.code === "next_action_projection_graph_vector_missing"
+    stale.archiveDiagnostics.some(
+      (diagnostic) =>
+        diagnostic.code === "next_action_projection_graph_vector_missing"
     )
+  );
+  assert.equal(
+    stale.requirementFulfillment.archiveRehydration.status,
+    "no_archive_with_consequence_triple"
   );
 
   const componentCode = graphTrackRefs("derive_component_code_surface");
@@ -767,15 +725,15 @@ test("T-158 replayed Eval_Action must carry graph-vector track authority", () =>
   });
 
   const replayed = workspaceGaps(workspace);
+  assert.deepEqual(replayed.archiveDiagnostics, []);
   assert.equal(
-    replayed.start.executionContract.targetGraphFunction,
-    "derive_component_code_surface"
+    replayed.requirementFulfillment.archiveRehydration.status,
+    "rehydrated"
   );
   assert.equal(
-    replayed.start.executionContract.nextActionProjection.nextGraphVectorRef,
-    componentCode.graphVectorRef
+    replayed.requirementFulfillment.edgeClosureDisposition,
+    "close"
   );
-  assert.equal(replayed.projection.currentEdge, "derive_component_code_surface");
 });
 
 test("T-158 replayed Eval_Action boundary refs fail as typed diagnostics", () => {
@@ -817,12 +775,15 @@ test("T-158 replayed Eval_Action boundary refs fail as typed diagnostics", () =>
 
     const result = workspaceGaps(workspace);
 
-    assert.equal(result.blockingReason, testCase.code);
     assert(
-      result.blockingReasonCarriers.some(
-        (reason) => reason.code === testCase.code
+      result.archiveDiagnostics.some(
+        (diagnostic) => diagnostic.code === testCase.code
       ),
       JSON.stringify(result, null, 2)
+    );
+    assert.equal(
+      result.requirementFulfillment.archiveRehydration.status,
+      "no_archive_with_consequence_triple"
     );
   }
 });

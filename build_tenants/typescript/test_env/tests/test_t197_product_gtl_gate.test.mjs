@@ -334,7 +334,7 @@ test("T-197 W-110 keeps traversal selection as projection, not SDLC-authored F_D
   assert.doesNotMatch(source, /input\.eventSink\(traversalAuditEvent\)/u);
 });
 
-test("T-197 W-110 routes conform-project F_D advance through ABG runner ownership", () => {
+test("T-197 W-110 keeps conform-project F_D advance out of SDLC runner ownership", () => {
   const source = repoFile(
     "build_tenants/typescript/code/src/operator/installed_operator.ts"
   );
@@ -343,11 +343,10 @@ test("T-197 W-110 routes conform-project F_D advance through ABG runner ownershi
     "isConformProjectGraphVectorEdge"
   );
 
-  assert.match(source, /\bappendFdConformanceRuntimeEvents\b/u);
-  assert.match(source, /\brunEngineIterateAsync\b/u);
-  assert.match(source, /\bconstructFdEvaluationOutcome\b/u);
-  assert.match(source, /\bdefaultFdEvaluatorPlugin\.contract\b/u);
-  assert.match(source, /until:\s*"first_traversal"/u);
+  assert.doesNotMatch(source, /\bappendFdConformanceRuntimeEvents\b/u);
+  assert.doesNotMatch(source, /\brunEngineIterateAsync\b/u);
+  assert.doesNotMatch(source, /\bconstructFdEvaluationOutcome\b/u);
+  assert.doesNotMatch(source, /\bdefaultFdEvaluatorPlugin\.contract\b/u);
   assert.match(source, /\bisConformProjectGraphVectorEdge\(pluginInput\.edge\)/u);
   assert.match(conformVectorGuard, /\bCONFORM_PROJECT_OUTPUTS\.some\b/u);
   assert.match(conformVectorGuard, /`\$\{FG_CONFORM_PROJECT\}__\$\{targetAssetType\}`/u);
@@ -358,14 +357,14 @@ test("T-197 W-110 routes conform-project F_D advance through ABG runner ownershi
   assert.doesNotMatch(source, /\bruntimeEventsForIterationDecision\b/u);
 });
 
-test("T-197 W-110 consumes ABI runtime authorship routes for cursor and graph-span reentry", () => {
+test("T-197 W-110 leaves cursor and graph-span reentry authorship to ABG", () => {
   const source = repoFile(
     "build_tenants/typescript/code/src/operator/installed_operator.ts"
   );
 
-  assert.match(source, /\bapplyExplicitGraphVectorResumeCursor\b/u);
-  assert.match(source, /\bapplyGraphSpanReentryRoute\b/u);
-  assert.match(source, /reason:\s*"odd_sdlc_post_close_graph_continuation_cursor"/u);
+  assert.doesNotMatch(source, /\bapplyExplicitGraphVectorResumeCursor\b/u);
+  assert.doesNotMatch(source, /\bapplyGraphSpanReentryRoute\b/u);
+  assert.doesNotMatch(source, /reason:\s*"odd_sdlc_post_close_graph_continuation_cursor"/u);
   assert.doesNotMatch(source, /\bconstructVectorTraversalPlannedEvent\b/u);
   assert.doesNotMatch(source, /\bconstructVectorEvaluatedEvent\b/u);
   assert.doesNotMatch(source, /\bconstructVectorClosedEvent\b/u);
@@ -517,7 +516,7 @@ test("T-197 A5 gates installed convergence on ABG terminal convergence", () => {
   );
   assert.match(
     source,
-    /const effectiveTerminalKind\s*=\s*terminal\?\.terminalKind\s*\?\?\s*null/u
+    /const terminalKind\s*=\s*input\.terminal\?\.terminalKind\s*\?\?\s*null/u
   );
   assert.doesNotMatch(
     source,
@@ -1199,7 +1198,7 @@ test("T-158/T-203 keep plugin result interfaces under GTL/ABG authority", () => 
   assert.match(designDepthSource, /admitted_plugin_result_envelope/u);
   assert.match(designDepthSource, /resultInterfaceContractDigest/u);
   assert.match(designDepthSource, /authorityRef/u);
-  assert.match(installedOperatorSource, /pluginResultInterfaceCatalog/u);
+  assert.doesNotMatch(installedOperatorSource, /pluginResultInterfaceCatalog/u);
   assert.doesNotMatch(
     installedOperatorSource,
     /pluginResultInterfaces:\s*constructCurrentSdlcGtlProgramConformanceInput/u

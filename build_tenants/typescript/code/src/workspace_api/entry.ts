@@ -13,7 +13,8 @@ import {
   admitExecutionBasis,
   admitResolvedPolicyIdentity,
   admitResolvedRuntimeIdentity,
-  admitStartIntent
+  admitStartIntent,
+  materializeGraphFunction
 } from "@abiogenesis/typescript-tenant";
 import { isPlainRecord } from "../admission/index.js";
 import { constructSdlcGtlModule } from "../graph/index.js";
@@ -77,7 +78,12 @@ export interface SdlcWorkspaceGapArchiveDiagnostic {
   readonly kind: "sdlc_workspace_gap_archive_diagnostic";
   readonly code:
     | "missing_bind_outcome_after_passed_compute"
-    | "traversal_consequence_artifacts_missing";
+    | "traversal_consequence_artifacts_missing"
+    | "next_action_projection_graph_vector_missing"
+    | "legacy_graph_function_boundary_ref"
+    | "unknown_graph_function_boundary_ref"
+    | "legacy_graph_vector_boundary_ref"
+    | "unknown_graph_vector_boundary_ref";
   readonly archiveRef: string;
   readonly evidenceRefs: readonly string[];
 }
@@ -593,6 +599,97 @@ function missingTraversalConsequenceArtifactRefs(
   );
 }
 
+function graphFunctionByBoundaryRef(input: {
+  readonly module: ReturnType<typeof constructSdlcGtlModule>;
+  readonly graphFunctionRef: string;
+}): ReturnType<typeof constructSdlcGtlModule>["graphFunctions"][number] | null {
+  return (
+    input.module.graphFunctions.find(
+      (graphFunction) =>
+        graphFunction.name === input.graphFunctionRef ||
+        graphFunction.id === input.graphFunctionRef
+    ) ?? null
+  );
+}
+
+function graphVectorBoundaryRefAdmitted(input: {
+  readonly graphFunction: ReturnType<typeof constructSdlcGtlModule>["graphFunctions"][number];
+  readonly graphVectorRef: string;
+}): boolean {
+  return materializeGraphFunction(input.graphFunction).vectors.some(
+    (vector) =>
+      vector.name === input.graphVectorRef ||
+      vector.id === input.graphVectorRef
+  );
+}
+
+function nextActionProjectionArchiveDiagnosticCode(input: {
+  readonly archiveRoot: string;
+  readonly module: ReturnType<typeof constructSdlcGtlModule>;
+}): SdlcWorkspaceGapArchiveDiagnostic["code"] | null {
+  const record = jsonRecordFromFile(
+    path.join(input.archiveRoot, "sdlc_next_action_projection.json")
+  );
+  if (record?.["kind"] !== "sdlc_next_action_projection") {
+    return null;
+  }
+  if (record["choosesNextTraversal"] !== true) {
+    return null;
+  }
+  const nextGraphFunctionRef = stringField(record, "nextGraphFunctionRef");
+  const nextGraphVectorRef = stringField(record, "nextGraphVectorRef");
+  if (nextGraphFunctionRef === null) {
+    return null;
+  }
+  if (nextGraphFunctionRef.startsWith("graph-function:")) {
+    return "legacy_graph_function_boundary_ref";
+  }
+  const graphFunction = graphFunctionByBoundaryRef({
+    module: input.module,
+    graphFunctionRef: nextGraphFunctionRef
+  });
+  if (graphFunction === null) {
+    return "unknown_graph_function_boundary_ref";
+  }
+  if (nextGraphVectorRef === null) {
+    return "next_action_projection_graph_vector_missing";
+  }
+  if (nextGraphVectorRef.startsWith("graph-vector:")) {
+    return "legacy_graph_vector_boundary_ref";
+  }
+  return graphVectorBoundaryRefAdmitted({
+    graphFunction,
+    graphVectorRef: nextGraphVectorRef
+  })
+    ? null
+    : "unknown_graph_vector_boundary_ref";
+}
+
+function nextActionProjectionArchiveDiagnostics(input: {
+  readonly archive: SdlcWorkspaceGapsArchiveReadModel;
+  readonly module: ReturnType<typeof constructSdlcGtlModule>;
+}): readonly SdlcWorkspaceGapArchiveDiagnostic[] {
+  const code = nextActionProjectionArchiveDiagnosticCode({
+    archiveRoot: input.archive.archiveRoot,
+    module: input.module
+  });
+  return code === null
+    ? Object.freeze([])
+    : Object.freeze([
+        Object.freeze({
+          kind: "sdlc_workspace_gap_archive_diagnostic" as const,
+          code,
+          archiveRef: input.archive.archiveRef,
+          evidenceRefs: Object.freeze([
+            archiveFileRef({
+              archiveRoot: input.archive.archiveRoot,
+              fileName: "sdlc_next_action_projection.json"
+            })
+          ])
+        })
+      ]);
+}
+
 function assessmentStatusFromRecord(
   record: Readonly<Record<string, unknown>>
 ): SdlcRequirementFulfillmentAssessmentPublicInput["fulfillmentStatus"] | null {
@@ -637,6 +734,7 @@ function requirementAssessmentsFromArchive(
 
 function requirementFulfillmentForGaps(input: {
   readonly context: OddSdlcWorkspaceApiContext;
+  readonly module: ReturnType<typeof constructSdlcGtlModule>;
   readonly sourceProjection: SdlcRequirementFulfillmentPublicProjection;
 }): {
   readonly projection: SdlcRequirementFulfillmentPublicProjection;
@@ -689,6 +787,17 @@ function requirementFulfillmentForGaps(input: {
           evidenceRefs: missingTraversalRefs
         })
       );
+      continue;
+    }
+    const nextActionDiagnostics = nextActionProjectionArchiveDiagnostics({
+      archive,
+      module: input.module
+    });
+    if (nextActionDiagnostics.length > 0) {
+      missingArtifactRefs.push(
+        ...nextActionDiagnostics.flatMap((diagnostic) => diagnostic.evidenceRefs)
+      );
+      archiveDiagnostics.push(...nextActionDiagnostics);
       continue;
     }
     return Object.freeze({
@@ -801,6 +910,7 @@ export function projectOddSdlcWorkspaceGaps(input: {
   });
   const requirementFulfillment = requirementFulfillmentForGaps({
     context,
+    module,
     sourceProjection: queryDomain.requirementFulfillment
   });
   const dossier = deriveSdlcGapDossier({

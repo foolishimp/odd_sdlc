@@ -22,28 +22,32 @@ import { fileURLToPath,
   pathToFileURL } from "node:url";
 
 import {
-  admitWorkerResultReport,
   admitSdlcProjectConstraints,
-  constructWorkerProcessFailurePostflight,
   constructSdlcGtlModule,
-  constructorResultFromWorkerOutput,
   defaultOperationForTarget,
-  deriveSdlcConformProjectProfileFromWorkspace,
-  deriveSdlcWorkspaceIngressReport,
-  deriveWorkerHandoffManifest,
-  executeInstalledOperatorStart,
   hookContractByEdgeName,
   installOddSdlcTypescript,
   minimalSdlcHookInvocationForContract,
-  projectSdlcQueryDomain,
-  readWorkerResultReport,
   runSdlcHookTurn,
-  sha256Text,
-  writeHandoffFiles
+  projectSdlcQueryDomain
 } from "../../build/semantic/code/src/index.js";
 import { executeOddSdlcWorkspaceStartViaAbgCliForTest } from "../abg_cli_start_harness.mjs";
 import {
-  projectSdlcWorkerAttachment,
+  constructWorkerProcessFailurePostflight
+} from "../../build/semantic/code/src/operator/index.js";
+import {
+  constructorResultFromWorkerOutput
+} from "../../build/semantic/code/src/operator/plugins/consequence/constructor_projection.js";
+import {
+  admitWorkerResultReport,
+  readWorkerResultReport
+} from "../../build/semantic/code/src/operator/plugins/transform/result_projection.js";
+import {
+  deriveWorkerHandoffManifest,
+  sha256Text,
+  writeHandoffFiles
+} from "../../build/semantic/code/src/operator/plugins/transform/launch_contract.js";
+import {
   publicStartOnce
 } from "../../build/semantic/code/src/start/index.js";
 
@@ -332,8 +336,8 @@ test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () 
 
     assert.equal(start.status, "worker_failed");
     assert.equal(start.workerRun.timedOut, true);
-    assert.equal(start.workerRun.stdoutByteCount, 0);
-    assert.equal(start.workerRun.stderrByteCount, 0);
+    assert.equal(start.workerRun.stdoutByteCount ?? 0, 0);
+    assert.equal(start.workerRun.stderrByteCount ?? 0, 0);
     assert.equal(
       start.postflight.blockingReasonCarriers[0].code,
       "worker_hard_timeout"
@@ -386,11 +390,11 @@ test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () 
     );
     assert.match(
       start.postflight.blockingReasonCarriers[0].detail,
-      /runtimeLivenessLeaseState=externally_interrupted/u
+      /runtimeLivenessLeaseState=hard_safety_cap_requires_interruption_event/u
     );
     assert.match(
       start.postflight.blockingReasonCarriers[0].detail,
-      /runtimeLivenessDispositionAction=block/u
+      /runtimeLivenessDispositionAction=controlled_terminate/u
     );
     assert.match(
       start.postflight.blockingReasonCarriers[0].detail,
@@ -441,9 +445,12 @@ test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () 
     );
     assert.equal(
       processSummary.runtimeLivenessLeaseState,
-      "externally_interrupted"
+      "hard_safety_cap_requires_interruption_event"
     );
-    assert.equal(processSummary.runtimeLivenessDispositionAction, "block");
+    assert.equal(
+      processSummary.runtimeLivenessDispositionAction,
+      "controlled_terminate"
+    );
     assert.equal(processSummary.pid > 0, true);
     assert.equal(processSummary.lastHeartbeatElapsedMs >= 0, true);
     assert.deepStrictEqual(
@@ -461,14 +468,12 @@ test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () 
       )
     );
     assert.equal(livenessProjection.kind, "runtime_liveness_observer_projection");
-    assert.equal(livenessProjection.leaseState, "externally_interrupted");
-    assert.equal(livenessProjection.disposition.action, "block");
     assert.equal(
-      livenessProjection.interruptionRows.some(
-        (row) => row.source === "harness_safety_cap"
-      ),
-      true
+      livenessProjection.leaseState,
+      "hard_safety_cap_requires_interruption_event"
     );
+    assert.equal(livenessProjection.disposition.action, "controlled_terminate");
+    assert.equal(livenessProjection.requiresExternalInterruptionEvent, true);
   } finally {
     if (previousTimeout === undefined) {
       delete process.env["ODD_SDLC_WORKER_TIMEOUT_MS"];
@@ -902,128 +907,21 @@ test("T-159 assurance rejection rewrites F_P evaluate result as blocked", async 
     /evaluation_set_incomplete|design-depth register payload|review_grade_assessment_missing/u
   );
 });
-test("T-106 installed operator uses admitted conformed profile after workspace drift", async () => {
-  const workspace = makeWorkspace();
-  const module = constructSdlcGtlModule();
-  const ingressReport = deriveSdlcWorkspaceIngressReport({
-    workspaceRootUri: `file://${workspace}`,
-    projectConstraints: admitSdlcProjectConstraints({
-      projectSlug: "t064_fixture",
-      activeTenant: "typescript",
-      selectedOutputRoot: "build_tenants/typescript",
-      ambiguityRiskAppetite: "medium",
-      capabilityContracts: []
-    }),
-    sourceInputs: []
-  });
-  const queryDomain = projectSdlcQueryDomain({ module, ingressReport });
-  const conformedProject =
-    deriveSdlcConformProjectProfileFromWorkspace(workspace);
-  assert.equal(conformedProject.activeTenant, "typescript");
-  const start = publicStartOnce({
-    request: {
-      kind: "sdlc_public_start_request",
-      workspaceRoot: workspace,
-      target: {
-        kind: "graph_function",
-        handle: "bootstrap_release_self_test"
-      },
-      until: "first_traversal",
-      defaultRegime: "F_P"
-    },
-    module,
-    queryDomain,
-    conformedProject,
-    workerAttachment: projectSdlcWorkerAttachment({
-      transportContract: "process://node"
-    })
-  });
-  assert.equal(start.kind, "sdlc_public_start_projected");
-
-  writeFileSync(
-    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
-    [
-      "project:",
-      "  name: drifted_fixture",
-      "active_tenant: scala_spark",
-      "selected_output_root: build_tenants/scala_spark",
-      "ambiguity_risk_appetite: medium",
-      "build_tenants:",
-      "  scala_spark:",
-      "    output_dir: build_tenants/scala_spark/",
-      "    language: Scala",
-      "    build_tool: sbt",
-      "    test_runner: sbt test"
-    ].join("\n"),
+test("T-204 installed operator does not expose a local start executor", async () => {
+  const source = readFileSync(
+    new URL("../../code/src/operator/installed_operator.ts", import.meta.url),
     "utf8"
   );
-
-  const workerScript = writeTransformOnlyWorkerScript(workspace);
-  const result = await executeInstalledOperatorStart({
-    workspaceRoot: workspace,
-    start,
-    workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`,
-    replayEvents: []
-  });
-
-  assert.notEqual(result.status, "worker_failed");
-  assert.notEqual(result.manifest, null);
-  assert.equal(result.manifest.conformedProject.activeTenant, "typescript");
-  assert.notEqual(result.traversalConsequence, null);
-  assert.equal(
-    result.manifest.productMaterialization.tenantRoot.endsWith(
-      "build_tenants/typescript"
-    ),
-    true
-  );
-  const archiveRoot = result.manifest.archiveRoot;
-  const consequence = result.traversalConsequence;
-  const archivedEdgeGain = JSON.parse(
-    readFileSync(path.join(archiveRoot, "sdlc_edge_gain.json"), "utf8")
-  );
-  const archivedResidualPressure = JSON.parse(
-    readFileSync(
-      path.join(archiveRoot, "sdlc_edge_residual_pressure.json"),
-      "utf8"
-    )
-  );
-  const archivedLedger = JSON.parse(
-    readFileSync(path.join(archiveRoot, "sdlc_edge_fulfillment_ledger.json"), "utf8")
-  );
-  const archivedClosureDecision = JSON.parse(
-    readFileSync(path.join(archiveRoot, "sdlc_edge_closure_decision.json"), "utf8")
-  );
-  const archivedNextAction = JSON.parse(
-    readFileSync(path.join(archiveRoot, "sdlc_next_action_projection.json"), "utf8")
+  const rootModule = await import("../../build/semantic/code/src/index.js");
+  const operatorModule = await import("../../build/semantic/code/src/operator/index.js");
+  const installedModule = await import(
+    "../../build/semantic/code/src/operator/installed_operator.js"
   );
 
-  assert.equal(archivedEdgeGain.gainRef, consequence.edgeGain.gainRef);
-  assert.equal(archivedEdgeGain.contractRef, archivedLedger.edgeAssuranceContractRef);
-  assert.equal(
-    archivedEdgeGain.contractDigest,
-    archivedLedger.edgeAssuranceContractDigest
-  );
-  assert.equal(archivedResidualPressure.contractRef, archivedEdgeGain.contractRef);
-  assert.equal(
-    archivedResidualPressure.contractDigest,
-    archivedEdgeGain.contractDigest
-  );
-  assert.deepStrictEqual(
-    archivedLedger.edgeResidualPressureRefs,
-    archivedResidualPressure.requiredPressureRefs
-  );
-  assert.equal(archivedClosureDecision.edgeGainRef, archivedEdgeGain.gainRef);
-  assert.equal(
-    archivedClosureDecision.edgeAssuranceDecisionRef,
-    consequence.edgeClosureDecision.edgeAssuranceDecisionRef
-  );
-  assert.equal(
-    archivedNextAction.edgeAssuranceContractRef,
-    archivedLedger.edgeAssuranceContractRef
-  );
-  assert.equal(archivedNextAction.edgeGainRef, archivedEdgeGain.gainRef);
-  assert.deepStrictEqual(
-    archivedNextAction.edgeResidualPressureRefs,
-    archivedResidualPressure.requiredPressureRefs
-  );
+  assert.equal(source.includes("executeInstalledOperatorStart"), false);
+  assert.equal(source.includes("runEngineIterateAsync"), false);
+  assert.equal(source.includes("appendOddSdlcRuntimeEvents"), false);
+  assert.equal(Object.hasOwn(rootModule, "executeInstalledOperatorStart"), false);
+  assert.equal(Object.hasOwn(operatorModule, "executeInstalledOperatorStart"), false);
+  assert.equal(Object.hasOwn(installedModule, "executeInstalledOperatorStart"), false);
 });

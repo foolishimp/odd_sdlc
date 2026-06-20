@@ -1169,7 +1169,7 @@ test("T-140 installed operator does not dispatch from legacy gap action strings"
 test("T-140 closure reasons use typed blocking-reason reentry points", () => {
   const source = installedOperatorSource();
 
-  assert.equal(source.includes("sdlcClosureBlockingReasonRefsForReentry"), true);
+  assert.equal(source.includes("sdlcClosureBlockingReasonRefsForReentry"), false);
   assert.equal(source.includes('reason.lawfulReentryPoint === "same_edge_retry"'), true);
   assert.equal(
     source.includes('reason.blockingReason.lawfulReentryPoint === "repair_worker_output"'),

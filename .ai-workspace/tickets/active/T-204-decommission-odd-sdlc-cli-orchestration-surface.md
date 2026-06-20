@@ -1955,3 +1955,135 @@ Status:
 - Strict T-204 closure remains open only for the already-classified
   `move_to_abg`/`survival_pending` inventory, not because odd_sdlc exposes a
   second command/control truth surface.
+
+## 2026-06-20 Hard-Break Executor Removal Checkpoint
+
+Inside-out hard-break work in this cut:
+
+- deleted `executeInstalledOperatorStart(...)` and the local terminal outcome,
+  summary, run-archive, F_D append, graph-continuation cursor, and graph-span
+  reentry helpers from `operator/installed_operator.ts`.
+- removed the root public `effects/index.js` export; generic effects remain
+  internal/move-to-ABG inventory and are no longer root package API.
+- migrated stale proof tests away from root/internal executor imports. Tests now
+  either import product-owned helpers from their owning modules or assert that
+  the old local executor/event-authorship path is absent.
+- changed T-140/T-197 gates so W-110/A5 assert ABG ownership by absence of
+  odd_sdlc-local `runEngineIterateAsync`, explicit graph-vector cursor, and
+  graph-span reentry event authorship.
+- kept `workspace_api` gaps as a read-only projection, and added fail-fast
+  archive diagnostics for malformed replayed `sdlc_next_action_projection.json`
+  graph function/vector refs:
+  `next_action_projection_graph_vector_missing`,
+  `legacy_graph_function_boundary_ref`,
+  `unknown_graph_function_boundary_ref`,
+  `legacy_graph_vector_boundary_ref`, and
+  `unknown_graph_vector_boundary_ref`.
+
+Checkpoint validation:
+
+- passed: `npm run build:semantic`
+- passed: `npm run guard:pack-no-command-artifacts`
+- passed: `git diff --check`
+- passed: focused T-204/T-205/T-140/T-141/T-143/T-151/T-158/T-172/T-197/T-203
+  proof lane, 126/126 tests.
+- passed: scans show no `executeInstalledOperatorStart(...)` calls in
+  `code/src`, `build/semantic/code/src`, or active test code; remaining textual
+  mentions are negative/boundary assertions only.
+
+Status:
+
+- This cut removes the residual product-local installed start executor and the
+  old local ABG event-authorship paths. Functional command/control truth remains
+  ABG-owned.
+- Strict closure still requires executing the existing `move_to_abg` inventory
+  for generic analysis/effects/event-store/start mechanics and the remaining
+  physical relocation work. This checkpoint does not claim release closure until
+  a fresh hello-world live run passes after the hard break.
+
+## 2026-06-20 Post-Hard-Break Hello-World Live Proof
+
+Fresh clean live proof after deleting the residual local installed executor:
+
+- archive:
+  `build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260620T080343355Z_pid55860`
+- command/test result:
+  `npm run test:scenario:t132-hello-world-js-live`
+  passed with 1/1 tests in 1,612,128 ms.
+- direct tenant verification:
+  `node --test test/hello.test.js` from the generated
+  `build_tenants/hello_world_javascript` tenant passed 1/1 tests in 61 ms.
+- total scenario progress from first step begin to return: 26.45.
+
+| Step | Target graph function | Status | Step time | Prompt consistency |
+| ---: | --- | --- | ---: | --- |
+| 0 | `Fg_conform_project` | converged | 0.02 | no worker prompt |
+| 1 | `derive_lite_design_adr_surface` | converged | 5.10 | consistent; implementation-design planning, no materialization target contradiction |
+| 2 | `derive_lite_component_code_surface` | converged | 7.25 | consistent; materialization required with declared `src/hello.js`; review overworked |
+| 3 | `derive_lite_test_design_surface` | converged | 4.24 | consistent; planning surface, materialization not required |
+| 4 | `derive_lite_component_test_surface` | converged | 5.53 | consistent; materialization required with declared `test/hello.test.js`; worker over-read package context |
+| 5 | `derive_lite_uat_test_source_surface` | converged | 3.47 | consistent; UAT source edge reused admitted role=test target and emitted UAT carrier |
+| 6 | `prepare_test_execution_surface` | converged | 0.02 | execution-preparation system stage |
+| 7 | `derive_test_execution_result_surface` | converged | 0.02 | execution-result system stage |
+
+Prompt and evaluator proportionality notes from this run:
+
+- `derive_lite_design_adr_surface`: worker prompt 13,958 chars /
+  1,568 words; design-depth evaluator prompt 24,934 chars / 1,891 words.
+- `derive_lite_component_code_surface`: worker prompt 20,526 chars /
+  2,209 words; review-grade prompt 24,577 chars / 2,177 words; worker elapsed
+  2.13; review elapsed 4.43. This is the main overwork signal: 4 reviewed
+  obligations produced a large review trace even though the prompt was not
+  contradictory.
+- `derive_lite_test_design_surface`: worker prompt 14,183 chars / 1,359 words;
+  review-grade prompt 17,997 chars / 1,504 words; worker elapsed 2.08; review
+  elapsed 2.14. This is the cleaner planning-surface shape.
+- `derive_lite_component_test_surface`: worker prompt 18,970 chars /
+  1,969 words; review-grade prompt 21,123 chars / 1,745 words; worker elapsed
+  2.46; review elapsed 3.03. Worker spent time rediscovering tenant/root and
+  execution context from raw package files even though the top-level prompt
+  carried enough context.
+- `derive_lite_uat_test_source_surface`: worker prompt 15,305 chars /
+  1,545 words; review-grade prompt 20,412 chars / 1,657 words; worker elapsed
+  1.36; review elapsed 2.07. The prompt was smaller and the wait was
+  proportional.
+
+Archive consistency check:
+
+- every graph stage with a worker prompt has `fp_evaluate_result.status =
+  passed`, `postflight.status = passed`,
+  `sdlc_edge_closure_decision.json` present, and
+  `sdlc_next_action_projection.json` present.
+- review-grade stages passed all reviewed obligations:
+  component-code 4/4, test-design 2/2, component-test 5/5, UAT test source 5/5.
+- generated product files are lawful and executable:
+  `src/hello.js` emits `Hello, world!\n`, and `test/hello.test.js` imports
+  Node built-ins and verifies stdout through `execFileSync`.
+
+Validation after the post-hard-break live proof:
+
+- passed: `npm run build:semantic`
+- passed: `npm run guard:pack-no-command-artifacts`
+- passed: `git diff --check`
+- passed: focused T-204/T-205/T-140/T-141/T-143/T-151/T-158/T-172/T-197/T-203
+  proof lane, 126/126 tests.
+- passed: `npm run test:scenario:t132-hello-world-js-live`
+- not green: broad `npm run test:semantic`. The failures are outside the
+  one-surface/live proof lane and fall into two known classes:
+  stale root-barrel imports over internal/product helpers that are no longer
+  public API (`admitWorkerTransport`,
+  `admitComponentDepthRegisterFromArtifact`, `declaredProductFileTargets`,
+  `deriveWorkerHandoffManifest`, and traversal-pressure helpers), and older
+  product-materialization assertions still priced against pre-tightening
+  postflight/materialization law. Some later `ERR_MODULE_NOT_FOUND` entries are
+  cascade/concurrency noise from the broad glob after package/release tests
+  rebuild or clean semantic output while sibling test files are loading.
+
+Status:
+
+- The hard-break executor removal is live-proven. ABG-owned `genesis-ts start`
+  drove the scenario; odd_sdlc did not restore a local start executor or
+  command/control wrapper.
+- No contradictory prompt was found in the live run. The remaining runtime-cost
+  trend is review-grade overwork, especially component-code materialization
+  binding language and raw sidecar/package discovery pressure.

@@ -30,22 +30,27 @@ import {
   conformProjectProfileFromConstraintsText,
   constructSdlcGtlModule,
   deriveSdlcProjectConstraintsFromWorkspace,
-  deriveSdlcSelectedAbgFnCompositionIdentity,
   deriveSdlcInstalledQualificationInitialState,
   deriveSdlcWorkspaceIngressReport,
-  deriveWorkerHandoffManifest,
-  executeInstalledOperatorStart,
   FG_CONFORM_PROJECT_AUTHORITY,
   FG_CONFORM_PROJECT,
   installOddSdlcTypescript,
   hookContractByEdgeName,
   materializeSdlcProjectConformance,
   evalSdlcGapFromReplay,
-  projectSdlcQueryDomain,
-  readOddSdlcRuntimeEvents,
+  projectSdlcQueryDomain
+} from "../../build/semantic/code/src/index.js";
+import {
+  deriveSdlcSelectedAbgFnCompositionIdentity
+} from "../../build/semantic/code/src/operator/composition_identity.js";
+import {
+  readOddSdlcRuntimeEvents
+} from "../../build/semantic/code/src/operator/event_store.js";
+import {
+  deriveWorkerHandoffManifest,
   sha256Text,
   writeHandoffFiles
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/plugins/transform/launch_contract.js";
 import { canonicalDataMapperFixtureRoot } from "../fixtures/data_mapper_fixture.mjs";
 import {
   projectSdlcWorkerAttachment,

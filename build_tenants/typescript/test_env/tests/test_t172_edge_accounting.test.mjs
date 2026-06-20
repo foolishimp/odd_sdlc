@@ -25,13 +25,14 @@ import {
   conformProjectProfileFromConstraintsText,
   constructSdlcGtlModule,
   deriveSdlcWorkspaceIngressReport,
-  deriveWorkerHandoffManifest,
   deriveSdlcExecutiveEdgeAccountingAudit,
-  executeInstalledOperatorStart,
   hookContractByEdgeName,
-  projectSdlcQueryDomain,
-  writeHandoffFiles
+  projectSdlcQueryDomain
 } from "../../build/semantic/code/src/index.js";
+import {
+  deriveWorkerHandoffManifest,
+  writeHandoffFiles
+} from "../../build/semantic/code/src/operator/plugins/transform/launch_contract.js";
 import {
   analyzeSdlcFdRunArchive
 } from "../../build/semantic/code/src/analysis/index.js";
@@ -401,7 +402,7 @@ test("T-172 F_D failure rows do not embed stack-specific build-tool classifiers"
   assert.doesNotMatch(source, /failure:sbt-build-definition/u);
 });
 
-test("T-172 installed operator executes no-dispatch edges without worker_run", async () => {
+test("T-172 no-dispatch edge accounting is product law without a local executor", async () => {
   const noDispatchEdgeNames = SDLC_T172_FULL_TRAVERSAL_EDGE_ACCOUNTING
     .filter((row) => !row.workerDispatchAllowed)
     .map((row) => row.edgeName);
@@ -417,160 +418,32 @@ test("T-172 installed operator executes no-dispatch edges without worker_run", a
     "prepare_release_surface"
   ]);
 
-  for (const edgeName of noDispatchEdgeNames) {
-    const workspaceRoot = makeRuntimeWorkspace();
-    if (edgeName === "derive_test_run_archive_surface") {
-      writePriorSucceededExecutionResult(workspaceRoot);
-    }
-    const start = runtimeStart(workspaceRoot);
-    const basis = start.executionContract.basis;
-    const outcome = await executeInstalledOperatorStart({
-      workspaceRoot,
-      start,
-      workerTransport: null,
-      replayEvents: preclosedEventsBeforeEdge(basis, edgeName)
-    });
-
-    assert.equal(outcome.manifest.edgeName, edgeName);
-    assert.equal(outcome.workerRun, null, edgeName);
-    const structuralPostflight = JSON.parse(
-      readFileSync(path.join(outcome.archiveRoot, "postflight.json"), "utf8")
-    );
-    assert.equal(structuralPostflight.status, "passed", edgeName);
-    assert.equal(
-      existsSync(path.join(outcome.archiveRoot, "worker_run.json")),
-      false,
-      edgeName
-    );
-    assert.equal(
-      existsSync(path.join(outcome.archiveRoot, "worker_result_report.json")),
-      true,
-      edgeName
-    );
-
-    const report = JSON.parse(
-      readFileSync(path.join(outcome.archiveRoot, "worker_result_report.json"), "utf8")
-    );
-    assert.equal(report.fpTransformRequestRef, null, edgeName);
-    assert.equal(report.fpTransformResultRef, null, edgeName);
-    assert.equal(report.fpTransformStatusSnapshot, null, edgeName);
-    if (edgeName === "qualify_component_realization_surface") {
-      assert.equal(existsSync(outcome.manifest.outputFile), true, edgeName);
-      const declaredProjectionArtifact = JSON.parse(
-        readFileSync(
-          path.join(outcome.archiveRoot, "declared_edge_projection_artifact.json"),
-          "utf8"
-        )
-      );
-      assert.equal(
-        declaredProjectionArtifact.sourceFunction,
-        "consequence.edge_projection.writeDeclaredEdgeProjectionOutput",
-        edgeName
-      );
-    }
-    if (edgeName === "derive_test_execution_result_surface") {
-      const projectedEvidence = JSON.parse(
-        readFileSync(outcome.manifest.outputFile, "utf8")
-      );
-      assert.equal(
-        projectedEvidence.kind,
-        "sdlc_worker_execution_evidence",
-        edgeName
-      );
-      assert.deepEqual(report.executionEvidence, projectedEvidence, edgeName);
-      assert.notEqual(projectedEvidence.status, "pending", edgeName);
-      assert.equal(report.executionEvidenceErrors?.length ?? 0, 0, edgeName);
-      const declaredProjectionArtifact = JSON.parse(
-        readFileSync(
-          path.join(outcome.archiveRoot, "declared_edge_projection_artifact.json"),
-          "utf8"
-        )
-      );
-      assert.equal(
-        declaredProjectionArtifact.sourceFunction,
-        "consequence.edge_projection.writeDeclaredEdgeProjectionOutput",
-        edgeName
-      );
-    }
-
-    const closureDecision = JSON.parse(
-      readFileSync(path.join(outcome.archiveRoot, "sdlc_edge_closure_decision.json"), "utf8")
-    );
-    assert.equal(
-      closureDecision.targetCarrierAdmissionStatus,
-      "admitted",
-      edgeName
-    );
-    if (edgeName === "qualify_component_realization_surface") {
-      assert.equal(
-        closureDecision.edgeResidualPressureRefs.some((ref) =>
-          ref.includes("component_depth_output_missing")
-        ),
-        false,
-        edgeName
-      );
-    }
-    if (edgeName === "derive_test_execution_result_surface") {
-      assert.notEqual(closureDecision.disposition, "retry", edgeName);
-    }
-
-    const analysis = analyzeSdlcFdRunArchive({
-      inspectedRoot: workspaceRoot,
-      profile: "generic",
-      nowMs: Date.parse("2026-05-19T00:00:00.000Z")
-    });
-    assert.equal(analysis.edgeAccounting.admissionDecision, "admit", edgeName);
-    assert.deepEqual(
-      analysis.edgeAccounting.observedWorkerDispatchViolationEdgeNames,
-      [],
-      edgeName
-    );
-  }
+  const audit = deriveSdlcExecutiveEdgeAccountingAudit();
+  assert.equal(audit.admissionDecision, "admit");
+  assert.deepEqual(audit.workerDispatchViolationEdgeNames, []);
+  assert.deepEqual(audit.observedWorkerDispatchViolationEdgeNames, []);
+  assert.deepEqual(
+    SDLC_T172_FULL_TRAVERSAL_EDGE_ACCOUNTING
+      .filter((row) => noDispatchEdgeNames.includes(row.edgeName))
+      .map((row) => row.workerDispatchAllowed),
+    noDispatchEdgeNames.map(() => false)
+  );
 });
 
-test("T-172 no-dispatch test execution projection writes an admitted target carrier", async () => {
-  const workspaceRoot = makeRuntimeWorkspace();
-  writeFileSync(
-    path.join(workspaceRoot, ".ai-workspace/context/project_constraints.yml"),
-    [
-      "project:",
-      "  name: t172_runtime",
-      "  active_tenant: typescript",
-      "  selected_output_root: build_tenants/typescript",
-      "  ambiguity_risk_appetite: medium",
-      "build_tenants:",
-      "  typescript:",
-      "    output_dir: build_tenants/typescript",
-      "    language: TypeScript",
-      "    build_tool: npm",
-      "    test_runner: node --test",
-      "    test_execution_contract: node --test",
-      "    module_structure:",
-      "      - runtime"
-    ].join("\n"),
+test("T-172 odd_sdlc publishes no local no-dispatch execution runner", async () => {
+  const rootModule = await import("../../build/semantic/code/src/index.js");
+  const operatorModule = await import("../../build/semantic/code/src/operator/index.js");
+  const installedModule = await import(
+    "../../build/semantic/code/src/operator/installed_operator.js"
+  );
+  const source = readFileSync(
+    new URL("../../code/src/operator/installed_operator.ts", import.meta.url),
     "utf8"
   );
-  const start = runtimeStart(workspaceRoot);
-  const basis = start.executionContract.basis;
-  const outcome = await executeInstalledOperatorStart({
-    workspaceRoot,
-    start,
-    workerTransport: null,
-    replayEvents: preclosedEventsBeforeEdge(basis, "prepare_test_execution_surface")
-  });
 
-  assert.equal(outcome.status, "worker_invoked");
-  assert.equal(outcome.manifest.edgeName, "prepare_test_execution_surface");
-  assert.equal(outcome.workerRun, null);
-  assert.equal(outcome.postflight.status, "passed");
-
-  const payload = JSON.parse(readFileSync(outcome.manifest.outputFile, "utf8"));
-  assert.equal(payload.kind, "sdlc_test_execution_surface_register");
-  assert.equal(payload.targetAssetType, "test_execution_surface");
-  assert.ok(payload.testExecutionPreparationRows.length > 0);
-
-  const closureDecision = JSON.parse(
-    readFileSync(path.join(outcome.archiveRoot, "sdlc_edge_closure_decision.json"), "utf8")
-  );
-  assert.equal(closureDecision.targetCarrierAdmissionStatus, "admitted");
+  assert.equal(Object.hasOwn(rootModule, "executeInstalledOperatorStart"), false);
+  assert.equal(Object.hasOwn(operatorModule, "executeInstalledOperatorStart"), false);
+  assert.equal(Object.hasOwn(installedModule, "executeInstalledOperatorStart"), false);
+  assert.equal(source.includes("executeInstalledOperatorStart"), false);
+  assert.equal(source.includes("runEngineIterateAsync"), false);
 });

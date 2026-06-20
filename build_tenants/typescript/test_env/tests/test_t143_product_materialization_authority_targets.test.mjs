@@ -20,31 +20,46 @@ import {
   FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
   admitSdlcProjectConstraints,
-  assertSdlcProductMaterializationLaunchable,
-  buildPostTransformWorkerResultReport,
   conformProjectProfileFromConstraintsText,
   constructSdlcGtlModule,
-  constructWorkerInvocationPackage,
-  declaredProductFileTargets,
   deriveSdlcWorkspaceIngressReport,
-  deriveWorkerHandoffManifest,
-  executeInstalledOperatorStart,
-  evaluateSdlcComputeStage,
   hookContractByEdgeName,
-  observeProductMaterializationDelta,
-  promptForHandoff,
-  projectSdlcQueryDomain,
-  readWorkerResultReport,
-  reconcileSdlcProductMaterializationAuthority,
-  sha256Text,
-  sdlcOperatorRuntimePolicy,
-  sdlcOperatorRuntimePolicyConfigPath,
-  sdlcProductMaterializationLaunchBlocker,
-  sdlcWorkspaceLocalToolEnvironment,
-  snapshotProductMaterializationRoot,
-  writeHandoffFiles,
-  writeProductMaterializationManifest
+  projectSdlcQueryDomain
 } from "../../build/semantic/code/src/index.js";
+import {
+  assertSdlcProductMaterializationLaunchable,
+  declaredProductFileTargets,
+  reconcileSdlcProductMaterializationAuthority,
+  sdlcProductMaterializationLaunchBlocker
+} from "../../build/semantic/code/src/operator/product_materialization/authority.js";
+import {
+  writeProductMaterializationManifest
+} from "../../build/semantic/code/src/operator/product_materialization/manifest.js";
+import {
+  observeProductMaterializationDelta,
+  snapshotProductMaterializationRoot
+} from "../../build/semantic/code/src/operator/product_materialization/observation.js";
+import {
+  sdlcOperatorRuntimePolicy,
+  sdlcOperatorRuntimePolicyConfigPath
+} from "../../build/semantic/code/src/operator/runtime_policy.js";
+import {
+  sdlcWorkspaceLocalToolEnvironment
+} from "../../build/semantic/code/src/operator/tool_environment.js";
+import {
+  evaluateSdlcComputeStage
+} from "../../build/semantic/code/src/operator/plugins/evaluate/postflight.js";
+import {
+  constructWorkerInvocationPackage,
+  deriveWorkerHandoffManifest,
+  promptForHandoff,
+  sha256Text,
+  writeHandoffFiles
+} from "../../build/semantic/code/src/operator/plugins/transform/launch_contract.js";
+import {
+  buildPostTransformWorkerResultReport,
+  readWorkerResultReport
+} from "../../build/semantic/code/src/operator/plugins/transform/result_projection.js";
 import {
   projectSdlcWorkerAttachment,
   publicStartOnce
@@ -1576,48 +1591,25 @@ test("T-143 empty component-code source target authority fails before F_P launch
   );
 });
 
-test("T-205 installed dispatch archives product-materialization launch blockers", async () => {
+test("T-205 product-materialization launch blockers stay pre-dispatch under ABG control", async () => {
   const workspaceRoot = workspaceWithoutProductTargets();
   try {
-    const start = launchBlockerRuntimeStart(workspaceRoot);
-    const outcome = await executeInstalledOperatorStart({
-      workspaceRoot,
-      start,
-      workerTransport: "process://node",
-      replayEvents: []
-    });
-
-    assert.equal(outcome.status, "blocked");
-    assert.equal(outcome.manifest.edgeName, "derive_component_code_surface");
-    assert.equal(outcome.workerRun, null);
-    assert.equal(outcome.postflight.status, "blocked");
-    assert.deepEqual(outcome.postflight.blockingReasons, ["worker_launch_failed"]);
-    assert.equal(
-      existsSync(path.join(outcome.archiveRoot, "worker_run.json")),
-      false
-    );
-    assert.equal(
-      existsSync(path.join(outcome.archiveRoot, "worker_launch_postflight.json")),
-      true
-    );
-    assert.equal(existsSync(path.join(outcome.archiveRoot, "postflight.json")), true);
-    assert.equal(existsSync(path.join(outcome.archiveRoot, "gap_dossier.json")), true);
-    assert.equal(
-      existsSync(path.join(outcome.archiveRoot, "sdlc_edge_closure_decision.json")),
-      true
-    );
-    assert.equal(
-      existsSync(path.join(outcome.archiveRoot, "sdlc_next_action_projection.json")),
-      true
+    const manifest = materializationManifest(workspaceRoot);
+    const source = installedOperatorSource();
+    const operatorIndex = readFileSync(
+      new URL("../../code/src/operator/index.ts", import.meta.url),
+      "utf8"
     );
 
-    const gapDossier = JSON.parse(
-      readFileSync(path.join(outcome.archiveRoot, "gap_dossier.json"), "utf8")
+    assert.equal(source.includes("executeInstalledOperatorStart"), false);
+    assert.equal(operatorIndex.includes("executeInstalledOperatorStart"), false);
+    assert.throws(
+      () => constructWorkerInvocationPackage({ manifest }),
+      /sdlc_product_materialization_launch_blocked:component_code_source_materialization_targets_missing/u
     );
-    assert.equal(gapDossier.reasons[0].blockingReason.reasonClass, "contract_violation");
-    assert.match(
-      gapDossier.reasons[0].blockingReason.detail,
-      /component_code_source_materialization_targets_missing/u
+    assert.throws(
+      () => promptForHandoff(manifest),
+      /sdlc_product_materialization_launch_blocked:component_code_source_materialization_targets_missing/u
     );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });

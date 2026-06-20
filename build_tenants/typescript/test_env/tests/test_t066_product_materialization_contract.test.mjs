@@ -72,7 +72,6 @@ import {
   deriveSdlcPostCloseOverlayContinuationActionInput,
   deriveSdlcProductLineageYieldResumeBasis,
   edgeAssuranceEvidenceCandidatesFor,
-  executeInstalledOperatorStart,
   normalizePostCloseContinuationVectorIndex,
   sdlcAssessmentCarriesRequirementForDownstreamClosure,
   sdlcWorkerAssessmentCarriesRequirementTransformationSet

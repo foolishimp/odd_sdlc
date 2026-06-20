@@ -21,7 +21,6 @@ import {
   constructSdlcGtlModule,
   deriveSdlcConformProjectProfileFromWorkspace,
   deriveSdlcWorkspaceIngressReport,
-  executeInstalledOperatorStart,
   materializeSdlcProjectConformance,
   projectSdlcQueryDomain
 } from "../../build/semantic/code/src/index.js";
@@ -924,148 +923,30 @@ function writeWrongStageTestDesignWorkerScript(workspaceRoot) {
   return workerPath;
 }
 
-test("T-151 first_traversal returns the first admitted non-close consequence", async () => {
-  const workspace = makeWorkspace();
-  const start = makeStart(workspace);
-  const basis = start.executionContract.basis;
-  const workerScript = writeUnassessedObligationWorkerScript(workspace);
+test("T-204 local installed operator cannot be used as a consequence executor", async () => {
+  const rootModule = await import("../../build/semantic/code/src/index.js");
+  const operatorModule = await import("../../build/semantic/code/src/operator/index.js");
+  const installedModule = await import(
+    "../../build/semantic/code/src/operator/installed_operator.js"
+  );
 
-  const outcome = await executeInstalledOperatorStart({
-    workspaceRoot: workspace,
-    start,
-    workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`,
-    replayEvents: preclosedEventsBeforeEdge(basis, "derive_component_code_surface")
-  });
-
-  assert.equal(Object.hasOwn(outcome, "loop"), false);
-  assert.equal(outcome.status, "blocked");
-  assert.equal(outcome.summary.currentEdge, "derive_component_code_surface");
-  assert.equal(outcome.postflight.status, "blocked");
-  assert(outcome.traversalConsequence);
-  assert.equal(outcome.traversalConsequence.edgeClosureDecision.disposition, "retry");
-  assert.equal(
-    outcome.traversalConsequence.nextActionProjection.choosesNextTraversal,
-    true
-  );
-  assert.match(
-    outcome.summary.nextLawfulAction,
-    /post_retry\/derive_component_code_surface/u
-  );
-  assert.equal(
-    outcome.traversalConsequence.nextActionProjection.predecessorRefs.includes(
-      outcome.traversalConsequence.edgeClosureDecision.decisionRef
-    ),
-    true
-  );
-  assert.equal(
-    existsSync(path.join(outcome.archiveRoot, "sdlc_edge_closure_decision.json")),
-    true
-  );
-  assert.equal(
-    existsSync(path.join(outcome.archiveRoot, "sdlc_next_action_projection.json")),
-    true
-  );
+  assert.equal(Object.hasOwn(rootModule, "executeInstalledOperatorStart"), false);
+  assert.equal(Object.hasOwn(operatorModule, "executeInstalledOperatorStart"), false);
+  assert.equal(Object.hasOwn(installedModule, "executeInstalledOperatorStart"), false);
 });
 
-test("T-151 component-test trace_missing review pressure writes retry closure", async () => {
-  const workspace = makeWorkspace();
-  writeTestDesignAuthority(workspace);
-  const start = makeStart(workspace, "derive_component_test_surface");
-  const workerScript = writeTraceMissingComponentTestWorkerScript(workspace);
-
-  const outcome = await executeInstalledOperatorStart({
-    workspaceRoot: workspace,
-    start,
-    workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`,
-    replayEvents: []
-  });
-
-  assert.equal(outcome.status, "blocked");
-  assert.equal(outcome.summary.currentEdge, "derive_component_test_surface");
-  assert.equal(outcome.postflight.status, "blocked");
-  assert(outcome.traversalConsequence);
-  assert.equal(outcome.traversalConsequence.edgeClosureDecision.disposition, "retry");
-  assert.equal(
-    outcome.traversalConsequence.nextActionProjection.nextGraphFunctionRef,
-    "derive_component_test_surface"
+test("T-204 installed operator source does not author ABG traversal events", () => {
+  const source = readFileSync(
+    new URL("../../code/src/operator/installed_operator.ts", import.meta.url),
+    "utf8"
   );
-  assert.equal(
-    existsSync(path.join(outcome.archiveRoot, "sdlc_edge_closure_decision.json")),
-    true
-  );
-  assert.equal(
-    existsSync(path.join(outcome.archiveRoot, "sdlc_next_action_projection.json")),
-    true
-  );
-});
 
-test("T-151 lawful wrong_stage review carryover is closure-visible evidence", async () => {
-  const workspace = makeWorkspace();
-  const start = makeStart(workspace, "derive_test_design_surface");
-  const workerScript = writeWrongStageTestDesignWorkerScript(workspace);
-
-  const outcome = await executeInstalledOperatorStart({
-    workspaceRoot: workspace,
-    start,
-    workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`,
-    replayEvents: []
-  });
-
-  const reviewRuleOutcomeRef = pathToFileURL(
-    path.join(outcome.archiveRoot, "review_grade_edge_fulfillment_rule_outcome.json")
-  ).href;
-
-  assert.equal(outcome.status, "worker_invoked");
-  assert.notEqual(outcome.summary.currentEdge, "derive_test_design_surface");
-  assert(outcome.traversalConsequence);
-  assert.equal(outcome.traversalConsequence.edgeClosureDecision.disposition, "close");
-  assert.equal(existsSync(path.join(outcome.archiveRoot, "review_grade_edge_fulfillment_rule_outcome.json")), true);
-  assert.equal(existsSync(path.join(outcome.archiveRoot, "review_grade_postflight.json")), false);
-  assert.equal(
-    outcome.traversalConsequence.edgeFulfillmentLedger.admissionRefs.includes(
-      reviewRuleOutcomeRef
-    ),
-    true
-  );
-  assert.equal(
-    outcome.traversalConsequence.edgeClosureDecision.predecessorRefs.includes(
-      reviewRuleOutcomeRef
-    ),
-    true
-  );
-});
-
-test("T-164 conform-project start stops at one admitted boundary before downstream graph work", async () => {
-  const workspace = makeUnderstructuredConformWorkspace();
-  const start = makeConformStart(workspace);
-
-  const outcome = await executeInstalledOperatorStart({
-    workspaceRoot: workspace,
-    start,
-    workerTransport: null,
-    replayEvents: []
-  });
-
-  assert.equal(outcome.status, "converged");
-  assert.equal(Object.hasOwn(outcome, "loop"), false);
-  assert.equal(
-    outcome.summary.nextLawfulAction,
-    "rerun_start_for_downstream_graph"
-  );
-  assert.deepStrictEqual(outcome.emittedRuntimeEventKinds, [
-    "basis_admitted",
-    "graph_call_opened",
-    "frame_opened",
-    "vector_traversal_planned",
-    "payload_observed",
-    "payload_validated",
-    "fd_authority_outcome_admitted",
-    "vector_evaluated",
-    "vector_closed",
-    "fd_advance_ready",
-    "payload_observed",
-    "payload_validated"
-  ]);
+  assert.equal(source.includes("runEngineIterateAsync"), false);
+  assert.equal(source.includes("applyGraphSpanReentryRoute"), false);
+  assert.equal(source.includes("applyExplicitGraphVectorResumeCursor"), false);
+  assert.equal(source.includes("appendOddSdlcRuntimeEvents"), false);
+  assert.equal(source.includes("writeRunArchive"), false);
+  assert.equal(source.includes("terminalOutcome"), false);
 });
 
 test("T-151 installed runner source exposes no local requested-until loop", () => {
@@ -1076,13 +957,7 @@ test("T-151 installed runner source exposes no local requested-until loop", () =
 
   assert.equal(source.includes('latest.status === "worker_invoked"'), false);
   assert.equal(source.includes("latest.traversalConsequence !== null"), false);
-  assert.deepStrictEqual(source.match(/requestedUntil/gu) ?? [], [
-    "requestedUntil"
-  ]);
-  assert.match(
-    source,
-    /maxAttachedFpAttempts:\s*\n\s*input\.start\.executionContract\.requestedUntil === "first_traversal"/u
-  );
+  assert.deepStrictEqual(source.match(/requestedUntil/gu) ?? [], []);
   assert.equal(source.includes("refreshReplayState"), false);
   assert.equal(source.includes("sdlc_installed_operator_start_loop"), false);
   assert.equal(source.includes("completedDispatchState.nextLawfulAction"), false);

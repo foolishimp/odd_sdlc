@@ -25,25 +25,30 @@ import {
   FG_CONFORM_PROJECT_AUTHORITY,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
   admitSdlcProjectConstraints,
-  buildPostTransformWorkerResultReport,
-  constructSdlcEdgeFulfillmentLedger,
   constructSdlcGtlModule,
-  constructSdlcNextActionProjection,
   deriveOddSdlcEvaluateNextReport,
   deriveSdlcConformProjectProfileFromWorkspace,
-  deriveSdlcPublishedProductMaterializationAction,
+  deriveSdlcTargetObligationBinding,
+  deriveSdlcWorkspaceIngressReport,
+  hookContractByEdgeName,
+  materializeSdlcProjectConformance,
+  projectSdlcQueryDomain
+} from "../../build/semantic/code/src/index.js";
+import {
+  constructSdlcEdgeFulfillmentLedger,
+  constructSdlcNextActionProjection,
   deriveSdlcEdgeClosureDecision,
   deriveSdlcEdgeFulfillmentCountsFromAssessments,
   deriveSdlcOperatorAssuranceGate,
-  deriveSdlcTargetObligationBinding,
-  deriveSdlcWorkspaceIngressReport,
-  deriveWorkerHandoffManifest,
-  executeInstalledOperatorStart,
-  hookContractByEdgeName,
-  materializeSdlcProjectConformance,
-  projectSdlcQueryDomain,
+  deriveSdlcPublishedProductMaterializationAction,
   snapshotProductMaterializationRoot
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/operator/index.js";
+import {
+  buildPostTransformWorkerResultReport
+} from "../../build/semantic/code/src/operator/plugins/transform/result_projection.js";
+import {
+  deriveWorkerHandoffManifest
+} from "../../build/semantic/code/src/operator/plugins/transform/launch_contract.js";
 import {
   admitSdlcPublicStartRequest,
   projectSdlcWorkerAttachment,
