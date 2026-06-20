@@ -1,12 +1,6 @@
 // Implements: T-197
 
-import {
-  existsSync,
-  readdirSync,
-  readFileSync,
-  statSync
-} from "node:fs";
-import path, { resolve } from "node:path";
+import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type {
   ExecutionBasis,
@@ -29,40 +23,10 @@ import {
   deriveSdlcConformProjectProfileFromWorkspace,
   deriveSdlcConformProjectReportFromWorkspace,
   deriveSdlcProjectConstraintsFromWorkspace,
-  deriveSdlcSourceInput,
-  deriveSdlcWorkspaceIngressReport,
-  type SdlcSourceInput
+  collectSdlcWorkspaceSourceInputs,
+  deriveSdlcWorkspaceIngressReport
 } from "../workspace/index.js";
 import { createSdlcInstalledOperatorAbgPluginSession } from "./installed_operator.js";
-
-const DEFAULT_SOURCE_PATHS = Object.freeze([
-  "README.md",
-  "specification/GOALS.md",
-  "specification/INTENT.md",
-  "specification/PRODUCT.md",
-  "specification/REQUIREMENTS.md",
-  ".ai-workspace/context/project_constraints.yml"
-] as const);
-
-const SOURCE_DISCOVERY_EXTENSIONS = Object.freeze([
-  ".md",
-  ".markdown",
-  ".txt",
-  ".yml",
-  ".yaml"
-] as const);
-
-const SOURCE_DISCOVERY_EXTENSION_SET: ReadonlySet<string> = new Set(
-  SOURCE_DISCOVERY_EXTENSIONS
-);
-
-const SOURCE_DISCOVERY_IGNORED_DIRS = Object.freeze([
-  ".abiogenesis",
-  ".genesis",
-  ".git",
-  "node_modules",
-  "build_tenants"
-] as const);
 
 export interface OddSdlcAbgRuntimeBindingPluginFactoryInput {
   readonly workspaceRoot: string;
@@ -85,62 +49,6 @@ export function oddSdlcAbgRuntimeWorkerTransportFromEnv(
     env["ODD_SDLC_TS_DATA_MAPPER_WORKER"] ??
     env["ODD_SDLC_WORKER_TRANSPORT"] ??
     null
-  );
-}
-
-function sourceFilePaths(workspaceRoot: string): readonly string[] {
-  const paths = new Set<string>();
-  for (const relativePath of DEFAULT_SOURCE_PATHS) {
-    if (existsSync(path.join(workspaceRoot, relativePath))) {
-      paths.add(relativePath);
-    }
-  }
-  const requirementsRoot = path.join(workspaceRoot, "specification/requirements");
-  if (existsSync(requirementsRoot)) {
-    for (const fileName of readdirSync(requirementsRoot)) {
-      const relativePath = `specification/requirements/${fileName}`;
-      const absolutePath = path.join(workspaceRoot, relativePath);
-      if (statSync(absolutePath).isFile() && fileName.endsWith(".md")) {
-        paths.add(relativePath);
-      }
-    }
-  }
-  const ignored = new Set<string>(SOURCE_DISCOVERY_IGNORED_DIRS);
-  const visit = (absoluteDir: string, relativeDir: string): void => {
-    for (const entry of readdirSync(absoluteDir, { withFileTypes: true })) {
-      const relativePath =
-        relativeDir.length === 0 ? entry.name : `${relativeDir}/${entry.name}`;
-      const absolutePath = path.join(absoluteDir, entry.name);
-      if (entry.isDirectory()) {
-        if (
-          !ignored.has(entry.name) &&
-          !relativePath.startsWith(".ai-workspace/runtime") &&
-          !relativePath.startsWith(".ai-workspace/events")
-        ) {
-          visit(absolutePath, relativePath);
-        }
-      } else if (
-        entry.isFile() &&
-        SOURCE_DISCOVERY_EXTENSION_SET.has(path.extname(entry.name).toLowerCase())
-      ) {
-        paths.add(relativePath);
-      }
-    }
-  };
-  visit(workspaceRoot, "");
-  return Object.freeze([...paths].sort());
-}
-
-function readSourceInputs(workspaceRoot: string): readonly SdlcSourceInput[] {
-  return Object.freeze(
-    sourceFilePaths(workspaceRoot).map((relativePath) => {
-      const absolutePath = path.join(workspaceRoot, relativePath);
-      return deriveSdlcSourceInput({
-        uri: `${pathToFileURL(workspaceRoot).href}/${relativePath}`,
-        relativePath,
-        content: readFileSync(absolutePath, "utf8")
-      });
-    })
   );
 }
 
@@ -171,7 +79,7 @@ export function createOddSdlcAbgRuntimeBindingPlugins(
   const ingressReport = deriveSdlcWorkspaceIngressReport({
     workspaceRootUri: pathToFileURL(workspaceRoot).href,
     projectConstraints: deriveSdlcProjectConstraintsFromWorkspace(workspaceRoot),
-    sourceInputs: readSourceInputs(workspaceRoot)
+    sourceInputs: collectSdlcWorkspaceSourceInputs(workspaceRoot)
   });
   const queryDomain = projectSdlcQueryDomain({
     module,

@@ -21,7 +21,6 @@ import {
   writeSdlcInstalledQualificationInitialStateArchive
 } from "../../build/semantic/code/src/index.js";
 import { canonicalDataMapperFixtureRoot } from "../fixtures/data_mapper_fixture.mjs";
-import { executeOddSdlcWorkspaceStartForTest } from "../workspace_start_harness.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
@@ -113,23 +112,26 @@ test("T-069 initial-state validation fails closed without installed topology", (
   ]);
 });
 
-test("T-069 typed worker start blocks before graph execution when install topology is absent", async () => {
+test("T-069 installed topology precondition blocks before graph execution when absent", () => {
   const workspaceRoot = freshDataMapperWorkspace();
-  const started = await executeOddSdlcWorkspaceStartForTest({
-    workspaceRoot,
-    target: {
-      kind: "graph_function",
-      handle: "bootstrap_release_self_test"
-    },
-    until: "blocked",
-    workerTransport: "process://node"
+  const validation = deriveSdlcInstalledQualificationInitialState({
+    workspaceRoot
+  });
+  const archive = writeSdlcInstalledQualificationInitialStateArchive({
+    archiveRoot: path.join(
+      workspaceRoot,
+      ".ai-workspace/runtime/odd_sdlc/t069_missing_topology"
+    ),
+    validation
   });
 
-  assert.equal(started.status, "blocked");
-  assert.equal(started.summary.blockingReason, "installed_topology_invalid");
-  assert.equal(started.replayEventCountAfter, 0);
+  assert.equal(validation.status, "invalid");
+  assert.deepStrictEqual(validation.missingCommands, [
+    "abiogenesis-ts",
+    "genesis-ts"
+  ]);
   assert.equal(
-    existsSync(path.join(started.archiveRoot, "initial_state_validation.json")),
+    existsSync(archive.validationPath),
     true
   );
 });

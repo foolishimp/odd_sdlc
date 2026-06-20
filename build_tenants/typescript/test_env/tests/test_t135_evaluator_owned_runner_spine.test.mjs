@@ -13,7 +13,6 @@ import path from "node:path";
 
 import {
   admitSdlcProjectConstraints,
-  admitSdlcPublicStartRequest,
   buildPostTransformWorkerResultReport,
   conformProjectProfileFromConstraintsText,
   constructSdlcEdgeFulfillmentLedger,
@@ -25,10 +24,13 @@ import {
   hookContractByEdgeName,
   materializeSdlcProjectConformance,
   projectSdlcQueryDomain,
-  projectSdlcWorkerAttachment,
-  publicStartOnce,
   snapshotProductMaterializationRoot
 } from "../../build/semantic/code/src/index.js";
+import {
+  admitSdlcPublicStartRequest,
+  projectSdlcWorkerAttachment,
+  publicStartOnce
+} from "../../build/semantic/code/src/start/index.js";
 
 function context(activeTenant = "typescript") {
   const module = constructSdlcGtlModule();

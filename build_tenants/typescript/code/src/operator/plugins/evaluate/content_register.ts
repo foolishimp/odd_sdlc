@@ -849,6 +849,26 @@ function dropNonSourceFileTargetComponentRows(
   return changed ? Object.freeze(normalized) : input;
 }
 
+function normalizeDesignCompletenessVerdict(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null || record["kind"] !== "sdlc_design_completeness_verdict") {
+    return input;
+  }
+  let changed = false;
+  const normalized: Record<string, unknown> = { ...record };
+  for (const axisName of ["entity", "attribute", "flow"]) {
+    const axis = objectRecord(record[axisName]);
+    if (axis !== null && axis["kind"] === "sdlc_verdict_axis") {
+      normalized[axisName] = Object.freeze({
+        ...axis,
+        kind: "sdlc_design_completeness_axis_verdict"
+      });
+      changed = true;
+    }
+  }
+  return changed ? Object.freeze(normalized) : input;
+}
+
 function normalizeDesignDepthContentRegisterPayload(input: unknown): unknown {
   const record = objectRecord(input);
   if (record === null || record["kind"] !== "sdlc_design_depth_register") {
@@ -861,6 +881,13 @@ function normalizeDesignDepthContentRegisterPayload(input: unknown): unknown {
       delete normalized[key];
       changed = true;
     }
+  }
+  const normalizedVerdict = normalizeDesignCompletenessVerdict(
+    normalized["designCompletenessVerdict"]
+  );
+  if (normalizedVerdict !== normalized["designCompletenessVerdict"]) {
+    normalized["designCompletenessVerdict"] = normalizedVerdict;
+    changed = true;
   }
   const normalizedRows = dropNonSourceFileTargetComponentRows(normalized);
   if (normalizedRows !== normalized) {
@@ -923,7 +950,7 @@ function designDepthRegisterPayloadFromFragments(
   }
   try {
     return parseDesignDepthRegisterPayload(
-      dropNonSourceFileTargetComponentRows(assembled)
+      normalizeDesignDepthContentRegisterPayload(assembled)
     );
   } catch (error) {
     throw new TypeError(

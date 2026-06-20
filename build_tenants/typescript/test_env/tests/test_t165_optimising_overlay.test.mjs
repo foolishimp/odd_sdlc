@@ -2,7 +2,8 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { materializeGraphFunction } from "@abiogenesis/typescript-tenant";
+import {
+  materializeGraphFunction } from "@abiogenesis/typescript-tenant";
 
 import {
   admitSdlcBootstrapPreStartExecutionContract,
@@ -20,8 +21,6 @@ import {
   FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
   FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
   projectSdlcQueryDomain,
-  projectSdlcWorkerAttachment,
-  publicStartOnce,
   SDLC_BOOTSTRAP_OPTIMISING_OVERLAY_REF,
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
   SDLC_DEEP_SDLC_TRAVERSAL_OVERLAY_REF,
@@ -29,6 +28,10 @@ import {
   SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
   SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
 } from "../../build/semantic/code/src/index.js";
+import {
+  projectSdlcWorkerAttachment,
+  publicStartOnce
+} from "../../build/semantic/code/src/start/index.js";
 
 function projectContext(input = {}) {
   const workspaceRoot = input.workspaceRoot ?? "/workspace/t165";

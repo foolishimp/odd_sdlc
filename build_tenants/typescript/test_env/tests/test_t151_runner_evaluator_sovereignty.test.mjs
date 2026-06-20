@@ -2,10 +2,16 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  createHash } from "node:crypto";
+import { existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import path, { dirname } from "node:path";
+import path,
+  { dirname } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { emit } from "@abiogenesis/typescript-tenant";
@@ -17,10 +23,12 @@ import {
   deriveSdlcWorkspaceIngressReport,
   executeInstalledOperatorStart,
   materializeSdlcProjectConformance,
-  projectSdlcQueryDomain,
+  projectSdlcQueryDomain
+} from "../../build/semantic/code/src/index.js";
+import {
   projectSdlcWorkerAttachment,
   publicStartOnce
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/start/index.js";
 
 function sha256Text(text) {
   return `sha256:${createHash("sha256").update(text, "utf8").digest("hex")}`;

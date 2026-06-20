@@ -25,7 +25,6 @@ import {
   FG_CONFORM_PROJECT_AUTHORITY,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
   admitSdlcProjectConstraints,
-  admitSdlcPublicStartRequest,
   buildPostTransformWorkerResultReport,
   constructSdlcEdgeFulfillmentLedger,
   constructSdlcGtlModule,
@@ -43,10 +42,13 @@ import {
   hookContractByEdgeName,
   materializeSdlcProjectConformance,
   projectSdlcQueryDomain,
-  projectSdlcWorkerAttachment,
-  publicStartOnce,
   snapshotProductMaterializationRoot
 } from "../../build/semantic/code/src/index.js";
+import {
+  admitSdlcPublicStartRequest,
+  projectSdlcWorkerAttachment,
+  publicStartOnce
+} from "../../build/semantic/code/src/start/index.js";
 
 function moduleBasis(moduleOverride = constructSdlcGtlModule()) {
   const module = moduleOverride;

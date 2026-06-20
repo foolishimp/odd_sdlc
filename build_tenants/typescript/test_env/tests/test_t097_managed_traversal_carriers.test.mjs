@@ -19,7 +19,7 @@ import {
   FG_CONFORM_PROJECT,
   installOddSdlcTypescript
 } from "../../build/semantic/code/src/index.js";
-import { executeOddSdlcWorkspaceStartForTest } from "../workspace_start_harness.mjs";
+import { executeOddSdlcWorkspaceStartViaAbgCliForTest } from "../abg_cli_start_harness.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
@@ -83,7 +83,7 @@ test("T-097 archives bootstrap manifest without legacy managed traversal ledger"
     ["prestep", "execute", "postprocess"]
   );
 
-  const induction = await executeOddSdlcWorkspaceStartForTest({ workspaceRoot: workspace });
+  const induction = await executeOddSdlcWorkspaceStartViaAbgCliForTest({ workspaceRoot: workspace });
   assert.equal(induction.status, "converged");
   assert.equal(induction.summary.graphFunctionName, FG_CONFORM_PROJECT);
 

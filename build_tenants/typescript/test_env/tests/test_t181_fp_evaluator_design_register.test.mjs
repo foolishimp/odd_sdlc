@@ -15,25 +15,12 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
-  designDepthFpEvaluatorContentRegisterPath,
-  admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity,
-  constructSdlcFpEvaluateResult,
-  constructWorkerConstructionBrief,
-  constructWorkerInvocationPackage,
-  deriveWorkerHandoffManifest,
-  deriveSdlcOperatorAssuranceGate,
-  evaluateSdlcComputeStage,
   FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
   hookContractByEdgeName,
   materializeSdlcProjectConformance,
-  promptForHandoff,
   typecheckCurrentSdlcGtlProgram,
   SDLC_FUNCTION_CATALOG,
-  SDLC_OPERATOR_RUN_ARTIFACT_CATALOG,
-  sha256Text,
-  selectSdlcWorkCategoryGovernance,
-  writeDesignDepthRegisterProjectionFromEvaluateContentRegister,
-  writeHandoffFiles
+  SDLC_OPERATOR_RUN_ARTIFACT_CATALOG
 } from "../../build/semantic/code/src/index.js";
 import {
   admitImplementationDesignRegisterCandidateForManifest,
@@ -41,6 +28,29 @@ import {
   admitImplementationDesignRegisterForRuntimeEvaluation,
   designDepthFpEvaluatorRegisterPath
 } from "../../build/semantic/code/src/operator/plugins/evaluate/design_depth_register.js";
+import {
+  admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity,
+  designDepthFpEvaluatorContentRegisterPath,
+  writeDesignDepthRegisterProjectionFromEvaluateContentRegister
+} from "../../build/semantic/code/src/operator/plugins/evaluate/content_register.js";
+import {
+  constructSdlcFpEvaluateResult,
+  evaluateSdlcComputeStage
+} from "../../build/semantic/code/src/operator/plugins/evaluate/postflight.js";
+import {
+  constructWorkerConstructionBrief,
+  constructWorkerInvocationPackage,
+  deriveWorkerHandoffManifest,
+  promptForHandoff,
+  sha256Text,
+  writeHandoffFiles
+} from "../../build/semantic/code/src/operator/plugins/transform/launch_contract.js";
+import {
+  deriveSdlcOperatorAssuranceGate
+} from "../../build/semantic/code/src/operator/assurance_gate.js";
+import {
+  selectSdlcWorkCategoryGovernance
+} from "../../build/semantic/code/src/operator/work_category_governance.js";
 import { readOperatorRunCarriers } from "../../build/semantic/code/src/analysis/carrier_loaders.js";
 
 const PACKAGE_ROOT = process.cwd();
@@ -923,6 +933,139 @@ test("T-181 design-depth content register supports incremental fragment projecti
       register.componentRealizationRows
     );
     assert.deepEqual(projected.fileTargetRows, register.fileTargetRows);
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-181 design-depth fragment projection canonicalizes legacy verdict axis aliases", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForImplementationDesign(
+      workspaceRoot,
+      "t181-verdict-axis-alias-fragment"
+    );
+    mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+    writeFileSync(
+      manifest.outputFile,
+      implementationDesignAdr("axis-alias-component"),
+      "utf8"
+    );
+    const registerPath = designDepthFpEvaluatorRegisterPath(manifest);
+    const contentRegisterPath = designDepthFpEvaluatorContentRegisterPath({
+      archiveRoot: manifest.archiveRoot
+    });
+    const composition = designDepthGtlSelectedComposition();
+    const evidenceRef = pathToFileURL(manifest.outputFile).href;
+    const register = implementationDesignRegister(
+      "axis-alias-component",
+      evidenceRef
+    );
+    const aliasAxis = (axis) => ({
+      kind: "sdlc_verdict_axis",
+      axis,
+      status: "satisfied",
+      reasons: [`${axis} axis satisfied by fixture implementation design`],
+      evidenceRefs: [evidenceRef]
+    });
+    register.designCompletenessVerdict = {
+      kind: "sdlc_design_completeness_verdict",
+      verdictVersion: "ts-design-depth-v1",
+      entity: aliasAxis("entity"),
+      attribute: aliasAxis("attribute"),
+      flow: aliasAxis("flow")
+    };
+    const sections = [
+      "stackProfileRows",
+      "implementationModuleRows",
+      "aggregateDomainModelRows",
+      "moduleSchemaFragments",
+      "moduleStateDiagramFragments",
+      "aggregateDomainModel",
+      "sunnyDaySequenceRows",
+      "aggregateSunnyDaySequence",
+      "componentTopologyRows",
+      "componentRealizationRows",
+      "fileTargetRows",
+      "designCompletenessVerdict"
+    ];
+    mkdirSync(path.dirname(contentRegisterPath), { recursive: true });
+    writeFileSync(
+      contentRegisterPath,
+      `${JSON.stringify(
+        {
+          kind: "sdlc_evaluate_content_register",
+          registerVersion: "ts-evaluate-content-register-v1",
+          stage: "evaluate.C",
+          ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+          ruleRole: "semantic_judgment",
+          computeMeans: "F_P",
+          authorityFunction: "synthesize_model",
+          selectedCompositionRef: composition.compositionRef,
+          selectedCompositionDigest: composition.compositionDigest,
+          selectedCompositionSelectionRef: composition.compositionSelectionRef,
+          selectedRegimeBindingRef: composition.selectedRegimeBindingRef,
+          compositionContributionRef: composition.selectedRegimeBindingRef,
+          sourceBasisRefs: [evidenceRef],
+          candidateArtifactRefs: [evidenceRef],
+          evidenceRefs: [evidenceRef],
+          contentRows: sections.map((section, index) => ({
+            kind: "sdlc_evaluate_content_register_row",
+            rowRef: `content-register-row://t181/axis-alias/${section}`,
+            authorityFunction: "synthesize_model",
+            carrierFamily: "ProductAssetModel",
+            contentKind: "sdlc_design_depth_register_fragment",
+            payload: {
+              kind: "sdlc_design_depth_register_fragment",
+              fragmentVersion: "ts-design-depth-fragment-v1",
+              targetAssetType: "implementation_design_surface",
+              section,
+              sequence: index + 1,
+              mergeMode: "replace",
+              value: register[section]
+            },
+            sourceBasisRefs: [evidenceRef],
+            evidenceRefs: [evidenceRef]
+          }))
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+
+    const admission = admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity({
+      registerPath: contentRegisterPath,
+      selectedIdentity: {
+        selectedCompositionRef: composition.compositionRef,
+        selectedCompositionDigest: composition.compositionDigest,
+        selectedCompositionSelectionRef: composition.compositionSelectionRef,
+        selectedRegimeBindingRef: composition.selectedRegimeBindingRef
+      },
+      ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+      authorityFunction: "synthesize_model"
+    });
+    assert.equal(admission.status, "admitted");
+
+    writeDesignDepthRegisterProjectionFromEvaluateContentRegister({
+      register: admission.register,
+      archiveRoot: manifest.archiveRoot,
+      registerPath
+    });
+    const projected = JSON.parse(readFileSync(registerPath, "utf8"));
+
+    assert.equal(
+      projected.designCompletenessVerdict.entity.kind,
+      "sdlc_design_completeness_axis_verdict"
+    );
+    assert.equal(
+      projected.designCompletenessVerdict.attribute.kind,
+      "sdlc_design_completeness_axis_verdict"
+    );
+    assert.equal(
+      projected.designCompletenessVerdict.flow.kind,
+      "sdlc_design_completeness_axis_verdict"
+    );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
   }

@@ -2,14 +2,17 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
 
 import {
   admitSdlcProjectConstraints,
-  admitSdlcPublicStartRequest,
   admitSdlcTicketExecutionContract,
   assertTraversalIntentPackagePressure,
   conformProjectProfileFromConstraintsText,
@@ -20,11 +23,14 @@ import {
   hookContractByEdgeName,
   projectSdlcQueryDomain,
   projectSdlcTicketWorkflow,
-  projectSdlcWorkerAttachment,
-  publicStartOnce,
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
   sdlcTicketExecutionContractRefs
 } from "../../build/semantic/code/src/index.js";
+import {
+  admitSdlcPublicStartRequest,
+  projectSdlcWorkerAttachment,
+  publicStartOnce
+} from "../../build/semantic/code/src/start/index.js";
 
 function workspace() {
   const root = mkdtempSync(join(tmpdir(), "odd-sdlc-t162-overlay-"));

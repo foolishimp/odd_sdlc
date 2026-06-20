@@ -17,8 +17,11 @@ import {
   writeFileSync
 } from "node:fs";
 import { tmpdir } from "node:os";
-import path, { dirname, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import path,
+  { dirname,
+  resolve } from "node:path";
+import { fileURLToPath,
+  pathToFileURL } from "node:url";
 
 import { emit } from "@abiogenesis/typescript-tenant";
 
@@ -39,13 +42,15 @@ import {
   materializeSdlcProjectConformance,
   evalSdlcGapFromReplay,
   projectSdlcQueryDomain,
-  projectSdlcWorkerAttachment,
-  publicStartOnce,
   readOddSdlcRuntimeEvents,
   sha256Text,
   writeHandoffFiles
 } from "../../build/semantic/code/src/index.js";
 import { canonicalDataMapperFixtureRoot } from "../fixtures/data_mapper_fixture.mjs";
+import {
+  projectSdlcWorkerAttachment,
+  publicStartOnce
+} from "../../build/semantic/code/src/start/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");

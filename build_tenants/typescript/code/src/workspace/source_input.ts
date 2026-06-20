@@ -2,6 +2,10 @@
 // Implements: REQ-F-ODDSDLC-012
 // Implements: REQ-F-ODDSDLC-022
 
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+
 import {
   parseClosedRecord,
   parseEnumValue,
@@ -23,6 +27,35 @@ import {
 export { uniqueSorted } from "../shared/collections.js";
 export { sha256Digest } from "../shared/digest.js";
 
+export const SDLC_WORKSPACE_DEFAULT_SOURCE_PATHS = Object.freeze([
+  "README.md",
+  "specification/GOALS.md",
+  "specification/INTENT.md",
+  "specification/PRODUCT.md",
+  "specification/REQUIREMENTS.md",
+  ".ai-workspace/context/project_constraints.yml"
+] as const);
+
+const SDLC_WORKSPACE_SOURCE_DISCOVERY_EXTENSIONS = Object.freeze([
+  ".md",
+  ".markdown",
+  ".txt",
+  ".yml",
+  ".yaml"
+] as const);
+
+const SDLC_WORKSPACE_SOURCE_DISCOVERY_EXTENSION_SET: ReadonlySet<string> = new Set(
+  SDLC_WORKSPACE_SOURCE_DISCOVERY_EXTENSIONS
+);
+
+const SDLC_WORKSPACE_SOURCE_DISCOVERY_IGNORED_DIRS = Object.freeze([
+  ".abiogenesis",
+  ".genesis",
+  ".git",
+  "node_modules",
+  "build_tenants"
+] as const);
+
 export function fnv1aDigest(content: string): string {
   let hash = 0x811c9dc5;
   for (let index = 0; index < content.length; index += 1) {
@@ -30,6 +63,68 @@ export function fnv1aDigest(content: string): string {
     hash = Math.imul(hash, 0x01000193);
   }
   return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+export function sourceFilePathsForSdlcWorkspace(
+  workspaceRoot: string
+): readonly string[] {
+  const paths = new Set<string>();
+  for (const relativePath of SDLC_WORKSPACE_DEFAULT_SOURCE_PATHS) {
+    if (existsSync(path.join(workspaceRoot, relativePath))) {
+      paths.add(relativePath);
+    }
+  }
+  const requirementsRoot = path.join(workspaceRoot, "specification/requirements");
+  if (existsSync(requirementsRoot)) {
+    for (const fileName of readdirSync(requirementsRoot)) {
+      const relativePath = `specification/requirements/${fileName}`;
+      const absolutePath = path.join(workspaceRoot, relativePath);
+      if (statSync(absolutePath).isFile() && fileName.endsWith(".md")) {
+        paths.add(relativePath);
+      }
+    }
+  }
+  const ignored = new Set<string>(SDLC_WORKSPACE_SOURCE_DISCOVERY_IGNORED_DIRS);
+  const visit = (absoluteDir: string, relativeDir: string): void => {
+    for (const entry of readdirSync(absoluteDir, { withFileTypes: true })) {
+      const relativePath =
+        relativeDir.length === 0 ? entry.name : `${relativeDir}/${entry.name}`;
+      const absolutePath = path.join(absoluteDir, entry.name);
+      if (entry.isDirectory()) {
+        if (
+          !ignored.has(entry.name) &&
+          !relativePath.startsWith(".ai-workspace/runtime") &&
+          !relativePath.startsWith(".ai-workspace/events")
+        ) {
+          visit(absolutePath, relativePath);
+        }
+      } else if (
+        entry.isFile() &&
+        SDLC_WORKSPACE_SOURCE_DISCOVERY_EXTENSION_SET.has(
+          path.extname(entry.name).toLowerCase()
+        )
+      ) {
+        paths.add(relativePath);
+      }
+    }
+  };
+  visit(workspaceRoot, "");
+  return Object.freeze([...paths].sort());
+}
+
+export function collectSdlcWorkspaceSourceInputs(
+  workspaceRoot: string
+): readonly SdlcSourceInput[] {
+  return Object.freeze(
+    sourceFilePathsForSdlcWorkspace(workspaceRoot).map((relativePath) => {
+      const absolutePath = path.join(workspaceRoot, relativePath);
+      return deriveSdlcSourceInput({
+        uri: `${pathToFileURL(workspaceRoot).href}/${relativePath}`,
+        relativePath,
+        content: readFileSync(absolutePath, "utf8")
+      });
+    })
+  );
 }
 
 function detectRole(relativePath: string): SdlcSourceInputRole {

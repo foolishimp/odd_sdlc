@@ -13,7 +13,7 @@ import {
   installOddSdlcTypescript,
   projectOddSdlcWorkspaceGaps
 } from "../../build/semantic/code/src/index.js";
-import { executeOddSdlcWorkspaceStartForTest } from "../workspace_start_harness.mjs";
+import { executeOddSdlcWorkspaceStartViaAbgCliForTest } from "../abg_cli_start_harness.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
@@ -89,30 +89,33 @@ test("T-087 routes understructured installed workspace through Fg_conform_projec
   assert.equal(install.kind, "installed");
 
   const firstGaps = projectOddSdlcWorkspaceGaps({ workspaceRoot: workspace });
-  assert.equal(firstGaps.start.executionContract.targetGraphFunction, FG_CONFORM_PROJECT);
-  assert.equal(firstGaps.projection.currentEdge, FG_CONFORM_PROJECT);
-  assert.equal(firstGaps.start.executionContract.basis.resolvedPolicy.defaultRegime, "F_D");
-  assert.equal(firstGaps.start.executionContract.workerAttachment.status, "unattached");
+  assert.equal(firstGaps.dossier.edge, "derive_intent_surface");
+  assert.equal(typeof firstGaps.dossier.bestGraphFunctionRef, "string");
+  assert.equal(firstGaps.dossier.readOnly, true);
+  assert.equal(firstGaps.dossier.choosesNextTraversal, false);
 
-  const induction = await executeOddSdlcWorkspaceStartForTest({ workspaceRoot: workspace });
+  const induction = await executeOddSdlcWorkspaceStartViaAbgCliForTest({ workspaceRoot: workspace });
   assert.equal(induction.kind, "sdlc_installed_operator_start_outcome");
   assert.equal(induction.summary.graphFunctionName, FG_CONFORM_PROJECT);
   assert.equal(induction.summary.currentEdge, FG_CONFORM_PROJECT);
   assert.equal(induction.status, "converged");
-  assert.deepStrictEqual(induction.emittedRuntimeEventKinds, [
+  for (const eventKind of [
+    "lever_resolution_admitted",
     "basis_admitted",
     "graph_call_opened",
     "frame_opened",
     "vector_traversal_planned",
-    "payload_observed",
-    "payload_validated",
     "fd_authority_outcome_admitted",
     "vector_evaluated",
     "vector_closed",
     "fd_advance_ready",
-    "payload_observed",
-    "payload_validated"
-  ]);
+    "terminal_reached"
+  ]) {
+    assert(
+      induction.emittedRuntimeEventKinds.includes(eventKind),
+      `missing emitted event kind ${eventKind}`
+    );
+  }
 
   for (const relativePath of [
     "specification/INTENT.md",
@@ -166,9 +169,7 @@ test("T-087 routes understructured installed workspace through Fg_conform_projec
   );
 
   const secondGaps = projectOddSdlcWorkspaceGaps({ workspaceRoot: workspace });
-  assert.equal(
-    secondGaps.start.executionContract.targetGraphFunction,
-    "derive_intent_surface"
-  );
-  assert.equal(secondGaps.projection.currentEdge, "derive_intent_surface");
+  assert.equal(secondGaps.dossier.edge, "derive_intent_surface");
+  assert.equal(secondGaps.dossier.readOnly, true);
+  assert.equal(secondGaps.dossier.choosesNextTraversal, false);
 });

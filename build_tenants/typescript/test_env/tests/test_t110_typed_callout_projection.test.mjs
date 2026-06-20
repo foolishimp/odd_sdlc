@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import {
   installOddSdlcTypescript
 } from "../../build/semantic/code/src/index.js";
-import { executeOddSdlcWorkspaceStartForTest } from "../workspace_start_harness.mjs";
+import { executeOddSdlcWorkspaceStartViaAbgCliForTest } from "../abg_cli_start_harness.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
@@ -110,7 +110,7 @@ function withEnv(overrides, callback) {
 }
 
 async function runStart(workspace, worker) {
-  return executeOddSdlcWorkspaceStartForTest({
+  return executeOddSdlcWorkspaceStartViaAbgCliForTest({
     workspaceRoot: workspace,
     target: {
       kind: "graph_function",

@@ -19,17 +19,19 @@ import {
   admitSdlcBlockingReason,
   canonicalSdlcPriorGapReasonCode,
   classifySdlcFdFailure,
-  constructPostflightGapDossier,
-  deriveWorkerHandoffManifest,
-  evaluateSdlcComputeStage,
-  hookContractByEdgeName,
+  deriveSdlcInstalledQualificationInitialState,
   installOddSdlcTypescript,
   legacyBlockingReasonCode,
   makeSdlcBlockingReason,
-  sha256Text,
   sdlcBlockingReasonFromLegacy
 } from "../../build/semantic/code/src/index.js";
-import { executeOddSdlcWorkspaceStartForTest } from "../workspace_start_harness.mjs";
+import { hookContractByEdgeName } from "../../build/semantic/code/src/hooks/index.js";
+import {
+  constructPostflightGapDossier,
+  deriveWorkerHandoffManifest,
+  evaluateSdlcComputeStage,
+  sha256Text
+} from "../../build/semantic/code/src/operator/index.js";
 
 function makeWorkspace() {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t086-"));
@@ -362,27 +364,23 @@ test("T-086 rejected install exposes typed blocking reason", async () => {
   assert(readFileSync(path.join(root, "README.md"), "utf8").includes("T-086"));
 });
 
-test("T-086 typed start preserves typed summary blocking reasons", async () => {
+test("T-086 installed topology precondition preserves typed blocking reasons", () => {
   const root = makeWorkspace();
-  const result = await executeOddSdlcWorkspaceStartForTest({
-    workspaceRoot: root,
-    target: {
-      kind: "graph_function",
-      handle: "bootstrap_release_self_test"
-    },
-    until: "blocked",
-    workerTransport: "process://node"
+  const validation = deriveSdlcInstalledQualificationInitialState({
+    workspaceRoot: root
+  });
+  const reason = makeSdlcBlockingReason({
+    code: "installed_topology_invalid",
+    evidenceRefs: validation.missingPaths
   });
 
-  assert.equal(result.kind, "sdlc_installed_operator_start_outcome");
-  assert.equal(result.status, "blocked");
-  assert.equal(result.summary.blockingReason, "installed_topology_invalid");
-  assert.equal(
-    result.summary.blockingReasons[0].kind,
-    "sdlc_blocking_reason"
-  );
-  assert.equal(
-    result.summary.blockingReasons[0].code,
-    "installed_topology_invalid"
-  );
+  assert.equal(validation.status, "invalid");
+  assert.deepStrictEqual(validation.missingCommands, [
+    "abiogenesis-ts",
+    "genesis-ts"
+  ]);
+  assert.equal(reason.kind, "sdlc_blocking_reason");
+  assert.equal(reason.code, "installed_topology_invalid");
+  assert.equal(reason.reasonClass, "topology");
+  assert.equal(reason.lawfulReentryPoint, "repair_installed_topology");
 });

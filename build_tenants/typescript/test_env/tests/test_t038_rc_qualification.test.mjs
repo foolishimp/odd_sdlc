@@ -7,8 +7,11 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import {
+  existsSync,
+  readFileSync } from "node:fs";
+import { dirname,
+  resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -32,14 +35,16 @@ import {
   projectSdlcQueryDomain,
   projectSdlcRepairFrontier,
   projectSdlcRequirementClosureRegister,
-  projectSdlcWorkerAttachment,
-  publicStartOnce,
   remainingOddSdlcTypescriptRcGaps,
   routeSdlcTicketWorkItem,
   runSdlcHookTurn,
   bindSdlcRoute,
   advanceSdlcOperationalTransitionOnce
 } from "../../build/semantic/code/src/index.js";
+import {
+  projectSdlcWorkerAttachment,
+  publicStartOnce
+} from "../../build/semantic/code/src/start/index.js";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
 

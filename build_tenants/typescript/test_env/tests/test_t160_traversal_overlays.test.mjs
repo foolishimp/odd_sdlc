@@ -2,14 +2,17 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { materializeGraphFunction } from "@abiogenesis/typescript-tenant";
 
 import {
   admitSdlcProjectConstraints,
-  admitSdlcPublicStartRequest,
   constructSdlcOverlayBinding,
   conformProjectProfileFromConstraintsText,
   constructSdlcEdgeFulfillmentLedger,
@@ -36,9 +39,7 @@ import {
   FG_SOLUTION_ARCHITECTURE_EXECUTIVE,
   hookContractByEdgeName,
   projectSdlcQueryDomain,
-  projectSdlcWorkerAttachment,
   publicSdlcOverlayStartTargets,
-  publicStartOnce,
   sdlcTraversalOverlayFailureReentryRoute,
   SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF,
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
@@ -49,6 +50,11 @@ import {
   SDLC_TICKET_WORKFLOW_OVERLAY_REF,
   withSdlcOverlayBindingPostActionEvidence
 } from "../../build/semantic/code/src/index.js";
+import {
+  admitSdlcPublicStartRequest,
+  projectSdlcWorkerAttachment,
+  publicStartOnce
+} from "../../build/semantic/code/src/start/index.js";
 
 function startContext(workspaceRoot = "/workspace/t160") {
   const module = constructSdlcGtlModule();

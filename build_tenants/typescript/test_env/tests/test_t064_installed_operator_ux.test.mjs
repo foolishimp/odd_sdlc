@@ -8,10 +8,18 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  existsSync } from "node:fs";
 import { tmpdir } from "node:os";
-import path, { dirname, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import path,
+  { dirname,
+  resolve } from "node:path";
+import { fileURLToPath,
+  pathToFileURL } from "node:url";
 
 import {
   admitWorkerResultReport,
@@ -28,14 +36,16 @@ import {
   installOddSdlcTypescript,
   minimalSdlcHookInvocationForContract,
   projectSdlcQueryDomain,
-  projectSdlcWorkerAttachment,
-  publicStartOnce,
   readWorkerResultReport,
   runSdlcHookTurn,
   sha256Text,
   writeHandoffFiles
 } from "../../build/semantic/code/src/index.js";
-import { executeOddSdlcWorkspaceStartForTest } from "../workspace_start_harness.mjs";
+import { executeOddSdlcWorkspaceStartViaAbgCliForTest } from "../abg_cli_start_harness.mjs";
+import {
+  projectSdlcWorkerAttachment,
+  publicStartOnce
+} from "../../build/semantic/code/src/start/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
@@ -310,7 +320,7 @@ test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () 
   process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"] = "10000";
   process.env["ODD_SDLC_WORKER_HEARTBEAT_MS"] = "20";
   try {
-    const start = await executeOddSdlcWorkspaceStartForTest({
+    const start = await executeOddSdlcWorkspaceStartViaAbgCliForTest({
       workspaceRoot: workspace,
       target: {
         kind: "graph_function",
@@ -496,7 +506,7 @@ test("T-128 installed start returns worker_failed envelope after process failure
   assert.equal(install.kind, "installed");
   const workerScript = writeFailingWorkerScript(workspace);
 
-  const start = await executeOddSdlcWorkspaceStartForTest({
+  const start = await executeOddSdlcWorkspaceStartViaAbgCliForTest({
     workspaceRoot: workspace,
     target: {
       kind: "graph_function",
@@ -843,7 +853,7 @@ test("T-159 assurance rejection rewrites F_P evaluate result as blocked", async 
   assert.equal(install.kind, "installed");
   const workerScript = writeInvalidComponentTopologyWorkerScript(workspace);
 
-  const start = await executeOddSdlcWorkspaceStartForTest({
+  const start = await executeOddSdlcWorkspaceStartViaAbgCliForTest({
     workspaceRoot: workspace,
     target: {
       kind: "graph_function",

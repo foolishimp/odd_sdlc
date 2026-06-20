@@ -10,15 +10,17 @@ import { readFileSync } from "node:fs";
 
 import {
   admitSdlcProjectConstraints,
-  admitSdlcPublicStartRequest,
   conformProjectProfileFromConstraintsText,
   constructSdlcGtlModule,
   deriveSdlcWorkspaceIngressReport,
-  projectSdlcQueryDomain,
+  projectSdlcQueryDomain
+} from "../../build/semantic/code/src/index.js";
+import {
+  admitSdlcPublicStartRequest,
   projectSdlcWorkerAttachment,
   publicStartOnce,
   SDLC_PUBLIC_START_TARGET_POLICY
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/start/index.js";
 
 function startContext() {
   const module = constructSdlcGtlModule();

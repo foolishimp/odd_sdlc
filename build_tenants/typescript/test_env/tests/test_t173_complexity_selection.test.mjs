@@ -15,25 +15,27 @@ import { fileURLToPath } from "node:url";
 
 import {
   admitSdlcProjectConstraints,
-  admitSdlcPublicStartRequest,
   conformProjectProfileFromConstraintsText,
   constructSdlcGtlModule,
   deriveSdlcDecompositionSummary,
-	  deriveSdlcTraversalHopSelection,
-	  deriveSdlcWorkspaceIngressReport,
-	  FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
-	  FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
-	  projectSdlcQueryDomain,
-	  projectSdlcWorkerAttachment,
-	  publicStartOnce,
-	  SDLC_DEFAULT_DECOMPOSITION_SUMMARY_THRESHOLDS,
-	  SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
-	  SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
+  deriveSdlcTraversalHopSelection,
+  deriveSdlcWorkspaceIngressReport,
+  FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
+  FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
+  projectSdlcQueryDomain,
+  SDLC_DEFAULT_DECOMPOSITION_SUMMARY_THRESHOLDS,
+  SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
+  SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
 } from "../../build/semantic/code/src/index.js";
 import {
   analyzeSdlcFdRunArchive,
   renderSdlcFdRunAnalysisMarkdown
 } from "../../build/semantic/code/src/analysis/index.js";
+import {
+  admitSdlcPublicStartRequest,
+  projectSdlcWorkerAttachment,
+  publicStartOnce
+} from "../../build/semantic/code/src/start/index.js";
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(TEST_DIR, "../..");

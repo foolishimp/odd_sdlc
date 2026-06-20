@@ -24,7 +24,7 @@ import {
   normalizeSdlcRequirementDisplayId,
   projectOddSdlcWorkspaceGaps
 } from "../../build/semantic/code/src/index.js";
-import { executeOddSdlcWorkspaceStartForTest } from "../workspace_start_harness.mjs";
+import { executeOddSdlcWorkspaceStartViaAbgCliForTest } from "../abg_cli_start_harness.mjs";
 import {
   copyInternalDataMapperFixture,
   INTERNAL_DATA_MAPPER_FIXTURE_ROOT,
@@ -66,7 +66,7 @@ function projectGapsResult(input) {
 async function startWorkspaceResult(input) {
   return Object.freeze({
     status: "ok",
-    payload: await executeOddSdlcWorkspaceStartForTest(input)
+    payload: await executeOddSdlcWorkspaceStartViaAbgCliForTest(input)
   });
 }
 

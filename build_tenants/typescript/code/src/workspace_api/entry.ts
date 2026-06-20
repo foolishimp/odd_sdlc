@@ -37,12 +37,11 @@ import {
   deriveSdlcConformProjectReportFromWorkspace,
   deriveSdlcConformProjectReportFromWorkspaces,
   deriveSdlcProjectConstraintsFromWorkspace,
-  deriveSdlcSourceInput,
   deriveSdlcWorkspaceIngressReport,
+  collectSdlcWorkspaceSourceInputs,
   type SdlcConformProjectReport,
   type SdlcConformProjectProfile,
   type SdlcProjectConstraints,
-  type SdlcSourceInput,
   type SdlcWorkspaceIngressReport
 } from "../workspace/index.js";
 
@@ -83,34 +82,15 @@ export interface SdlcWorkspaceGapArchiveDiagnostic {
   readonly evidenceRefs: readonly string[];
 }
 
-const DEFAULT_SOURCE_PATHS = Object.freeze([
-  "README.md",
-  "specification/GOALS.md",
-  "specification/INTENT.md",
-  "specification/PRODUCT.md",
-  "specification/REQUIREMENTS.md",
-  ".ai-workspace/context/project_constraints.yml"
-] as const);
-
-const SOURCE_DISCOVERY_EXTENSIONS = Object.freeze([
-  ".md",
-  ".markdown",
-  ".txt",
-  ".yml",
-  ".yaml"
-] as const);
-
-const SOURCE_DISCOVERY_EXTENSION_SET: ReadonlySet<string> = new Set(
-  SOURCE_DISCOVERY_EXTENSIONS
-);
-
-const SOURCE_DISCOVERY_IGNORED_DIRS = Object.freeze([
-  ".abiogenesis",
-  ".genesis",
-  ".git",
-  "node_modules",
-  "build_tenants"
-] as const);
+interface SdlcWorkspaceGapsArchiveReadModel {
+  readonly archiveRoot: string;
+  readonly archiveRef: string;
+  readonly edgeFulfillmentLedger: SdlcRequirementFulfillmentEdgeLedgerSource | null;
+  readonly edgeClosureDecision: SdlcRequirementFulfillmentClosureSource | null;
+  readonly nextActionProjection: SdlcRequirementFulfillmentNextActionSource | null;
+  readonly passedComputeEvidenceRefs: readonly string[];
+  readonly assessments: readonly SdlcRequirementFulfillmentAssessmentPublicInput[];
+}
 
 const WORKSPACE_API_MODULE_ROOT = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PACKAGE_SOURCE_ROOT = resolve(WORKSPACE_API_MODULE_ROOT, "../../../../..");
@@ -200,62 +180,6 @@ export function resolveDefaultAbgDocsSourceRoot(
   return null;
 }
 
-function sourceFilePaths(workspaceRoot: string): readonly string[] {
-  const paths = new Set<string>();
-  for (const relativePath of DEFAULT_SOURCE_PATHS) {
-    if (existsSync(path.join(workspaceRoot, relativePath))) {
-      paths.add(relativePath);
-    }
-  }
-  const requirementsRoot = path.join(workspaceRoot, "specification/requirements");
-  if (existsSync(requirementsRoot)) {
-    for (const fileName of readdirSync(requirementsRoot)) {
-      const relativePath = `specification/requirements/${fileName}`;
-      const absolutePath = path.join(workspaceRoot, relativePath);
-      if (statSync(absolutePath).isFile() && fileName.endsWith(".md")) {
-        paths.add(relativePath);
-      }
-    }
-  }
-  const ignored = new Set<string>(SOURCE_DISCOVERY_IGNORED_DIRS);
-  const visit = (absoluteDir: string, relativeDir: string): void => {
-    for (const entry of readdirSync(absoluteDir, { withFileTypes: true })) {
-      const relativePath =
-        relativeDir.length === 0 ? entry.name : `${relativeDir}/${entry.name}`;
-      const absolutePath = path.join(absoluteDir, entry.name);
-      if (entry.isDirectory()) {
-        if (
-          !ignored.has(entry.name) &&
-          !relativePath.startsWith(".ai-workspace/runtime") &&
-          !relativePath.startsWith(".ai-workspace/events")
-        ) {
-          visit(absolutePath, relativePath);
-        }
-      } else if (
-        entry.isFile() &&
-        SOURCE_DISCOVERY_EXTENSION_SET.has(path.extname(entry.name).toLowerCase())
-      ) {
-        paths.add(relativePath);
-      }
-    }
-  };
-  visit(workspaceRoot, "");
-  return Object.freeze([...paths].sort());
-}
-
-function readSourceInputs(workspaceRoot: string): readonly SdlcSourceInput[] {
-  return Object.freeze(
-    sourceFilePaths(workspaceRoot).map((relativePath) => {
-      const absolutePath = path.join(workspaceRoot, relativePath);
-      return deriveSdlcSourceInput({
-        uri: `${pathToFileURL(workspaceRoot).href}/${relativePath}`,
-        relativePath,
-        content: readFileSync(absolutePath, "utf8")
-      });
-    })
-  );
-}
-
 function projectConstraints(workspaceRoot: string): SdlcProjectConstraints {
   return deriveSdlcProjectConstraintsFromWorkspace(workspaceRoot);
 }
@@ -328,7 +252,7 @@ function workspaceContext(
   const ingressReport = deriveSdlcWorkspaceIngressReport({
     workspaceRootUri: pathToFileURL(root).href,
     projectConstraints: projectConstraints(root),
-    sourceInputs: readSourceInputs(root)
+    sourceInputs: collectSdlcWorkspaceSourceInputs(root)
   });
   return Object.freeze({
     workspaceRoot: root,
@@ -574,75 +498,95 @@ function archiveFpEvaluatePassed(archiveRoot: string): boolean {
   );
 }
 
-function missingBindOutcomeAfterPassedComputeRefs(input: {
-  readonly archiveRoot: string;
-  readonly edgeFulfillmentLedger: SdlcRequirementFulfillmentEdgeLedgerSource | null;
-  readonly edgeClosureDecision: SdlcRequirementFulfillmentClosureSource | null;
-  readonly nextActionProjection: SdlcRequirementFulfillmentNextActionSource | null;
-}): readonly string[] {
+function passedComputeEvidenceRefs(archiveRoot: string): readonly string[] {
+  const workerReportRef = archiveRecordHasKind({
+    archiveRoot,
+    fileName: "worker_result_report.json",
+    kind: "odd_sdlc.worker_result_report"
+  })
+    ? archiveFileRef({ archiveRoot, fileName: "worker_result_report.json" })
+    : null;
+  const postflightRef = archivePostflightPassed(archiveRoot)
+    ? archiveFileRef({ archiveRoot, fileName: "postflight.json" })
+    : null;
+  const fpEvaluateRef = archiveFpEvaluatePassed(archiveRoot)
+    ? archiveFileRef({ archiveRoot, fileName: "fp_evaluate_result.json" })
+    : null;
+  if (workerReportRef === null || postflightRef === null || fpEvaluateRef === null) {
+    return Object.freeze([]);
+  }
+  return Object.freeze([workerReportRef, postflightRef, fpEvaluateRef]);
+}
+
+function operatorRunArchiveReadModel(
+  archiveRoot: string
+): SdlcWorkspaceGapsArchiveReadModel {
+  return Object.freeze({
+    archiveRoot,
+    archiveRef: archiveRefForRoot(archiveRoot),
+    edgeFulfillmentLedger: edgeFulfillmentLedgerFromArchive(archiveRoot),
+    edgeClosureDecision: edgeClosureDecisionFromArchive(archiveRoot),
+    nextActionProjection: nextActionProjectionFromArchive(archiveRoot),
+    passedComputeEvidenceRefs: passedComputeEvidenceRefs(archiveRoot),
+    assessments: requirementAssessmentsFromArchive(archiveRoot)
+  });
+}
+
+function missingBindOutcomeAfterPassedComputeRefs(
+  archive: SdlcWorkspaceGapsArchiveReadModel
+): readonly string[] {
   if (
-    input.edgeFulfillmentLedger !== null &&
-    input.edgeClosureDecision !== null &&
-    input.nextActionProjection !== null
+    archive.edgeFulfillmentLedger !== null &&
+    archive.edgeClosureDecision !== null &&
+    archive.nextActionProjection !== null
   ) {
     return Object.freeze([]);
   }
-  const hasPassedComputeFacts =
-    archiveRecordHasKind({
-      archiveRoot: input.archiveRoot,
-      fileName: "worker_result_report.json",
-      kind: "odd_sdlc.worker_result_report"
-    }) &&
-    archivePostflightPassed(input.archiveRoot) &&
-    archiveFpEvaluatePassed(input.archiveRoot);
-  if (!hasPassedComputeFacts) {
+  if (archive.passedComputeEvidenceRefs.length === 0) {
     return Object.freeze([]);
   }
   return Object.freeze(
     [
-      "worker_result_report.json",
-      "postflight.json",
-      "fp_evaluate_result.json",
-      input.edgeFulfillmentLedger === null
+      ...archive.passedComputeEvidenceRefs,
+      archive.edgeFulfillmentLedger === null
         ? "sdlc_edge_fulfillment_ledger.json"
         : null,
-      input.edgeClosureDecision === null
+      archive.edgeClosureDecision === null
         ? "sdlc_edge_closure_decision.json"
         : null,
-      input.nextActionProjection === null
+      archive.nextActionProjection === null
         ? "sdlc_next_action_projection.json"
         : null
     ]
-      .filter((fileName): fileName is string => fileName !== null)
-      .map((fileName) =>
-        archiveFileRef({
-          archiveRoot: input.archiveRoot,
-          fileName
-        })
+      .filter((refOrFileName): refOrFileName is string => refOrFileName !== null)
+      .map((refOrFileName) =>
+        refOrFileName.startsWith("file:")
+          ? refOrFileName
+          : archiveFileRef({
+              archiveRoot: archive.archiveRoot,
+              fileName: refOrFileName
+            })
       )
   );
 }
 
-function missingTraversalConsequenceArtifactRefs(input: {
-  readonly archiveRoot: string;
-  readonly edgeFulfillmentLedger: SdlcRequirementFulfillmentEdgeLedgerSource | null;
-  readonly edgeClosureDecision: SdlcRequirementFulfillmentClosureSource | null;
-  readonly nextActionProjection: SdlcRequirementFulfillmentNextActionSource | null;
-}): readonly string[] {
+function missingTraversalConsequenceArtifactRefs(
+  archive: SdlcWorkspaceGapsArchiveReadModel
+): readonly string[] {
   const missing: string[] = [];
-  if (input.edgeFulfillmentLedger === null) {
+  if (archive.edgeFulfillmentLedger === null) {
     missing.push("sdlc_edge_fulfillment_ledger.json");
   }
-  if (input.edgeClosureDecision === null) {
+  if (archive.edgeClosureDecision === null) {
     missing.push("sdlc_edge_closure_decision.json");
   }
-  if (input.nextActionProjection === null) {
+  if (archive.nextActionProjection === null) {
     missing.push("sdlc_next_action_projection.json");
   }
   return Object.freeze(
     missing.map((fileName) =>
       archiveFileRef({
-        archiveRoot: input.archiveRoot,
+        archiveRoot: archive.archiveRoot,
         fileName
       })
     )
@@ -714,45 +658,34 @@ function requirementFulfillmentForGaps(input: {
   const scannedArchiveRefs = Object.freeze(archiveRoots.map(archiveRefForRoot));
   const missingArtifactRefs: string[] = [];
   for (const archiveRoot of archiveRoots) {
-    const archiveRef = archiveRefForRoot(archiveRoot);
-    const edgeFulfillmentLedger = edgeFulfillmentLedgerFromArchive(archiveRoot);
-    const edgeClosureDecision = edgeClosureDecisionFromArchive(archiveRoot);
-    const nextActionProjection = nextActionProjectionFromArchive(archiveRoot);
-    const missingBindOutcomeRefs = missingBindOutcomeAfterPassedComputeRefs({
-      archiveRoot,
-      edgeFulfillmentLedger,
-      edgeClosureDecision,
-      nextActionProjection
-    });
+    const archive = operatorRunArchiveReadModel(archiveRoot);
+    const missingBindOutcomeRefs =
+      missingBindOutcomeAfterPassedComputeRefs(archive);
     if (missingBindOutcomeRefs.length > 0) {
       missingArtifactRefs.push(...missingBindOutcomeRefs);
       archiveDiagnostics.push(
         Object.freeze({
           kind: "sdlc_workspace_gap_archive_diagnostic" as const,
           code: "missing_bind_outcome_after_passed_compute" as const,
-          archiveRef,
+          archiveRef: archive.archiveRef,
           evidenceRefs: missingBindOutcomeRefs
         })
       );
       continue;
     }
     if (
-      edgeFulfillmentLedger === null ||
-      edgeClosureDecision === null ||
-      nextActionProjection === null
+      archive.edgeFulfillmentLedger === null ||
+      archive.edgeClosureDecision === null ||
+      archive.nextActionProjection === null
     ) {
-      const missingTraversalRefs = missingTraversalConsequenceArtifactRefs({
-        archiveRoot,
-        edgeFulfillmentLedger,
-        edgeClosureDecision,
-        nextActionProjection
-      });
+      const missingTraversalRefs =
+        missingTraversalConsequenceArtifactRefs(archive);
       missingArtifactRefs.push(...missingTraversalRefs);
       archiveDiagnostics.push(
         Object.freeze({
           kind: "sdlc_workspace_gap_archive_diagnostic" as const,
           code: "traversal_consequence_artifacts_missing" as const,
-          archiveRef,
+          archiveRef: archive.archiveRef,
           evidenceRefs: missingTraversalRefs
         })
       );
@@ -761,14 +694,14 @@ function requirementFulfillmentForGaps(input: {
     return Object.freeze({
       projection: projectSdlcRequirementFulfillmentPublicViewFromPriorProjection({
         sourceProjection: input.sourceProjection,
-        assessments: requirementAssessmentsFromArchive(archiveRoot),
-        edgeFulfillmentLedger,
-        edgeClosureDecision,
-        nextActionProjection,
+        assessments: archive.assessments,
+        edgeFulfillmentLedger: archive.edgeFulfillmentLedger,
+        edgeClosureDecision: archive.edgeClosureDecision,
+        nextActionProjection: archive.nextActionProjection,
         sourceRegisterRef: `requirement-fulfillment-public://odd-sdlc/${encodeURIComponent(archiveRoot)}`,
         archiveRehydration: constructSdlcRequirementFulfillmentArchiveRehydration({
           status: "rehydrated",
-          archiveRef,
+          archiveRef: archive.archiveRef,
           scannedArchiveRefs,
           missingArtifactRefs
         })
@@ -892,7 +825,10 @@ export function admitOddSdlcWorkspaceTicket(input: {
 }): ReturnType<typeof admitSdlcTicketExecutionContract> {
   const admitted = admitWorkspaceTicketInput(input);
   return admitSdlcTicketExecutionContract({
-    workflow: projectOddSdlcWorkspaceTickets(admitted),
+    workflow: projectOddSdlcWorkspaceTickets({
+      workspaceRoot: admitted.workspaceRoot,
+      outputWorkspaceRoot: admitted.outputWorkspaceRoot
+    }),
     ticketId: admitted.ticketId
   });
 }

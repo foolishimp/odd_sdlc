@@ -30,13 +30,15 @@ import {
   executeInstalledOperatorStart,
   hookContractByEdgeName,
   projectSdlcQueryDomain,
-  projectSdlcWorkerAttachment,
-  publicStartOnce,
   writeHandoffFiles
 } from "../../build/semantic/code/src/index.js";
 import {
   analyzeSdlcFdRunArchive
 } from "../../build/semantic/code/src/analysis/index.js";
+import {
+  projectSdlcWorkerAttachment,
+  publicStartOnce
+} from "../../build/semantic/code/src/start/index.js";
 
 function makeRuntimeWorkspace() {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t172-runtime-"));

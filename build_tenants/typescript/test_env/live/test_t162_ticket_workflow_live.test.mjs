@@ -9,12 +9,12 @@ import { fileURLToPath } from "node:url";
 
 import {
   admitOddSdlcWorkspaceTicket,
+  deriveSdlcInstalledQualificationInitialState,
   projectOddSdlcWorkspaceTickets,
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
   SDLC_TICKET_WORKFLOW_OVERLAY_REF
 } from "../../build/semantic/code/src/index.js";
 import { liveTestArchiveRoot } from "./archive_root.mjs";
-import { executeOddSdlcWorkspaceStartForTest } from "../workspace_start_harness.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
@@ -173,7 +173,7 @@ overlay_continuation_proof_expectation: start through admitted ticket authority
   );
 }
 
-test("T-162 live package API projects, admits, and starts an active ticket", async () => {
+test("T-162 live package API projects and admits an active ticket before ABG start", async () => {
   const archiveRoot = liveTestArchiveRoot(
     "t162_ticket_workflow_live",
     archiveTimestamp(),
@@ -208,26 +208,14 @@ test("T-162 live package API projects, admits, and starts an active ticket", asy
     "ticket admission must preserve selected reviewer profile"
   );
 
-  const started = await executeOddSdlcWorkspaceStartForTest({
-    workspaceRoot: workspace,
-    target: { kind: "asset", handle: "ticket/T-162" },
-    until: "blocked",
-    workerTransport: "process://codex"
+  const installedTopology = deriveSdlcInstalledQualificationInitialState({
+    workspaceRoot: workspace
   });
-  assert.equal(started.kind, "sdlc_installed_operator_start_outcome");
-  assert.equal(started.status, "blocked");
-  assert.equal(
-    started.summary.blockingReason,
-    "installed_topology_invalid"
-  );
-  assert.equal(
-    started.summary.graphFunctionName,
-    "derive_intent_surface"
-  );
-  assert.equal(
-    started.summary.nextLawfulAction,
-    "run_install_or_repair_installed_topology"
-  );
+  assert.equal(installedTopology.status, "invalid");
+  assert.deepStrictEqual(installedTopology.missingCommands, [
+    "abiogenesis-ts",
+    "genesis-ts"
+  ]);
 
   writeFileSync(
     path.join(archiveRoot, "t162_ticket_workflow_live_summary.json"),
@@ -239,8 +227,8 @@ test("T-162 live package API projects, admits, and starts an active ticket", asy
         executionContractRef: admitted.executionContractRef,
         ticketWorkflowOverlayRef: SDLC_TICKET_WORKFLOW_OVERLAY_REF,
         selectedOverlayRef: SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
-        selectedGraphFunction: started.summary.graphFunctionName,
-        startBlockingReason: started.summary.blockingReason,
+        installedTopologyStatus: installedTopology.status,
+        installedTopologyMissingCommands: installedTopology.missingCommands,
         ticketDigest: admitted.ticketDigest
       },
       null,

@@ -1873,3 +1873,85 @@ Status:
   `survival_pending`, especially `analysis/*`, `effects/*`, `start/*`,
   `operator/event_store.ts`, `operator/installed_operator.ts`, and the final
   ABG/product fold in `operator/traversal_consequence.ts`.
+
+## 2026-06-20 Follow-Up One-Surface Proof After Review Fixes
+
+Review-response fixes in this cut:
+
+- stale public-start and deleted workspace-start-harness tests now use explicit
+  internal plugin-support imports or ABG CLI start proof; no public start/gaps
+  package surface was reopened.
+- `workspace/source_input.ts` is the single admitted workspace source-ingress
+  helper used by runtime binding and read-model projection.
+- `workspace_api` gaps archive reading is named as a read-model carrier rather
+  than an implicit command/control replay surface.
+- the live failure in archive
+  `build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260620T030936371Z_pid83731`
+  found a real F_P-boundary bug: the design-depth evaluator emitted
+  `designCompletenessVerdict.*.kind = "sdlc_verdict_axis"`. Typed admission
+  correctly rejected it, but the root cause was relying on evaluator self-check
+  for an exact carrier string already known as a legacy alias. The fix is a
+  narrow deterministic canonicalization in the evaluator content-register
+  projection before strict register admission; unknown axis kinds still fail.
+
+Regression added:
+
+- `test_env/tests/test_t181_fp_evaluator_design_register.test.mjs` now covers
+  incremental design-depth fragments with the legacy axis alias and proves the
+  projected register uses
+  `sdlc_design_completeness_axis_verdict`.
+
+Fresh clean live proof:
+
+- archive:
+  `build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260620T031939859Z_pid14825`
+- command/test result:
+  `npm run test:scenario:t132-hello-world-js-live`
+  passed with 1/1 tests in 1,517,104 ms.
+- total scenario progress from first step begin to return: 25.09.
+
+| Step | Target graph function | Status | Step time |
+| ---: | --- | --- | ---: |
+| 0 | `Fg_conform_project` | converged | 0.02 |
+| 1 | `derive_lite_design_adr_surface` | converged | 4.43 |
+| 2 | `derive_lite_component_code_surface` | converged | 6.06 |
+| 3 | `derive_lite_test_design_surface` | converged | 3.48 |
+| 4 | `derive_lite_component_test_surface` | converged | 6.01 |
+| 5 | `derive_lite_uat_test_source_surface` | converged | 4.26 |
+| 6 | `prepare_test_execution_surface` | converged | 0.02 |
+| 7 | `derive_test_execution_result_surface` | converged | 0.02 |
+
+Archive consistency check:
+
+- `derive_lite_design_adr_surface`: postflight `passed`, zero blocking reasons,
+  closure artifact present.
+- `derive_lite_component_code_surface`: postflight `passed`, zero blocking
+  reasons, closure artifact present.
+- `derive_lite_test_design_surface`: postflight `passed`, zero blocking
+  reasons, closure artifact present.
+- `derive_lite_component_test_surface`: postflight `passed`, zero blocking
+  reasons, closure artifact present.
+- `derive_lite_uat_test_source_surface`: postflight `passed`, zero blocking
+  reasons, closure artifact present.
+- `prepare_test_execution_surface`: postflight `passed`, zero blocking reasons,
+  closure artifact present.
+- `derive_test_execution_result_surface`: postflight `passed`, zero blocking
+  reasons, closure artifact present.
+
+Validation after the follow-up fix:
+
+- passed: `npm run lint:semantic`
+- passed: `npm run lint:test-harness`
+- passed: `npm run build:semantic`
+- passed: `node --test test_env/tests/test_t181_fp_evaluator_design_register.test.mjs`
+- passed: `npm run test:scenario:t132-hello-world-js-live`
+- passed: `npm run guard:pack-no-command-artifacts`
+- passed: focused T-204/T-205/T-181/T-197/T-203 proof lane, 105/105 tests.
+
+Status:
+
+- Functional one-surface proof is refreshed after the review-response fixes and
+  after the evaluator alias-boundary bug fix.
+- Strict T-204 closure remains open only for the already-classified
+  `move_to_abg`/`survival_pending` inventory, not because odd_sdlc exposes a
+  second command/control truth surface.

@@ -2,12 +2,19 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import path, { dirname } from "node:path";
+import path,
+  { dirname } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { emit, materializeGraphFunction } from "@abiogenesis/typescript-tenant";
+import { emit,
+  materializeGraphFunction } from "@abiogenesis/typescript-tenant";
 
 import {
   admitSdlcProjectConstraints,
@@ -19,10 +26,12 @@ import {
   executeInstalledOperatorStart,
   materializeSdlcProjectConformance,
   projectOddSdlcWorkspaceGaps,
-  projectSdlcQueryDomain,
+  projectSdlcQueryDomain
+} from "../../build/semantic/code/src/index.js";
+import {
   projectSdlcWorkerAttachment,
   publicStartOnce
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/start/index.js";
 
 function workspaceGaps(workspaceRoot) {
   return projectOddSdlcWorkspaceGaps({ workspaceRoot });

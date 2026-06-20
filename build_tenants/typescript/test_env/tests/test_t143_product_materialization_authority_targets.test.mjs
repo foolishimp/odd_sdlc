@@ -13,7 +13,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath,
+  pathToFileURL } from "node:url";
 
 import {
   FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
@@ -33,8 +34,6 @@ import {
   observeProductMaterializationDelta,
   promptForHandoff,
   projectSdlcQueryDomain,
-  projectSdlcWorkerAttachment,
-  publicStartOnce,
   readWorkerResultReport,
   reconcileSdlcProductMaterializationAuthority,
   sha256Text,
@@ -44,8 +43,12 @@ import {
   sdlcWorkspaceLocalToolEnvironment,
   snapshotProductMaterializationRoot,
   writeHandoffFiles,
-  writeProductMaterializationManifest,
+  writeProductMaterializationManifest
 } from "../../build/semantic/code/src/index.js";
+import {
+  projectSdlcWorkerAttachment,
+  publicStartOnce
+} from "../../build/semantic/code/src/start/index.js";
 
 const installedOperatorSource = () =>
   readFileSync(

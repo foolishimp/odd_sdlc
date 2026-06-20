@@ -4,8 +4,14 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import path, { dirname, resolve } from "node:path";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync } from "node:fs";
+import path,
+  { dirname,
+  resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 
@@ -31,8 +37,6 @@ import {
   projectSdlcQueryDomain,
   projectSdlcRepairFrontier,
   projectSdlcRequirementClosureRegister,
-  projectSdlcWorkerAttachment,
-  publicStartOnce,
   renderOddSdlcSandboxPostmortem,
   routeSdlcTicketWorkItem,
   runSdlcHookTurn,
@@ -43,6 +47,10 @@ import {
   provisionAbgInstalledSandbox
 } from "./abg_installed_workspace.mjs";
 import { canonicalDataMapperFixtureRoot } from "../fixtures/data_mapper_fixture.mjs";
+import {
+  projectSdlcWorkerAttachment,
+  publicStartOnce
+} from "../../build/semantic/code/src/start/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");

@@ -5,7 +5,8 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import {
+  spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   existsSync,
@@ -13,7 +14,8 @@ import {
   readFileSync,
   writeFileSync
 } from "node:fs";
-import path, { dirname } from "node:path";
+import path,
+  { dirname } from "node:path";
 import { performance } from "node:perf_hooks";
 
 import {
@@ -25,8 +27,6 @@ import {
   hookContractByEdgeName,
   minimalSdlcHookInvocationForContract,
   projectSdlcQueryDomain,
-  projectSdlcWorkerAttachment,
-  publicStartOnce,
   runSdlcHookTurn
 } from "../../build/semantic/code/src/index.js";
 import {
@@ -36,6 +36,10 @@ import {
 import { liveTestArchiveRoot } from "./archive_root.mjs";
 import { liveOperatorRuntimePolicy } from "./operator_runtime_policy.mjs";
 import { canonicalDataMapperFixtureRoot } from "../fixtures/data_mapper_fixture.mjs";
+import {
+  projectSdlcWorkerAttachment,
+  publicStartOnce
+} from "../../build/semantic/code/src/start/index.js";
 
 const RUNTIME_POLICY = liveOperatorRuntimePolicy();
 const LIVE_ENABLED = process.env["ODD_SDLC_TS_LIVE_FP"] === "1";

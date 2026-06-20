@@ -5,15 +5,17 @@ import assert from "node:assert/strict";
 
 import {
   admitSdlcProjectConstraints,
-  admitSdlcPublicStartRequest,
   conformProjectProfileFromConstraintsText,
   constructSdlcGtlModule,
   deriveSdlcTargetObligationBinding,
   deriveSdlcWorkspaceIngressReport,
-  projectSdlcQueryDomain,
+  projectSdlcQueryDomain
+} from "../../build/semantic/code/src/index.js";
+import {
+  admitSdlcPublicStartRequest,
   projectSdlcWorkerAttachment,
   publicStartOnce
-} from "../../build/semantic/code/src/index.js";
+} from "../../build/semantic/code/src/start/index.js";
 
 function queryContext() {
   const module = constructSdlcGtlModule();

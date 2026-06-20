@@ -539,17 +539,46 @@ function readWorkerInvocationPackageScope(
       featureScope === null ||
       payload["kind"] !== "sdlc_worker_invocation_package" ||
       payload["packageVersion"] !== "ts-invocation-v1" ||
+      featureScope["kind"] !== "sdlc_feature_scope" ||
+      featureScope["scopeVersion"] !== "ts-scope-v1" ||
       !isSdlcFeatureScopeMode(featureScope["mode"]) ||
+      typeof featureScope["scopeRef"] !== "string" ||
+      !isStringList(featureScope["basisRefs"]) ||
+      !isStringList(featureScope["includedRequirementRefs"]) ||
+      !isStringList(featureScope["includedModuleNames"]) ||
+      !isStringList(featureScope["includedEntityIds"]) ||
+      !isStringList(featureScope["includedOperationIds"]) ||
+      !isStringList(featureScope["deferredModuleNames"]) ||
       !isStringList(payload["inlineObligationIds"])
     ) {
       return null;
     }
+    const admittedFeatureScope: SdlcWorkerInvocationPackage["featureScope"] =
+      Object.freeze({
+        kind: "sdlc_feature_scope",
+        scopeVersion: "ts-scope-v1",
+        mode: featureScope["mode"],
+        scopeRef: featureScope["scopeRef"],
+        basisRefs: Object.freeze([...featureScope["basisRefs"]]),
+        includedRequirementRefs: Object.freeze([
+          ...featureScope["includedRequirementRefs"]
+        ]),
+        includedModuleNames: Object.freeze([
+          ...featureScope["includedModuleNames"]
+        ]),
+        includedEntityIds: Object.freeze([
+          ...featureScope["includedEntityIds"]
+        ]),
+        includedOperationIds: Object.freeze([
+          ...featureScope["includedOperationIds"]
+        ]),
+        deferredModuleNames: Object.freeze([
+          ...featureScope["deferredModuleNames"]
+        ])
+      });
     return Object.freeze({
       kind: "sdlc_worker_invocation_package" as const,
-      featureScope: Object.freeze({
-        ...featureScope,
-        mode: featureScope["mode"]
-      }) as SdlcWorkerInvocationPackage["featureScope"],
+      featureScope: admittedFeatureScope,
       inlineObligationIds: Object.freeze([...payload["inlineObligationIds"]])
     });
   } catch {
