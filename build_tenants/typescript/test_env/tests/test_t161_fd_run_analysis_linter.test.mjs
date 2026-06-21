@@ -382,7 +382,7 @@ function buildSyntheticT132Archive(opts) {
           selectedRegimeBindingRef,
           decisionRef: `closure-decision://synthetic/${edge.name}/${index}`,
           ledgerRef: `ledger://synthetic/${edge.name}`,
-          ledgerVersionRef: `ledger-version://synthetic/${edge.name}/${index}`,
+          registerVersionRef: `ledger-version://synthetic/${edge.name}/${index}`,
           disposition: closureDisposition,
           basisRefs: []
         },
@@ -397,7 +397,7 @@ function buildSyntheticT132Archive(opts) {
           compositionSelectionRef,
           selectedRegimeBindingRef,
           ledgerRef: `ledger://synthetic/${edge.name}`,
-          ledgerVersionRef: `ledger-version://synthetic/${edge.name}/${index}`,
+          registerVersionRef: `ledger-version://synthetic/${edge.name}/${index}`,
           edgeRef: `edge://synthetic/${edge.name}/${index}`,
           attemptRef: `attempt://synthetic/${edge.name}/${index}`,
           targetBindingRefs: [],
@@ -591,8 +591,8 @@ function buildSyntheticT132Archive(opts) {
         writeJson(
           designDepthContentRegisterPath,
           {
-            kind: "sdlc_evaluate_content_register",
-            registerVersion: "ts-evaluate-content-register-v1",
+            kind: "sdlc_evaluate_content_ledger",
+            ledgerVersion: "ts-evaluate-content-ledger-v1",
             stage: "evaluate.C",
             ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
             ruleRole: "semantic_judgment",
@@ -608,7 +608,7 @@ function buildSyntheticT132Archive(opts) {
             evidenceRefs: [pathToFileURL(operatorRunRoot).href],
             contentRows: [
               {
-                kind: "sdlc_evaluate_content_register_row",
+                kind: "sdlc_evaluate_content_ledger_row",
                 rowRef: `evaluate-content-row://synthetic/${edge.name}/${index}/design-depth-register`,
                 authorityFunction: "synthesize_model",
                 carrierFamily: "ProductAssetModel",

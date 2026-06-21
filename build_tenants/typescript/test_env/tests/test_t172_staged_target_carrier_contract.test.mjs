@@ -371,8 +371,8 @@ function writeFpEvaluatorDesignRegister(manifest, register) {
     basisRef: "basis://t172"
   };
   writeJsonFile(contentRegisterPath, {
-    kind: "sdlc_evaluate_content_register",
-    registerVersion: "ts-evaluate-content-register-v1",
+    kind: "sdlc_evaluate_content_ledger",
+    ledgerVersion: "ts-evaluate-content-ledger-v1",
     stage: "evaluate.C",
     ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
     ruleRole: "semantic_judgment",
@@ -388,7 +388,7 @@ function writeFpEvaluatorDesignRegister(manifest, register) {
     evidenceRefs: [pathToFileURL(manifest.outputFile).href],
     contentRows: [
       {
-        kind: "sdlc_evaluate_content_register_row",
+        kind: "sdlc_evaluate_content_ledger_row",
         rowRef: "evaluate-content-row://t172/design-depth-register",
         authorityFunction: "synthesize_model",
         carrierFamily: "ProductAssetModel",

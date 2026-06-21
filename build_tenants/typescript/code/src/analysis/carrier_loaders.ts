@@ -208,8 +208,8 @@ export interface DesignDepthFpEvaluatorRunRecord {
 }
 
 export interface EvaluateContentRegisterRecord {
-  readonly kind: "sdlc_evaluate_content_register";
-  readonly registerVersion?: string;
+  readonly kind: "sdlc_evaluate_content_ledger";
+  readonly ledgerVersion?: string;
   readonly stage?: string;
   readonly ruleRef?: string;
   readonly authorityFunction?: string;
@@ -479,7 +479,7 @@ const DESIGN_DEPTH_FP_EVALUATOR_RUN_GUARD: (
 const EVALUATE_CONTENT_REGISTER_GUARD: (
   value: unknown
 ) => value is EvaluateContentRegisterRecord =
-  guardKind<EvaluateContentRegisterRecord>("sdlc_evaluate_content_register");
+  guardKind<EvaluateContentRegisterRecord>("sdlc_evaluate_content_ledger");
 
 const REVIEW_GRADE_EDGE_FULFILLMENT_RUN_GUARD: (
   value: unknown

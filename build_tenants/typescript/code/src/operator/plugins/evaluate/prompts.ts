@@ -512,7 +512,7 @@ function compactObligationPromptLines(
       : reviewGradePromptObligationRefs(manifest, invocationScope);
   const coverageLaw =
     coverageTarget === "content_register"
-      ? "- Coverage law: obligationRefs above are fold context only for this content register. Do not add reviewedObligationIds, findings, summary, status, or other assessment fields to sdlc_evaluate_content_register; represent semantic judgment only through permitted contentRows/evidenceRefs, and ABG folds coverage/closure from refs."
+      ? "- Coverage law: obligationRefs above are fold context only for this content register. Do not add reviewedObligationIds, findings, summary, status, or other assessment fields to sdlc_evaluate_content_ledger; represent semantic judgment only through permitted contentRows/evidenceRefs, and ABG folds coverage/closure from refs."
       : "- Review coverage law: reviewedObligationIds and findings must cover exactly every obligationRef above and no other obligation ids. Worker-report obligation IDs not listed above are evidence/carryover aliases only.";
   return Object.freeze([
     `- graphFunctionName: ${manifest.graphFunctionName}`,
@@ -587,8 +587,8 @@ function compactDesignDepthPromptLineGroups(input: {
       "- Do not write EvaluationFinding rows into the content register. The grid's expected finding refs are prompt-sidecar and ABG-fold refs, not contentRows[].",
       "",
       "Required content-register envelope:",
-      "- kind: \"sdlc_evaluate_content_register\"",
-      "- registerVersion: \"ts-evaluate-content-register-v1\"",
+      "- kind: \"sdlc_evaluate_content_ledger\"",
+      "- ledgerVersion: \"ts-evaluate-content-ledger-v1\"",
       "- stage: \"evaluate.C\"",
       `- ruleRef: "${DESIGN_DEPTH_FP_EVALUATOR_RULE_REF}"`,
       "- ruleRole: \"semantic_judgment\"",
@@ -600,7 +600,7 @@ function compactDesignDepthPromptLineGroups(input: {
       `- selectedRegimeBindingRef: ${input.selectedRegimeBindingRef === null ? "null" : JSON.stringify(input.selectedRegimeBindingRef)}`,
       `- compositionContributionRef: "${input.selectedRegimeBindingRef ?? input.selectedCompositionRef}"`,
       "- sourceBasisRefs[], candidateArtifactRefs[], evidenceRefs[], contentRows[].",
-      "- Top-level key set is exactly kind, registerVersion, stage, ruleRef, ruleRole, computeMeans, authorityFunction, selectedCompositionRef, selectedCompositionDigest, selectedCompositionSelectionRef, selectedRegimeBindingRef, compositionContributionRef, sourceBasisRefs, candidateArtifactRefs, evidenceRefs, contentRows. Do not add reviewedObligationIds, findings, summary, status, or assessment fields to this register.",
+      "- Top-level key set is exactly kind, ledgerVersion, stage, ruleRef, ruleRole, computeMeans, authorityFunction, selectedCompositionRef, selectedCompositionDigest, selectedCompositionSelectionRef, selectedRegimeBindingRef, compositionContributionRef, sourceBasisRefs, candidateArtifactRefs, evidenceRefs, contentRows. Do not add reviewedObligationIds, findings, summary, status, or assessment fields to this register.",
       "- contentRows[] entries have exactly kind, rowRef, authorityFunction, carrierFamily, contentKind, payload, sourceBasisRefs, evidenceRefs.",
       `- Preferred contentKind: "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND}". Optional final contentKind: "sdlc_design_depth_register".`,
       "- Forbidden contentKind values in this register include \"sdlc_evaluation_finding\" and any grid/fold finding row. Do not use carrierFamily values outside ProductAssetModel, ObservationSnapshot, GapPressureRow, EdgeFulfillment, EdgeClosureDecision, or NextActionProjection.",
@@ -952,8 +952,8 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
     `Durable evaluation artifact to create and validate: ${input.contentRegisterPath}`,
     "",
     "Required content register shape:",
-    "- kind: \"sdlc_evaluate_content_register\"",
-    "- registerVersion: \"ts-evaluate-content-register-v1\"",
+    "- kind: \"sdlc_evaluate_content_ledger\"",
+    "- ledgerVersion: \"ts-evaluate-content-ledger-v1\"",
     "- stage: \"evaluate.C\"",
     `- ruleRef: "${DESIGN_DEPTH_FP_EVALUATOR_RULE_REF}"`,
     "- ruleRole: \"semantic_judgment\"",
@@ -966,7 +966,7 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
     `- compositionContributionRef: "${input.selectedRegimeBindingRef ?? input.selectedCompositionRef}"`,
     "- sourceBasisRefs[], candidateArtifactRefs[], evidenceRefs[], contentRows[].",
     "- contentRows[] are the incremental register rows. Each row must be a closed carrier with exactly kind, rowRef, authorityFunction, carrierFamily, contentKind, payload, sourceBasisRefs, evidenceRefs.",
-    "- contentRows[].kind: \"sdlc_evaluate_content_register_row\"",
+    "- contentRows[].kind: \"sdlc_evaluate_content_ledger_row\"",
     "- contentRows[].rowRef: a stable non-empty ref such as \"content-register-row://odd-sdlc/design-depth/<edgeName>/<section>/<sequence>\"",
     "- contentRows[].authorityFunction: \"synthesize_model\"",
     "- contentRows[].carrierFamily: \"ProductAssetModel\"",

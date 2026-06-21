@@ -147,8 +147,8 @@ function makeConformanceWorkspace(name, constraintsText) {
 function designDepthDraftRegister() {
   const sourceRef = "file:///tmp/t187/implementation_design_surface.md";
   return {
-    kind: "sdlc_evaluate_content_register",
-    registerVersion: "ts-evaluate-content-register-v1",
+    kind: "sdlc_evaluate_content_ledger",
+    ledgerVersion: "ts-evaluate-content-ledger-v1",
     stage: "evaluate.C",
     ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
     ruleRole: "semantic_judgment",
@@ -163,7 +163,7 @@ function designDepthDraftRegister() {
     candidateArtifactRefs: [sourceRef],
     evidenceRefs: [sourceRef],
     contentRows: SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.map((section, index) => ({
-      kind: "sdlc_evaluate_content_register_row",
+      kind: "sdlc_evaluate_content_ledger_row",
       rowRef: `content-register-row-draft://odd-sdlc/design-depth/${section}`,
       authorityFunction: "synthesize_model",
       carrierFamily: "ProductAssetModel",

@@ -573,13 +573,17 @@ test("T-184 F_P evaluator prompt uses incremental content register writes", () =
   assert.match(contentRegisterSource, /sdlc_design_depth_register_fragment_draft/u);
   assert.match(contentRegisterSource, /SDLC_EVALUATE_CONTENT_LEDGER_KIND/u);
   assert.match(contentRegisterSource, /sdlc_evaluate_content_ledger/u);
-  assert.match(contentRegisterSource, /SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND/u);
+  assert.doesNotMatch(
+    contentRegisterSource,
+    /SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND/u
+  );
   assert.match(evaluatorPromptSource, /content-register-row-draft:\/\//u);
   assert.match(evaluatorPromptSource, /sdlc_design_depth_register_fragment/u);
   assert.match(installedOperatorSource, /ODD_SDLC_EVALUATOR_INCREMENTAL_REGISTER/u);
   assert.doesNotMatch(installedOperatorSource, /ODD_SDLC_EVALUATOR_INCREMENTAL_LEDGER/u);
   assert.doesNotMatch(installedOperatorSource, /ODD_SDLC_EVALUATOR_CONTENT_LEDGER/u);
-  assert.doesNotMatch(evaluatorPromptSource, /content-ledger/u);
+  assert.match(evaluatorPromptSource, /sdlc_evaluate_content_ledger/u);
+  assert.doesNotMatch(evaluatorPromptSource, /sdlc_evaluate_content_register/u);
   assert.doesNotMatch(
     evaluatorPromptSource,
     /contentRows\[0\]\.payload must be the full design-depth register object/u

@@ -319,7 +319,7 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
   row({
     artifactRef: "operator-run-artifact://design-depth-fp-evaluator-content-register",
     relativePath: "design_depth_fp_evaluator_content_register.json",
-    carrierKind: "sdlc_evaluate_content_register",
+    carrierKind: "sdlc_evaluate_content_ledger",
     role: "read_model",
     sourceOwner: "fp_evaluator",
     requiredForPresentEdge: false,

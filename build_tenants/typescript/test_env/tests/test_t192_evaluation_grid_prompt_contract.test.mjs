@@ -292,7 +292,7 @@ test("T-192 small admitted handoffs render compact fused-grid prompts", () => {
   );
   assert.match(
     compactDesign.promptText,
-    /Do not add reviewedObligationIds, findings, summary, status, or other assessment fields to sdlc_evaluate_content_register/u
+    /Do not add reviewedObligationIds, findings, summary, status, or other assessment fields to sdlc_evaluate_content_ledger/u
   );
   assert.match(
     compactDesign.promptText,

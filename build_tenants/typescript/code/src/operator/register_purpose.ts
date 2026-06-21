@@ -1,9 +1,6 @@
 // Implements: T-204
 
-import {
-  SDLC_EVALUATE_CONTENT_LEDGER_KIND,
-  SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND
-} from "./plugins/evaluate/content_register.js";
+import { SDLC_EVALUATE_CONTENT_LEDGER_KIND } from "./plugins/evaluate/content_register.js";
 
 export const SDLC_REGISTER_PURPOSE_CLASSES = Object.freeze([
   "product_evaluate_carrier",
@@ -11,9 +8,7 @@ export const SDLC_REGISTER_PURPOSE_CLASSES = Object.freeze([
   "product_assurance_carrier",
   "product_projection",
   "split_boundary",
-  "migration_authority",
-  "legacy_projection",
-  "retired_adapter_only"
+  "migration_authority"
 ] as const);
 
 export type SdlcRegisterPurposeClass =
@@ -157,17 +152,6 @@ export const SDLC_REGISTER_PURPOSE_CATALOG = Object.freeze([
       "target authority carrier for evaluate.C semantic content rows before ABG admission."
   }),
   row({
-    carrierKind: SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND,
-    carrierName: "SdlcEvaluateContentRegister",
-    purposeClass: "legacy_projection",
-    owner: "odd_sdlc",
-    authorityUse: "non_authoritative_projection",
-    sourceModule: "operator/plugins/evaluate/content_register.ts",
-    replacementCarrierKind: SDLC_EVALUATE_CONTENT_LEDGER_KIND,
-    purpose:
-      "legacy archive projection of evaluate content rows while content-ledger migration completes."
-  }),
-  row({
     carrierKind: "sdlc_edge_fulfillment_ledger",
     carrierName: "SdlcEdgeFulfillmentLedger",
     purposeClass: "split_boundary",
@@ -221,17 +205,6 @@ export const SDLC_REGISTER_PURPOSE_CATALOG = Object.freeze([
     replacementCarrierKind: null,
     purpose:
       "ABG consequence traversal binding target; current odd_sdlc copy is migration debt."
-  }),
-  row({
-    carrierKind: "sdlc_installed_operator_traversal_consequence",
-    carrierName: "installed traversal consequence archive projection",
-    purposeClass: "retired_adapter_only",
-    owner: "abg",
-    authorityUse: "non_authoritative_projection",
-    sourceModule: "operator/installed_operator.ts",
-    replacementCarrierKind: "gtl_consequence_projection_ref",
-    purpose:
-      "retired installed-operator envelope retained only as internal archive projection until ABG migration."
   }),
 ]);
 

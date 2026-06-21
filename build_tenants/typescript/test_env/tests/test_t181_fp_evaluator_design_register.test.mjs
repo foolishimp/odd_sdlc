@@ -642,8 +642,8 @@ function writeDesignDepthFpEvaluatorContentRegister({ manifest, registerPath }) 
     contentRegisterPath,
     `${JSON.stringify(
       {
-        kind: "sdlc_evaluate_content_register",
-        registerVersion: "ts-evaluate-content-register-v1",
+        kind: "sdlc_evaluate_content_ledger",
+        ledgerVersion: "ts-evaluate-content-ledger-v1",
         stage: "evaluate.C",
         ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
         ruleRole: "semantic_judgment",
@@ -659,7 +659,7 @@ function writeDesignDepthFpEvaluatorContentRegister({ manifest, registerPath }) 
         evidenceRefs: [pathToFileURL(manifest.outputFile).href, registerRef],
         contentRows: [
           {
-            kind: "sdlc_evaluate_content_register_row",
+            kind: "sdlc_evaluate_content_ledger_row",
             rowRef: `content-register-row://t181/${manifest.runId}/design-depth`,
             authorityFunction: "synthesize_model",
             carrierFamily: "ProductAssetModel",
@@ -743,8 +743,8 @@ test("T-181 design-depth content register normalizes root version aliases during
       contentRegisterPath,
       `${JSON.stringify(
         {
-          kind: "sdlc_evaluate_content_register",
-          registerVersion: "ts-evaluate-content-register-v1",
+          kind: "sdlc_evaluate_content_ledger",
+          ledgerVersion: "ts-evaluate-content-ledger-v1",
           stage: "evaluate.C",
           ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
           ruleRole: "semantic_judgment",
@@ -760,7 +760,7 @@ test("T-181 design-depth content register normalizes root version aliases during
           evidenceRefs: [evidenceRef],
           contentRows: [
             {
-              kind: "sdlc_evaluate_content_register_row",
+              kind: "sdlc_evaluate_content_ledger_row",
               rowRef: `content-register-row://t181/${manifest.runId}/design-depth`,
               authorityFunction: "synthesize_model",
               carrierFamily: "ProductAssetModel",
@@ -864,8 +864,8 @@ test("T-181 design-depth content register supports incremental fragment projecti
       contentRegisterPath,
       `${JSON.stringify(
         {
-          kind: "sdlc_evaluate_content_register",
-          registerVersion: "ts-evaluate-content-register-v1",
+          kind: "sdlc_evaluate_content_ledger",
+          ledgerVersion: "ts-evaluate-content-ledger-v1",
           stage: "evaluate.C",
           ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
           ruleRole: "semantic_judgment",
@@ -880,7 +880,7 @@ test("T-181 design-depth content register supports incremental fragment projecti
           candidateArtifactRefs: [evidenceRef],
           evidenceRefs: [evidenceRef],
           contentRows: sections.map((section, index) => ({
-            kind: "sdlc_evaluate_content_register_row",
+            kind: "sdlc_evaluate_content_ledger_row",
             rowRef: `content-register-row://t181/incremental/${section}`,
             authorityFunction: "synthesize_model",
             carrierFamily: "ProductAssetModel",
@@ -994,8 +994,8 @@ test("T-181 design-depth fragment projection canonicalizes legacy verdict axis a
       contentRegisterPath,
       `${JSON.stringify(
         {
-          kind: "sdlc_evaluate_content_register",
-          registerVersion: "ts-evaluate-content-register-v1",
+          kind: "sdlc_evaluate_content_ledger",
+          ledgerVersion: "ts-evaluate-content-ledger-v1",
           stage: "evaluate.C",
           ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
           ruleRole: "semantic_judgment",
@@ -1010,7 +1010,7 @@ test("T-181 design-depth fragment projection canonicalizes legacy verdict axis a
           candidateArtifactRefs: [evidenceRef],
           evidenceRefs: [evidenceRef],
           contentRows: sections.map((section, index) => ({
-            kind: "sdlc_evaluate_content_register_row",
+            kind: "sdlc_evaluate_content_ledger_row",
             rowRef: `content-register-row://t181/axis-alias/${section}`,
             authorityFunction: "synthesize_model",
             carrierFamily: "ProductAssetModel",
@@ -1122,8 +1122,8 @@ test("T-181 design-depth content register canonicalizes numeric tranche ids", ()
       contentRegisterPath,
       `${JSON.stringify(
         {
-          kind: "sdlc_evaluate_content_register",
-          registerVersion: "ts-evaluate-content-register-v1",
+          kind: "sdlc_evaluate_content_ledger",
+          ledgerVersion: "ts-evaluate-content-ledger-v1",
           stage: "evaluate.C",
           ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
           ruleRole: "semantic_judgment",
@@ -1138,7 +1138,7 @@ test("T-181 design-depth content register canonicalizes numeric tranche ids", ()
           candidateArtifactRefs: [evidenceRef],
           evidenceRefs: [evidenceRef],
           contentRows: sections.map((section, index) => ({
-            kind: "sdlc_evaluate_content_register_row",
+            kind: "sdlc_evaluate_content_ledger_row",
             rowRef: `content-register-row://t181/numeric-tranche/${section}`,
             authorityFunction: "synthesize_model",
             carrierFamily: "ProductAssetModel",
@@ -1243,8 +1243,8 @@ test("T-184 evaluator projection rejects object-valued invariants before writing
       contentRegisterPath,
       `${JSON.stringify(
         {
-          kind: "sdlc_evaluate_content_register",
-          registerVersion: "ts-evaluate-content-register-v1",
+          kind: "sdlc_evaluate_content_ledger",
+          ledgerVersion: "ts-evaluate-content-ledger-v1",
           stage: "evaluate.C",
           ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
           ruleRole: "semantic_judgment",
@@ -1260,7 +1260,7 @@ test("T-184 evaluator projection rejects object-valued invariants before writing
           evidenceRefs: [evidenceRef],
           contentRows: [
             {
-              kind: "sdlc_evaluate_content_register_row",
+              kind: "sdlc_evaluate_content_ledger_row",
               rowRef: `content-register-row://t184/${manifest.runId}/design-depth`,
               authorityFunction: "synthesize_model",
               carrierFamily: "ProductAssetModel",
@@ -1329,8 +1329,8 @@ test("T-181 incomplete design-depth fragments remain observable but not projecte
       contentRegisterPath,
       `${JSON.stringify(
         {
-          kind: "sdlc_evaluate_content_register",
-          registerVersion: "ts-evaluate-content-register-v1",
+          kind: "sdlc_evaluate_content_ledger",
+          ledgerVersion: "ts-evaluate-content-ledger-v1",
           stage: "evaluate.C",
           ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
           ruleRole: "semantic_judgment",
@@ -1346,7 +1346,7 @@ test("T-181 incomplete design-depth fragments remain observable but not projecte
           evidenceRefs: [evidenceRef],
           contentRows: [
             {
-              kind: "sdlc_evaluate_content_register_row",
+              kind: "sdlc_evaluate_content_ledger_row",
               rowRef: "content-register-row://t181/incomplete/stack",
               authorityFunction: "synthesize_model",
               carrierFamily: "ProductAssetModel",
@@ -2687,7 +2687,7 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(source, /stdoutBudgetBytes/u);
   assert.match(evaluatorPromptSource, /write the content register file first, then validate that file/u);
   assert.match(evaluatorPromptSource, /highest semantic design-depth truth/u);
-  assert.match(evaluatorPromptSource, /sdlc_evaluate_content_register/u);
+  assert.match(evaluatorPromptSource, /sdlc_evaluate_content_ledger/u);
   assert.match(evaluatorPromptSource, /contentRows\[\]\.rowRef/u);
   assert.match(evaluatorPromptSource, /contentRows\[\]\.sourceBasisRefs\[\]/u);
   assert.match(evaluatorPromptSource, /contentRows\[\]\.evidenceRefs\[\]/u);
@@ -2793,7 +2793,7 @@ test("T-181 evaluator artifacts are cataloged operator-run truth", () => {
 
   assert.equal(
     rowsByPath.get("design_depth_fp_evaluator_content_register.json").carrierKind,
-    "sdlc_evaluate_content_register"
+    "sdlc_evaluate_content_ledger"
   );
   assert.equal(
     rowsByPath.get("design_depth_fp_evaluator_content_register.json").sourceOwner,

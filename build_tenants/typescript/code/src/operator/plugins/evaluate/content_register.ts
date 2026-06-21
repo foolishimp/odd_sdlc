@@ -59,18 +59,11 @@ export const SDLC_EVALUATE_CONTENT_LEDGER_ROW_KIND =
   "sdlc_evaluate_content_ledger_row" as const;
 export const SDLC_EVALUATE_CONTENT_LEDGER_VERSION =
   "ts-evaluate-content-ledger-v1" as const;
-
-export const SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND =
-  "sdlc_evaluate_content_register" as const;
-export const SDLC_EVALUATE_CONTENT_REGISTER_ROW_PROJECTION_KIND =
-  "sdlc_evaluate_content_register_row" as const;
-export const SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_VERSION =
-  "ts-evaluate-content-register-v1" as const;
-export const SDLC_EVALUATE_CONTENT_REGISTER_ADMISSION_KIND =
-  "sdlc_evaluate_content_register_admission" as const;
+export const SDLC_EVALUATE_CONTENT_LEDGER_ADMISSION_KIND =
+  "sdlc_evaluate_content_ledger_admission" as const;
 
 export interface SdlcEvaluateContentRegisterRow {
-  readonly kind: typeof SDLC_EVALUATE_CONTENT_REGISTER_ROW_PROJECTION_KIND;
+  readonly kind: typeof SDLC_EVALUATE_CONTENT_LEDGER_ROW_KIND;
   readonly rowRef: string;
   readonly authorityFunction: SdlcEvaluateAuthorityFunction;
   readonly carrierFamily: SdlcEvaluateContentCarrierFamily;
@@ -81,8 +74,8 @@ export interface SdlcEvaluateContentRegisterRow {
 }
 
 export interface SdlcEvaluateContentRegister {
-  readonly kind: typeof SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND;
-  readonly registerVersion: typeof SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_VERSION;
+  readonly kind: typeof SDLC_EVALUATE_CONTENT_LEDGER_KIND;
+  readonly ledgerVersion: typeof SDLC_EVALUATE_CONTENT_LEDGER_VERSION;
   readonly stage: "evaluate.C";
   readonly ruleRef: string;
   readonly ruleRole: "semantic_judgment";
@@ -100,7 +93,7 @@ export interface SdlcEvaluateContentRegister {
 }
 
 export interface SdlcEvaluateContentRegisterAdmission {
-  readonly kind: typeof SDLC_EVALUATE_CONTENT_REGISTER_ADMISSION_KIND;
+  readonly kind: typeof SDLC_EVALUATE_CONTENT_LEDGER_ADMISSION_KIND;
   readonly status: "admitted" | "rejected";
   readonly register: SdlcEvaluateContentRegister | null;
   readonly blockingReasons: readonly string[];
@@ -341,13 +334,13 @@ function parseRow(input: unknown, label: string): SdlcEvaluateContentRegisterRow
     label
   );
   const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
-  if (kind !== SDLC_EVALUATE_CONTENT_REGISTER_ROW_PROJECTION_KIND) {
+  if (kind !== SDLC_EVALUATE_CONTENT_LEDGER_ROW_KIND) {
     throw new TypeError(
-      `${label}.kind: expected ${SDLC_EVALUATE_CONTENT_REGISTER_ROW_PROJECTION_KIND}`
+      `${label}.kind: expected ${SDLC_EVALUATE_CONTENT_LEDGER_ROW_KIND}`
     );
   }
   return Object.freeze({
-    kind: SDLC_EVALUATE_CONTENT_REGISTER_ROW_PROJECTION_KIND,
+    kind: SDLC_EVALUATE_CONTENT_LEDGER_ROW_KIND,
     rowRef: parseNonEmptyString(record["rowRef"], `${label}.rowRef`),
     authorityFunction: parseEnumValue(
       record["authorityFunction"],
@@ -372,13 +365,13 @@ function parseRow(input: unknown, label: string): SdlcEvaluateContentRegisterRow
 function parseRegister(input: unknown): SdlcEvaluateContentRegister {
   const record = objectRecord(input);
   if (record === null) {
-    throw new TypeError(`${SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND}: expected object`);
+    throw new TypeError(`${SDLC_EVALUATE_CONTENT_LEDGER_KIND}: expected object`);
   }
   requireExactKeys(
     record,
     [
       "kind",
-      "registerVersion",
+      "ledgerVersion",
       "stage",
       "ruleRef",
       "ruleRole",
@@ -394,21 +387,21 @@ function parseRegister(input: unknown): SdlcEvaluateContentRegister {
       "evidenceRefs",
       "contentRows"
     ],
-    SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND
+    SDLC_EVALUATE_CONTENT_LEDGER_KIND
   );
   const kind = parseNonEmptyString(record["kind"], "register.kind");
-  if (kind !== SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND) {
+  if (kind !== SDLC_EVALUATE_CONTENT_LEDGER_KIND) {
     throw new TypeError(
-      `register.kind: expected ${SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND}`
+      `register.kind: expected ${SDLC_EVALUATE_CONTENT_LEDGER_KIND}`
     );
   }
-  const registerVersion = parseNonEmptyString(
-    record["registerVersion"],
-    "register.registerVersion"
+  const ledgerVersion = parseNonEmptyString(
+    record["ledgerVersion"],
+    "register.ledgerVersion"
   );
-  if (registerVersion !== SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_VERSION) {
+  if (ledgerVersion !== SDLC_EVALUATE_CONTENT_LEDGER_VERSION) {
     throw new TypeError(
-      `register.registerVersion: expected ${SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_VERSION}`
+      `register.ledgerVersion: expected ${SDLC_EVALUATE_CONTENT_LEDGER_VERSION}`
     );
   }
   const stage = parseNonEmptyString(record["stage"], "register.stage");
@@ -432,8 +425,8 @@ function parseRegister(input: unknown): SdlcEvaluateContentRegister {
     throw new TypeError("register.contentRows: expected at least one row");
   }
   return Object.freeze({
-    kind: SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND,
-    registerVersion: SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_VERSION,
+    kind: SDLC_EVALUATE_CONTENT_LEDGER_KIND,
+    ledgerVersion: SDLC_EVALUATE_CONTENT_LEDGER_VERSION,
     stage: "evaluate.C" as const,
     ruleRef: parseNonEmptyString(record["ruleRef"], "register.ruleRef"),
     ruleRole: "semantic_judgment" as const,
@@ -562,7 +555,7 @@ export function constructDesignDepthDraftFragmentContentRegisterUpdate(input: {
           );
         }
         return Object.freeze({
-          kind: SDLC_EVALUATE_CONTENT_REGISTER_ROW_PROJECTION_KIND,
+          kind: SDLC_EVALUATE_CONTENT_LEDGER_ROW_KIND,
           rowRef: `content-register-row://odd-sdlc/design-depth/${section}`,
           authorityFunction: input.draftRegister.authorityFunction,
           carrierFamily: "ProductAssetModel" as const,
@@ -732,10 +725,10 @@ export function admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity(inpu
   const evidenceRefs = Object.freeze([pathToFileURL(input.registerPath).href]);
   if (!existsSync(input.registerPath) || !statSync(input.registerPath).isFile()) {
     return Object.freeze({
-      kind: SDLC_EVALUATE_CONTENT_REGISTER_ADMISSION_KIND,
+      kind: SDLC_EVALUATE_CONTENT_LEDGER_ADMISSION_KIND,
       status: "rejected" as const,
       register: null,
-      blockingReasons: Object.freeze(["evaluate_content_register_missing"]),
+      blockingReasons: Object.freeze(["evaluate_content_ledger_missing"]),
       evidenceRefs
     });
   }
@@ -743,50 +736,50 @@ export function admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity(inpu
     const register = parseRegister(JSON.parse(readFileSync(input.registerPath, "utf8")));
     const blockingReasons: string[] = [];
     if (register.ruleRef !== input.ruleRef) {
-      blockingReasons.push("evaluate_content_register_rule_ref_mismatch");
+      blockingReasons.push("evaluate_content_ledger_rule_ref_mismatch");
     }
     if (register.authorityFunction !== input.authorityFunction) {
-      blockingReasons.push("evaluate_content_register_authority_function_mismatch");
+      blockingReasons.push("evaluate_content_ledger_authority_function_mismatch");
     }
     if ((input.computeMeans ?? "F_P") !== register.computeMeans) {
-      blockingReasons.push("evaluate_content_register_compute_means_mismatch");
+      blockingReasons.push("evaluate_content_ledger_compute_means_mismatch");
     }
     if (
       register.selectedCompositionRef !==
       input.selectedIdentity.selectedCompositionRef
     ) {
-      blockingReasons.push("evaluate_content_register_selected_composition_ref_mismatch");
+      blockingReasons.push("evaluate_content_ledger_selected_composition_ref_mismatch");
     }
     if (
       register.selectedCompositionDigest !==
       input.selectedIdentity.selectedCompositionDigest
     ) {
-      blockingReasons.push("evaluate_content_register_selected_composition_digest_mismatch");
+      blockingReasons.push("evaluate_content_ledger_selected_composition_digest_mismatch");
     }
     if (
       register.selectedCompositionSelectionRef !==
       input.selectedIdentity.selectedCompositionSelectionRef
     ) {
       blockingReasons.push(
-        "evaluate_content_register_selected_composition_selection_ref_mismatch"
+        "evaluate_content_ledger_selected_composition_selection_ref_mismatch"
       );
     }
     if (
       register.selectedRegimeBindingRef !==
       input.selectedIdentity.selectedRegimeBindingRef
     ) {
-      blockingReasons.push("evaluate_content_register_selected_regime_binding_ref_mismatch");
+      blockingReasons.push("evaluate_content_ledger_selected_regime_binding_ref_mismatch");
     }
     if (
       register.contentRows.some(
         (row) => row.authorityFunction !== register.authorityFunction
       )
     ) {
-      blockingReasons.push("evaluate_content_register_row_authority_function_mismatch");
+      blockingReasons.push("evaluate_content_ledger_row_authority_function_mismatch");
     }
     if (blockingReasons.length > 0) {
       return Object.freeze({
-        kind: SDLC_EVALUATE_CONTENT_REGISTER_ADMISSION_KIND,
+        kind: SDLC_EVALUATE_CONTENT_LEDGER_ADMISSION_KIND,
         status: "rejected" as const,
         register: null,
         blockingReasons: Object.freeze(blockingReasons),
@@ -794,7 +787,7 @@ export function admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity(inpu
       });
     }
     return Object.freeze({
-      kind: SDLC_EVALUATE_CONTENT_REGISTER_ADMISSION_KIND,
+      kind: SDLC_EVALUATE_CONTENT_LEDGER_ADMISSION_KIND,
       status: "admitted" as const,
       register,
       blockingReasons: Object.freeze([]),
@@ -802,11 +795,11 @@ export function admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity(inpu
     });
   } catch (error) {
     return Object.freeze({
-      kind: SDLC_EVALUATE_CONTENT_REGISTER_ADMISSION_KIND,
+      kind: SDLC_EVALUATE_CONTENT_LEDGER_ADMISSION_KIND,
       status: "rejected" as const,
       register: null,
       blockingReasons: Object.freeze([
-        `evaluate_content_register_invalid:${error instanceof Error ? error.message : "unknown"}`
+        `evaluate_content_ledger_invalid:${error instanceof Error ? error.message : "unknown"}`
       ]),
       evidenceRefs
     });
@@ -993,7 +986,7 @@ function designDepthRegisterPayloadFromFragments(
     );
   } catch (error) {
     throw new TypeError(
-      `evaluate_content_register_design_depth_payload_invalid:${error instanceof Error ? error.message : "unknown"}`
+      `evaluate_content_ledger_design_depth_payload_invalid:${error instanceof Error ? error.message : "unknown"}`
     );
   }
 }
@@ -1016,7 +1009,7 @@ export function designDepthRegisterPayloadFromEvaluateContentRegister(
     );
   } catch (error) {
     throw new TypeError(
-      `evaluate_content_register_design_depth_payload_invalid:${error instanceof Error ? error.message : "unknown"}`
+      `evaluate_content_ledger_design_depth_payload_invalid:${error instanceof Error ? error.message : "unknown"}`
     );
   }
 }

@@ -325,8 +325,8 @@ function writeAdmittedImplementationDesignArchive({
     contentRegisterPath,
     `${JSON.stringify(
       {
-        kind: "sdlc_evaluate_content_register",
-        registerVersion: "ts-evaluate-content-register-v1",
+        kind: "sdlc_evaluate_content_ledger",
+        ledgerVersion: "ts-evaluate-content-ledger-v1",
         stage: "evaluate.C",
         ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
         ruleRole: "semantic_judgment",
@@ -344,7 +344,7 @@ function writeAdmittedImplementationDesignArchive({
         evidenceRefs: [pathToFileURL(prior.outputFile).href],
         contentRows: [
           {
-            kind: "sdlc_evaluate_content_register_row",
+            kind: "sdlc_evaluate_content_ledger_row",
             rowRef: "evaluate-content-row://t066/design-depth-register",
             authorityFunction: "synthesize_model",
             carrierFamily: "ProductAssetModel",
@@ -1367,7 +1367,7 @@ function writeDataMapperInventoryWorkerScript(workspaceRoot) {
       "  const selectedRegimeBindingRef = process.env.ODD_SDLC_EVALUATOR_SELECTED_REGIME_BINDING_REF || null;",
       "  const compositionContributionRef = process.env.ODD_SDLC_EVALUATOR_COMPOSITION_CONTRIBUTION_REF || selectedRegimeBindingRef || selectedCompositionRef;",
       "  const sourceRef = pathToFileURL(manifest.outputFile).href;",
-      "  const ledger = { kind: 'sdlc_evaluate_content_register', registerVersion: 'ts-evaluate-content-register-v1', stage: 'evaluate.C', ruleRef: 'evaluation-rule://odd-sdlc/design-depth-register/fp', ruleRole: 'semantic_judgment', computeMeans: 'F_P', authorityFunction: 'synthesize_model', selectedCompositionRef, selectedCompositionDigest, selectedCompositionSelectionRef, selectedRegimeBindingRef, compositionContributionRef, sourceBasisRefs: [sourceRef], candidateArtifactRefs: [sourceRef], evidenceRefs: [sourceRef], contentRows: [{ kind: 'sdlc_evaluate_content_register_row', rowRef: 'evaluate-content-row://t066/data-mapper/design-depth-register', authorityFunction: 'synthesize_model', carrierFamily: 'ProductAssetModel', contentKind: 'sdlc_design_depth_register', payload: register, sourceBasisRefs: [sourceRef], evidenceRefs: [sourceRef] }] };",
+      "  const ledger = { kind: 'sdlc_evaluate_content_ledger', ledgerVersion: 'ts-evaluate-content-ledger-v1', stage: 'evaluate.C', ruleRef: 'evaluation-rule://odd-sdlc/design-depth-register/fp', ruleRole: 'semantic_judgment', computeMeans: 'F_P', authorityFunction: 'synthesize_model', selectedCompositionRef, selectedCompositionDigest, selectedCompositionSelectionRef, selectedRegimeBindingRef, compositionContributionRef, sourceBasisRefs: [sourceRef], candidateArtifactRefs: [sourceRef], evidenceRefs: [sourceRef], contentRows: [{ kind: 'sdlc_evaluate_content_ledger_row', rowRef: 'evaluate-content-row://t066/data-mapper/design-depth-register', authorityFunction: 'synthesize_model', carrierFamily: 'ProductAssetModel', contentKind: 'sdlc_design_depth_register', payload: register, sourceBasisRefs: [sourceRef], evidenceRefs: [sourceRef] }] };",
       "  mkdirSync(dirname(contentRegisterPath), { recursive: true });",
       "  writeFileSync(contentRegisterPath, `${JSON.stringify(ledger, null, 2)}\\n`, 'utf8');",
       "  process.exit(0);",
@@ -6582,7 +6582,7 @@ function t102Ledger(id, options = {}) {
   return constructSdlcEdgeFulfillmentLedger({
     selectedComposition,
     ledgerRef: `ledger://t102/${id}`,
-    ledgerVersionRef: `ledger-version://t102/${id}`,
+    registerVersionRef: `ledger-version://t102/${id}`,
     edgeRef: "edge://odd-sdlc/derive_test_execution_result_surface/26",
     attemptRef: `attempt://t102/${id}`,
     targetBindingRefs: [`target-binding://t102/${id}`],

@@ -166,11 +166,9 @@ test("T-204 register carriers declare one explicit purpose", () => {
     "sdlc_test_execution_surface_register",
     "sdlc_requirement_closure_register",
     "sdlc_evaluate_content_ledger",
-    "sdlc_evaluate_content_register",
     "sdlc_edge_fulfillment_ledger",
     "sdlc_edge_closure_decision",
-    "sdlc_next_action_projection",
-    "sdlc_installed_operator_traversal_consequence"
+    "sdlc_next_action_projection"
   ]) {
     assert.notEqual(
       sdlcRegisterPurposeForCarrierKind(carrierKind),
@@ -180,12 +178,12 @@ test("T-204 register carriers declare one explicit purpose", () => {
   }
 
   assert.equal(
-    rowsByKind.get("sdlc_evaluate_content_register").purposeClass,
-    "legacy_projection"
+    rowsByKind.get("sdlc_evaluate_content_ledger").purposeClass,
+    "migration_authority"
   );
   assert.equal(
-    rowsByKind.get("sdlc_evaluate_content_register").replacementCarrierKind,
-    "sdlc_evaluate_content_ledger"
+    rowsByKind.get("sdlc_evaluate_content_ledger").replacementCarrierKind,
+    null
   );
   const contentRegisterArtifact = SDLC_OPERATOR_RUN_ARTIFACT_CATALOG.find(
     (row) =>
@@ -193,13 +191,8 @@ test("T-204 register carriers declare one explicit purpose", () => {
       "operator-run-artifact://design-depth-fp-evaluator-content-register"
   );
   assert.notEqual(contentRegisterArtifact, undefined);
-  assert.equal(contentRegisterArtifact.carrierKind, "sdlc_evaluate_content_register");
+  assert.equal(contentRegisterArtifact.carrierKind, "sdlc_evaluate_content_ledger");
   assert.equal(contentRegisterArtifact.role, "read_model");
-  assert.equal(
-    rowsByKind.get("sdlc_installed_operator_traversal_consequence").purposeClass,
-    "retired_adapter_only"
-  );
-
   const operatorIndex = repoFile(
     "build_tenants/typescript/code/src/operator/index.ts"
   );
@@ -218,6 +211,10 @@ test("T-204 register carriers declare one explicit purpose", () => {
   assert.doesNotMatch(
     carriers,
     /\bSdlcInstalledOperatorTraversalConsequence\b/u
+  );
+  assert.doesNotMatch(
+    repoFile("build_tenants/typescript/code/src/operator/installed_operator.ts"),
+    /sdlc_installed_operator_traversal_consequence/u
   );
 });
 

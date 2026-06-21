@@ -662,8 +662,8 @@ function writeT174AdmittedImplementationDesignArchive(root, manifest) {
     contentRegisterPath,
     `${JSON.stringify(
       {
-        kind: "sdlc_evaluate_content_register",
-        registerVersion: "ts-evaluate-content-register-v1",
+        kind: "sdlc_evaluate_content_ledger",
+        ledgerVersion: "ts-evaluate-content-ledger-v1",
         stage: "evaluate.C",
         ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
         ruleRole: "semantic_judgment",
@@ -679,7 +679,7 @@ function writeT174AdmittedImplementationDesignArchive(root, manifest) {
         evidenceRefs: [pathToFileURL(designOutputFile).href],
         contentRows: [
           {
-            kind: "sdlc_evaluate_content_register_row",
+            kind: "sdlc_evaluate_content_ledger_row",
             rowRef: "evaluate-content-row://t174/design-depth-register",
             authorityFunction: "synthesize_model",
             carrierFamily: "ProductAssetModel",

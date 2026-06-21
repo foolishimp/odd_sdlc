@@ -202,9 +202,9 @@ import {
   SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND,
   SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND,
   SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS,
-  SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND,
-  SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_VERSION,
-  SDLC_EVALUATE_CONTENT_REGISTER_ROW_PROJECTION_KIND,
+  SDLC_EVALUATE_CONTENT_LEDGER_KIND,
+  SDLC_EVALUATE_CONTENT_LEDGER_ROW_KIND,
+  SDLC_EVALUATE_CONTENT_LEDGER_VERSION,
   admitSdlcEvaluateContentRegisterArtifact,
   designDepthFpEvaluatorContentRegisterPath,
   evaluateSdlcComputeStage,
@@ -3460,7 +3460,7 @@ function writeDesignDepthFpEvaluatorDraftContentRegister(input: {
   const draftContentRows = Object.freeze(
     SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.map((section, index) =>
       Object.freeze({
-        kind: SDLC_EVALUATE_CONTENT_REGISTER_ROW_PROJECTION_KIND,
+        kind: SDLC_EVALUATE_CONTENT_LEDGER_ROW_KIND,
         rowRef: `content-register-row-draft://odd-sdlc/design-depth/${section}`,
         authorityFunction: "synthesize_model" as const,
         carrierFamily: "ProductAssetModel" as const,
@@ -3486,8 +3486,8 @@ function writeDesignDepthFpEvaluatorDraftContentRegister(input: {
     archiveRoot: input.archiveRoot,
     absolutePath: input.contentRegisterPath,
     payload: Object.freeze({
-      kind: SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND,
-      registerVersion: SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_VERSION,
+      kind: SDLC_EVALUATE_CONTENT_LEDGER_KIND,
+      ledgerVersion: SDLC_EVALUATE_CONTENT_LEDGER_VERSION,
       stage: "evaluate.C" as const,
       ruleRef: DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
       ruleRole: "semantic_judgment" as const,
@@ -8047,7 +8047,6 @@ function deriveInstalledTraversalConsequence(input: {
     ])
   });
   return Object.freeze({
-    kind: "sdlc_installed_operator_traversal_consequence" as const,
     selectedComposition,
     constructionIntent,
     worksiteEvidence,
