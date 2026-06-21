@@ -72,7 +72,7 @@ terminal result is claimed.
 | `SdlcAssuranceLedger` | assurance dimension | admitted evaluator/product-domain fold truth | deterministic ledger projection over admitted materialization facts, selected evaluator rows, obligation carry, requirement fulfillment, ambiguity, capability, or shallow-realization pressure | hidden evaluator branch, F_D semantic-row synthesis, or prose-only assessment |
 | `TraversalRequirementSatisfaction` | total-transition input | folded SDLC domain closure truth | deterministic fold over required assurance ledgers and selected evaluator facts | closing from one green artifact, archive-only note, or locally inferred semantic row |
 | `RuntimeEvent[]` | traversal truth | ABG event calculus | `vector_evaluated`, `retry_repair_planned`, `retry_attempt_opened`, optional continuation events, or `assessed` | archive-only status |
-| `SdlcInstalledOperatorStartOutcome` | operator projection | read model over state and archive | carries emitted event kinds, gap dossier, and archive refs | next action as transition authority |
+| `GtlConsequenceProjectionRef` | ABG transition projection | ABG-owned traversal transition truth | references ABG terminal, runtime continuation transition, and admitted SDLC consequence candidate refs | local installed start outcome as convergence authority |
 
 ## Traversal Strategy Law
 

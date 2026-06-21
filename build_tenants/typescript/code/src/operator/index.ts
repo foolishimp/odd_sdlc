@@ -95,9 +95,7 @@ export type {
   SdlcImplementationDesignBinding,
   SdlcImplementationModuleRow,
   SdlcImplementationStackProfileRow,
-  SdlcInstalledOperatorStartOutcome,
   SdlcInstalledOperatorStatus,
-  SdlcInstalledOperatorTraversalConsequence,
   SdlcMaterializedProductFile,
   SdlcMaterializedProductFileRole,
   SdlcMinFpPressurePreservationDecision,
@@ -218,6 +216,17 @@ export {
   SDLC_COMPUTE_SUBWORKSTREAM_ROW_FIELDS,
   SDLC_EVALUATE_COMPUTE_SUBWORKSTREAM_MANIFEST_FILE
 } from "./compute_subworkstreams.js";
+
+export {
+  SDLC_REGISTER_PURPOSE_CATALOG,
+  SDLC_REGISTER_PURPOSE_CLASSES,
+  requireSdlcRegisterPurposeForCarrierKind,
+  sdlcRegisterPurposeForCarrierKind
+} from "./register_purpose.js";
+export type {
+  SdlcRegisterPurposeClass,
+  SdlcRegisterPurposeRow
+} from "./register_purpose.js";
 
 export {
   stableOperatorJson,
@@ -644,11 +653,9 @@ export {
   deriveSdlcPostActionOverlayReentryActionInput,
   deriveSdlcPostProductMaterializationActionInput,
   deriveSdlcPostProductMaterializationActionResolution,
-  deriveSdlcInstalledOperatorStatusFromAbgTerminal,
   deriveSdlcProductLineageYieldResumeBasis,
   deriveSdlcPublishedProductMaterializationAction,
   deriveSdlcWorkerRetryContextFromPostActionProjection,
-  deriveSdlcWorkerRetryContextFromTraversalConsequence,
   edgeAssuranceEvidenceCandidatesFor,
   createSdlcInstalledOperatorAbgPluginSession,
   mergeSdlcWorkerRetryContextWithRuntimeGapRegister,
@@ -662,9 +669,7 @@ export {
 export type {
   SdlcPostProductMaterializationActionResolution,
   SdlcPublishedProductMaterializationAction,
-  SdlcPublishedProductMaterializationActionStatus,
-  SdlcWorkerRetryContextDerivation,
-  SdlcWorkerRetryContextDerivationStatus
+  SdlcPublishedProductMaterializationActionStatus
 } from "./installed_operator.js";
 
 export {

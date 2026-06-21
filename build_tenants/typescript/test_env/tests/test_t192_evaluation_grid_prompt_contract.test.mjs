@@ -111,6 +111,25 @@ function compactManifest(targetAssetType = "component_code_surface", overrides =
   };
 }
 
+function invocationScope(inlineObligationIds) {
+  return {
+    kind: "sdlc_worker_invocation_package",
+    featureScope: {
+      kind: "sdlc_feature_scope",
+      scopeVersion: "ts-scope-v1",
+      mode: "full_breadth",
+      scopeRef: "scope://t192/full-breadth",
+      basisRefs: [],
+      includedRequirementRefs: [],
+      includedModuleNames: [],
+      includedEntityIds: [],
+      includedOperationIds: [],
+      deferredModuleNames: []
+    },
+    inlineObligationIds
+  };
+}
+
 function designDepthProjection() {
   return designDepthFpEvaluatorPromptProjection({
     manifest: minimalManifest("implementation_design_surface"),
@@ -223,6 +242,10 @@ test("T-192 small admitted handoffs render compact fused-grid prompts", () => {
     manifest: compactManifest("component_code_surface", {
       productMaterialization: materializationContract(true)
     }),
+    invocationScope: invocationScope([
+      "requirement:req_t192_001",
+      "requirement:req_t192_002"
+    ]),
     governanceRef: "config://test/review-grade",
     governancePath: "config/work-category-governance/coding_build.md",
     constructionBriefPath: "worker_construction_brief.json",
@@ -330,6 +353,44 @@ test("T-192 small admitted handoffs render compact fused-grid prompts", () => {
     compactDesign.promptText,
     /Reject and rewrite if any design-depth row contains field\/value\/sourceRef summary triples/u
   );
+});
+
+test("T-204 review-grade compaction uses admitted invocation scope before broad manifest lineage", () => {
+  const broadObligations = Array.from({ length: 161 }, (_, index) => ({
+    obligationId: `requirement:req_t204_broad_${String(index + 1).padStart(3, "0")}`
+  }));
+  const scopedObligationIds = broadObligations
+    .slice(0, 21)
+    .map((row) => row.obligationId);
+  const projection = reviewGradeEdgeFulfillmentPromptProjection({
+    manifest: compactManifest("component_code_surface", {
+      productMaterialization: materializationContract(true),
+      traversalObligationContext: {
+        obligations: broadObligations
+      }
+    }),
+    invocationScope: invocationScope(scopedObligationIds),
+    governanceRef: "config://test/review-grade",
+    governancePath: "config/work-category-governance/coding_build.md",
+    constructionBriefPath: "worker_construction_brief.json",
+    invocationPackagePath: "worker_invocation_package.json",
+    workerReportPath: "worker_result_report.json",
+    assessmentPath: "review_grade_edge_fulfillment_assessment.json",
+    subworkstreamManifestPath: "evaluate_compute_subworkstream_manifest.json",
+    tenantToolEnvironment: null
+  });
+
+  assert.match(projection.promptText, /Small fused evaluation grid mode:/u);
+  assert.match(
+    projection.promptText,
+    /First-blocker protocol: once one current-edge semantic blocker is identified/u
+  );
+  assert.match(
+    projection.promptText,
+    /source-dumping grep\/cat\/sed\/tail\/head\/nl commands/u
+  );
+  assert.match(projection.promptText, /obligationRefs=requirement:req_t204_broad_001/u);
+  assert.doesNotMatch(projection.promptText, /requirement:req_t204_broad_022/u);
 });
 
 test("T-192 review-grade prompt schema is projected by edge profile", () => {

@@ -3252,7 +3252,12 @@ function priorSourceAssetAuthorityRefsForSourceAsset(input: {
   if (!existsSync(operatorRunsRoot) || !statSync(operatorRunsRoot).isDirectory()) {
     return admittedOutputAuthorityRefs;
   }
-  const refs: string[] = [...admittedOutputAuthorityRefs];
+  const candidates: {
+    readonly runId: string;
+    readonly reportRef: string;
+    readonly outputRef: string | null;
+    readonly mtimeMs: number;
+  }[] = [];
   for (const runId of readdirSync(operatorRunsRoot)) {
     const reportPath = join(operatorRunsRoot, runId, "worker_result_report.json");
     if (!existsSync(reportPath) || !statSync(reportPath).isFile()) {
@@ -3263,24 +3268,42 @@ function priorSourceAssetAuthorityRefsForSourceAsset(input: {
         filePath: reportPath,
         label: "PriorWorkerResultReport"
       });
-      if (
-        record["targetAssetType"] === input.assetType
-      ) {
-        refs.push(pathToFileURL(reportPath).href);
-        const outputFile = parseNonEmptyString(
-          record["outputFile"],
-          "PriorWorkerResultReport.outputFile"
-        );
-        const outputPath = resolve(input.workspaceRoot, outputFile);
-        if (existsSync(outputPath) && statSync(outputPath).isFile()) {
-          refs.push(pathToFileURL(outputPath).href);
-        }
+      if (record["targetAssetType"] !== input.assetType) {
+        continue;
       }
+      const outputFile = parseNonEmptyString(
+        record["outputFile"],
+        "PriorWorkerResultReport.outputFile"
+      );
+      const outputPath = resolve(input.workspaceRoot, outputFile);
+      const outputRef =
+        existsSync(outputPath) && statSync(outputPath).isFile()
+          ? pathToFileURL(outputPath).href
+          : null;
+      candidates.push(
+        Object.freeze({
+          runId,
+          reportRef: pathToFileURL(reportPath).href,
+          outputRef,
+          mtimeMs: statSync(reportPath).mtimeMs
+        })
+      );
     } catch {
       continue;
     }
   }
-  return Object.freeze(uniqueSorted(refs));
+  const latest = candidates.sort((left, right) => {
+    const runOrder = left.runId.localeCompare(right.runId);
+    return runOrder === 0 ? left.mtimeMs - right.mtimeMs : runOrder;
+  })[candidates.length - 1] ?? null;
+  return Object.freeze(
+    uniqueSorted([
+      ...admittedOutputAuthorityRefs,
+      ...(latest === null
+        ? []
+        : [latest.reportRef, ...(latest.outputRef === null ? [] : [latest.outputRef])])
+    ])
+  );
 }
 
 function outputAuthorityProjectionMatchesSourceAsset(input: {
@@ -5335,8 +5358,7 @@ function currentEvaluatedGapAssessmentRequirementIds(input: {
         finding === null ||
         typeof finding["obligationId"] !== "string" ||
         !finding["obligationId"].startsWith("requirement:") ||
-        (finding["fulfillmentStatus"] !== "blocked" &&
-          finding["fulfillmentStatus"] !== "unassessed")
+        finding["fulfillmentStatus"] !== "blocked"
       ) {
         continue;
       }

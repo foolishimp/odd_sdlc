@@ -165,10 +165,9 @@ export function liveOperatorRuntimePolicy() {
       "ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_TIMEOUT_MS",
       config.designDepthFpEvaluatorTimeoutMs
     ),
-    reviewGradeEdgeFulfillmentEvaluatorTimeoutMs: timeoutMs(
+    reviewGradeEdgeFulfillmentEvaluatorTimeoutMs: positiveInteger(
       "ODD_SDLC_REVIEW_GRADE_EDGE_FULFILLMENT_EVALUATOR_TIMEOUT_MS",
-      config.reviewGradeEdgeFulfillmentEvaluatorTimeoutMs,
-      minimumOperatorTimeoutMs
+      config.reviewGradeEdgeFulfillmentEvaluatorTimeoutMs
     ),
     reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs: positiveInteger(
       "ODD_SDLC_REVIEW_GRADE_EDGE_FULFILLMENT_EVALUATOR_INACTIVITY_TIMEOUT_MS",

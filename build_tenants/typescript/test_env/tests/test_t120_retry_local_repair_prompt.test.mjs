@@ -1044,6 +1044,7 @@ test("T-164 retry prompt uses review-grade blocked findings as the repair work q
     "requirement:data_mapper.requirements.req_trv_005_a",
     "requirement:data_mapper.requirements.req_trv_005_b"
   ];
+  const unassessedId = "requirement:data_mapper.requirements.req_trv_006";
   writeFileSync(
     assessmentPath,
     `${JSON.stringify(
@@ -1056,7 +1057,8 @@ test("T-164 retry prompt uses review-grade blocked findings as the repair work q
         status: "blocked",
         reviewedObligationIds: [
           "requirement:data_mapper.mapper_requirements.req_acc_001",
-          ...blockedIds
+          ...blockedIds,
+          unassessedId
         ],
         findings: [
           {
@@ -1080,7 +1082,27 @@ test("T-164 retry prompt uses review-grade blocked findings as the repair work q
             acceptedAuthorityRefs: [],
             fulfillmentBinding: null,
             rationale: "Trace missing."
-          }))
+          })),
+          {
+            kind: "sdlc_review_grade_obligation_finding",
+            obligationId: unassessedId,
+            fulfillmentStatus: "unassessed",
+            failureClass: "semantic_not_realized",
+            requiredAction: "Review after the first concrete blocker is repaired.",
+            evidenceRefs: [],
+            acceptedAuthorityRefs: [],
+            fulfillmentBinding: null,
+            repairSurfaceTriage: {
+              kind: "sdlc_repair_surface_triage",
+              disposition: "current_edge_repair",
+              repairGraphFunctionRef: null,
+              repairGraphVectorRef: null,
+              repairAssetRef: null,
+              evidenceRefs: [],
+              rationale: "First-blocker protocol."
+            },
+            rationale: "Not reviewed after first blocker."
+          }
         ],
         evidenceRefs: [],
         summary: "blocked"
@@ -1151,6 +1173,7 @@ test("T-164 retry prompt uses review-grade blocked findings as the repair work q
     assert.match(workQueue, new RegExp(id.replaceAll(".", "\\."), "u"));
   }
   assert.doesNotMatch(workQueue, /requirement:data_mapper\.mapper_requirements\.req_acc_001/u);
+  assert.doesNotMatch(workQueue, new RegExp(unassessedId.replaceAll(".", "\\."), "u"));
   assert.deepEqual(invocationPackage.requirementTraceObligationIds.slice(0, 3), blockedIds);
 });
 

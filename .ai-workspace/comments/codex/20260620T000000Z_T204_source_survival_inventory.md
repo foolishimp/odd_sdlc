@@ -2,15 +2,24 @@
 
 Generated from the current `build_tenants/typescript/code/src` tree after the T-204 command-surface cut. This is a checkpoint classification, not closure: rows marked `move_to_abg` or `survival_pending` remain active T-204 debt.
 
+## 2026-06-21 Correction (claude reclassification review)
+
+Two corrections to this read-model after a constitution check:
+
+1. **`analysis/*` (15 files) reclassified `move_to_abg/survival_pending` → `product_projection/survive`.** It is not generic ABG-facing debt: it is the product's **closure-proof harness**, bound by live requirement **REQ-F-ODDSDLC-081** (AC-6 analyzer reports missing/extra edge-accounting rows; AC-7 "T-172 closure is blocked while any selected executive edge is unaccounted"; AC-9 analyzer output is the read-only traversal-selection projection), by ratified design **`ODD_SDLC_TYPESCRIPT_STAGED_COMPUTE_BOUNDARY.md:56,60`** ("analyzer proof: projections over admitted carriers" as an in-tenant common surface), and by product gates **t197/t180** which read `code/src/analysis/*.ts` by path. Ratified design + live requirements outrank this read-model, so the original `move_to_abg` tag was the defect. KEEP in tenant. (`runtime_gaps.ts` and `requirement_lineage.ts` are the most product-specific via catalog coupling.)
+2. **`effects/environment.ts` + `effects/index.ts` deleted** (orphaned, zero consumers in source or tests; build + focused gates green).
+3. **Isolated dead exports deleted**: `writeTestExecutionResultSystemTransformOutput(...)`, `SdlcTicketDeclaredStatus`, and the unused closed-F_D mechanics descriptor object/check-list types. The retained `SDLC_ASSURANCE_CLOSED_FD_MECHANICS_CLASS_REF` remains live assurance predecessor truth.
+4. **`effects/file_store.ts` narrowed**: the unused read-plan branch and `read_text_file` effect kind were removed; the write-plan path remains live through `operator/plugins/consequence/edge_projection.ts` and T-175.
+
 ## Counts
 
 - gtl_program: 10
-- move_to_abg: 25
+- move_to_abg: 8
 - plugin: 24
 - product_carrier: 43
-- product_projection: 53
+- product_projection: 68
 - test_or_release_plumbing: 25
-- total: 180
+- total: 178
 
 ## Inventory
 
@@ -18,21 +27,21 @@ Generated from the current `build_tenants/typescript/code/src` tree after the T-
 | --- | --- | --- | --- |
 | `admission/codecs.ts` | product_carrier | survive | admission codecs |
 | `admission/index.ts` | product_carrier | survive | admission codecs |
-| `analysis/analyze.ts` | move_to_abg | survival_pending | archive/run analysis is generic ABG-facing proof debt unless product-specific |
-| `analysis/archive_reader.ts` | move_to_abg | survival_pending | archive/run analysis is generic ABG-facing proof debt unless product-specific |
-| `analysis/bloat_slope.ts` | move_to_abg | survival_pending | archive/run analysis is generic ABG-facing proof debt unless product-specific |
-| `analysis/carrier_loaders.ts` | move_to_abg | survival_pending | archive/run analysis is generic ABG-facing proof debt unless product-specific |
-| `analysis/diagnostics.ts` | move_to_abg | survival_pending | archive/run analysis is generic ABG-facing proof debt unless product-specific |
-| `analysis/edge_attempts.ts` | move_to_abg | survival_pending | archive/run analysis is generic ABG-facing proof debt unless product-specific |
-| `analysis/index.ts` | move_to_abg | survival_pending | archive/run analysis is generic ABG-facing proof debt unless product-specific |
-| `analysis/liveness.ts` | move_to_abg | survival_pending | archive/run analysis is generic ABG-facing proof debt unless product-specific |
-| `analysis/profiles.ts` | move_to_abg | survival_pending | archive/run analysis is generic ABG-facing proof debt unless product-specific |
-| `analysis/render_markdown.ts` | move_to_abg | survival_pending | archive/run analysis is generic ABG-facing proof debt unless product-specific |
-| `analysis/requirement_lineage.ts` | move_to_abg | survival_pending | archive/run analysis is generic ABG-facing proof debt unless product-specific |
-| `analysis/retry_forensics.ts` | move_to_abg | survival_pending | archive/run analysis is generic ABG-facing proof debt unless product-specific |
-| `analysis/runtime_gaps.ts` | move_to_abg | survival_pending | archive/run analysis is generic ABG-facing proof debt unless product-specific |
-| `analysis/summary_drift.ts` | move_to_abg | survival_pending | archive/run analysis is generic ABG-facing proof debt unless product-specific |
-| `analysis/types.ts` | move_to_abg | survival_pending | archive/run analysis is generic ABG-facing proof debt unless product-specific |
+| `analysis/analyze.ts` | product_projection | survive | product closure-proof harness bound by REQ-F-ODDSDLC-081 (AC-6/7/9) + ratified STAGED_COMPUTE_BOUNDARY design + gates t197/t180; KEEP in tenant |
+| `analysis/archive_reader.ts` | product_projection | survive | product closure-proof harness bound by REQ-F-ODDSDLC-081 (AC-6/7/9) + ratified STAGED_COMPUTE_BOUNDARY design + gates t197/t180; KEEP in tenant |
+| `analysis/bloat_slope.ts` | product_projection | survive | product closure-proof harness bound by REQ-F-ODDSDLC-081 (AC-6/7/9) + ratified STAGED_COMPUTE_BOUNDARY design + gates t197/t180; KEEP in tenant |
+| `analysis/carrier_loaders.ts` | product_projection | survive | product closure-proof harness bound by REQ-F-ODDSDLC-081 (AC-6/7/9) + ratified STAGED_COMPUTE_BOUNDARY design + gates t197/t180; KEEP in tenant |
+| `analysis/diagnostics.ts` | product_projection | survive | product closure-proof harness bound by REQ-F-ODDSDLC-081 (AC-6/7/9) + ratified STAGED_COMPUTE_BOUNDARY design + gates t197/t180; KEEP in tenant |
+| `analysis/edge_attempts.ts` | product_projection | survive | product closure-proof harness bound by REQ-F-ODDSDLC-081 (AC-6/7/9) + ratified STAGED_COMPUTE_BOUNDARY design + gates t197/t180; KEEP in tenant |
+| `analysis/index.ts` | product_projection | survive | product closure-proof harness bound by REQ-F-ODDSDLC-081 (AC-6/7/9) + ratified STAGED_COMPUTE_BOUNDARY design + gates t197/t180; KEEP in tenant |
+| `analysis/liveness.ts` | product_projection | survive | product closure-proof harness bound by REQ-F-ODDSDLC-081 (AC-6/7/9) + ratified STAGED_COMPUTE_BOUNDARY design + gates t197/t180; KEEP in tenant |
+| `analysis/profiles.ts` | product_projection | survive | product closure-proof harness bound by REQ-F-ODDSDLC-081 (AC-6/7/9) + ratified STAGED_COMPUTE_BOUNDARY design + gates t197/t180; KEEP in tenant |
+| `analysis/render_markdown.ts` | product_projection | survive | product closure-proof harness bound by REQ-F-ODDSDLC-081 (AC-6/7/9) + ratified STAGED_COMPUTE_BOUNDARY design + gates t197/t180; KEEP in tenant |
+| `analysis/requirement_lineage.ts` | product_projection | survive | product closure-proof harness bound by REQ-F-ODDSDLC-081 (AC-6/7/9) + ratified STAGED_COMPUTE_BOUNDARY design + gates t197/t180; KEEP in tenant |
+| `analysis/retry_forensics.ts` | product_projection | survive | product closure-proof harness bound by REQ-F-ODDSDLC-081 (AC-6/7/9) + ratified STAGED_COMPUTE_BOUNDARY design + gates t197/t180; KEEP in tenant |
+| `analysis/runtime_gaps.ts` | product_projection | survive | product closure-proof harness bound by REQ-F-ODDSDLC-081 (AC-6/7/9) + ratified STAGED_COMPUTE_BOUNDARY design + gates t197/t180; KEEP in tenant |
+| `analysis/summary_drift.ts` | product_projection | survive | product closure-proof harness bound by REQ-F-ODDSDLC-081 (AC-6/7/9) + ratified STAGED_COMPUTE_BOUNDARY design + gates t197/t180; KEEP in tenant |
+| `analysis/types.ts` | product_projection | survive | product closure-proof harness bound by REQ-F-ODDSDLC-081 (AC-6/7/9) + ratified STAGED_COMPUTE_BOUNDARY design + gates t197/t180; KEEP in tenant |
 | `assurance/ambiguity.ts` | product_carrier | survive | SDLC assurance carriers/folds over product meaning |
 | `assurance/capability.ts` | product_carrier | survive | SDLC assurance carriers/folds over product meaning |
 | `assurance/carriers.ts` | product_carrier | survive | SDLC assurance carriers/folds over product meaning |
@@ -59,9 +68,9 @@ Generated from the current `build_tenants/typescript/code/src` tree after the T-
 | `domain/operational_projection.ts` | product_carrier | survive | domain carriers and catalog |
 | `domain/software_domain_catalog.ts` | product_carrier | survive | domain carriers and catalog |
 | `effects/archive_store.ts` | move_to_abg | survival_pending | generic effect shell should move or be proven package plumbing |
-| `effects/environment.ts` | move_to_abg | survival_pending | generic effect shell should move or be proven package plumbing |
-| `effects/file_store.ts` | move_to_abg | survival_pending | generic effect shell should move or be proven package plumbing |
-| `effects/index.ts` | move_to_abg | survival_pending | generic effect shell should move or be proven package plumbing |
+| `effects/environment.ts` | delete | done 2026-06-21 | orphaned, zero consumers in source or tests; deleted |
+| `effects/file_store.ts` | move_to_abg | narrowed 2026-06-21 | write-plan effect path remains live in consequence projection; generic shell still should move or be proven package plumbing |
+| `effects/index.ts` | delete | done 2026-06-21 | unused barrel (live effects imported by direct path); deleted |
 | `effects/process_runner.ts` | move_to_abg | survival_pending | generic effect shell should move or be proven package plumbing |
 | `graph/boundary_refs.ts` | gtl_program | survive | published graph program, overlays, and GTL target contracts |
 | `graph/catalog.ts` | gtl_program | survive | published graph program, overlays, and GTL target contracts |

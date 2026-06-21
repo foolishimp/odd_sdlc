@@ -1158,6 +1158,9 @@ async function main() {
   summary.productMaterializationPackages = findProductMaterializationPackages(workspace);
   summary.observedDetailZoomEdges = observedDetailZoomEdges(workspace);
   summary.releaseProofConverged = releaseProofStopSatisfied(workspace);
+  summary.releaseProofStopKind = summary.releaseProofConverged
+    ? "sdlc_release_proof_converged"
+    : null;
   summary.terminalReason = startResult.terminalReason ?? terminalReasonFromStart(start);
   summary.terminalGapTicketWorkflow = await maybeRunTerminalGapTicketWorkflow({
     start,

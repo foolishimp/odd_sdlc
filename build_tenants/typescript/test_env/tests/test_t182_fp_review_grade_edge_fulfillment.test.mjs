@@ -56,6 +56,8 @@ import {
   designDepthFpEvaluatorRegisterPath
 } from "../../build/semantic/code/src/operator/plugins/evaluate/design_depth_register.js";
 import { evaluateSdlcComputeStage } from "../../build/semantic/code/src/operator/plugins/evaluate/postflight.js";
+import { reviewGradeEdgeFulfillmentPrompt } from "../../build/semantic/code/src/operator/plugins/evaluate/prompts.js";
+import { makeSdlcBlockingReason } from "../../build/semantic/code/src/shared/blocking_reason.js";
 
 const PACKAGE_ROOT = process.cwd();
 const REPO_ROOT = path.resolve(PACKAGE_ROOT, "../..");
@@ -633,6 +635,31 @@ test("T-199 lite component-code projection carries out-of-scope requirements dow
     assert.deepEqual(byId.get(outOfScopeRequirementId)?.blockingReasons, [
       `requirement_carried_for_downstream_closure:${outOfScopeRequirementId.replace(/^requirement:/u, "")}`
     ]);
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-204 component-code materialization blockers are active postflight blockers", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_lite_component_code_surface",
+      "t204-component-code-materialization-active"
+    );
+    writeComponentCodeDepthTargetCarrier(manifest);
+    const outputContent = readFileSync(manifest.outputFile, "utf8");
+    const report = {
+      ...componentCodeReport(manifest, { outputContent }),
+      materializedFiles: []
+    };
+    const postflight = evaluateSdlcComputeStage({ manifest, report });
+
+    assert.equal(postflight.status, "blocked");
+    assert.ok(
+      postflight.blockingReasons.includes("materialized_product_files_missing")
+    );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
   }
@@ -1951,6 +1978,79 @@ test("T-203 scoped review-grade admission uses invocation package inline obligat
   }
 });
 
+test("T-204 review-grade admission uses invocation scope over full-breadth lineage", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_code_surface",
+      "t204-full-breadth-inline-review"
+    );
+    assert.equal(manifest.featureScope.mode, "full_breadth");
+    const allObligationIds =
+      manifest.traversalObligationContext.obligations.map(
+        (obligation) => obligation.obligationId
+      );
+    assert.ok(allObligationIds.length > 2);
+    const inlineObligationIds = allObligationIds.slice(0, 2);
+    writeValidCodeBuilderFrontier(manifest);
+
+    const base = reviewGradeAssessment(manifest);
+    const inlineFindings = base.findings
+      .filter((finding) => inlineObligationIds.includes(finding.obligationId))
+      .map((finding, index) =>
+        index === 0
+          ? {
+              ...finding,
+              fulfillmentStatus: "partial",
+              failureClass: "semantic_not_realized",
+              requiredAction:
+                "Repair the current edge output for the active inline review scope.",
+              fulfillmentBinding: null
+            }
+          : finding
+      );
+    const scopedAssessment = {
+      ...base,
+      status: "blocked",
+      reviewedObligationIds: inlineObligationIds,
+      findings: inlineFindings,
+      summary:
+        "Full-breadth lineage remains context while inline obligations are the active review scope."
+    };
+    const outputFile = writeAssessment(manifest, scopedAssessment);
+    const invocationScope = {
+      kind: "sdlc_worker_invocation_package",
+      featureScope: manifest.featureScope,
+      inlineObligationIds
+    };
+    const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest,
+      outputFile,
+      invocationScope
+    });
+
+    assert.equal(
+      admission.status,
+      "admitted",
+      JSON.stringify(admission.blockingReasons)
+    );
+    assert.deepStrictEqual(
+      admission.assessment.reviewedObligationIds,
+      inlineObligationIds
+    );
+    assert.equal(admission.assessment.status, "blocked");
+    assert.equal(
+      admission.blockingReasons.some((reason) =>
+        reason.includes("review_grade_obligation_unreviewed")
+      ),
+      false
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
 test("T-203 scoped review-grade prompt makes inline obligations the only review scope", () => {
   const source = readRepoFile(
     "build_tenants/typescript/code/src/operator/plugins/evaluate/prompts.ts"
@@ -1958,7 +2058,11 @@ test("T-203 scoped review-grade prompt makes inline obligations the only review 
 
   assert.match(
     source,
-    /reviewedObligationIds: exactly the obligationRefs in the admitted edge packet above\. For scoped runs, this is invocationPackage\.inlineObligationIds; do not add worker aliases/u
+    /reviewedObligationIds: exactly the active review-scope obligationRefs in the admitted edge packet above; do not add worker aliases/u
+  );
+  assert.match(
+    source,
+    /worker_invocation_package\.inlineObligationIds is present, it is the active review scope/u
   );
   assert.match(
     source,
@@ -1966,7 +2070,7 @@ test("T-203 scoped review-grade prompt makes inline obligations the only review 
   );
   assert.match(
     source,
-    /active review scope is invocationPackage\.inlineObligationIds/u
+    /lineage\/evidence context only unless the id is also present in the active review scope/u
   );
   assert.doesNotMatch(
     source,
@@ -2398,6 +2502,115 @@ test("T-182 wrong-stage review findings are downstream pressure, not same-edge r
       }),
       []
     );
+    const semanticMisclassifiedCarryFinding = {
+      ...blockedDownstreamExecutionCarryFinding,
+      failureClass: "semantic_not_realized",
+      requiredAction:
+        "Bind this downstream carried requirement to the current source row."
+    };
+    const semanticMisclassifiedCarryAssessment = {
+      kind: "sdlc_worker_obligation_assessment",
+      obligationId: semanticMisclassifiedCarryFinding.obligationId,
+      fulfillmentStatus: "blocked",
+      evidenceRefs: semanticMisclassifiedCarryFinding.evidenceRefs,
+      blockingReasons: [
+        `requirement_carried_for_downstream_closure:${semanticMisclassifiedCarryFinding.obligationId.replace(/^requirement:/u, "")}`
+      ],
+      reviewGrade: true,
+      reviewFailureClass: semanticMisclassifiedCarryFinding.failureClass,
+      requiredAction: semanticMisclassifiedCarryFinding.requiredAction,
+      semanticEvidenceRefs: semanticMisclassifiedCarryFinding.evidenceRefs,
+      acceptedAuthorityRefs: semanticMisclassifiedCarryFinding.acceptedAuthorityRefs,
+      fulfillmentBinding: null
+    };
+    assert.equal(
+      reviewGradeFindingsAreDownstreamStagePressure(
+        [semanticMisclassifiedCarryFinding],
+        {
+          targetAssetType: "component_code_surface",
+          workerAssessments: [semanticMisclassifiedCarryAssessment]
+        }
+      ),
+      true
+    );
+    assert.notDeepEqual(
+      reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+        runRef: "t204-carryover-without-worker-report-context",
+        targetAssetType: "component_code_surface",
+        assessment: {
+          ...base,
+          status: "blocked",
+          findings: [semanticMisclassifiedCarryFinding]
+        }
+      }),
+      []
+    );
+    assert.deepEqual(
+      reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+        runRef: "t204-carryover-with-worker-report-context",
+        targetAssetType: "component_code_surface",
+        assessment: {
+          ...base,
+          status: "blocked",
+          findings: [semanticMisclassifiedCarryFinding]
+        },
+        workerAssessments: [semanticMisclassifiedCarryAssessment]
+      }),
+      []
+    );
+    const explicitCurrentEdgeRepairFinding = {
+      ...semanticMisclassifiedCarryFinding,
+      repairSurfaceTriage: {
+        kind: "sdlc_repair_surface_triage",
+        disposition: "current_edge_repair",
+        repairGraphFunctionRef: null,
+        repairGraphVectorRef: null,
+        repairAssetRef: null,
+        evidenceRefs: semanticMisclassifiedCarryFinding.evidenceRefs,
+        rationale:
+          "Review-grade evaluator classified this as current source repair despite stale downstream carryover in the prior worker report."
+      }
+    };
+    assert.equal(
+      reviewGradeFindingsAreDownstreamStagePressure(
+        [explicitCurrentEdgeRepairFinding],
+        {
+          targetAssetType: "component_code_surface",
+          workerAssessments: [semanticMisclassifiedCarryAssessment]
+        }
+      ),
+      false
+    );
+    assert.equal(
+      reviewGradeFindingsAreDownstreamStagePressure(
+        [explicitDownstreamTriageCarryFinding, explicitCurrentEdgeRepairFinding],
+        {
+          targetAssetType: "component_code_surface",
+          workerAssessments: [semanticMisclassifiedCarryAssessment]
+        }
+      ),
+      false
+    );
+    assert.notDeepEqual(
+      reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+        runRef: "t204-current-edge-repair-dominates-stale-carryover",
+        targetAssetType: "component_code_surface",
+        assessment: {
+          ...base,
+          status: "blocked",
+          findings: [explicitCurrentEdgeRepairFinding]
+        },
+        workerAssessments: [semanticMisclassifiedCarryAssessment]
+      }),
+      []
+    );
+    assert.deepEqual(
+      reviewGradeEdgeFulfillmentOpenPressureRefs({
+        runRef: "t204-worker-carryover-semantic-misclassified",
+        assessments: [semanticMisclassifiedCarryAssessment]
+      }),
+      []
+    );
     const downstreamTestFinding = {
       ...wrongStageFindings[0],
       failureClass: "test_overlap_missing",
@@ -2498,6 +2711,37 @@ test("T-182 wrong-stage review findings are downstream pressure, not same-edge r
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
   }
+});
+
+test("T-204 review-grade merge drops unreviewed full-breadth report rows", () => {
+  const installedOperatorSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+  const mergeFunction = installedOperatorSource.slice(
+    installedOperatorSource.indexOf("function workerReportWithReviewGradeAssessment"),
+    installedOperatorSource.indexOf("function reviewGradePostflight")
+  );
+
+  assert.match(
+    mergeFunction,
+    /obligationAssessments:\s*Object\.freeze\(reviewedRows\)/u,
+    "admitted review-grade assessment rows must become the active report scope"
+  );
+  assert.doesNotMatch(
+    mergeFunction,
+    /\.\.\.unreviewedRows/u,
+    "unreviewed full-breadth report rows must remain archive context, not close-blocking report truth"
+  );
+  assert.match(
+    installedOperatorSource,
+    /reviewGradeAssessment\.reviewedObligationIds/u,
+    "edge closure must derive declared obligation scope from admitted review-grade scope"
+  );
+  assert.match(
+    installedOperatorSource,
+    /scopedAssessments[\s\S]+declaredSet\.has\(assessment\.obligationId\)/u,
+    "edge closure must not count unreviewed full-manifest report rows as missing or extra"
+  );
 });
 
 test("T-188 component-code execution proof pressure is downstream, not retry churn", () => {
@@ -2776,6 +3020,68 @@ test("T-202 review-grade downstream carryover does not force same-edge retry", (
   );
 });
 
+test("T-182 passed review-grade discharges prior F_P open-obligation pressure", () => {
+  const scalarPressureRefs = sdlcFpEvaluateOpenObligationPressureRefs({
+    runRef: "t182-review-grade-discharge",
+    status: "admitted_with_open_obligations",
+    obligationAssessmentCounts: {
+      total: 1,
+      fulfilled: 0,
+      partial: 1,
+      blocked: 0,
+      unassessed: 0
+    },
+    obligationAssessments: [
+      {
+        fulfillmentStatus: "partial",
+        blockingReasons: ["review_grade_edge_fulfillment_blocked"]
+      }
+    ]
+  });
+  assert.deepEqual(scalarPressureRefs, [
+    "pressure://odd-sdlc/fp-evaluate/t182-review-grade-discharge/partial-1",
+    "pressure://odd-sdlc/fp-evaluate/t182-review-grade-discharge/status%3Aadmitted_with_open_obligations"
+  ]);
+
+  const fulfilledFinding = {
+    kind: "sdlc_review_grade_obligation_finding",
+    obligationId: "requirement://t182/review-grade-discharge",
+    fulfillmentStatus: "fulfilled",
+    failureClass: null,
+    requiredAction: null,
+    evidenceRefs: ["evidence://t182/review-grade-discharge"],
+    acceptedAuthorityRefs: ["authority://t182/review-grade-discharge"],
+    fulfillmentBinding: null,
+    rationale: "selected review-grade evaluator accepted the obligation"
+  };
+  assert.deepEqual(
+    reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+      runRef: "t182-review-grade-discharge",
+      assessment: {
+        kind: "sdlc_review_grade_edge_fulfillment_assessment",
+        assessmentVersion: "ts-review-grade-v1",
+        graphFunctionName: "derive_component_code_surface",
+        edgeName: "derive_component_code_surface",
+        targetAssetType: "component_code_surface",
+        status: "passed",
+        reviewedObligationIds: [fulfilledFinding.obligationId],
+        findings: [fulfilledFinding],
+        evidenceRefs: ["evidence://t182/review-grade-discharge"],
+        summary: "selected review-grade assessment passed"
+      }
+    }),
+    []
+  );
+
+  const source = readRepoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+  assert.match(
+    source,
+    /reviewGradeEdgeFulfillmentAssessmentRequired\(state\.manifest\)[\s\S]+reviewGradeResidualPressureRefsForState\(state\)\.length === 0[\s\S]+return Object\.freeze\(\[\]\);/u
+  );
+});
+
 test("T-183 scalar F_P evaluation carries open review-grade pressure", () => {
   const pressureRefs = reviewGradeEdgeFulfillmentOpenPressureRefs({
     runRef: "t183-scalar-review-grade",
@@ -2925,10 +3231,30 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
     );
     assert.match(
       promptSource,
+      /If you find a current-edge blocker, stop deeper inspection and write a minimal blocked assessment immediately/u
+    );
+    assert.match(
+      promptSource,
+      /First-blocker protocol: once one current-edge semantic blocker is identified/u
+    );
+    assert.match(
+      promptSource,
+      /source-dumping grep\/cat\/sed\/tail\/head\/nl commands/u
+    );
+    assert.match(
+      promptSource,
+      /Do not paste source, requirements, JSON, diffs, command output, or intermediate notes into the final response/u
+    );
+    assert.match(
+      promptSource,
       /assessment path is output-only and is expected to be absent before evaluation/u
     );
     assert.match(promptSource, /evaluator is read-only over workspace and product files/u);
     assert.match(promptSource, /The only durable JSON output you may create or modify/u);
+    assert.match(
+      promptSource,
+      /For that assessment artifact only, filesystem writes or a single shell redirection are permitted/u
+    );
     assert.match(promptSource, /The only optional sidecar you may create or modify/u);
     assert.match(promptSource, /Do not use apply_patch/u);
     assert.match(
@@ -3097,6 +3423,74 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
     );
     assert.match(transportSource, /"--tools"[\s\S]*input\.allowedTools/u);
     assert.match(installedOperatorSource, /component_code_surface/u);
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-204 review-grade prompts carry current postflight blockers as admitted pressure", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_code_surface",
+      "t204-review-grade-current-postflight"
+    );
+    const blocker = makeSdlcBlockingReason({
+      code: "staged_authority_missing",
+      detail: "implementation_design_surface",
+      evidenceRefs: ["file:///tmp/t204/postflight.json"]
+    });
+    const prompt = reviewGradeEdgeFulfillmentPrompt({
+      manifest,
+      invocationScope: null,
+      currentPostflight: {
+        kind: "sdlc_operator_postflight_result",
+        status: "blocked",
+        blockingReasons: ["staged_authority_missing"],
+        blockingReasonCarriers: [blocker],
+        evidenceRefs: ["file:///tmp/t204/postflight.json"]
+      },
+      governanceRef: "config://odd-sdlc/work-category/component-code",
+      governancePath: path.join(workspaceRoot, "config/operator-work-categories.json"),
+      constructionBriefPath: path.join(
+        manifest.archiveRoot,
+        "worker_construction_brief.json"
+      ),
+      invocationPackagePath: path.join(
+        manifest.archiveRoot,
+        "worker_invocation_package.json"
+      ),
+      workerReportPath: path.join(manifest.archiveRoot, "worker_result_report.json"),
+      assessmentPath: path.join(
+        manifest.archiveRoot,
+        REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE
+      ),
+      subworkstreamManifestPath: path.join(
+        manifest.archiveRoot,
+        "sdlc_evaluate_compute_subworkstream_manifest.json"
+      )
+    });
+
+    assert.match(prompt, /Current compute-stage postflight blockers:/u);
+    assert.match(prompt, /code=staged_authority_missing/u);
+    assert.match(prompt, /detail=implementation_design_surface/u);
+    assert.match(prompt, /already admitted current-edge pressure/u);
+    assert.match(prompt, /write a minimal blocked assessment first/u);
+
+    const installedOperatorSource = readRepoFile(
+      "build_tenants/typescript/code/src/operator/installed_operator.ts"
+    );
+    assert.match(installedOperatorSource, /currentPostflightBlockers\.length > 0/u);
+    assert.match(installedOperatorSource, /current_postflight_blocked/u);
+    assert.match(
+      installedOperatorSource,
+      /blockingReasonCarriers:\s*Object\.freeze\(currentPostflightBlockers\)/u
+    );
+    assert.doesNotMatch(
+      installedOperatorSource,
+      /currentPostflightBlockers\.length > 0[\s\S]*code:\s*"review_grade_assessment_invalid"[\s\S]*current_postflight_blocked/u
+    );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
   }

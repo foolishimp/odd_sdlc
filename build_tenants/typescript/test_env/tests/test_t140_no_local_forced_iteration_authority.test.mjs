@@ -14,7 +14,6 @@ import { pathToFileURL } from "node:url";
 
 import {
   deriveSdlcWorkerRetryContextFromPostActionProjection,
-  deriveSdlcWorkerRetryContextFromTraversalConsequence,
   mergeSdlcWorkerRetryContextWithRuntimeGapRegister,
   sdlcRequirementObligationBelongsToDownstreamComponentSurface,
   sdlcWorkerRetryContextFromAbgRetryContext
@@ -31,72 +30,6 @@ const installedOperatorSource = () =>
     new URL("../../code/src/operator/installed_operator.ts", import.meta.url),
     "utf8"
   );
-
-test("T-140 retry context derives from traversal consequence projection refs", () => {
-  const gapDossier = {
-    kind: "sdlc_postflight_gap_dossier",
-    status: "open",
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: "derive_component_code_surface",
-    vectorIndex: 7,
-    targetAssetType: "component_code_surface",
-    reasons: [
-      {
-        kind: "sdlc_postflight_gap_reason",
-        reason:
-          "obligation_assessment_blocked:requirement:workspace.requirements.req_dq_003",
-        reasonClass: "assurance",
-        blockingReason: sdlcBlockingReasonFromLegacy({
-          reason:
-            "obligation_assessment_blocked:requirement:workspace.requirements.req_dq_003"
-        })
-      }
-    ],
-    evidenceRefs: ["file:///tmp/odd-sdlc-t140/postflight.json"],
-    priorManifestId: "file:///tmp/odd-sdlc-t140/handoff_manifest.json",
-    currentGapDossierRef: "file:///tmp/odd-sdlc-t140/gap_dossier.json",
-    retryEligible: true,
-    nextLawfulActions: ["repair_worker_output"]
-  };
-  const derivation = deriveSdlcWorkerRetryContextFromTraversalConsequence({
-    attemptIndex: 3,
-    outcome: {
-      manifest: {
-        archiveRoot: "/tmp/odd-sdlc-t140/archive",
-        vectorIndex: 7
-      },
-      gapDossier,
-      traversalConsequence: {
-        edgeClosureDecision: {
-          decisionRef: "closure-decision://t140/retry"
-        },
-        nextActionProjection: {
-          choosesNextTraversal: true,
-          nextActionProjectionRef: "next-action://t140/evaluate-next"
-        }
-      }
-    }
-  });
-
-  assert.equal(derivation.status, "ready");
-  const retryContext = derivation.retryContext;
-  assert(retryContext);
-  assert.equal(
-    retryContext.retryAttemptRefs[0].sourceProjectionRef,
-    "next-action://t140/evaluate-next"
-  );
-  assert.equal(
-    retryContext.retryAttemptRefs[0].priorAuthorityRef,
-    "file:///tmp/odd-sdlc-t140/gap_dossier.json"
-  );
-  assert.equal(retryContext.retryAttemptRefs[0].attemptIndex, 3);
-  assert.equal(retryContext.retryAttemptRefs[0].vectorIndex, 7);
-  assert.equal(retryContext.priorGapDossiers.length, 1);
-  assert.equal(
-    retryContext.priorGapDossiers[0].currentGapDossierRef,
-    "file:///tmp/odd-sdlc-t140/gap_dossier.json"
-  );
-});
 
 test("T-164 post-action retry context restores current gap dossier from pressure refs", () => {
   const archiveRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t140-gap-"));
@@ -395,7 +328,7 @@ test("T-189 retry context fails closed on non-fresh or unselected ABG seam", () 
   assert.deepEqual(emptyContext.priorGapDossiers, []);
 });
 
-test("T-188 post-action retry context restores closure residual pressure without a gap dossier file", () => {
+test("T-204 post-action retry context ignores closure archive without a gap dossier file", () => {
   const archiveRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t188-closure-"));
   const reason =
     "component_depth_register_invalid:component_depth_register.componentTopologyRows[0].sourceAssetRefs: expected array";
@@ -443,20 +376,14 @@ test("T-188 post-action retry context restores closure residual pressure without
   });
 
   assert(retryContext);
-  assert.equal(retryContext.priorGapDossiers.length, 1);
-  assert.match(
-    retryContext.priorGapDossiers[0].currentGapDossierRef,
-    /^closure-gap-dossier:\/\//u
-  );
-  assert.equal(retryContext.retryAttemptRefs[0].priorAuthorityRef, retryContext.priorGapDossiers[0].currentGapDossierRef);
-  assert.equal(retryContext.priorGapDossiers[0].reasons[0].reason, reason);
   assert.equal(
-    retryContext.priorGapDossiers[0].reasons[0].blockingReason.detail,
-    reasonRef
+    retryContext.retryAttemptRefs[0].priorAuthorityRef,
+    "construction-action://odd-sdlc/post-action/derive_component_code_surface/post_retry/derive_component_code_surface"
   );
+  assert.equal(retryContext.priorGapDossiers.length, 0);
 });
 
-test("T-188 runtime gap merge restores latest closure residual for same-edge retry refs", () => {
+test("T-204 runtime gap merge ignores closure archive without a gap dossier file", () => {
   const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t188-runtime-"));
   const archiveRoot = path.join(
     workspace,
@@ -514,12 +441,11 @@ test("T-188 runtime gap merge restores latest closure residual for same-edge ret
     }
   });
 
-  assert.equal(retryContext.priorGapDossiers.length, 1);
-  assert.match(
-    retryContext.priorGapDossiers[0].currentGapDossierRef,
-    /^closure-gap-dossier:\/\//u
+  assert.equal(retryContext.priorGapDossiers.length, 0);
+  assert.equal(
+    retryContext.retryAttemptRefs[0].priorAuthorityRef,
+    "construction-action://odd-sdlc/post-action/Fg_materialize_declared_product_asset/post_downstream_product_materialization/component_code_surface"
   );
-  assert.equal(retryContext.priorGapDossiers[0].reasons[0].reason, reason);
 });
 
 test("T-188 runtime gap merge does not promote non-retryable triage dossiers", () => {
@@ -812,6 +738,112 @@ test("T-188 runtime gap merge restores newer real same-edge gap after stale retr
   assert.equal(retryContext.priorGapDossiers[0].reasons[0].reason, reason);
 });
 
+test("T-204 runtime gap merge drops stale review-grade gap when a newer run lacks a current dossier", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t204-stale-review-gap-"));
+  const runsRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs"
+  );
+  const staleRun = path.join(runsRoot, "20260621T062026437Z_pid77635");
+  const latestRun = path.join(runsRoot, "20260621T062945972Z_pid77635");
+  mkdirSync(staleRun, { recursive: true });
+  mkdirSync(latestRun, { recursive: true });
+  const staleRef = pathToFileURL(path.join(staleRun, "gap_dossier.json")).href;
+  const staleReason =
+    "review_grade_edge_fulfillment_blocked:requirement:data_mapper.requirements.req_int_001:semantic_not_realized:Revise ADR-003 synthesis coverage.";
+  const staleDossier = {
+    kind: "sdlc_postflight_gap_dossier",
+    status: "open",
+    graphFunctionName: "lite_design_module_implementation",
+    edgeName: "derive_lite_test_design_surface",
+    vectorIndex: 2,
+    targetAssetType: "test_design_surface",
+    reasons: [
+      {
+        kind: "sdlc_postflight_gap_reason",
+        reason: staleReason,
+        reasonClass: "assurance",
+        blockingReason: sdlcBlockingReasonFromLegacy({ reason: staleReason })
+      }
+    ],
+    evidenceRefs: [
+      pathToFileURL(
+        path.join(staleRun, "review_grade_edge_fulfillment_assessment.json")
+      ).href
+    ],
+    priorManifestId: pathToFileURL(path.join(staleRun, "handoff_manifest.json")).href,
+    currentGapDossierRef: staleRef,
+    retryEligible: true,
+    nextLawfulActions: ["retry_same_edge"]
+  };
+  writeFileSync(
+    path.join(staleRun, "gap_dossier.json"),
+    JSON.stringify(staleDossier),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(latestRun, "handoff_manifest.json"),
+    JSON.stringify({
+      kind: "sdlc_worker_handoff_manifest",
+      archiveRoot: latestRun,
+      graphFunctionName: "lite_design_module_implementation",
+      edgeName: "derive_lite_test_design_surface",
+      vectorIndex: 2,
+      targetAssetType: "test_design_surface"
+    }),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(latestRun, "review_grade_edge_fulfillment_assessment.json"),
+    JSON.stringify({
+      kind: "sdlc_review_grade_edge_fulfillment_assessment",
+      assessmentVersion: "ts-review-grade-v1",
+      graphFunctionName: "lite_design_module_implementation",
+      edgeName: "derive_lite_test_design_surface",
+      targetAssetType: "test_design_surface",
+      status: "blocked",
+      reviewedObligationIds: [
+        "requirement:data_mapper.requirements.req_ldm_004_a",
+        "requirement:data_mapper.requirements.req_ldm_006"
+      ],
+      findings: [],
+      stageBoundaryConformance: null,
+      materializationBindingRelation: null,
+      obligationCoverageFold: null,
+      evidenceRefs: [],
+      summary: "newer blocked assessment exists without a published gap dossier"
+    }),
+    "utf8"
+  );
+
+  const retryContext = mergeSdlcWorkerRetryContextWithRuntimeGapRegister({
+    workspaceRoot: workspace,
+    vectorIndex: 2,
+    edgeName: "derive_lite_test_design_surface",
+    targetAssetType: "test_design_surface",
+    projected: {
+      kind: "sdlc_worker_retry_context",
+      retryAttemptRefs: [
+        {
+          vectorIndex: 2,
+          retryRunId: "run://odd-sdlc/public-start:retry:1",
+          retryCallId: pathToFileURL(path.join(staleRun, "worker_result_report.json")).href,
+          manifestId: pathToFileURL(path.join(staleRun, "handoff_manifest.json")).href,
+          priorAuthorityRef: pathToFileURL(
+            path.join(staleRun, "worker_result_report.json")
+          ).href,
+          attemptIndex: 1,
+          sourceProjectionRef: "retry-frontier://odd-sdlc/stale"
+        }
+      ],
+      priorGapDossiers: [staleDossier]
+    }
+  });
+
+  assert.equal(retryContext.priorGapDossiers.length, 0);
+  assert.equal(retryContext.retryAttemptRefs.length, 1);
+});
+
 test("T-199 runtime gap merge restores same-run assurance retry gap dossier", () => {
   const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t199-same-run-gap-"));
   const runsRoot = path.join(
@@ -1080,80 +1112,34 @@ test("T-174 component-code closure carries test and execution requirements downs
   );
 });
 
-test("T-140 retry context is absent without executable evaluate-next truth", () => {
-  const derivation = deriveSdlcWorkerRetryContextFromTraversalConsequence({
-    attemptIndex: 1,
-    outcome: {
-      manifest: {
-        archiveRoot: "/tmp/odd-sdlc-t140/archive",
-        vectorIndex: 0
-      },
-      traversalConsequence: {
-        edgeClosureDecision: {
-          decisionRef: "closure-decision://t140/block"
-        },
-        nextActionProjection: {
-          choosesNextTraversal: false,
-          nextActionProjectionRef: "next-action://t140/no-action"
-        }
-      }
-    }
-  });
-  assert.equal(derivation.status, "no_executable_intent");
-  assert.equal(derivation.retryContext, null);
-});
-
-test("T-140 retry context absence keeps no consequence and no manifest distinct", () => {
-  const noConsequence = deriveSdlcWorkerRetryContextFromTraversalConsequence({
-    attemptIndex: 1,
-    outcome: {
-      manifest: {
-        archiveRoot: "/tmp/odd-sdlc-t140/archive",
-        vectorIndex: 0
-      },
-      traversalConsequence: null
-    }
-  });
-  assert.equal(noConsequence.status, "no_consequence");
-  assert.equal(noConsequence.retryContext, null);
-
-  const noManifest = deriveSdlcWorkerRetryContextFromTraversalConsequence({
-    attemptIndex: 1,
-    outcome: {
-      manifest: null,
-      traversalConsequence: {
-        edgeClosureDecision: {
-          decisionRef: "closure-decision://t140/no-manifest"
-        },
-        nextActionProjection: {
-          choosesNextTraversal: true,
-          nextActionProjectionRef: "next-action://t140/no-manifest"
-        }
-      }
-    }
-  });
-  assert.equal(noManifest.status, "no_manifest");
-  assert.equal(noManifest.retryContext, null);
-});
-
-test("T-140 installed loop names traversal consequence as retry source", () => {
+test("T-140 installed operator has no local traversal-consequence retry derivation", () => {
   const source = installedOperatorSource();
 
   assert.equal(
     source.includes("deriveSdlcWorkerRetryContextFromTraversalConsequence"),
-    true
+    false
   );
   assert.equal(source.includes("retryContextFromGapDossier"), false);
-  assert.equal(
-    source.includes(
-      "deriveSdlcWorkerRetryContextFromTraversalConsequence"
-    ),
-    true
-  );
   assert.equal(
     source.includes("latest.gapDossier === null\n        ? undefined"),
     false
   );
+});
+
+test("T-204 installed operator does not synthesize gap authority from closure archives", () => {
+  const source = installedOperatorSource();
+
+  assert.equal(source.includes("syntheticClosureGapDossierFromArchiveRoot"), false);
+  assert.equal(
+    source.includes('readFileSync(join(archiveRoot, "sdlc_edge_closure_decision.json")'),
+    false
+  );
+  assert.match(
+    source,
+    /function stateWithReviewGradePostflight[\s\S]*constructPostflightGapDossier[\s\S]*writePostflightGapDossier[\s\S]*gapDossier: reviewGradeGapDossier \?\? state\.gapDossier/u
+  );
+  assert.match(source, /latestRuntimeAttemptRunIdForRetryContext/u);
+  assert.match(source, /retryContextWithoutPriorGapDossiers/u);
 });
 
 test("T-140 installed operator does not dispatch from legacy gap action strings", () => {

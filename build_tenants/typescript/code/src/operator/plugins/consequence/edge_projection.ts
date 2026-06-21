@@ -1376,16 +1376,6 @@ export function admittedTestExecutionResultOutput(
   }
 }
 
-export function writeTestExecutionResultSystemTransformOutput(input: {
-  readonly manifest: SdlcWorkerHandoffManifest;
-}): string | null {
-  if (input.manifest.targetAssetType !== "test_execution_result_surface") {
-    return null;
-  }
-  writeTestExecutionResultProjection(input.manifest);
-  return input.manifest.outputFile;
-}
-
 function writeComponentDepthProjection(
   manifest: SdlcWorkerHandoffManifest
 ): void {

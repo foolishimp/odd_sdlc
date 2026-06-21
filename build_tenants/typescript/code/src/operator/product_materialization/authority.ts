@@ -4,9 +4,12 @@ import path, {
   relative,
   resolve
 } from "node:path";import type {
+  SdlcComponentDepthRegister,
+  SdlcComponentTestRealizationRow,
   SdlcMaterializedProductFileRole,
   SdlcDesignDepthRegister,
   SdlcTestDesignRegister,
+  SdlcTestComponentTopologyRow,
   SdlcProductMaterializationContract,
   SdlcProductMaterializationAuthorityReconciliation,
   SdlcProductMaterializationAuthorityTarget,
@@ -1663,6 +1666,65 @@ function testTargetSeedFromDesignRelativePath(input: {
   });
 }
 
+type SdlcTestTargetPathRow =
+  | SdlcTestComponentTopologyRow
+  | SdlcComponentTestRealizationRow;
+
+function testTargetSeedsFromRows(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly rows: readonly Pick<SdlcTestTargetPathRow, "relativePath">[];
+}): readonly DeclaredProductTargetSeed[] {
+  return input.rows
+    .map((row) =>
+      testTargetSeedFromDesignRelativePath({
+        manifest: input.manifest,
+        relativePath: row.relativePath
+      })
+    )
+    .filter((seed): seed is DeclaredProductTargetSeed => seed !== null);
+}
+
+function selectUatTestTargetRows(input: {
+  readonly rows: readonly SdlcTestTargetPathRow[];
+  readonly testDesign: SdlcTestDesignRegister | null;
+}): readonly SdlcTestTargetPathRow[] {
+  if (input.rows.length === 0) {
+    return Object.freeze([]);
+  }
+  const implicitUatRows = input.rows.filter((row) =>
+    row.testcaseIds.some((testcaseId) =>
+      testcaseId.toLowerCase().includes("/uat/")
+    )
+  );
+  if (implicitUatRows.length > 0) {
+    return Object.freeze(implicitUatRows);
+  }
+  if (input.testDesign === null) {
+    return input.rows;
+  }
+  const uatTestcaseRefs = new Set(
+    input.testDesign.uatTestcaseRows.map((row) => row.testCaseRef)
+  );
+  const directUatRows = input.rows.filter((row) =>
+    row.testcaseIds.some((testcaseId) => uatTestcaseRefs.has(testcaseId))
+  );
+  if (directUatRows.length > 0) {
+    return Object.freeze(directUatRows);
+  }
+  const integrationRefs = new Set(
+    input.testDesign.uatIntegrationBindings
+      .filter((row) => uatTestcaseRefs.has(row.uatTestCaseRef))
+      .map((row) => row.integrationTestCaseRef)
+  );
+  const integrationRows = input.rows.filter((row) =>
+    row.testcaseIds.some((testcaseId) => integrationRefs.has(testcaseId))
+  );
+  if (integrationRows.length > 0) {
+    return Object.freeze(integrationRows);
+  }
+  return input.rows;
+}
+
 function designTargetSeedFromFileTargetRow(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly relativePath: string;
@@ -1846,39 +1908,68 @@ function designAssetAuthorityTargetsFor(
       sourceRefs: Object.freeze([sourceRef])
     });
   }
-  if (manifest.targetAssetType !== "component_test_surface") {
+  if (
+    manifest.targetAssetType !== "component_test_surface" &&
+    manifest.targetAssetType !== "uat_test_source_surface"
+  ) {
     return Object.freeze({
       targets: Object.freeze([]),
       sourceRefs: Object.freeze([])
     });
   }
+  const testDesign = readAdmittedTestDesign(manifest);
   const currentAdmission = admitComponentDepthRegisterFromArtifact({
     targetAssetType: manifest.targetAssetType,
     outputFile: manifest.outputFile
   });
   const currentOutputSourceRef =
     currentAdmission.evidenceRefs[0] ?? pathToFileURL(manifest.outputFile).href;
-  const currentOutputTargets =
-    currentAdmission.status === "admitted" && currentAdmission.register !== null
-      ? targetContractsFromSeeds({
-          source: "design_asset_authority",
-          sourceRef: currentOutputSourceRef,
-          manifest,
-          seeds: currentAdmission.register.componentTestRows
-            .map((row) =>
-              testTargetSeedFromDesignRelativePath({
-                manifest,
-                relativePath: row.relativePath
-              })
-            )
-            .filter((seed): seed is DeclaredProductTargetSeed => seed !== null)
-        })
-      : Object.freeze([] as const);
   const currentOutputAdmitted =
     currentAdmission.status === "admitted" && currentAdmission.register !== null;
-  const testDesign = currentOutputAdmitted
-    ? null
-    : readAdmittedTestDesign(manifest);
+  const componentTestSurface =
+    !currentOutputAdmitted && manifest.targetAssetType === "uat_test_source_surface"
+      ? readAdmittedComponentDepthSurface(manifest, "component_test_surface")
+      : null;
+  const currentRows =
+    currentOutputAdmitted && currentAdmission.register !== null
+      ? currentAdmission.register.componentTestRows
+      : Object.freeze([] as const);
+  const componentTestRows =
+    componentTestSurface === null
+      ? Object.freeze([] as const)
+      : componentTestSurface.register.componentTestRows;
+  const testDesignRows =
+    testDesign === null
+      ? Object.freeze([] as const)
+      : testDesign.register.testComponentTopologyRows;
+  const candidateRows: readonly SdlcTestTargetPathRow[] =
+    currentRows.length > 0
+      ? currentRows
+      : componentTestRows.length > 0
+        ? componentTestRows
+        : testDesignRows;
+  const selectedRows =
+    manifest.targetAssetType === "uat_test_source_surface"
+      ? selectUatTestTargetRows({
+          rows: candidateRows,
+          testDesign: testDesign?.register ?? null
+        })
+      : candidateRows;
+  const selectedSourceRef = currentOutputAdmitted
+    ? currentOutputSourceRef
+    : componentTestSurface?.sourceRef ?? testDesign?.sourceRef ?? currentOutputSourceRef;
+  const selectedTargets =
+    selectedRows.length === 0
+      ? Object.freeze([] as const)
+      : targetContractsFromSeeds({
+          source: "design_asset_authority",
+          sourceRef: selectedSourceRef,
+          manifest,
+          seeds: testTargetSeedsFromRows({
+            manifest,
+            rows: selectedRows
+          })
+        });
   const testDesignTargets =
     testDesign === null
       ? Object.freeze([] as const)
@@ -1886,22 +1977,22 @@ function designAssetAuthorityTargetsFor(
           source: "design_asset_authority",
           sourceRef: testDesign.sourceRef,
           manifest,
-          seeds: testDesign.register.testComponentTopologyRows
-            .map((row) =>
-              testTargetSeedFromDesignRelativePath({
-                manifest,
-                relativePath: row.relativePath
-              })
-            )
-            .filter((seed): seed is DeclaredProductTargetSeed => seed !== null)
+          seeds: testTargetSeedsFromRows({
+            manifest,
+            rows: testDesign.register.testComponentTopologyRows
+          })
         });
-  const targets = currentOutputAdmitted
-    ? currentOutputTargets
-    : testDesignTargets;
+  const targets =
+    selectedTargets.length > 0
+      ? selectedTargets
+      : manifest.targetAssetType === "component_test_surface"
+        ? testDesignTargets
+        : Object.freeze([] as const);
   return Object.freeze({
     targets,
     sourceRefs: uniqueSorted([
       ...(testDesign === null ? [] : [testDesign.sourceRef]),
+      ...(componentTestSurface === null ? [] : [componentTestSurface.sourceRef]),
       ...(currentAdmission.status === "admitted" ? [currentOutputSourceRef] : [])
     ])
   });
@@ -2055,8 +2146,40 @@ function mergeAuthorityTargets(
     targets.set(target.path, target);
   }
   for (const target of additions) {
-    if (!targets.has(target.path)) {
+    const prior = targets.get(target.path);
+    if (prior === undefined) {
       targets.set(target.path, target);
+      continue;
+    }
+    const targetKind =
+      prior.targetKind === "directory" || target.targetKind === "directory"
+        ? "directory" as const
+        : prior.targetKind;
+    if (
+      prior.requiredRole === target.requiredRole &&
+      target.source === "tenant_stack_authority"
+    ) {
+      targets.set(
+        target.path,
+        Object.freeze({
+          ...target,
+          targetKind
+        })
+      );
+      continue;
+    }
+    if (
+      prior.requiredRole === target.requiredRole &&
+      prior.targetKind !== target.targetKind &&
+      (prior.targetKind === "directory" || target.targetKind === "directory")
+    ) {
+      targets.set(
+        target.path,
+        Object.freeze({
+          ...prior,
+          targetKind
+        })
+      );
     }
   }
   return Object.freeze(
@@ -2117,13 +2240,23 @@ export function reconcileSdlcProductMaterializationAuthority(
     manifest,
     targets: tenantStackTargets
   });
+  const currentTenantStackReconciliationTargets = currentTenantStackTargets.filter(
+    (target) =>
+      currentDesignTargets.some(
+        (designTarget) =>
+          designTarget.path === target.path &&
+          designTarget.requiredRole === target.requiredRole
+      )
+  );
   const currentTenantStackMaterializationTargets =
     tenantStackTargetsCanExtendCurrentMaterialization({
       manifest,
       currentDesignTargets
     })
       ? currentTenantStackTargets.filter(tenantStackTargetCanDeclareProductMaterialization)
-      : Object.freeze([] as const);
+      : currentTenantStackReconciliationTargets.filter(
+          tenantStackTargetCanDeclareProductMaterialization
+        );
   const currentRequirementTargets = targetsForCurrentMaterializationEdge({
     manifest,
     targets: requirementTargets
@@ -2428,6 +2561,30 @@ function componentDepthSurfaceFile(
     return null;
   }
   return join(manifest.productMaterialization.tenantRoot, relativePath);
+}
+
+function readAdmittedComponentDepthSurface(
+  manifest: SdlcWorkerHandoffManifest,
+  targetAssetType: string
+): {
+  readonly register: SdlcComponentDepthRegister;
+  readonly sourceRef: string;
+} | null {
+  const outputFile = componentDepthSurfaceFile(manifest, targetAssetType);
+  if (outputFile === null || !existsSync(outputFile)) {
+    return null;
+  }
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType,
+    outputFile
+  });
+  if (admission.status !== "admitted" || admission.register === null) {
+    return null;
+  }
+  return Object.freeze({
+    register: admission.register,
+    sourceRef: admission.evidenceRefs[0] ?? pathToFileURL(outputFile).href
+  });
 }
 
 function readAdmittedTestDesign(

@@ -501,8 +501,8 @@ canonical relationship between those carriers.
 ```mermaid
 sequenceDiagram
   participant CLI as ABG CLI
-  participant Operator as installed operator
-  participant ABG as runEngineIterateAsync
+  participant ABG as ABG runtime
+  participant Plugins as odd_sdlc plugin set
   participant Handoff as handoff manifest
   participant Worker as process://claude
   participant Observe as post-transform observation
@@ -510,17 +510,16 @@ sequenceDiagram
   participant Assurance as assurance gate
   participant Gap as gap dossier
 
-  CLI->>Operator: executeInstalledOperatorStart
-  Operator->>ABG: runEngineIterateAsync with fpDispatch plugin
-  ABG->>Operator: dispatch current vector
-  Operator->>Handoff: create manifest and prompt
-  Operator->>Worker: start process worker
+  CLI->>ABG: genesis-ts start
+  ABG->>Plugins: dispatch current vector through product binding
+  Plugins->>Handoff: create manifest and prompt
+  Plugins->>Worker: start process worker
   Worker-->>Observe: output artifact and optional product files
   Observe->>Postflight: product materialization and report admission
   Postflight->>Assurance: evidence and worker/framework assessments
   Assurance->>Gap: blocked reasons and retry eligibility
   Gap-->>ABG: retry/continuation pressure candidate
-  ABG-->>Operator: blocked, retry, or continue projection
+  ABG-->>CLI: blocked, retry, continue, or converged projection
 
   alt test65 vector 8 first attempt
     Worker-->>Observe: implementation_design_surface.md

@@ -59,26 +59,6 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     admissionRef: "admission://odd-sdlc/operator-run/operator-summary"
   }),
   row({
-    artifactRef: "operator-run-artifact://run",
-    relativePath: "run.json",
-    carrierKind: "sdlc_installed_operator_start_outcome",
-    role: "read_model",
-    sourceOwner: "installed_operator",
-    requiredForPresentEdge: false,
-    malformedGapTracked: false,
-    admissionRef: "admission://odd-sdlc/operator-run/run"
-  }),
-  row({
-    artifactRef: "operator-run-artifact://run-compact",
-    relativePath: "run_compact.json",
-    carrierKind: "sdlc_installed_operator_run_compact",
-    role: "read_model",
-    sourceOwner: "installed_operator",
-    requiredForPresentEdge: false,
-    malformedGapTracked: false,
-    admissionRef: "admission://odd-sdlc/operator-run/run-compact"
-  }),
-  row({
     artifactRef: "operator-run-artifact://managed-traversal-manifest",
     relativePath: "managed_traversal_manifest.json",
     carrierKind: null,
@@ -340,7 +320,7 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     artifactRef: "operator-run-artifact://design-depth-fp-evaluator-content-register",
     relativePath: "design_depth_fp_evaluator_content_register.json",
     carrierKind: "sdlc_evaluate_content_register",
-    role: "authority_admission",
+    role: "read_model",
     sourceOwner: "fp_evaluator",
     requiredForPresentEdge: false,
     requiredWhen: "implementation_design_surface_present",

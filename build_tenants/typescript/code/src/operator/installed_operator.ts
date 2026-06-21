@@ -51,7 +51,6 @@ import {
   type RuntimeAggregateProjection,
   type RuntimeLivenessObserverProjection,
   type SupervisedProcessActorResult,
-  type TerminalKind,
   type TracedProcessExecutorProfile,
   type TracedProcessOutcome,
   type TracedProcessStreamModel
@@ -94,6 +93,9 @@ import {
   deriveSdlcOperatorAssuranceGate,
   type SdlcOperatorAssuranceGateResult
 } from "./assurance_gate.js";
+import type {
+  SdlcTraversalRequirementSatisfaction
+} from "../assurance/index.js";
 import {
   defaultOperationForTarget,
   hookContractByEdgeName,
@@ -103,9 +105,7 @@ import {
 } from "../hooks/index.js";
 import type { SdlcPublicStartOutcome } from "../start/index.js";
 import type {
-  SdlcInstalledOperatorStartOutcome,
   SdlcInstalledOperatorStatus,
-  SdlcInstalledOperatorTraversalConsequence,
   SdlcPostflightGapDossier,
   SdlcPostflightGapReason,
   SdlcPostflightResult,
@@ -138,8 +138,7 @@ import type {
 import {
   deriveSdlcClosureStateTransition,
   makeSdlcClosureResidualPressureCarrier,
-  syntheticGapDossierFromClosureRefs,
-  syntheticGapDossiersFromClosureDecision
+  syntheticGapDossierFromClosureRefs
 } from "./closure_state_machine.js";
 import {
   defaultComputeSubworkstreamManifest,
@@ -180,7 +179,6 @@ import {
 } from "./plugins/consequence/constructor_projection.js";
 import {
   constructPostflightGapDossier,
-  gapDossierPathForManifest,
   readPostflightGapDossierRef,
   writePostflightGapDossier
 } from "./postflight/gap_dossier.js";
@@ -204,6 +202,9 @@ import {
   SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND,
   SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND,
   SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS,
+  SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND,
+  SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_VERSION,
+  SDLC_EVALUATE_CONTENT_REGISTER_ROW_PROJECTION_KIND,
   admitSdlcEvaluateContentRegisterArtifact,
   designDepthFpEvaluatorContentRegisterPath,
   evaluateSdlcComputeStage,
@@ -515,6 +516,19 @@ function stateWithReviewGradePostflight(
   if (reviewGradePostflight === null || reviewGradePostflight.status === "passed") {
     return state;
   }
+  const reviewGradeGapDossier =
+    reviewGradePostflight.status === "blocked"
+      ? constructPostflightGapDossier({
+          manifest: state.manifest,
+          postflight: reviewGradePostflight
+        })
+      : null;
+  if (reviewGradeGapDossier !== null) {
+    writePostflightGapDossier({
+      manifest: state.manifest,
+      gapDossier: reviewGradeGapDossier
+    });
+  }
   const blockingReasonCarriers = Object.freeze([
     ...activePostflightBlockingReasonCarriers(reviewGradePostflight),
     ...state.blockingReasonCarriers
@@ -522,128 +536,10 @@ function stateWithReviewGradePostflight(
   return Object.freeze({
     ...state,
     postflight: reviewGradePostflight,
+    gapDossier: reviewGradeGapDossier ?? state.gapDossier,
     blockingReason: summarizeBlockingReasons(blockingReasonCarriers),
     blockingReasonCarriers
   });
-}
-
-export type SdlcWorkerRetryContextDerivationStatus =
-  | "ready"
-  | "no_consequence"
-  | "no_manifest"
-  | "no_executable_intent";
-
-export interface SdlcWorkerRetryContextDerivation {
-  readonly kind: "sdlc_worker_retry_context_derivation";
-  readonly status: SdlcWorkerRetryContextDerivationStatus;
-  readonly retryContext: SdlcWorkerRetryContext | null;
-  readonly reasonRef: string;
-  readonly sourceProjectionRef: string | null;
-}
-
-export function deriveSdlcWorkerRetryContextFromTraversalConsequence(input: {
-  readonly outcome: SdlcInstalledOperatorStartOutcome;
-  readonly attemptIndex: number;
-}): SdlcWorkerRetryContextDerivation {
-  const consequence = input.outcome.traversalConsequence;
-  if (consequence === null) {
-    return Object.freeze({
-      kind: "sdlc_worker_retry_context_derivation" as const,
-      status: "no_consequence" as const,
-      retryContext: null,
-      reasonRef: "retry-context-unavailable://odd-sdlc/no-consequence",
-      sourceProjectionRef: null
-    });
-  }
-  const sourceProjectionRef =
-    consequence.nextActionProjection.nextActionProjectionRef;
-  if (input.outcome.manifest === null) {
-    return Object.freeze({
-      kind: "sdlc_worker_retry_context_derivation" as const,
-      status: "no_manifest" as const,
-      retryContext: null,
-      reasonRef: "retry-context-unavailable://odd-sdlc/no-manifest",
-      sourceProjectionRef
-    });
-  }
-  if (consequence.nextActionProjection.choosesNextTraversal !== true) {
-    return Object.freeze({
-      kind: "sdlc_worker_retry_context_derivation" as const,
-      status: "no_executable_intent" as const,
-      retryContext: null,
-      reasonRef: "retry-context-unavailable://odd-sdlc/no-executable-intent",
-      sourceProjectionRef
-    });
-  }
-  const archivedGapDossier =
-    input.outcome.gapDossier === null
-      ? archivedGapDossierForManifest(input.outcome.manifest)
-      : null;
-  const priorGapDossiers =
-    input.outcome.gapDossier === null
-      ? archivedGapDossier === null
-        ? syntheticGapDossiersFromClosureDecision({
-            manifest: input.outcome.manifest,
-            edgeClosureDecision:
-              input.outcome.traversalConsequence?.edgeClosureDecision ?? null,
-            sourceProjectionRef
-          })
-        : Object.freeze([archivedGapDossier])
-      : Object.freeze([input.outcome.gapDossier]);
-  const priorAuthorityRef =
-    priorGapDossiers[0]?.currentGapDossierRef ??
-    consequence.edgeClosureDecision.decisionRef;
-  const manifestRef = pathToFileURL(
-    join(input.outcome.manifest.archiveRoot, "handoff_manifest.json")
-  ).href;
-  const refSegment = encodeURIComponent(sourceProjectionRef);
-  const retryContext = Object.freeze({
-    kind: "sdlc_worker_retry_context",
-    retryAttemptRefs: Object.freeze([
-      Object.freeze({
-        vectorIndex: input.outcome.manifest.vectorIndex,
-        retryRunId: `retry-run://odd-sdlc/installed-reentry/${refSegment}/${input.attemptIndex}`,
-        retryCallId: `retry-call://odd-sdlc/installed-reentry/${refSegment}/${input.attemptIndex}`,
-        manifestId: manifestRef,
-        priorAuthorityRef,
-        attemptIndex: input.attemptIndex,
-        sourceProjectionRef
-      })
-    ]),
-    priorGapDossiers
-  });
-  return Object.freeze({
-    kind: "sdlc_worker_retry_context_derivation" as const,
-    status: "ready" as const,
-    retryContext,
-    reasonRef: "retry-context://odd-sdlc/ready",
-    sourceProjectionRef
-  });
-}
-
-function archivedGapDossierForManifest(
-  manifest: SdlcWorkerHandoffManifest
-): SdlcPostflightGapDossier | null {
-  const filePath = gapDossierPathForManifest(manifest);
-  if (!existsSync(filePath)) {
-    return null;
-  }
-  try {
-    const dossier = readPostflightGapDossierRef(pathToFileURL(filePath).href);
-    if (
-      dossier === null ||
-      dossier.edgeName !== manifest.edgeName ||
-      dossier.vectorIndex !== manifest.vectorIndex ||
-      dossier.targetAssetType !== manifest.targetAssetType ||
-      dossier.retryEligible !== true ||
-      dossier.reasons.length === 0
-    ) {
-      return null;
-    }
-    return dossier;
-  } catch {
-    return null;
-  }
 }
 
 function vectorEvaluatorNames(input: {
@@ -929,49 +825,6 @@ function postActionArchiveRefFromSelectedActionRef(ref: string | null): string |
   return decoded.startsWith("file://") ? decoded : null;
 }
 
-function syntheticClosureGapDossierFromArchiveRoot(
-  archiveRoot: string,
-  sourceProjectionRef: string
-): SdlcPostflightGapDossier | null {
-  try {
-    const handoff = jsonRecord(JSON.parse(
-      readFileSync(join(archiveRoot, "handoff_manifest.json"), "utf8")
-    ));
-    const closure = jsonRecord(JSON.parse(
-      readFileSync(join(archiveRoot, "sdlc_edge_closure_decision.json"), "utf8")
-    ));
-    if (handoff === null || closure === null) {
-      return null;
-    }
-    if (
-      closure["disposition"] === "close" ||
-      typeof closure["decisionRef"] !== "string" ||
-      !isStringList(closure["reasonRefs"]) ||
-      typeof handoff["archiveRoot"] !== "string" ||
-      typeof handoff["edgeName"] !== "string" ||
-      typeof handoff["graphFunctionName"] !== "string" ||
-      typeof handoff["targetAssetType"] !== "string" ||
-      typeof handoff["vectorIndex"] !== "number"
-    ) {
-      return null;
-    }
-    return syntheticGapDossierFromClosureRefs({
-      manifest: {
-        archiveRoot: handoff["archiveRoot"],
-        edgeName: handoff["edgeName"],
-        graphFunctionName: handoff["graphFunctionName"],
-        targetAssetType: handoff["targetAssetType"],
-        vectorIndex: handoff["vectorIndex"]
-      },
-      decisionRef: closure["decisionRef"],
-      reasonRefs: closure["reasonRefs"],
-      sourceProjectionRef
-    });
-  } catch {
-    return null;
-  }
-}
-
 function gapDossierFromPostActionArchiveRef(
   archiveRef: string
 ): SdlcPostflightGapDossier | null {
@@ -980,15 +833,8 @@ function gapDossierFromPostActionArchiveRef(
     const archiveRoot = archivePath.endsWith("/general")
       ? dirname(archivePath)
       : archivePath;
-    const gapDossier = readPostflightGapDossierRef(
+    return readPostflightGapDossierRef(
       pathToFileURL(join(archiveRoot, "gap_dossier.json")).href
-    );
-    if (gapDossier !== null) {
-      return gapDossier;
-    }
-    return syntheticClosureGapDossierFromArchiveRoot(
-      archiveRoot,
-      pathToFileURL(join(archiveRoot, "sdlc_next_action_projection.json")).href
     );
   } catch {
     return null;
@@ -1135,12 +981,7 @@ function latestRuntimeGapDossierForRetryContext(input: {
   for (const runId of runIds) {
     const archiveRoot = join(operatorRunsRoot, runId);
     const gapDossierRef = pathToFileURL(join(archiveRoot, "gap_dossier.json")).href;
-    const dossier =
-      readPostflightGapDossierRef(gapDossierRef) ??
-      syntheticClosureGapDossierFromArchiveRoot(
-        archiveRoot,
-        pathToFileURL(join(archiveRoot, "sdlc_next_action_projection.json")).href
-      );
+    const dossier = readPostflightGapDossierRef(gapDossierRef);
     if (
       dossier !== null &&
       dossier.vectorIndex === input.vectorIndex &&
@@ -1151,6 +992,83 @@ function latestRuntimeGapDossierForRetryContext(input: {
     }
   }
   return preferredWorkerFacingGapDossierForRetryContext(candidates) ?? null;
+}
+
+function latestRuntimeAttemptRunIdForRetryContext(input: {
+  readonly workspaceRoot: string;
+  readonly vectorIndex: number;
+  readonly edgeName: string;
+  readonly targetAssetType: string;
+}): string | null {
+  const operatorRunsRoot = join(
+    input.workspaceRoot,
+    deriveSdlcConformProjectProfileFromWorkspace(input.workspaceRoot).runtimeLayout
+      .operatorRunRoot
+  );
+  if (!existsSync(operatorRunsRoot) || !statSync(operatorRunsRoot).isDirectory()) {
+    return null;
+  }
+  const runIds = readdirSync(operatorRunsRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  let latestRunId: string | null = null;
+  for (const runId of runIds) {
+    const manifestPath = join(operatorRunsRoot, runId, "handoff_manifest.json");
+    if (!existsSync(manifestPath) || !statSync(manifestPath).isFile()) {
+      continue;
+    }
+    try {
+      const manifest = jsonRecord(JSON.parse(readFileSync(manifestPath, "utf8")));
+      if (
+        manifest !== null &&
+        manifest["vectorIndex"] === input.vectorIndex &&
+        manifest["edgeName"] === input.edgeName &&
+        manifest["targetAssetType"] === input.targetAssetType
+      ) {
+        latestRunId = runId;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return latestRunId;
+}
+
+function latestOperatorRunIdFromRetryContext(
+  retryContext: SdlcWorkerRetryContext
+): string | null {
+  const runIds = uniqueSorted([
+    ...operatorRunIdsFromRetryContext(retryContext),
+    ...retryContext.priorGapDossiers.flatMap(operatorRunIdsFromGapDossier)
+  ]);
+  return runIds[runIds.length - 1] ?? null;
+}
+
+function retryContextLagsRuntimeAttempt(input: {
+  readonly retryContext: SdlcWorkerRetryContext;
+  readonly latestRuntimeAttemptRunId: string | null;
+}): boolean {
+  if (input.latestRuntimeAttemptRunId === null) {
+    return false;
+  }
+  const retryContextRunId = latestOperatorRunIdFromRetryContext(input.retryContext);
+  return (
+    retryContextRunId === null ||
+    retryContextRunId < input.latestRuntimeAttemptRunId
+  );
+}
+
+function retryContextWithoutPriorGapDossiers(
+  retryContext: SdlcWorkerRetryContext
+): SdlcWorkerRetryContext {
+  if (retryContext.priorGapDossiers.length === 0) {
+    return retryContext;
+  }
+  return Object.freeze({
+    ...retryContext,
+    priorGapDossiers: Object.freeze([])
+  });
 }
 
 function retryContextCarriesGapAuthority(
@@ -1316,9 +1234,34 @@ export function mergeSdlcWorkerRetryContextWithRuntimeGapRegister(input: {
     retryContext: input.projected,
     workspaceRoot: input.workspaceRoot
   });
+  const latestRuntimeAttemptRunId = latestRuntimeAttemptRunIdForRetryContext(input);
   const latestGapDossier = latestRuntimeGapDossierForRetryContext(input);
   if (latestGapDossier === null || latestGapDossier.retryEligible !== true) {
+    if (
+      retryContextLagsRuntimeAttempt({
+        retryContext: projected,
+        latestRuntimeAttemptRunId
+      })
+    ) {
+      return retryContextWithoutPriorGapDossiers(projected);
+    }
     return projected;
+  }
+  const latestGapRunId = latestOperatorRunIdFromRetryContext({
+    kind: "sdlc_worker_retry_context",
+    retryAttemptRefs: Object.freeze([]),
+    priorGapDossiers: Object.freeze([latestGapDossier])
+  });
+  if (
+    latestRuntimeAttemptRunId !== null &&
+    latestGapRunId !== null &&
+    latestGapRunId < latestRuntimeAttemptRunId &&
+    retryContextLagsRuntimeAttempt({
+      retryContext: projected,
+      latestRuntimeAttemptRunId
+    })
+  ) {
+    return retryContextWithoutPriorGapDossiers(projected);
   }
   if (
     gapDossierSupersededByCurrentWorkspace({
@@ -3505,7 +3448,7 @@ function writeDesignDepthFpEvaluatorDraftContentRegister(input: {
   const draftContentRows = Object.freeze(
     SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.map((section, index) =>
       Object.freeze({
-        kind: "sdlc_evaluate_content_register_row" as const,
+        kind: SDLC_EVALUATE_CONTENT_REGISTER_ROW_PROJECTION_KIND,
         rowRef: `content-register-row-draft://odd-sdlc/design-depth/${section}`,
         authorityFunction: "synthesize_model" as const,
         carrierFamily: "ProductAssetModel" as const,
@@ -3531,8 +3474,8 @@ function writeDesignDepthFpEvaluatorDraftContentRegister(input: {
     archiveRoot: input.archiveRoot,
     absolutePath: input.contentRegisterPath,
     payload: Object.freeze({
-      kind: "sdlc_evaluate_content_register" as const,
-      registerVersion: "ts-evaluate-content-register-v1" as const,
+      kind: SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND,
+      registerVersion: SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_VERSION,
       stage: "evaluate.C" as const,
       ruleRef: DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
       ruleRole: "semantic_judgment" as const,
@@ -4202,7 +4145,6 @@ function workerReportWithReviewGradeAssessment(input: {
     right: SdlcWorkerObligationFulfillmentStatus
   ): SdlcWorkerObligationFulfillmentStatus =>
     statusWeight(left) >= statusWeight(right) ? left : right;
-  const reviewed = new Set(input.assessment.reviewedObligationIds);
   const reviewedRows = input.assessment.reviewedObligationIds.flatMap((obligationId) => {
     const finding = findingById.get(obligationId);
     if (finding === undefined) {
@@ -4211,7 +4153,8 @@ function workerReportWithReviewGradeAssessment(input: {
     const existing = existingById.get(obligationId);
     const isDownstreamStagePressure =
       reviewGradeFindingsAreDownstreamStagePressure([finding], {
-        targetAssetType: input.targetAssetType
+        targetAssetType: input.targetAssetType,
+        workerAssessments: input.report.obligationAssessments
       });
     const existingIsDownstreamCarryover =
       isDownstreamStagePressure &&
@@ -4280,12 +4223,9 @@ function workerReportWithReviewGradeAssessment(input: {
       })
     ];
   });
-  const unreviewedRows = input.report.obligationAssessments.filter(
-    (assessment) => !reviewed.has(assessment.obligationId)
-  );
   return Object.freeze({
     ...input.report,
-    obligationAssessments: Object.freeze([...reviewedRows, ...unreviewedRows])
+    obligationAssessments: Object.freeze(reviewedRows)
   });
 }
 
@@ -4315,6 +4255,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
   readonly transport: SdlcWorkerTransportContract;
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly pluginInput: EnginePluginInput;
+  readonly currentPostflight?: SdlcPostflightResult | null | undefined;
   readonly eventSink: (event: RuntimeEvent) => void;
 }): Promise<EvaluationRuleOutcome> {
   const manifestPath = join(input.manifest.archiveRoot, "handoff_manifest.json");
@@ -4340,6 +4281,64 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
     input.manifest.archiveRoot,
     "review_grade_edge_fulfillment_prompt.md"
   );
+  const currentPostflightBlockers =
+    input.currentPostflight === null || input.currentPostflight === undefined
+      ? Object.freeze([])
+      : activePostflightBlockingReasonCarriers(input.currentPostflight);
+  if (currentPostflightBlockers.length > 0) {
+    const diagnosticRefs = uniqueSorted([
+      ...(input.currentPostflight?.evidenceRefs ?? []),
+      ...currentPostflightBlockers.flatMap((reason) => reason.evidenceRefs),
+      pathToFileURL(join(input.manifest.archiveRoot, "postflight.json")).href
+    ]);
+    const blockerCodes = uniqueSorted(
+      currentPostflightBlockers.map(legacyBlockingReasonCode)
+    );
+    const postflight = Object.freeze({
+      kind: "sdlc_operator_postflight_result" as const,
+      status: "blocked" as const,
+      blockingReasons: blockerCodes,
+      blockingReasonCarriers: Object.freeze(currentPostflightBlockers),
+      evidenceRefs: diagnosticRefs
+    });
+    writeSdlcSystemArtifact({
+      archiveRoot: input.manifest.archiveRoot,
+      relativePath: "review_grade_postflight.json",
+      payload: postflight
+    });
+    writePostflightGapDossier({
+      manifest: input.manifest,
+      gapDossier: constructPostflightGapDossier({
+        manifest: input.manifest,
+        postflight
+      })
+    });
+    const residualPressureRefs = currentPostflightBlockers.map(
+      (reason) =>
+        `pressure://odd-sdlc/review-grade/${manifestRefSegment(input.manifest)}/current-postflight/${encodeURIComponent(
+          legacyBlockingReasonCode(reason)
+        )}`
+    );
+    return constructEvaluationRuleOutcome({
+      status: "blocked",
+      ruleRef: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
+      ruleRole: "semantic_judgment",
+      computeMeans: "F_P",
+      evidenceRefs: diagnosticRefs,
+      residualPressureRefs,
+      diagnosticRefs,
+      selectedCompositionRef: input.pluginInput.selectedCompositionRef,
+      selectedCompositionDigest: input.pluginInput.selectedCompositionDigest,
+      selectedCompositionSelectionRef:
+        input.pluginInput.selectedCompositionSelectionRef,
+      selectedRegimeBindingRef: input.pluginInput.selectedRegimeBindingRef,
+      compositionContributionRef:
+        input.pluginInput.selectedRegimeBindingRef ??
+        input.pluginInput.selectedCompositionRef,
+      reason:
+        `current_postflight_blocked:${blockerCodes.join(",") || "blocked"}`
+    });
+  }
   const invocationScope = readWorkerInvocationPackageScope(invocationPackagePath);
   if (input.manifest.featureScope.mode !== "full_breadth" && invocationScope === null) {
     const diagnosticRefs = uniqueSorted([
@@ -4399,6 +4398,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
   const reviewGradePromptProjection = reviewGradeEdgeFulfillmentPromptProjection({
     manifest: input.manifest,
     invocationScope,
+    currentPostflight: input.currentPostflight,
     governanceRef: workCategoryGovernance.configRef,
     governancePath: join(input.manifest.workspaceRoot, workCategoryGovernance.workerPath),
     constructionBriefPath,
@@ -4746,7 +4746,8 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
   );
   if (
     reviewGradeFindingsAreDownstreamStagePressure(openFindings, {
-      targetAssetType: input.manifest.targetAssetType
+      targetAssetType: input.manifest.targetAssetType,
+      workerAssessments: reviewGradeWorkerReport.obligationAssessments
     })
   ) {
     const downstreamPressureRefs = uniqueSorted(
@@ -4780,10 +4781,15 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
     });
   }
   if (admission.assessment.status === "blocked" || openFindings.length > 0) {
+    const concreteRepairFindings = openFindings.filter(
+      (finding) => finding.fulfillmentStatus !== "unassessed"
+    );
+    const postflightFindings =
+      concreteRepairFindings.length > 0 ? concreteRepairFindings : openFindings;
     const postflight = reviewGradePostflight({
       manifest: input.manifest,
       code: "review_grade_edge_fulfillment_blocked",
-      details: openFindings.map(
+      details: postflightFindings.map(
         (finding) =>
           `${finding.obligationId}:${finding.failureClass ?? "open"}:${finding.requiredAction ?? "required_action_missing"}`
       ),
@@ -4802,7 +4808,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       })
     });
     const residualPressureRefs = uniqueSorted(
-      openFindings.map(
+      postflightFindings.map(
         (finding) =>
           `pressure://odd-sdlc/review-grade/${manifestRefSegment(input.manifest)}/${encodeURIComponent(finding.obligationId)}`
       )
@@ -4927,7 +4933,7 @@ interface SdlcAbgOwnedFpDispatchState {
   readonly workerRun: SdlcWorkerRunResult | null;
   readonly workerReport: SdlcWorkerResultReport | null;
   readonly postflight: SdlcPostflightResult | null;
-  readonly assuranceSatisfaction: SdlcInstalledOperatorStartOutcome["assuranceSatisfaction"];
+  readonly assuranceSatisfaction: SdlcTraversalRequirementSatisfaction | null;
   readonly gapDossier: SdlcPostflightGapDossier | null;
   readonly hookOutcome: SdlcHookTurnOutcome | null;
   readonly blockingReason: string | null;
@@ -5125,13 +5131,46 @@ function fpEvaluateOpenObligationPressureRefsForState(
   if (result === null) {
     return Object.freeze([]);
   }
-  return sdlcFpEvaluateOpenObligationPressureRefs({
+  const pressureRefs = sdlcFpEvaluateOpenObligationPressureRefs({
     runRef: manifestRefSegment(state.manifest),
     status: result.status,
     obligationAssessmentCounts: result.obligationAssessmentCounts,
     obligationAssessments:
       state.workerReport?.obligationAssessments ?? Object.freeze([])
   });
+  if (
+    pressureRefs.length > 0 &&
+    reviewGradeEdgeFulfillmentAssessmentRequired(state.manifest) &&
+    reviewGradeResidualPressureRefsForState(state).length === 0
+  ) {
+    return Object.freeze([]);
+  }
+  return pressureRefs;
+}
+
+function admittedReviewGradeAssessmentForState(
+  state: SdlcAbgOwnedFpDispatchState
+): SdlcReviewGradeEdgeFulfillmentAssessment | null {
+  if (!reviewGradeEdgeFulfillmentAssessmentRequired(state.manifest)) {
+    return null;
+  }
+  const assessmentPath = join(
+    state.manifest.archiveRoot,
+    REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE
+  );
+  if (!existsSync(assessmentPath)) {
+    return null;
+  }
+  const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+    manifest: state.manifest,
+    outputFile: assessmentPath,
+    invocationScope: readWorkerInvocationPackageScope(
+      join(state.manifest.archiveRoot, "worker_invocation_package.json")
+    )
+  });
+  return admission.status === "admitted" && admission.assessment !== null
+    ? admission.assessment
+    : null;
 }
 
 function reviewGradeResidualPressureRefsForState(
@@ -5168,7 +5207,8 @@ function reviewGradeResidualPressureRefsForState(
   return reviewGradeEdgeFulfillmentAssessmentPressureRefs({
     runRef,
     targetAssetType: state.manifest.targetAssetType,
-    assessment: admission.assessment
+    assessment: admission.assessment,
+    workerAssessments: state.workerReport?.obligationAssessments ?? Object.freeze([])
   });
 }
 
@@ -5240,7 +5280,8 @@ function reviewGradeResidualPressureCarriersForState(
   return reviewGradeEdgeFulfillmentRepairSurfaceTriageRows({
     runRef,
     targetAssetType: state.manifest.targetAssetType,
-    assessment: admission.assessment
+    assessment: admission.assessment,
+    workerAssessments: state.workerReport?.obligationAssessments ?? Object.freeze([])
   })
     .filter((row) => row.triage.disposition !== "downstream_deferred")
     .map((row) =>
@@ -6166,18 +6207,33 @@ function edgeFulfillmentProjectionFor(input: {
       }
     )
   );
+  const reviewGradeAssessment = admittedReviewGradeAssessmentForState(input.state);
+  const declaredObligationIds =
+    reviewGradeAssessment === null
+      ? uniqueSorted([
+          ...input.state.manifest.traversalObligationContext.obligations.map(
+            (obligation) => obligation.obligationId
+          ),
+          ...(input.state.manifest.graphFunctionName ===
+          FG_CONFORM_PROJECT_AUTHORITY
+            ? assessments
+                .map((assessment) => assessment.obligationId)
+                .filter((obligationId) =>
+                  obligationId.startsWith("requirement:")
+                )
+            : [])
+        ])
+      : uniqueSorted(reviewGradeAssessment.reviewedObligationIds);
+  const declaredSet = new Set(declaredObligationIds);
+  const scopedAssessments =
+    reviewGradeAssessment === null
+      ? assessments
+      : assessments.filter((assessment) =>
+          declaredSet.has(assessment.obligationId)
+        );
   return deriveSdlcEdgeFulfillmentCountsFromAssessments({
-    declaredObligationIds: uniqueSorted([
-      ...input.state.manifest.traversalObligationContext.obligations.map(
-        (obligation) => obligation.obligationId
-      ),
-      ...(input.state.manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY
-        ? assessments
-            .map((assessment) => assessment.obligationId)
-            .filter((obligationId) => obligationId.startsWith("requirement:"))
-        : [])
-    ]),
-    assessments
+    declaredObligationIds,
+    assessments: scopedAssessments
   });
 }
 
@@ -7385,35 +7441,6 @@ function abgTerminalRetryReasonRefs(input: {
   ]);
 }
 
-function abgTerminalAllowsInstalledConvergence(input: {
-  readonly stateStatus: SdlcInstalledOperatorStatus;
-  readonly closureDisposition: SdlcEdgeClosureDisposition;
-  readonly terminalKind: TerminalKind | null;
-}): boolean {
-  return (
-    input.stateStatus === "worker_invoked" &&
-    input.closureDisposition === "close" &&
-    input.terminalKind === "converged"
-  );
-}
-
-export function deriveSdlcInstalledOperatorStatusFromAbgTerminal(input: {
-  readonly stateStatus: SdlcInstalledOperatorStatus;
-  readonly closureDisposition: SdlcEdgeClosureDisposition;
-  readonly terminalKind: TerminalKind | null;
-}): SdlcInstalledOperatorStatus {
-  if (input.stateStatus !== "worker_invoked") {
-    return input.stateStatus;
-  }
-  if (abgTerminalAllowsInstalledConvergence(input)) {
-    return "converged";
-  }
-  if (input.terminalKind === "gap_stop") {
-    return "blocked";
-  }
-  return input.stateStatus;
-}
-
 function abgTraversalTransitionProjectionRef(input: {
   readonly basis: ExecutionBasis;
   readonly runtimeProjection: RuntimeAggregateProjection;
@@ -7496,7 +7523,7 @@ function deriveInstalledTraversalConsequence(input: {
   readonly nextVectorIndex: number | null;
   readonly fpEvaluatorAdmissionEvidenceRefs?: readonly string[] | undefined;
   readonly reviewGradeAdmissionEvidenceRefs?: readonly string[] | undefined;
-}): SdlcInstalledOperatorTraversalConsequence {
+}) {
   if (input.start.executionContract === null) {
     throw new TypeError("installed traversal consequence requires execution contract");
   }
@@ -8057,7 +8084,7 @@ function overlayScopedAllowedConsequenceTraversalCatalog(input: {
 function installedDepthTraversalActionBinding(input: {
   readonly basis: ExecutionBasis;
   readonly pluginInput: EnginePluginInput;
-  readonly consequence: SdlcInstalledOperatorTraversalConsequence;
+  readonly consequence: ReturnType<typeof deriveInstalledTraversalConsequence>;
   readonly executionContract: NonNullable<SdlcPublicStartOutcome["executionContract"]>;
   readonly traversalStrategyDecision: SdlcTraversalStrategyDecision;
 }) {
@@ -8151,7 +8178,7 @@ function installedDepthTraversalActionBinding(input: {
 
 function writeTraversalConsequenceArchive(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
-  readonly consequence: SdlcInstalledOperatorTraversalConsequence;
+  readonly consequence: ReturnType<typeof deriveInstalledTraversalConsequence>;
 }): void {
   writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
@@ -8543,7 +8570,7 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
   const admitDispatchConsequence = (
     state: SdlcAbgOwnedFpDispatchState,
     nextVectorIndex: number | null = null
-  ): SdlcInstalledOperatorTraversalConsequence => {
+  ): ReturnType<typeof deriveInstalledTraversalConsequence> => {
     const consequence = deriveInstalledTraversalConsequence({
       basis,
       start: input.start,
@@ -8565,7 +8592,7 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
   };
   const publishDispatchState = (
     state: SdlcAbgOwnedFpDispatchState
-  ): SdlcInstalledOperatorTraversalConsequence => {
+  ): ReturnType<typeof deriveInstalledTraversalConsequence> => {
     dispatchState.current = state;
     return admitDispatchConsequence(state);
   };
@@ -9487,6 +9514,7 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
         transport,
         manifest: dispatchState.current.manifest,
         pluginInput,
+        currentPostflight: dispatchState.current.postflight,
         eventSink: (event) => {
           emitRuntimeEvent(event);
         }

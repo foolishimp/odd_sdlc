@@ -13,23 +13,17 @@ import type {
   DependencyFrontierDeclaration,
   FpTransformRequest,
   FpTransformResult,
-  RuntimeEvent,
   TracedProcessExecutorProfile,
   TracedProcessOutcome,
   TracedProcessStreamModel,
   TraversalAttemptEnvelope,
-  GtlAdmittedStateRef,
-  GtlConsequenceProjectionRef,
   GtlContractFulfillmentBinding,
   GtlEvaluation,
   GtlEvaluationFindingRef
 } from "@abiogenesis/typescript-tenant";
-import type { SdlcTraversalRequirementSatisfaction } from "../assurance/index.js";
 import type {
-  SdlcHookTransformProfile,
-  SdlcHookTurnOutcome
+  SdlcHookTransformProfile
 } from "../hooks/index.js";
-import type { SdlcPublicStartOutcome } from "../start/index.js";
 import type {
   SdlcBlockingReason,
   SdlcBlockingReasonCode
@@ -37,7 +31,6 @@ import type {
 import type { SdlcSelectedAbgFnCompositionIdentity } from "./composition_identity.js";
 import type { SdlcConformProjectProfile } from "../workspace/index.js";
 import type {
-  SdlcOverlayBinding,
   SdlcWorkCategoryGovernanceCategory
 } from "../graph/index.js";
 import type { SdlcTicketExecutionContract } from "../tickets/index.js";
@@ -49,18 +42,6 @@ import type {
   SdlcTraversalOutcomeClass,
   SdlcZoomAdmissionDisposition
 } from "../contracts/carrier_domain_catalog.js";
-import type {
-  SdlcConstructionIntent,
-  SdlcEdgeClosureDecision,
-  SdlcEdgeFulfillmentLedger,
-  SdlcNextActionProjection,
-  SdlcOverlaySegmentCompletion,
-  SdlcWorksiteEvidence
-} from "./traversal_consequence.js";
-import type {
-  SdlcEdgeGain,
-  SdlcEdgeResidualPressure
-} from "./edge_gain_closure.js";
 
 export type {
   SdlcDependencyTraversalMethod,
@@ -106,22 +87,6 @@ export interface SdlcOperatorSummary {
   readonly blockingReasons: readonly SdlcBlockingReason[];
   readonly nextLawfulAction: string;
   readonly archiveRoot: string | null;
-}
-
-export interface SdlcInstalledOperatorTraversalConsequence {
-  readonly kind: "sdlc_installed_operator_traversal_consequence";
-  readonly selectedComposition: SdlcSelectedAbgFnCompositionIdentity;
-  readonly constructionIntent: SdlcConstructionIntent;
-  readonly worksiteEvidence: SdlcWorksiteEvidence;
-  readonly edgeGain?: SdlcEdgeGain;
-  readonly edgeResidualPressure?: SdlcEdgeResidualPressure;
-  readonly edgeFulfillmentLedger: SdlcEdgeFulfillmentLedger;
-  readonly edgeClosureDecision: SdlcEdgeClosureDecision;
-  readonly overlaySegmentCompletion: SdlcOverlaySegmentCompletion | null;
-  readonly postActionOverlayBinding: SdlcOverlayBinding;
-  readonly nextActionProjection: SdlcNextActionProjection;
-  readonly admittedStateRef: GtlAdmittedStateRef;
-  readonly consequenceProjection: GtlConsequenceProjectionRef;
 }
 
 export interface SdlcWorkerTransportContract {
@@ -2159,25 +2124,4 @@ export interface SdlcFpEvaluateResult {
     readonly unassessed: number;
   };
   readonly executionEvidenceStatusSnapshot: SdlcWorkerExecutionEvidence["status"] | null;
-}
-
-export interface SdlcInstalledOperatorStartOutcome {
-  readonly kind: "sdlc_installed_operator_start_outcome";
-  readonly status: SdlcInstalledOperatorStatus;
-  readonly summary: SdlcOperatorSummary;
-  readonly start: SdlcPublicStartOutcome;
-  readonly transport: SdlcWorkerTransportContract | null;
-  readonly manifest: SdlcWorkerHandoffManifest | null;
-  readonly workerRun: SdlcWorkerRunResult | null;
-  readonly workerReport: SdlcWorkerResultReport | null;
-  readonly postflight: SdlcPostflightResult | null;
-  readonly assuranceSatisfaction: SdlcTraversalRequirementSatisfaction | null;
-  readonly gapDossier: SdlcPostflightGapDossier | null;
-  readonly hookOutcome: SdlcHookTurnOutcome | null;
-  readonly replayEventCountBefore: number;
-  readonly replayEventCountAfter: number;
-  readonly emittedRuntimeEventKinds: readonly RuntimeEvent["kind"][];
-  readonly eventLogPath: string;
-  readonly archiveRoot: string | null;
-  readonly traversalConsequence: SdlcInstalledOperatorTraversalConsequence | null;
 }

@@ -167,6 +167,7 @@ export function reviewGradeEdgeFulfillmentAssessmentRequired(
 function reviewGradeFindingIsDownstreamStagePressure(input: {
   readonly finding: SdlcReviewGradeObligationFinding;
   readonly targetAssetType?: string | undefined;
+  readonly workerAssessments?: readonly SdlcWorkerObligationAssessment[] | undefined;
 }): boolean {
   const nonMaterializedPlanningSurface = reviewGradeTargetAllowsRequirementCarryover(
     input.targetAssetType
@@ -181,6 +182,17 @@ function reviewGradeFindingIsDownstreamStagePressure(input: {
     return false;
   }
   if (input.finding.repairSurfaceTriage?.disposition === "downstream_deferred") {
+    return true;
+  }
+  if (input.finding.repairSurfaceTriage?.disposition === "current_edge_repair") {
+    return false;
+  }
+  if (
+    reviewGradeWorkerAssessmentsCarryObligationDownstream({
+      obligationId: input.finding.obligationId,
+      assessments: input.workerAssessments ?? Object.freeze([])
+    })
+  ) {
     return true;
   }
   const action = input.finding.requiredAction?.toLowerCase() ?? "";
@@ -291,16 +303,36 @@ function reviewGradeTargetAllowsRequirementCarryover(
   );
 }
 
+function downstreamCarryoverReasonForObligation(obligationId: string): string {
+  return `requirement_carried_for_downstream_closure:${obligationId.replace(/^requirement:/u, "")}`;
+}
+
+export function reviewGradeWorkerAssessmentsCarryObligationDownstream(input: {
+  readonly obligationId: string;
+  readonly assessments: readonly SdlcWorkerObligationAssessment[];
+}): boolean {
+  const carryoverReason = downstreamCarryoverReasonForObligation(input.obligationId);
+  return input.assessments.some(
+    (assessment) =>
+      assessment.obligationId === input.obligationId &&
+      assessment.blockingReasons.includes(carryoverReason)
+  );
+}
+
 export function reviewGradeFindingsAreDownstreamStagePressure(
   findings: readonly SdlcReviewGradeObligationFinding[],
-  input: { readonly targetAssetType?: string | undefined } = {}
+  input: {
+    readonly targetAssetType?: string | undefined;
+    readonly workerAssessments?: readonly SdlcWorkerObligationAssessment[] | undefined;
+  } = {}
 ): boolean {
   return (
     findings.length > 0 &&
     findings.every((finding) =>
       reviewGradeFindingIsDownstreamStagePressure({
         finding,
-        targetAssetType: input.targetAssetType
+        targetAssetType: input.targetAssetType,
+        workerAssessments: input.workerAssessments
       })
     )
   );
@@ -312,11 +344,10 @@ export function reviewGradeEdgeFulfillmentOpenPressureRefs(input: {
 }): readonly string[] {
   return uniqueSorted(
     input.assessments.flatMap((assessment) => {
-      const downstreamCarryover =
-        assessment.reviewFailureClass === "wrong_stage" &&
-        assessment.blockingReasons.some((reason) =>
-          reason.startsWith("requirement_carried_for_downstream_closure:")
-        );
+      const downstreamCarryover = reviewGradeWorkerAssessmentsCarryObligationDownstream({
+        obligationId: assessment.obligationId,
+        assessments: input.assessments
+      });
       return assessment.reviewGrade === true &&
         assessment.fulfillmentStatus !== "fulfilled" &&
         !downstreamCarryover
@@ -338,10 +369,12 @@ export interface SdlcReviewGradeRepairSurfaceTriageRow {
 function defaultRepairSurfaceTriageForFinding(input: {
   readonly finding: SdlcReviewGradeObligationFinding;
   readonly targetAssetType?: string | undefined;
+  readonly workerAssessments?: readonly SdlcWorkerObligationAssessment[] | undefined;
 }): SdlcRepairSurfaceTriageCarrier {
   const downstreamDeferred = reviewGradeFindingIsDownstreamStagePressure({
     finding: input.finding,
-    targetAssetType: input.targetAssetType
+    targetAssetType: input.targetAssetType,
+    workerAssessments: input.workerAssessments
   });
   return Object.freeze({
     kind: "sdlc_repair_surface_triage" as const,
@@ -365,6 +398,7 @@ export function reviewGradeEdgeFulfillmentRepairSurfaceTriageRows(input: {
   readonly runRef: string;
   readonly targetAssetType?: string | undefined;
   readonly assessment: SdlcReviewGradeEdgeFulfillmentAssessment;
+  readonly workerAssessments?: readonly SdlcWorkerObligationAssessment[] | undefined;
 }): readonly SdlcReviewGradeRepairSurfaceTriageRow[] {
   return Object.freeze(
     input.assessment.findings
@@ -379,7 +413,8 @@ export function reviewGradeEdgeFulfillmentRepairSurfaceTriageRows(input: {
             finding.repairSurfaceTriage ??
             defaultRepairSurfaceTriageForFinding({
               finding,
-              targetAssetType: input.targetAssetType
+              targetAssetType: input.targetAssetType,
+              workerAssessments: input.workerAssessments
             })
         })
       )
@@ -390,6 +425,7 @@ export function reviewGradeEdgeFulfillmentAssessmentPressureRefs(input: {
   readonly runRef: string;
   readonly targetAssetType?: string | undefined;
   readonly assessment: SdlcReviewGradeEdgeFulfillmentAssessment;
+  readonly workerAssessments?: readonly SdlcWorkerObligationAssessment[] | undefined;
 }): readonly string[] {
   const openFindings = input.assessment.findings.filter(
     (finding) => finding.fulfillmentStatus !== "fulfilled"
@@ -1540,20 +1576,21 @@ function expectedReviewObligationIdsForManifest(input: {
   const fallback = input.manifest.traversalObligationContext.obligations.map(
     (obligation) => obligation.obligationId
   );
+  if (
+    input.invocationScope !== null &&
+    input.invocationScope !== undefined &&
+    input.invocationScope.kind === "sdlc_worker_invocation_package" &&
+    input.invocationScope.inlineObligationIds.length > 0
+  ) {
+    return uniqueSorted(input.invocationScope.inlineObligationIds);
+  }
   if (input.manifest.featureScope.mode === "full_breadth") {
     return Object.freeze(fallback);
   }
-  if (input.invocationScope === undefined) {
+  if (input.invocationScope === undefined || input.invocationScope === null) {
     return Object.freeze([]);
   }
-  if (
-    input.invocationScope === null ||
-    input.invocationScope.kind !== "sdlc_worker_invocation_package" ||
-    input.invocationScope.featureScope.mode === "full_breadth"
-  ) {
-    return Object.freeze([]);
-  }
-  return uniqueSorted(input.invocationScope.inlineObligationIds);
+  return Object.freeze([]);
 }
 
 function assessmentValidationErrors(input: {

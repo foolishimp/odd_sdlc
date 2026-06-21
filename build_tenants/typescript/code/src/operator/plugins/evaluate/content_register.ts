@@ -36,8 +36,24 @@ export const SDLC_EVALUATE_CONTENT_CARRIER_FAMILIES = Object.freeze([
 export type SdlcEvaluateContentCarrierFamily =
   (typeof SDLC_EVALUATE_CONTENT_CARRIER_FAMILIES)[number];
 
+export const SDLC_EVALUATE_CONTENT_LEDGER_KIND =
+  "sdlc_evaluate_content_ledger" as const;
+export const SDLC_EVALUATE_CONTENT_LEDGER_ROW_KIND =
+  "sdlc_evaluate_content_ledger_row" as const;
+export const SDLC_EVALUATE_CONTENT_LEDGER_VERSION =
+  "ts-evaluate-content-ledger-v1" as const;
+
+export const SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND =
+  "sdlc_evaluate_content_register" as const;
+export const SDLC_EVALUATE_CONTENT_REGISTER_ROW_PROJECTION_KIND =
+  "sdlc_evaluate_content_register_row" as const;
+export const SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_VERSION =
+  "ts-evaluate-content-register-v1" as const;
+export const SDLC_EVALUATE_CONTENT_REGISTER_ADMISSION_KIND =
+  "sdlc_evaluate_content_register_admission" as const;
+
 export interface SdlcEvaluateContentRegisterRow {
-  readonly kind: "sdlc_evaluate_content_register_row";
+  readonly kind: typeof SDLC_EVALUATE_CONTENT_REGISTER_ROW_PROJECTION_KIND;
   readonly rowRef: string;
   readonly authorityFunction: SdlcEvaluateAuthorityFunction;
   readonly carrierFamily: SdlcEvaluateContentCarrierFamily;
@@ -48,8 +64,8 @@ export interface SdlcEvaluateContentRegisterRow {
 }
 
 export interface SdlcEvaluateContentRegister {
-  readonly kind: "sdlc_evaluate_content_register";
-  readonly registerVersion: "ts-evaluate-content-register-v1";
+  readonly kind: typeof SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND;
+  readonly registerVersion: typeof SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_VERSION;
   readonly stage: "evaluate.C";
   readonly ruleRef: string;
   readonly ruleRole: "semantic_judgment";
@@ -67,7 +83,7 @@ export interface SdlcEvaluateContentRegister {
 }
 
 export interface SdlcEvaluateContentRegisterAdmission {
-  readonly kind: "sdlc_evaluate_content_register_admission";
+  readonly kind: typeof SDLC_EVALUATE_CONTENT_REGISTER_ADMISSION_KIND;
   readonly status: "admitted" | "rejected";
   readonly register: SdlcEvaluateContentRegister | null;
   readonly blockingReasons: readonly string[];
@@ -308,11 +324,13 @@ function parseRow(input: unknown, label: string): SdlcEvaluateContentRegisterRow
     label
   );
   const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
-  if (kind !== "sdlc_evaluate_content_register_row") {
-    throw new TypeError(`${label}.kind: expected sdlc_evaluate_content_register_row`);
+  if (kind !== SDLC_EVALUATE_CONTENT_REGISTER_ROW_PROJECTION_KIND) {
+    throw new TypeError(
+      `${label}.kind: expected ${SDLC_EVALUATE_CONTENT_REGISTER_ROW_PROJECTION_KIND}`
+    );
   }
   return Object.freeze({
-    kind: "sdlc_evaluate_content_register_row" as const,
+    kind: SDLC_EVALUATE_CONTENT_REGISTER_ROW_PROJECTION_KIND,
     rowRef: parseNonEmptyString(record["rowRef"], `${label}.rowRef`),
     authorityFunction: parseEnumValue(
       record["authorityFunction"],
@@ -337,7 +355,7 @@ function parseRow(input: unknown, label: string): SdlcEvaluateContentRegisterRow
 function parseRegister(input: unknown): SdlcEvaluateContentRegister {
   const record = objectRecord(input);
   if (record === null) {
-    throw new TypeError("sdlc_evaluate_content_register: expected object");
+    throw new TypeError(`${SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND}: expected object`);
   }
   requireExactKeys(
     record,
@@ -359,18 +377,22 @@ function parseRegister(input: unknown): SdlcEvaluateContentRegister {
       "evidenceRefs",
       "contentRows"
     ],
-    "sdlc_evaluate_content_register"
+    SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND
   );
   const kind = parseNonEmptyString(record["kind"], "register.kind");
-  if (kind !== "sdlc_evaluate_content_register") {
-    throw new TypeError("register.kind: expected sdlc_evaluate_content_register");
+  if (kind !== SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND) {
+    throw new TypeError(
+      `register.kind: expected ${SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND}`
+    );
   }
   const registerVersion = parseNonEmptyString(
     record["registerVersion"],
     "register.registerVersion"
   );
-  if (registerVersion !== "ts-evaluate-content-register-v1") {
-    throw new TypeError("register.registerVersion: expected ts-evaluate-content-register-v1");
+  if (registerVersion !== SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_VERSION) {
+    throw new TypeError(
+      `register.registerVersion: expected ${SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_VERSION}`
+    );
   }
   const stage = parseNonEmptyString(record["stage"], "register.stage");
   if (stage !== "evaluate.C") {
@@ -393,8 +415,8 @@ function parseRegister(input: unknown): SdlcEvaluateContentRegister {
     throw new TypeError("register.contentRows: expected at least one row");
   }
   return Object.freeze({
-    kind: "sdlc_evaluate_content_register" as const,
-    registerVersion: "ts-evaluate-content-register-v1" as const,
+    kind: SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND,
+    registerVersion: SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_VERSION,
     stage: "evaluate.C" as const,
     ruleRef: parseNonEmptyString(record["ruleRef"], "register.ruleRef"),
     ruleRole: "semantic_judgment" as const,
@@ -523,7 +545,7 @@ export function constructDesignDepthDraftFragmentContentRegisterUpdate(input: {
           );
         }
         return Object.freeze({
-          kind: "sdlc_evaluate_content_register_row" as const,
+          kind: SDLC_EVALUATE_CONTENT_REGISTER_ROW_PROJECTION_KIND,
           rowRef: `content-register-row://odd-sdlc/design-depth/${section}`,
           authorityFunction: input.draftRegister.authorityFunction,
           carrierFamily: "ProductAssetModel" as const,
@@ -693,7 +715,7 @@ export function admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity(inpu
   const evidenceRefs = Object.freeze([pathToFileURL(input.registerPath).href]);
   if (!existsSync(input.registerPath) || !statSync(input.registerPath).isFile()) {
     return Object.freeze({
-      kind: "sdlc_evaluate_content_register_admission" as const,
+      kind: SDLC_EVALUATE_CONTENT_REGISTER_ADMISSION_KIND,
       status: "rejected" as const,
       register: null,
       blockingReasons: Object.freeze(["evaluate_content_register_missing"]),
@@ -747,7 +769,7 @@ export function admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity(inpu
     }
     if (blockingReasons.length > 0) {
       return Object.freeze({
-        kind: "sdlc_evaluate_content_register_admission" as const,
+        kind: SDLC_EVALUATE_CONTENT_REGISTER_ADMISSION_KIND,
         status: "rejected" as const,
         register: null,
         blockingReasons: Object.freeze(blockingReasons),
@@ -755,7 +777,7 @@ export function admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity(inpu
       });
     }
     return Object.freeze({
-      kind: "sdlc_evaluate_content_register_admission" as const,
+      kind: SDLC_EVALUATE_CONTENT_REGISTER_ADMISSION_KIND,
       status: "admitted" as const,
       register,
       blockingReasons: Object.freeze([]),
@@ -763,7 +785,7 @@ export function admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity(inpu
     });
   } catch (error) {
     return Object.freeze({
-      kind: "sdlc_evaluate_content_register_admission" as const,
+      kind: SDLC_EVALUATE_CONTENT_REGISTER_ADMISSION_KIND,
       status: "rejected" as const,
       register: null,
       blockingReasons: Object.freeze([

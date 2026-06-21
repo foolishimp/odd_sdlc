@@ -129,6 +129,30 @@ test("T-188 data_mapper live scripts run the boundary guard before live executio
   }
 });
 
+test("T-188 product materialization observation consumes one cached authority carrier", () => {
+  for (const relativePath of [
+    "code/src/operator/product_materialization/observation.ts",
+    "code/src/operator/plugins/transform/result_projection.ts"
+  ]) {
+    const source = readFileSync(path.join(PACKAGE_ROOT, relativePath), "utf8");
+    assert.match(
+      source,
+      /const authorityByArchiveRoot = new Map/u,
+      `${relativePath} must cache materialization authority per archive`
+    );
+    assert.match(
+      source,
+      /effectiveProductMaterializationRequiredRoles:\s*\(manifest\) => \{[\s\S]*productMaterializationAuthority\(manifest\)[\s\S]*declaredProductTargetContracts/u,
+      `${relativePath} must derive effective roles from cached authority`
+    );
+    assert.doesNotMatch(
+      source,
+      /import \{[\s\S]*effectiveProductMaterializationRequiredRoles[\s\S]*\} from .*product_materialization\/authority/u,
+      `${relativePath} must not import the uncached effective-role helper into observation deps`
+    );
+  }
+});
+
 test("T-188 data_mapper live harness worker binding comes from runtime policy", () => {
   const runtimePolicy = JSON.parse(
     readFileSync(path.join(PACKAGE_ROOT, "config/operator-runtime-policy.json"), "utf8")
@@ -297,17 +321,23 @@ test("T-188 data_mapper release proof completion is not reported as overlay no-p
   assert.match(runnerSource, /function releaseSurfacePresent\(workspace\)/u);
   assert.match(runnerSource, /sdlc_release_proof_converged/u);
   assert.match(runnerSource, /summary\.releaseProofConverged = releaseProofStopSatisfied\(workspace\)/u);
+  assert.match(
+    runnerSource,
+    /summary\.releaseProofStopKind = summary\.releaseProofConverged\s+\?\s+"sdlc_release_proof_converged"\s+:\s+null/u
+  );
 
-  const releaseStopCheck = runnerSource.indexOf("releaseProofStopSatisfied(input.workspace)");
-  const noProgressCheck = runnerSource.indexOf(
-    "sameTraversalProgressKeyAfterClose >=\n        DATA_MAPPER_RETRY_YIELD_ATTEMPT_WINDOW"
+  const releaseConvergedCheck = runnerSource.indexOf(
+    "summary.releaseProofConverged = releaseProofStopSatisfied(workspace)"
   );
-  assert.notEqual(releaseStopCheck, -1);
-  assert.notEqual(noProgressCheck, -1);
-  assert.ok(
-    releaseStopCheck < noProgressCheck,
-    "completed release proof must be classified before generic overlay no-progress"
+  const releaseStopKindCheck = runnerSource.indexOf(
+    'summary.releaseProofStopKind = summary.releaseProofConverged'
   );
+  assert.notEqual(releaseConvergedCheck, -1);
+  assert.notEqual(releaseStopKindCheck, -1);
+  assert.ok(releaseConvergedCheck < releaseStopKindCheck);
+  assert.doesNotMatch(runnerSource, /DATA_MAPPER_RETRY_YIELD_ATTEMPT_WINDOW/u);
+  assert.doesNotMatch(runnerSource, /sameTraversalProgressKeyAfterClose/u);
+  assert.doesNotMatch(runnerSource, /sdlc_overlay_no_progress/u);
 });
 
 test("T-188 explicit graph-function resume is not hijacked by overlay replay", () => {

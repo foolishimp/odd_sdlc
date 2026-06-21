@@ -38,33 +38,6 @@ export type SdlcTraversalRequirementSatisfactionStatus =
 export const SDLC_ASSURANCE_CLOSED_FD_MECHANICS_CLASS_REF =
   "fd-mechanics://odd-sdlc/assurance/closed-fd-mechanics/v1" as const;
 
-export const SDLC_ASSURANCE_CLOSED_FD_MECHANICS_CHECKS = Object.freeze([
-  "carrier_shape",
-  "ref_resolution",
-  "path_containment",
-  "file_existence",
-  "digest_or_byte_count_validation",
-  "replay_predecessor_completeness",
-  "declared_deterministic_validator_result",
-  "required_evidence_presence"
-] as const);
-
-export type SdlcAssuranceClosedFdMechanicsCheck =
-  (typeof SDLC_ASSURANCE_CLOSED_FD_MECHANICS_CHECKS)[number];
-
-export interface SdlcAssuranceClosedFdMechanicsClass {
-  readonly kind: "sdlc_assurance_closed_fd_mechanics_class";
-  readonly classRef: typeof SDLC_ASSURANCE_CLOSED_FD_MECHANICS_CLASS_REF;
-  readonly checks: readonly SdlcAssuranceClosedFdMechanicsCheck[];
-}
-
-export const SDLC_ASSURANCE_CLOSED_FD_MECHANICS_CLASS =
-  Object.freeze({
-    kind: "sdlc_assurance_closed_fd_mechanics_class" as const,
-    classRef: SDLC_ASSURANCE_CLOSED_FD_MECHANICS_CLASS_REF,
-    checks: SDLC_ASSURANCE_CLOSED_FD_MECHANICS_CHECKS
-  }) satisfies SdlcAssuranceClosedFdMechanicsClass;
-
 export type SdlcAssuranceLawfulReentryPoint =
   | "same_edge_retry"
   | "escalate_to_fp"

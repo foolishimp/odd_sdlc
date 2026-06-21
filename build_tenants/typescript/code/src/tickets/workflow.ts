@@ -42,12 +42,6 @@ export const SDLC_TICKET_REQUIRED_FIELDS = Object.freeze([
 export type SdlcTicketRequiredField =
   (typeof SDLC_TICKET_REQUIRED_FIELDS)[number];
 
-export type SdlcTicketDeclaredStatus =
-  | "backlog"
-  | "active"
-  | "blocked"
-  | "completed";
-
 export type SdlcTicketWorkflowRowStatus =
   | "valid"
   | "blocked"

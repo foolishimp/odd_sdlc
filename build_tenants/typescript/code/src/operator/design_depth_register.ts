@@ -3,7 +3,7 @@
 // Implements: B-084
 
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   parseBoolean,
@@ -671,11 +671,22 @@ function containsFencedDesignDepthRegister(content: string): boolean {
 
 function writeDesignDepthCandidateEvidence(input: {
   readonly archiveRoot: string | null | undefined;
+  readonly outputFile: string;
   readonly candidateIndex: number;
   readonly rawCandidate: unknown;
   readonly admittedCandidate: unknown;
 }): readonly string[] {
   if (input.archiveRoot === null || input.archiveRoot === undefined) {
+    return Object.freeze([]);
+  }
+  const archiveRoot = resolve(input.archiveRoot);
+  const outputFile = resolve(input.outputFile);
+  const archiveRelativeOutput = relative(archiveRoot, outputFile);
+  if (
+    archiveRelativeOutput.startsWith("..") ||
+    archiveRelativeOutput === "" ||
+    archiveRelativeOutput.startsWith("/")
+  ) {
     return Object.freeze([]);
   }
   const rawPath = join(
@@ -686,6 +697,15 @@ function writeDesignDepthCandidateEvidence(input: {
     input.archiveRoot,
     `design_depth_candidate_${input.candidateIndex}_admitted.json`
   );
+  const outputMtimeMs = statSync(input.outputFile).mtimeMs;
+  if (
+    existsSync(rawPath) &&
+    existsSync(admittedPath) &&
+    statSync(rawPath).mtimeMs >= outputMtimeMs &&
+    statSync(admittedPath).mtimeMs >= outputMtimeMs
+  ) {
+    return Object.freeze([pathToFileURL(rawPath).href, pathToFileURL(admittedPath).href]);
+  }
   writeSdlcSystemArtifact({
     archiveRoot: input.archiveRoot,
     absolutePath: rawPath,
@@ -773,6 +793,7 @@ export function admitDesignDepthRegisterFromArtifact(input: {
     candidateEvidenceRefs.push(
       ...writeDesignDepthCandidateEvidence({
         archiveRoot: input.archiveRoot,
+        outputFile: input.outputFile,
         candidateIndex,
         rawCandidate: candidate,
         admittedCandidate: candidate

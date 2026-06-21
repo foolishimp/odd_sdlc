@@ -1,6 +1,7 @@
 // Implements: T-184
 
 import type {
+  SdlcPostflightResult,
   SdlcTenantToolEnvironmentProjection,
   SdlcWorkerHandoffManifest,
   SdlcWorkerInvocationPackage
@@ -124,23 +125,73 @@ type SdlcReviewGradeInvocationScope = Pick<
   "kind" | "featureScope" | "inlineObligationIds"
 >;
 
+type SdlcReviewGradeCurrentPostflight = Pick<
+  SdlcPostflightResult,
+  "status" | "blockingReasonCarriers" | "evidenceRefs"
+>;
+
+function reviewGradeCurrentPostflightRefs(
+  currentPostflight?: SdlcReviewGradeCurrentPostflight | null | undefined
+): readonly string[] {
+  if (
+    currentPostflight === null ||
+    currentPostflight === undefined ||
+    currentPostflight.status === "passed"
+  ) {
+    return Object.freeze([]);
+  }
+  return uniquePromptRefs([
+    ...currentPostflight.evidenceRefs,
+    ...currentPostflight.blockingReasonCarriers.flatMap(
+      (reason) => reason.evidenceRefs
+    )
+  ]);
+}
+
+function reviewGradeCurrentPostflightPromptLines(
+  currentPostflight?: SdlcReviewGradeCurrentPostflight | null | undefined
+): readonly string[] {
+  if (
+    currentPostflight === null ||
+    currentPostflight === undefined ||
+    currentPostflight.status === "passed" ||
+    currentPostflight.blockingReasonCarriers.length === 0
+  ) {
+    return Object.freeze(["Current compute-stage postflight blockers: none."]);
+  }
+  const blockerLines = currentPostflight.blockingReasonCarriers
+    .slice(0, 8)
+    .map((reason, index) => {
+      const detail =
+        reason.detail === null || reason.detail.trim().length === 0
+          ? "none"
+          : reason.detail.trim();
+      return `- blocker ${index + 1}: code=${reason.code}; detail=${detail}; class=${reason.reasonClass}; reentry=${reason.lawfulReentryPoint}; evidenceRefs=${listForPrompt(reason.evidenceRefs.slice(0, 4))}.`;
+    });
+  return Object.freeze([
+    "Current compute-stage postflight blockers:",
+    ...blockerLines,
+    "- These blockers are already admitted current-edge pressure. If any listed blocker is still active for the edge under review, do not rediscover global context; write a minimal blocked assessment first and stop deeper inspection."
+  ]);
+}
+
 function reviewGradePromptObligationRefs(
   manifest: SdlcWorkerHandoffManifest,
   invocationScope?: SdlcReviewGradeInvocationScope | null | undefined
 ): readonly string[] {
   const fallback = manifestObligationRefs(manifest);
+  if (
+    invocationScope !== null &&
+    invocationScope !== undefined &&
+    invocationScope.kind === "sdlc_worker_invocation_package" &&
+    invocationScope.inlineObligationIds.length > 0
+  ) {
+    return uniquePromptRefs(invocationScope.inlineObligationIds);
+  }
   if (manifest.featureScope?.mode === "full_breadth") {
     return fallback;
   }
-  if (
-    invocationScope === null ||
-    invocationScope === undefined ||
-    invocationScope.kind !== "sdlc_worker_invocation_package" ||
-    invocationScope.featureScope.mode === "full_breadth"
-  ) {
-    return Object.freeze([]);
-  }
-  return uniquePromptRefs(invocationScope.inlineObligationIds);
+  return Object.freeze([]);
 }
 
 function evaluationDimension(input: {
@@ -246,13 +297,27 @@ function evaluationGridContractForPrompt(input: {
   });
 }
 
+function useCompactFusedEvaluationPromptForObligationCount(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly obligationCount: number;
+}): boolean {
+  const profile = input.manifest.proportionalityProfile ?? null;
+  if (profile === null || input.obligationCount <= 0) {
+    return false;
+  }
+  if (input.manifest.targetAssetType === "component_code_surface") {
+    return input.obligationCount <= 25;
+  }
+  return input.obligationCount <= 8;
+}
+
 function useCompactFusedEvaluationPrompt(
   manifest: SdlcWorkerHandoffManifest
 ): boolean {
-  const profile = manifest.proportionalityProfile ?? null;
-  const obligationCount =
-    manifest.traversalObligationContext?.obligations?.length ?? 0;
-  return profile !== null && obligationCount > 0 && obligationCount <= 8;
+  return useCompactFusedEvaluationPromptForObligationCount({
+    manifest,
+    obligationCount: manifest.traversalObligationContext?.obligations?.length ?? 0
+  });
 }
 
 function isComponentCodeReviewGradeEdge(
@@ -567,6 +632,8 @@ function compactDesignDepthPromptLineGroups(input: {
       "- componentRealizationRows[]: kind, componentId, moduleName, relativePath, publicBoundary, trancheId, firstProductFileToChange, upstreamComponentIds, requirementIds, sourceAssetRefs. trancheId is string or null; if using an ordinal tranche emit \"1\", never numeric 1.",
       "- For a trivial product, keep one module and one source component unless accepted authority names separate source files or a hard boundary.",
       "- componentTopologyRows[] and componentRealizationRows[] must use source-role product paths only; every component relativePath must match a source-role fileTargetRows entry.",
+      "- componentTopologyRows[] and componentRealizationRows[] must carry non-empty local requirementIds. Empty requirementIds make the component an unowned downstream row and fail staged decomposition admission.",
+      "- For matching componentTopologyRows[]/componentRealizationRows[] with the same componentId, carry the same 1 to 8 local/high-signal requirementIds unless accepted authority proves a narrower realization basis.",
       "- Keep fileTargetRows to declared product targets. Do not add authority, spec, ADR, cache, target/, build output, or proof byproduct paths as product targets.",
       "- Preserve executable/script/service entrypoint obligations in publicBoundary and verdict reasons.",
       "- Use accepted product vocabulary for entity, operation, attribute, component, and sequence ids; do not substitute generic input/output/result names.",
@@ -576,6 +643,7 @@ function compactDesignDepthPromptLineGroups(input: {
       "",
       "Self-check before final response:",
       "- Re-open the content register with bounded Read and verify valid JSON, exact top-level key set, selected identity preservation, row key sets, all required sections, matching component/file paths, and compact size.",
+      "- Reject and rewrite if any componentTopologyRows[] or componentRealizationRows[] row has zero requirementIds or more than 8 requirementIds.",
       "- Reject and rewrite if any design-depth row contains field/value/sourceRef summary triples or any key outside the exact row contracts above.",
       "- Reject and rewrite if any nested row kind is sdlc_entity_row, sdlc_attribute_row, sdlc_operation_row, or sdlc_sunny_day_step; the accepted nested kinds are sdlc_domain_entity, sdlc_domain_attribute, sdlc_domain_operation, sdlc_entity_state_transition, sdlc_aggregate_domain_entity, and sdlc_sunny_day_sequence_step.",
       "- Rewrite until valid. Final response is one compact line; the content register file is the evaluation truth."
@@ -586,6 +654,7 @@ function compactDesignDepthPromptLineGroups(input: {
 function compactReviewGradePromptLineGroups(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly invocationScope?: SdlcReviewGradeInvocationScope | null | undefined;
+  readonly currentPostflight?: SdlcReviewGradeCurrentPostflight | null | undefined;
   readonly governanceRef: string;
   readonly governancePath: string;
   readonly constructionBriefPath: string;
@@ -606,6 +675,7 @@ function compactReviewGradePromptLineGroups(input: {
       "- Do not reconstruct global coverage, closure, continuation, or trace policy as a second SDLC. Coverage is a structural fold over refs; ABG owns close/block/redispatch.",
       "- This is semantic evaluation work. Do not rewrite source, tests, design artifacts, reports, ledgers, package files, or framework files.",
       `- The only durable JSON output you may create or modify is the assessment artifact at ${input.assessmentPath}.`,
+      "- For that assessment artifact only, filesystem writes or a single shell redirection are permitted; do not print the assessment JSON to stdout.",
       `- Optional observation-only subworkstream manifest: ${input.subworkstreamManifestPath}.`,
       "",
       "Admitted edge packet:",
@@ -622,6 +692,8 @@ function compactReviewGradePromptLineGroups(input: {
     ]),
     postAuthorityLines: Object.freeze([
       "",
+      ...reviewGradeCurrentPostflightPromptLines(input.currentPostflight),
+      "",
       "Read in order:",
       `1. compressed work-category governance (${input.governanceRef}): ${input.governancePath}`,
       `2. construction brief: ${input.constructionBriefPath}`,
@@ -631,9 +703,11 @@ function compactReviewGradePromptLineGroups(input: {
       "6. accepted design-depth/component refs named by the construction brief when present.",
       "",
       "Reading discipline:",
-      "- Do not print full files, full JSON objects, full requirement tables, or full source files to stdout.",
+      "- Do not print full files, full JSON objects, full requirement tables, full source files, source excerpts longer than 20 lines, or copied command/tool output to stdout.",
       "- Terminal output is a work trace. The assessment JSON is the evaluation truth.",
-      "- Do not issue parallel tool calls, helper-output debugging, background jobs, product execution, build, test, framework, or traversal commands.",
+      "- First-blocker protocol: once one current-edge semantic blocker is identified, write the blocked assessment artifact before inspecting additional modules or binding fulfilled obligations.",
+      "- If a current-edge blocker is found, write a minimal blocked assessment immediately; mark not-yet-reviewed active obligations unassessed with current_edge_repair triage and stop deeper inspection.",
+      "- Do not issue parallel tool calls, helper-output debugging, source-dumping grep/cat/sed/tail/head/nl commands, background jobs, product execution, build, test, framework, or traversal commands.",
       "- If command execution is unavailable, evaluate execution requirements only from admitted execution evidence. Missing later test/runtime proof is wrong_stage when the current edge declared no test/execution target.",
       "",
       "Required assessment envelope:",
@@ -927,6 +1001,8 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
     `- aggregateSunnyDaySequence.sequenceVersion must be exactly "ts-design-depth-v1".`,
     "- componentTopologyRows[] with kind \"sdlc_component_topology_row\", componentId, moduleName, relativePath, publicBoundary, concernRole, requirementIds, sourceAssetRefs",
     "- componentRealizationRows[] with kind \"sdlc_component_realization_row\", componentId, moduleName, relativePath, publicBoundary, trancheId, firstProductFileToChange, upstreamComponentIds, requirementIds, sourceAssetRefs. trancheId is string or null; if using an ordinal tranche emit \"1\", never numeric 1.",
+    "- componentTopologyRows[] and componentRealizationRows[] requirementIds are mandatory local ownership refs. Empty requirementIds make the row unowned and invalid.",
+    "- For matching componentTopologyRows[]/componentRealizationRows[] with the same componentId, carry the same 1 to 8 local/high-signal requirementIds unless accepted authority proves a narrower realization basis.",
     "- fileTargetRows[] with kind \"sdlc_file_target_row\", relativePath, role",
     "- designCompletenessVerdict with kind \"sdlc_design_completeness_verdict\", verdictVersion, entity, attribute, and flow axis verdicts.",
     "- designCompletenessVerdict is a closed object with exactly kind, verdictVersion, entity, attribute, flow. Do not emit entityAxis, attributeAxis, flowAxis, axisVerdicts, or any extra designCompletenessVerdict fields.",
@@ -969,7 +1045,7 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
     "- Keep moduleSchemaFragments compact: one fragment per implementation module, with representative entities and operations sufficient to preserve transformer pressure. Do not model every possible field, proof artifact, or test case as a separate entity.",
     "- Keep aggregateDomainModel compact: summarize cross-module domain shape with no more than 16 aggregate entities and no more than 24 aggregate operations.",
     "- Keep aggregateSunnyDaySequence compact: use no more than 18 steps that show the main public happy path and proof-output flow.",
-    "- Requirement ids on component rows are pressure samples for that component, not a full trace surface. Carry 3 to 8 local/high-signal requirementIds per component row and leave full global trace coverage in the ADR, feature decomposition, and requirement surfaces.",
+    "- Requirement ids on component rows are pressure samples for that component, not a full trace surface. Carry 1 to 8 local/high-signal requirementIds per component row and leave full global trace coverage in the ADR, feature decomposition, and requirement surfaces.",
     "- Do not repeat the same large requirement id list across many rows.",
     "- Use the construction brief stagePressure and target carrier refs to decide which staged authority this register must satisfy.",
     "- Treat construction_brief.stagePressure.proportionalityProfile as the admitted size budget for this edge: respect its profileClass, maxModules, and maxComponents. A degenerate profile means one module / one component / one function; do not expand the register beyond the admitted budget without a hard ADR requirement. A broad profile permits the full component range.",
@@ -981,17 +1057,17 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
     "- For a trivial product, fileTargetRows must name only downstream materialized product targets declared by authority. Include build_config files only when the ADR Product File Targets table, tenant stack authority, or another higher accepted product authority explicitly declares that exact build/config target; do not infer package/build files from ecosystem convention.",
     "- componentTopologyRows and componentRealizationRows must not be empty for implementation-design registers.",
     "- Do not collapse the register to manifest-only when source/runtime requirements are present in the ADR requirement lineage, construction brief, invocation package, or worker stderr.",
-    "- Requirements that imply separable public/runtime/data/test boundaries must become separate component-level realization rows unless the register gives a specific shared-component rationale in publicBoundary and designCompletenessVerdict.reasons.",
-    "- Trivial product override: when the workspace/constraints/ADR identify a trivial product or one tiny executable/script target, keep one componentTopologyRows row and one componentRealizationRows row for the shared source target unless there are separate source files or a hard accepted authority requiring separate product components. Carry runtime, route, response, and proof requirement ids as facets of that one component with an explicit shared-component rationale.",
-    "- If accepted authority says a source target is an executable, script, program, CLI, service entrypoint, or must print/emit/respond when run, preserve that executable-entrypoint obligation in publicBoundary and designCompletenessVerdict reasons. Do not downgrade it to an import-only helper boundary unless an admitted authority explicitly says the product is library-only.",
-    "- Do not split a trivial single-file service into runtime_binding, response, and proof-support components when all behavior is intentionally implemented in the same source file.",
-    "- Fail your own self-check and rewrite if the register assigns unrelated source/runtime/data/test obligations to one coarse component without a specific cohesion rationale.",
-    "- When a requirement lineage row says a source obligation is deferred to a downstream source-materialization edge, create the implementation component topology/realization row for that source target now and carry the deferred requirement id on that component.",
-    "- Staged decomposition admission is mandatory: each componentTopologyRows[] or componentRealizationRows[] row must own no more than 8 requirementIds.",
-    "- If one module or source root owns more than 8 requirement ids, split it into multiple component rows under the same module/source root with distinct componentIds and publicBoundary values.",
-    "- Keep upstreamComponentIds as component ids only; never use requirement ids as upstream component ids.",
-    "- Target enough componentRealizationRows so component-row pressure density remains 8 or less without copying the full global requirement surface into every row.",
-    "- Before final response, reject and rewrite the register if any component row has more than 8 requirementIds or repeats a global requirement list.",
+      "- Requirements that imply separable public/runtime/data/test boundaries must become separate component-level realization rows unless the register gives a specific shared-component rationale in publicBoundary and designCompletenessVerdict.reasons.",
+      "- Trivial product override: when the workspace/constraints/ADR identify a trivial product or one tiny executable/script target, keep one componentTopologyRows row and one componentRealizationRows row for the shared source target unless there are separate source files or a hard accepted authority requiring separate product components. Carry runtime, route, response, and proof requirement ids as facets of that one component with an explicit shared-component rationale.",
+      "- If accepted authority says a source target is an executable, script, program, CLI, service entrypoint, or must print/emit/respond when run, preserve that executable-entrypoint obligation in publicBoundary and designCompletenessVerdict reasons. Do not downgrade it to an import-only helper boundary unless an admitted authority explicitly says the product is library-only.",
+      "- Do not split a trivial single-file service into runtime_binding, response, and proof-support components when all behavior is intentionally implemented in the same source file.",
+      "- Fail your own self-check and rewrite if the register assigns unrelated source/runtime/data/test obligations to one coarse component without a specific cohesion rationale.",
+      "- When a requirement lineage row says a source obligation is deferred to a downstream source-materialization edge, create the implementation component topology/realization row for that source target now and carry the deferred requirement id on that component.",
+      "- Staged decomposition admission is mandatory: each componentTopologyRows[] or componentRealizationRows[] row must own 1 to 8 requirementIds. Zero requirementIds is invalid.",
+      "- If one module or source root owns more than 8 requirement ids, split it into multiple component rows under the same module/source root with distinct componentIds and publicBoundary values.",
+      "- Keep upstreamComponentIds as component ids only; never use requirement ids as upstream component ids.",
+      "- Target enough componentRealizationRows so component-row pressure density remains 8 or less without copying the full global requirement surface into every row.",
+      "- Before final response, reject and rewrite the register if any component row has zero requirementIds, more than 8 requirementIds, or repeats a global requirement list.",
     "- Before final response, reject and rewrite the register if schema/entity/operation/sequence names are generic substitutes not grounded in the accepted product vocabulary. A product about Object/Morphism/cardinality/dot-path behavior must not become a generic mapping-result model.",
     "- Every componentTopologyRows[].relativePath and componentRealizationRows[].relativePath must have a matching fileTargetRows entry with role source.",
     "- If the ADR repeats the same file path for behavioral roles such as runtime_binding, route, response, smoke proof, execution proof, or deferred implementation behavior, emit one fileTargetRows entry with the materialization role and carry those behavioral requirement ids on componentTopologyRows/componentRealizationRows instead.",
@@ -1008,7 +1084,7 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
     "- Before the final response, re-open the JSON you wrote and verify that every typed nested item above is an object with exactly the declared fields, not a string, Markdown paragraph, or partial object.",
     "- Before the final response, run a bounded path-integrity self-check: every source-role fileTargetRows[].relativePath and every component source relativePath must either appear in the transform artifact target/component tables or be justified by a higher source authority ref cited in sourceBasisRefs/evidenceRefs.",
     "- The path-integrity self-check is mandatory even when the first register was structurally valid; structural validity alone is not enough if exact product file paths drift from the admitted design/source authority.",
-    "- Self-check the size budget before final response: component rows are between 1 and 32, every component row has 8 or fewer requirementIds, aggregate entities are 16 or fewer, aggregate operations are 24 or fewer, and sunny-day steps are 18 or fewer.",
+      "- Self-check the size budget before final response: component rows are between 1 and 32, every component row has 1 to 8 requirementIds, aggregate entities are 16 or fewer, aggregate operations are 24 or fewer, and sunny-day steps are 18 or fewer.",
     "- Required self-check before final response: re-open the content register with bounded Read, verify JSON shape against this contract, and rewrite until it passes.",
     "- Self-check contentRows[] entries: exactly kind, rowRef, authorityFunction, carrierFamily, contentKind, payload, sourceBasisRefs, evidenceRefs.",
     `- Self-check ${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND} payloads: exactly kind, fragmentVersion, targetAssetType, section, sequence, mergeMode, value.`,
@@ -1170,6 +1246,7 @@ export function designDepthFpEvaluatorPrompt(input: {
 function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly invocationScope?: SdlcReviewGradeInvocationScope | null | undefined;
+  readonly currentPostflight?: SdlcReviewGradeCurrentPostflight | null | undefined;
   readonly governanceRef: string;
   readonly governancePath: string;
   readonly constructionBriefPath: string;
@@ -1179,7 +1256,15 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
   readonly subworkstreamManifestPath: string;
   readonly tenantToolEnvironment?: SdlcTenantToolEnvironmentProjection;
 }): EvaluatePromptLineGroups {
-  if (useCompactFusedEvaluationPrompt(input.manifest)) {
+  if (
+    useCompactFusedEvaluationPromptForObligationCount({
+      manifest: input.manifest,
+      obligationCount: reviewGradePromptObligationRefs(
+        input.manifest,
+        input.invocationScope
+      ).length
+    })
+  ) {
     return compactReviewGradePromptLineGroups(input);
   }
   return Object.freeze({
@@ -1192,6 +1277,7 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
       "- This is semantic evaluation work. Do not rewrite source, tests, design artifacts, reports, ledgers, or framework files.",
       "- The evaluator is read-only over workspace and product files. Do not use apply_patch, shell redirection, scripts, formatters, build tools, or editor commands to modify any generated asset, source file, test file, design surface, report, ledger, package file, or framework file.",
       `- The only durable JSON output you may create or modify is the assessment artifact at ${input.assessmentPath}.`,
+      "- For that assessment artifact only, filesystem writes or a single shell redirection are permitted; do not print the assessment JSON to stdout.",
       `- The only optional sidecar you may create or modify is the observation-only subworkstream manifest at ${input.subworkstreamManifestPath}.`,
       "- You may use agent-internal subagents or parallel workstreams as read-only compute strategy for independent modules, obligation slices, or evidence packets.",
       `- If you use evaluator subworkstreams, record them in ${input.subworkstreamManifestPath}. Rows must cite authority/dependency inputs, leave write/output-allocation fields empty, and remain observation only.`,
@@ -1205,6 +1291,8 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     ]),
     postAuthorityLines: Object.freeze([
       "",
+      ...reviewGradeCurrentPostflightPromptLines(input.currentPostflight),
+      "",
       "Read in order:",
     `1. compressed work-category governance (${input.governanceRef}): ${input.governancePath}`,
     `2. bounded inspection of construction brief: ${input.constructionBriefPath}`,
@@ -1215,7 +1303,7 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     "7. accepted design-depth register refs from construction_brief.stagePressure.designDepthEvaluatorRegisterRefs when present.",
     "",
     "Reading discipline:",
-    "- Do not print full files, full JSON objects, full requirement tables, or full source files to stdout.",
+    "- Do not print full files, full JSON objects, full requirement tables, full source files, source excerpts longer than 20 lines, or copied command/tool output to stdout.",
     "- Use only the active tool profile. When command execution is not available, inspect with bounded Read ranges and write the durable assessment JSON directly.",
     "- For non-executable planning/design/review surfaces, use bounded file inspection and assessment writing tools. Do not run convenience grep/count loops, command probes, helper scripts, or payload-printing commands unless the active tool list explicitly exposes command execution.",
     "- Do not issue parallel tool calls.",
@@ -1223,6 +1311,8 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     "- If the active tool profile cannot produce the assessment safely, stop with the final one-line blocked response and leave the assessment absent so the framework can classify evaluator failure.",
     "- Terminal output is a work trace. The JSON assessment file is the evaluation truth.",
     "- If reviewedObligationIds is large, still write the assessment file directly and keep stdout to compact status counts; do not stream a large findings array through stdout.",
+    "- First-blocker protocol: once one current-edge semantic blocker is identified, write the blocked assessment artifact before inspecting additional modules or binding fulfilled obligations.",
+    "- If you find a current-edge blocker, stop deeper inspection and write a minimal blocked assessment immediately. Include the blocked finding, mark any not-yet-reviewed active obligations unassessed with the same current_edge_repair triage, and keep stdout to the final one-line status.",
     "- Treat JSON collections defensively when reading evidence: worker_construction_brief.obligations may be an object map rather than an array; do not assume array shape when selecting obligation ids.",
     "- Prefer exact string equality, startsWith, includes, endsWith, and split-style reasoning for ref/path classification. Regex quoting mistakes are evaluator failures, not product evidence.",
     "- If pattern matching is unavoidable, validate the pattern against one sample mentally before writing the assessment JSON; do not add helper-output keys or regex debug fields.",
@@ -1231,6 +1321,7 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     "- Do not use shell job-control cleanup such as `kill %1` or Claude background tasks. A passed assessment is invalid if a spawned process remains live after evaluation.",
     "- Do not use /tmp, /private/tmp, $TMPDIR, or outside-workspace paths for temporary probe output. If a future execution-capable profile needs transient stdout/stderr capture, write it under the current operator-run archive or another explicit workspace/run-archive path named in this prompt, then clean it before exit.",
     "- If the executor advertises /tmp as sandbox-writable, ignore that capability for evaluation evidence. Writable does not mean authoritative.",
+    "- Do not paste source, requirements, JSON, diffs, command output, or intermediate notes into the final response. Final response is one line only after the assessment file exists and has been self-checked.",
     "- Derive source inspection from tenant-declared stack authority, materialized file roles, publicBoundary fields, and declared build/run configuration. Do not assume a single source language, file extension family, export syntax, package shape, script field, or function naming convention.",
     ...reviewGradePublicBoundaryInspectionLines(input.manifest),
     "- Public behavior may be a CLI, module main function, route, service class, binary entrypoint, declared framework target, or another tenant-declared runnable boundary. Assess the boundary from admitted product and tenant authority, not from hard-coded sample product helper names.",
@@ -1245,10 +1336,11 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     `- edgeName: ${JSON.stringify(input.manifest.edgeName)}`,
     `- targetAssetType: ${JSON.stringify(input.manifest.targetAssetType)}`,
     "- status: \"passed\" or \"blocked\"",
-    "- reviewedObligationIds: exactly the obligationRefs in the admitted edge packet above. For scoped runs, this is invocationPackage.inlineObligationIds; do not add worker aliases.",
+    "- reviewedObligationIds: exactly the active review-scope obligationRefs in the admitted edge packet above; do not add worker aliases.",
+    "- When worker_invocation_package.inlineObligationIds is present, it is the active review scope even when the manifest also carries broader full-breadth lineage obligations.",
     "- worker_result_report.obligationAssessments may support evidence and rationale, but it cannot enlarge review scope or create findings for generated-artifact requirement aliases.",
-    "- reviewedObligationIds must contain only admitted obligation ids from the admitted edge packet obligationRefs, invocationPackage.inlineObligationIds[], invocationPackage.obligationIds[], or invocationPackage.inlineObligations[].obligationId.",
-    "- For scoped runs where invocationPackage.featureScope.mode is steel_thread or targeted_repair, the active review scope is invocationPackage.inlineObligationIds. Treat invocationPackage.requirementTraceObligationIds, traversalIntentPackage.obligationIds, retrieval hint obligation ids, and omitted obligation ids as lineage/evidence context only unless the id is also present in invocationPackage.inlineObligationIds.",
+    "- reviewedObligationIds must contain only admitted obligation ids from the active review-scope obligationRefs, invocationPackage.inlineObligationIds[], invocationPackage.obligationIds[], or invocationPackage.inlineObligations[].obligationId.",
+    "- Treat invocationPackage.requirementTraceObligationIds, traversalIntentPackage.obligationIds, retrieval hint obligation ids, and omitted obligation ids as lineage/evidence context only unless the id is also present in the active review scope.",
     "- Do not build reviewedObligationIds by recursively collecting every string in JSON. Authority and evidence refs such as workspace://..., file://..., config://..., schema://..., gtl://..., handoff-projection://..., source-digest://..., and review-evidence://... are evidenceRefs or acceptedAuthorityRefs, not obligations and must not become findings.",
     "- findings[]: one sdlc_review_grade_obligation_finding per reviewed obligation id",
     "- evidenceRefs: refs for the assessment, generated assets, accepted authority, and review evidence",
@@ -1322,6 +1414,7 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
 export function reviewGradeEdgeFulfillmentPromptProjection(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly invocationScope?: SdlcReviewGradeInvocationScope | null | undefined;
+  readonly currentPostflight?: SdlcReviewGradeCurrentPostflight | null | undefined;
   readonly governanceRef: string;
   readonly governancePath: string;
   readonly constructionBriefPath: string;
@@ -1341,7 +1434,8 @@ export function reviewGradeEdgeFulfillmentPromptProjection(input: {
       input.governancePath,
       input.constructionBriefPath,
       input.invocationPackagePath,
-      input.workerReportPath
+      input.workerReportPath,
+      ...reviewGradeCurrentPostflightRefs(input.currentPostflight)
     ],
     targetAssetRefs: [
       input.assessmentPath,
@@ -1367,7 +1461,8 @@ export function reviewGradeEdgeFulfillmentPromptProjection(input: {
       input.governancePath,
       input.constructionBriefPath,
       input.invocationPackagePath,
-      input.workerReportPath
+      input.workerReportPath,
+      ...reviewGradeCurrentPostflightRefs(input.currentPostflight)
     ],
     obligationRefs: [
       input.manifest.graphFunctionName ?? "graph-function://unknown",
@@ -1402,6 +1497,7 @@ export function reviewGradeEdgeFulfillmentPromptProjection(input: {
 export function reviewGradeEdgeFulfillmentPrompt(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly invocationScope?: SdlcReviewGradeInvocationScope | null | undefined;
+  readonly currentPostflight?: SdlcReviewGradeCurrentPostflight | null | undefined;
   readonly governanceRef: string;
   readonly governancePath: string;
   readonly constructionBriefPath: string;

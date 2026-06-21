@@ -70,6 +70,7 @@ import {
   SdlcMaterializedProductFileRole,
   SdlcPostflightGapDossier,
   SdlcTraversalObligation,
+  SdlcProductMaterializationAuthorityReconciliation,
   SdlcProductMaterializationAuthorityTarget,
   SdlcWorkerHandoffManifest,
   SdlcWorkerExecutionEvidence,
@@ -79,8 +80,6 @@ import {
   SdlcWorkerResultReport
 } from "../../carriers.js";import {
   declaredBuildConfigRoleForObservedFile,
-  declaredProductAuthorityRoleForObservedFile,
-  effectiveProductMaterializationRequiredRoles,
   isTenantDeclaredToolByproductRelativePath,
   isTenantLocalSdlcSurfaceRelativePath,
   isTenantStackAuthoritySpecRelativePath,
@@ -1107,13 +1106,12 @@ function fileWithMaterializationProvenance(input: {
       ? authorityRole
       : input.file.role;
   const rolePolicyRef =
-    input.materializationSource === "replay"
-      ? effectiveRole === input.file.role
-        ? input.file.rolePolicyRef
-        : targetContract?.policyRef ?? rolePolicyRefForMaterializedRole(effectiveRole)
+    targetContract?.policyRef ??
+    (input.materializationSource === "replay" &&
+    effectiveRole === input.file.role
+      ? input.file.rolePolicyRef
       : input.file.rolePolicyRef ??
-        targetContract?.policyRef ??
-        rolePolicyRefForMaterializedRole(effectiveRole);
+        rolePolicyRefForMaterializedRole(effectiveRole));
   return Object.freeze({
     kind: input.file.kind,
     role: effectiveRole,
@@ -1203,6 +1201,22 @@ function currentAttemptMaterializedFileFromReplayPath(input: {
 
 
 function productMaterializationObservationDeps(): ProductMaterializationObservationDeps {
+  const authorityByArchiveRoot = new Map<
+    string,
+    SdlcProductMaterializationAuthorityReconciliation
+  >();
+  const productMaterializationAuthority = (
+    manifest: SdlcWorkerHandoffManifest
+  ): SdlcProductMaterializationAuthorityReconciliation => {
+    const key = resolve(manifest.archiveRoot);
+    const existing = authorityByArchiveRoot.get(key);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const authority = reconcileSdlcProductMaterializationAuthority(manifest);
+    authorityByArchiveRoot.set(key, authority);
+    return authority;
+  };
   return {
     targetIgnoresExecutionByproducts,
     targetAdmitsTestExecutionEvidence,
@@ -1210,8 +1224,30 @@ function productMaterializationObservationDeps(): ProductMaterializationObservat
     isTenantStackAuthoritySpecRelativePath,
     isTenantDeclaredToolByproductRelativePath,
     declaredBuildConfigRoleForObservedFile,
-    declaredProductAuthorityRoleForObservedFile,
-    effectiveProductMaterializationRequiredRoles,
+    declaredProductAuthorityRoleForObservedFile: (input) => {
+      const authority = productMaterializationAuthority(input.manifest);
+      const target = authority.declaredProductTargetContracts.find((candidate) =>
+        productAuthorityTargetCoversRelativePath({
+          manifest: input.manifest,
+          target: candidate,
+          normalizedRelativePath: input.normalizedRelativePath
+        })
+      );
+      return target?.requiredRole ?? null;
+    },
+    productMaterializationAuthority,
+    effectiveProductMaterializationRequiredRoles: (manifest) => {
+      const roles = new Set<SdlcMaterializedProductFileRole>(
+        manifest.productMaterialization.requiredRoles
+      );
+      for (const target of productMaterializationAuthority(manifest)
+        .declaredProductTargetContracts) {
+        roles.add(target.requiredRole);
+      }
+      return Object.freeze(
+        MATERIALIZED_PRODUCT_FILE_ROLES.filter((role) => roles.has(role))
+      );
+    },
     tenantRelativeOutputArtifactPath,
     textIfFile,
     uniqueSorted,

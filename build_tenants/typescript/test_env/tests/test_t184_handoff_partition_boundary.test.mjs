@@ -373,15 +373,11 @@ test("T-184 ABG terminal truth controls non-close traversal", () => {
   );
   assert.match(
     installedOperatorSource,
-    /function abgTerminalAllowsInstalledConvergence/u
+    /function abgTraversalTransitionProjectionRef/u
   );
   assert.match(
     installedOperatorSource,
-    /input\.terminalKind === "converged"/u
-  );
-  assert.match(
-    installedOperatorSource,
-    /if \(input\.terminalKind === "gap_stop"\) \{\s*return "blocked";\s*\}/u
+    /terminalKind === "gap_stop"[\s\S]*?terminalKind === "yielded"[\s\S]*?input\.closureDisposition === "close"/u
   );
   assert.doesNotMatch(
     installedOperatorSource,
@@ -550,15 +546,27 @@ test("T-184 operator timeout policy is tenant configuration, not handoff glue", 
   );
   assert.equal(
     runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.timeoutMs,
-    runtimePolicy.worker.timeoutMs
+    900000
+  );
+  assert.ok(
+    runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.timeoutMs <
+      runtimePolicy.worker.timeoutMs
   );
   assert.equal(
     typeof runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.inactivityTimeoutMs,
     "number"
   );
+  assert.equal(
+    runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.inactivityTimeoutMs,
+    420000
+  );
   assert.ok(
     runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.inactivityTimeoutMs <
       runtimePolicy.worker.inactivityTimeoutMs
+  );
+  assert.equal(
+    runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.stdoutBudgetBytes,
+    524288
   );
   assert.equal(
     runtimePolicy.executionShard.timeoutMs,
@@ -727,13 +735,15 @@ test("T-184 F_P evaluator prompt uses incremental content register writes", () =
     /SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND/u
   );
   assert.match(contentRegisterSource, /sdlc_design_depth_register_fragment_draft/u);
+  assert.match(contentRegisterSource, /SDLC_EVALUATE_CONTENT_LEDGER_KIND/u);
+  assert.match(contentRegisterSource, /sdlc_evaluate_content_ledger/u);
+  assert.match(contentRegisterSource, /SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND/u);
   assert.match(evaluatorPromptSource, /content-register-row-draft:\/\//u);
   assert.match(evaluatorPromptSource, /sdlc_design_depth_register_fragment/u);
   assert.match(installedOperatorSource, /ODD_SDLC_EVALUATOR_INCREMENTAL_REGISTER/u);
   assert.doesNotMatch(installedOperatorSource, /ODD_SDLC_EVALUATOR_INCREMENTAL_LEDGER/u);
   assert.doesNotMatch(installedOperatorSource, /ODD_SDLC_EVALUATOR_CONTENT_LEDGER/u);
   assert.doesNotMatch(evaluatorPromptSource, /content-ledger/u);
-  assert.doesNotMatch(contentRegisterSource, /sdlc_evaluate_content_ledger/u);
   assert.doesNotMatch(
     evaluatorPromptSource,
     /contentRows\[0\]\.payload must be the full design-depth register object/u
@@ -927,7 +937,7 @@ test("T-184 no-dispatch projection defers output reads until consequence", () =>
     "function stateWithReviewGradePostflight"
   );
   const reviewGradeStateEnd = installedOperatorSource.indexOf(
-    "export function deriveSdlcWorkerRetryContextFromTraversalConsequence",
+    "function vectorEvaluatorNames",
     reviewGradeStateStart
   );
   const reviewGradeStateSource = installedOperatorSource.slice(

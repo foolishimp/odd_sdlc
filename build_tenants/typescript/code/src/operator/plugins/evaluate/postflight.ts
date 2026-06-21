@@ -80,6 +80,10 @@ function activeComputeStageBlockingReasonCarriers(input: {
             reason.code === "code_builder_parallel_frontier_missing" ||
             reason.code === "code_builder_parallel_test_lanes_missing" ||
             reason.code === "code_builder_validation_command_failed" ||
+            reason.code === "materialized_product_file_is_output_artifact" ||
+            reason.code === "materialized_product_file_outside_tenant_root" ||
+            reason.code === "materialized_product_files_missing" ||
+            reason.code === "materialized_product_role_missing" ||
             reason.code === "materialized_product_role_policy_mismatch"
         )
       ]

@@ -15,6 +15,7 @@ import type {
   SdlcMaterializedProductFile,
   SdlcMaterializedProductFileRole,
   SdlcProductMaterializationContract,
+  SdlcProductMaterializationAuthorityReconciliation,
   SdlcProductMaterializationAuthorityTarget,
   SdlcWorkerHandoffManifest,
   SdlcWorkerResultMaterializationDiagnostic
@@ -28,8 +29,6 @@ import {
 } from "./replay.js";
 import {
   declaredBuildConfigRoleForObservedFile,
-  declaredProductAuthorityRoleForObservedFile,
-  effectiveProductMaterializationRequiredRoles,
   isTenantDeclaredToolByproductRelativePath,
   isTenantLocalSdlcSurfaceRelativePath,
   isTenantStackAuthoritySpecRelativePath,
@@ -144,6 +143,9 @@ export interface ProductMaterializationObservationDeps {
     readonly manifest: SdlcWorkerHandoffManifest;
     readonly normalizedRelativePath: string;
   }) => SdlcMaterializedProductFileRole | null;
+  readonly productMaterializationAuthority: (
+    manifest: SdlcWorkerHandoffManifest
+  ) => SdlcProductMaterializationAuthorityReconciliation;
   readonly effectiveProductMaterializationRequiredRoles: (
     manifest: SdlcWorkerHandoffManifest
   ) => readonly SdlcMaterializedProductFileRole[];
@@ -217,9 +219,12 @@ function textIfFile(filePath: string): string | null {
 function targetContractForMaterializedFile(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly relativePath: string;
+  readonly deps?: ProductMaterializationObservationDeps | undefined;
 }): SdlcProductMaterializationAuthorityTarget | null {
   const normalized = input.relativePath.split(path.sep).join("/");
-  const authority = reconcileSdlcProductMaterializationAuthority(input.manifest);
+  const authority =
+    input.deps?.productMaterializationAuthority(input.manifest) ??
+    reconcileSdlcProductMaterializationAuthority(input.manifest);
   return (
     authority.declaredProductTargetContracts.find((candidate) =>
       productAuthorityTargetCoversRelativePath({
@@ -296,13 +301,12 @@ function fileWithMaterializationProvenance(input: {
       ? authorityRole
       : input.file.role;
   const rolePolicyRef =
-    input.materializationSource === "replay"
-      ? effectiveRole === input.file.role
-        ? input.file.rolePolicyRef
-        : targetContract?.policyRef ?? rolePolicyRefForMaterializedRole(effectiveRole)
+    targetContract?.policyRef ??
+    (input.materializationSource === "replay" &&
+    effectiveRole === input.file.role
+      ? input.file.rolePolicyRef
       : input.file.rolePolicyRef ??
-        targetContract?.policyRef ??
-        rolePolicyRefForMaterializedRole(effectiveRole);
+        rolePolicyRefForMaterializedRole(effectiveRole));
   return Object.freeze({
     kind: input.file.kind,
     role: effectiveRole,
@@ -544,6 +548,22 @@ function admitReplayManifestMaterializedProductFile(
 }
 
 function productMaterializationObservationDeps(): ProductMaterializationObservationDeps {
+  const authorityByArchiveRoot = new Map<
+    string,
+    SdlcProductMaterializationAuthorityReconciliation
+  >();
+  const productMaterializationAuthority = (
+    manifest: SdlcWorkerHandoffManifest
+  ): SdlcProductMaterializationAuthorityReconciliation => {
+    const key = resolve(manifest.archiveRoot);
+    const existing = authorityByArchiveRoot.get(key);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const authority = reconcileSdlcProductMaterializationAuthority(manifest);
+    authorityByArchiveRoot.set(key, authority);
+    return authority;
+  };
   return {
     targetIgnoresExecutionByproducts,
     targetAdmitsTestExecutionEvidence,
@@ -551,8 +571,30 @@ function productMaterializationObservationDeps(): ProductMaterializationObservat
     isTenantStackAuthoritySpecRelativePath,
     isTenantDeclaredToolByproductRelativePath,
     declaredBuildConfigRoleForObservedFile,
-    declaredProductAuthorityRoleForObservedFile,
-    effectiveProductMaterializationRequiredRoles,
+    declaredProductAuthorityRoleForObservedFile: (input) => {
+      const authority = productMaterializationAuthority(input.manifest);
+      const target = authority.declaredProductTargetContracts.find((candidate) =>
+        productAuthorityTargetCoversRelativePath({
+          manifest: input.manifest,
+          target: candidate,
+          normalizedRelativePath: input.normalizedRelativePath
+        })
+      );
+      return target?.requiredRole ?? null;
+    },
+    productMaterializationAuthority,
+    effectiveProductMaterializationRequiredRoles: (manifest) => {
+      const roles = new Set<SdlcMaterializedProductFileRole>(
+        manifest.productMaterialization.requiredRoles
+      );
+      for (const target of productMaterializationAuthority(manifest)
+        .declaredProductTargetContracts) {
+        roles.add(target.requiredRole);
+      }
+      return Object.freeze(
+        MATERIALIZED_PRODUCT_FILE_ROLES.filter((role) => roles.has(role))
+      );
+    },
     tenantRelativeOutputArtifactPath,
     textIfFile,
     uniqueSorted,
@@ -572,12 +614,29 @@ function productMaterializationObservationDeps(): ProductMaterializationObservat
   };
 }
 
+function shouldPruneProductMaterializationSnapshotPath(input: {
+  readonly root: string;
+  readonly absolutePath: string;
+}): boolean {
+  const normalized = normalizedRelativePath(relative(input.root, input.absolutePath));
+  return isSdlcRuntimeByproductPath(normalized);
+}
+
 function walkFiles(root: string): readonly string[] {
   if (!existsSync(root) || !statSync(root).isDirectory()) {
     return Object.freeze([]);
   }
   const files: string[] = [];
   const visit = (current: string): void => {
+    if (
+      current !== root &&
+      shouldPruneProductMaterializationSnapshotPath({
+        root,
+        absolutePath: current
+      })
+    ) {
+      return;
+    }
     for (const name of readdirSync(current)) {
       const absolutePath = join(current, name);
       const stat = statSync(absolutePath);
@@ -1196,7 +1255,8 @@ export function observeProductMaterializationDeltaWithDiagnostics(
     const normalized = normalizedRelativePath(file.relativePath);
     const targetContract = targetContractForMaterializedFile({
       manifest: input.manifest,
-      relativePath: normalized
+      relativePath: normalized,
+      deps
     });
     if (
       isGenericBuildExecutionByproductPath(normalized) &&
@@ -1352,6 +1412,14 @@ export function observeProductMaterializationDeltaWithDiagnostics(
     }
     if (priorPathAdmitted.kind === "diagnostic") {
       addDiagnostics(diagnosticsByKey, priorPathAdmitted.diagnostics);
+      continue;
+    }
+    if (
+      input.manifest.productMaterialization.required &&
+      !changed &&
+      targetContract === null &&
+      !targetCarrierAnnotations.has(normalized)
+    ) {
       continue;
     }
     const satisfiesRequiredRole = observedFileSatisfiesRequiredRole({

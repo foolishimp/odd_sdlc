@@ -355,13 +355,16 @@ export function predecessorDesignDepthFpEvaluatorRegisterPaths(
   if (!manifest.inputAssetTypes.includes("implementation_design_surface")) {
     return Object.freeze([]);
   }
+  const candidateArchiveRoots = predecessorDesignRegisterArchiveRoots(manifest)
+    .filter((archiveRoot) =>
+      predecessorDesignRegisterArchiveMatchesCurrent({ archiveRoot, manifest })
+    )
+    .filter((archiveRoot) => {
+      const filePath = designDepthFpEvaluatorRegisterPathForArchiveRoot(archiveRoot);
+      return existsSync(filePath) && statSync(filePath).isFile();
+    });
   return uniqueSorted(
-    predecessorDesignRegisterArchiveRoots(manifest)
-      .filter((archiveRoot) =>
-        predecessorDesignRegisterArchiveMatchesCurrent({ archiveRoot, manifest })
-      )
-      .map(designDepthFpEvaluatorRegisterPathForArchiveRoot)
-      .filter((filePath) => existsSync(filePath) && statSync(filePath).isFile())
+    candidateArchiveRoots.map(designDepthFpEvaluatorRegisterPathForArchiveRoot)
   );
 }
 

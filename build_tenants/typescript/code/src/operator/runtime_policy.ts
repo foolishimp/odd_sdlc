@@ -287,10 +287,9 @@ export function sdlcOperatorRuntimePolicy(): SdlcOperatorRuntimePolicy {
       "ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_STDOUT_BUDGET_BYTES",
       config.designDepthFpEvaluator.stdoutBudgetBytes
     ),
-    reviewGradeEdgeFulfillmentEvaluatorTimeoutMs: configuredTimeoutMs(
+    reviewGradeEdgeFulfillmentEvaluatorTimeoutMs: configuredPositiveInteger(
       "ODD_SDLC_REVIEW_GRADE_EDGE_FULFILLMENT_EVALUATOR_TIMEOUT_MS",
-      config.reviewGradeEdgeFulfillmentEvaluator.timeoutMs,
-      minimumOperatorTimeoutMs
+      config.reviewGradeEdgeFulfillmentEvaluator.timeoutMs
     ),
     reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs: configuredPositiveInteger(
       "ODD_SDLC_REVIEW_GRADE_EDGE_FULFILLMENT_EVALUATOR_INACTIVITY_TIMEOUT_MS",

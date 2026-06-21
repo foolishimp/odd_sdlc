@@ -630,6 +630,43 @@ function writeMaterializedProductFile(manifest, relativePath, content, role) {
   };
 }
 
+function writeComponentTestSurfaceCarrier(workspaceRoot, rows) {
+  const outputFile = path.join(
+    workspaceRoot,
+    "build_tenants/scala_spark/design/component_test_surface.md"
+  );
+  mkdirSync(path.dirname(outputFile), { recursive: true });
+  writeFileSync(
+    outputFile,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_component_depth_register",
+        registerVersion: "ts-component-depth-v1",
+        targetAssetType: "component_test_surface",
+        componentTopologyRows: [],
+        componentRealizationRows: [],
+        testComponentTopologyRows: [],
+        componentTestRows: rows.map((row) => ({
+          kind: "sdlc_component_test_realization_row",
+          testClassId: row.testClassId,
+          relativePath: row.relativePath,
+          testcaseIds: row.testcaseIds,
+          componentIds: row.componentIds,
+          requirementIds: row.requirementIds,
+          shardId: row.shardId
+        })),
+        componentTestQualificationRows: [],
+        componentExecutionFailureRegister: null,
+        componentRepairSchedule: null,
+        releaseDepthParity: null
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+}
+
 function writeExecutionLog(manifest, filename, content) {
   const absolutePath = path.join(manifest.archiveRoot, filename);
   mkdirSync(path.dirname(absolutePath), { recursive: true });
@@ -1074,6 +1111,140 @@ test("T-143 T-132 fixture declares UAT test source materialization target", () =
       authority: reconciliation
     })
   );
+});
+
+test("T-143 UAT test source derives product test targets from admitted component-test carrier", () => {
+  const workspace = workspaceWithProductAuthority();
+  try {
+    writeComponentTestSurfaceCarrier(workspace, [
+      {
+        testClassId: "test-class://cdme/compiler/CompilerUatSpec",
+        relativePath: "cdme-compiler/src/test/scala/cdme/compiler/CompilerUatSpec.scala",
+        testcaseIds: [
+          "testcase://cdme/uat/ai-assurance-rejects-invalid-path"
+        ],
+        componentIds: ["compiler-validation"],
+        requirementIds: [
+          "requirement:data_mapper.requirements.req_ldm_003",
+          "requirement:data_mapper.requirements.req_ldm_005"
+        ],
+        shardId: "shard://cdme/integration"
+      }
+    ]);
+    const manifest = materializationManifest(
+      workspace,
+      FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE
+    );
+    const reconciliation = reconcileSdlcProductMaterializationAuthority(manifest);
+
+    assert.equal(reconciliation.status, "passed");
+    assert.equal(
+      reconciliation.declaredProductTargetContracts.some(
+        (target) =>
+          target.path ===
+            "build_tenants/scala_spark/cdme-compiler/src/test/scala/cdme/compiler/CompilerUatSpec.scala" &&
+          target.requiredRole === "test" &&
+          target.policyRef === "target-role-policy://odd-sdlc/product-test-tree"
+      ),
+      true
+    );
+    assert.equal(
+      sdlcProductMaterializationLaunchBlocker({
+        manifest,
+        authority: reconciliation
+      }),
+      null
+    );
+    assert.doesNotThrow(() =>
+      assertSdlcProductMaterializationLaunchable({
+        manifest,
+        authority: reconciliation
+      })
+    );
+  } finally {
+    rmSync(workspace, { recursive: true, force: true });
+  }
+});
+
+test("T-143 UAT observation does not promote pre-existing module tests to current attempt", () => {
+  const workspace = workspaceWithProductAuthority();
+  try {
+    writeComponentTestSurfaceCarrier(workspace, [
+      {
+        testClassId: "test-class://cdme/engine/EngineIntegrationSpec",
+        relativePath: "cdme-engine/src/test/scala/cdme/engine/EngineIntegrationSpec.scala",
+        testcaseIds: [
+          "testcase://cdme/uat/ai-assurance-rejects-invalid-path"
+        ],
+        componentIds: ["engine-api", "compiler-validation"],
+        requirementIds: [
+          "requirement:data_mapper.requirements.req_int_002",
+          "requirement:data_mapper.requirements.req_ldm_005"
+        ],
+        shardId: "shard://cdme/uat"
+      }
+    ]);
+    const manifest = materializationManifest(
+      workspace,
+      FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE
+    );
+    const preExistingModuleTest = path.join(
+      manifest.productMaterialization.tenantRoot,
+      "cdme-accounting/src/test/scala/cdme/accounting/AccountingSpec.scala"
+    );
+    mkdirSync(path.dirname(preExistingModuleTest), { recursive: true });
+    writeFileSync(
+      preExistingModuleTest,
+      [
+        "package cdme.accounting",
+        "",
+        "// requirement:data_mapper.mapper_requirements.req_acc_001",
+        "final class AccountingSpec"
+      ].join("\n") + "\n",
+      "utf8"
+    );
+    const before = snapshotProductMaterializationRoot(
+      manifest.productMaterialization
+    );
+
+    writeMaterializedProductFile(
+      manifest,
+      "build.sbt",
+      "ThisBuild / scalaVersion := \"2.13.12\"",
+      "build_config"
+    );
+    writeMaterializedProductFile(
+      manifest,
+      "project/build.properties",
+      "sbt.version=1.10.11",
+      "build_config"
+    );
+    writeMaterializedProductFile(
+      manifest,
+      "cdme-engine/src/test/scala/cdme/engine/EngineIntegrationSpec.scala",
+      [
+        "package cdme.engine",
+        "",
+        "// requirement:data_mapper.requirements.req_int_002",
+        "// requirement:data_mapper.requirements.req_ldm_005",
+        "final class EngineIntegrationSpec"
+      ].join("\n"),
+      "test"
+    );
+
+    const materialized = observeProductMaterializationDelta({ manifest, before });
+
+    assert.deepEqual(
+      materialized.map((file) => `${file.role}:${file.relativePath}`).sort(),
+      [
+        "build_config:build.sbt",
+        "build_config:project/build.properties",
+        "test:cdme-engine/src/test/scala/cdme/engine/EngineIntegrationSpec.scala"
+      ]
+    );
+  } finally {
+    rmSync(workspace, { recursive: true, force: true });
+  }
 });
 
 test("T-143 derives module source targets from tenant stack module layout", () => {

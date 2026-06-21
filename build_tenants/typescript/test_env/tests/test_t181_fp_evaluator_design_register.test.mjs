@@ -1991,6 +1991,198 @@ test("T-181 component edges read evaluator register from source-asset lineage re
   }
 });
 
+test("T-204 component edges fail fast on ambiguous predecessor design-depth registers", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const graphFunctionName = "Fg_t204_retry_history";
+    const blocked = manifestForEdge({
+      workspaceRoot,
+      runId: "20260523T000000005Z_pid20401",
+      graphFunctionName,
+      edgeName: "derive_lite_design_adr_surface"
+    });
+    writeHandoffFiles(blocked);
+    mkdirSync(path.dirname(blocked.outputFile), { recursive: true });
+    const blockedContent = implementationDesignAdr("blocked-predecessor");
+    writeFileSync(blocked.outputFile, blockedContent, "utf8");
+    const blockedRegisterPath = designDepthFpEvaluatorRegisterPath(blocked);
+    mkdirSync(path.dirname(blockedRegisterPath), { recursive: true });
+    writeFileSync(
+      blockedRegisterPath,
+      `${JSON.stringify(
+        implementationDesignRegister(
+          "blocked-predecessor",
+          pathToFileURL(blocked.outputFile).href
+        ),
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+    writeDesignDepthFpEvaluatorContentRegister({
+      manifest: blocked,
+      registerPath: blockedRegisterPath
+    });
+    writeDesignDepthFpEvaluatorRuleOutcomeProof({
+      manifest: blocked,
+      registerPath: blockedRegisterPath
+    });
+    writeFileSync(
+      path.join(blocked.archiveRoot, "fp_evaluate_result.json"),
+      `${JSON.stringify(
+        {
+          ...fpEvaluateResultPayloadForRegister(blockedRegisterPath),
+          status: "blocked",
+          postflightStatus: "blocked",
+          blockingReasons: ["staged_decomposition_rejected"]
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+    writeFileSync(
+      path.join(blocked.archiveRoot, "postflight.json"),
+      `${JSON.stringify(
+        {
+          kind: "sdlc_operator_postflight_result",
+          status: "blocked",
+          blockingReasons: ["staged_decomposition_rejected"],
+          blockingReasonCarriers: [],
+          evidenceRefs: []
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+    writePriorWorkerResultReport({ manifest: blocked, content: blockedContent });
+
+    const closed = manifestForEdge({
+      workspaceRoot,
+      runId: "20260523T000000006Z_pid20402",
+      graphFunctionName,
+      edgeName: "derive_lite_design_adr_surface"
+    });
+    writeHandoffFiles(closed);
+    mkdirSync(path.dirname(closed.outputFile), { recursive: true });
+    const closedContent = implementationDesignAdr("closed-predecessor");
+    writeFileSync(closed.outputFile, closedContent, "utf8");
+    const closedRegisterPath = designDepthFpEvaluatorRegisterPath(closed);
+    mkdirSync(path.dirname(closedRegisterPath), { recursive: true });
+    writeFileSync(
+      closedRegisterPath,
+      `${JSON.stringify(
+        implementationDesignRegister(
+          "closed-predecessor",
+          pathToFileURL(closed.outputFile).href
+        ),
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+    writeDesignDepthFpEvaluatorContentRegister({
+      manifest: closed,
+      registerPath: closedRegisterPath
+    });
+    writeDesignDepthFpEvaluatorRuleOutcomeProof({
+      manifest: closed,
+      registerPath: closedRegisterPath
+    });
+    writeFileSync(
+      path.join(closed.archiveRoot, "fp_evaluate_result.json"),
+      `${JSON.stringify(fpEvaluateResultPayloadForRegister(closedRegisterPath), null, 2)}\n`,
+      "utf8"
+    );
+    writeFileSync(
+      path.join(closed.archiveRoot, "postflight.json"),
+      `${JSON.stringify(
+        {
+          kind: "sdlc_operator_postflight_result",
+          status: "passed",
+          blockingReasons: [],
+          blockingReasonCarriers: [],
+          evidenceRefs: [pathToFileURL(closedRegisterPath).href]
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+    writeFileSync(
+      path.join(closed.archiveRoot, "sdlc_edge_closure_decision.json"),
+      `${JSON.stringify(
+        {
+          kind: "sdlc_edge_closure_decision",
+          disposition: "close",
+          evidenceRefs: [pathToFileURL(closedRegisterPath).href]
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+    writePriorWorkerResultReport({ manifest: closed, content: closedContent });
+
+    const baseCurrent = manifestForEdge({
+      workspaceRoot,
+      runId: "20260523T000000007Z_pid20403",
+      graphFunctionName,
+      edgeName: "derive_lite_component_code_surface"
+    });
+    const current = {
+      ...baseCurrent,
+      traversalObligationContext: {
+        ...baseCurrent.traversalObligationContext,
+        priorEdgeRefs: [
+          pathToFileURL(blocked.archiveRoot).href,
+          pathToFileURL(closed.archiveRoot).href
+        ]
+      }
+    };
+    const admission = admitImplementationDesignRegisterForManifest({
+      manifest: current
+    });
+
+    assert.equal(admission.status, "rejected");
+    assert.deepEqual(admission.blockingReasons, [
+      "design_depth_fp_evaluator_register_ambiguous"
+    ]);
+    assert.equal(
+      admission.evidenceRefs.some((ref) =>
+        ref.includes("20260523T000000006Z_pid20402")
+      ),
+      true,
+      JSON.stringify(admission.evidenceRefs, null, 2)
+    );
+    assert.equal(
+      admission.evidenceRefs.some((ref) =>
+        ref.includes("20260523T000000005Z_pid20401")
+      ),
+      true,
+      JSON.stringify(admission.evidenceRefs, null, 2)
+    );
+
+    const invocationPackage = constructWorkerInvocationPackage({ manifest: current });
+    const constructionBrief = constructWorkerConstructionBrief({
+      manifest: current,
+      constructionBriefPath: path.join(
+        current.archiveRoot,
+        "worker_construction_brief.json"
+      ),
+      invocationPackage
+    });
+    assert.deepEqual(
+      constructionBrief.stagePressure.designDepthEvaluatorRegisterRefs,
+      [],
+      JSON.stringify(constructionBrief.stagePressure, null, 2)
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
 test("T-203 component-code targets admit predecessor evaluator register when rule outcome is separate", () => {
   const workspaceRoot = makeWorkspace();
   try {
@@ -2399,7 +2591,10 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(evaluatorPromptSource, /A source row marked deferred is still a materialized product target/u);
   assert.match(evaluatorPromptSource, /Do not collapse the register to manifest-only/u);
   assert.match(evaluatorPromptSource, /Staged decomposition admission is mandatory/u);
-  assert.match(evaluatorPromptSource, /must own no more than 8 requirementIds/u);
+  assert.match(evaluatorPromptSource, /must own 1 to 8 requirementIds/u);
+  assert.match(evaluatorPromptSource, /Zero requirementIds is invalid/u);
+  assert.match(evaluatorPromptSource, /Empty requirementIds make the row unowned and invalid/u);
+  assert.match(evaluatorPromptSource, /has zero requirementIds or more than 8 requirementIds/u);
   assert.match(evaluatorPromptSource, /split it into multiple component rows/u);
   assert.match(evaluatorPromptSource, /component-row pressure density remains 8 or less/u);
   assert.match(evaluatorPromptSource, /Keep upstreamComponentIds as component ids only/u);
@@ -2410,7 +2605,7 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(evaluatorPromptSource, /no more than 16 aggregate entities/u);
   assert.match(evaluatorPromptSource, /no more than 24 aggregate operations/u);
   assert.match(evaluatorPromptSource, /no more than 18 steps/u);
-  assert.match(evaluatorPromptSource, /3 to 8 local\/high-signal requirementIds per component row/u);
+  assert.match(evaluatorPromptSource, /1 to 8 local\/high-signal requirementIds per component row/u);
   assert.match(evaluatorPromptSource, /Do not repeat the same large requirement id list/u);
   assert.match(evaluatorPromptSource, /Do not print, cat, tail, grep, or paste full authority files into stdout/u);
   assert.match(evaluatorPromptSource, /Do not display worker_invocation_package\.json/u);

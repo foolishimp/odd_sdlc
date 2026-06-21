@@ -2192,3 +2192,187 @@ Status:
   executor, command wrapper, or data-mapper continuation loop was restored.
 - This does not close the physical shrink inventory; strict T-204 closure still
   requires moving/deleting the remaining `move_to_abg` rows.
+
+## 2026-06-20 Register Walk And Remaining Tech-Debt Split
+
+Register audit source:
+`.ai-workspace/comments/codex/20260620T130634Z_T204_register_walk.md`.
+
+Current conclusion:
+
+- a register-shaped carrier is not itself legacy. Product semantic carriers
+  survive when they are plugin I/O or irreducible SDLC domain meaning.
+- the live defect is mixed ownership: product carriers are still tangled with
+  installed-operator consequence/archive code and archive rehydration helpers.
+- the clearest remaining migration surface is the evaluate content carrier:
+  active staged-compute design names `sdlc_evaluate_content_ledger` as the
+  concrete authority carrier. Implementation now names the ledger replacement
+  target and classifies `sdlc_evaluate_content_register` as a legacy projection,
+  and the operator-run artifact catalog now treats the legacy content-register
+  archive as `read_model`; prompts, analysis loaders, and archive fixtures
+  still use register wording.
+- the verified isolated dead exports from the 2026-06-21 audit are removed:
+  `writeTestExecutionResultSystemTransformOutput(...)`,
+  `SdlcTicketDeclaredStatus`, and the unused closed-F_D mechanics descriptor
+  object/check-list types. The retained closed-F_D mechanics ref remains the
+  admitted assurance predecessor ref.
+- `effects/file_store.ts` is narrowed to its live write-plan effect. The
+  unused read-plan branch and read effect kind are removed; the file itself
+  survives because `edge_projection.ts` and T-175 consume the write path.
+
+Register classification:
+
+| Carrier family | Classification | T-204 action |
+| --- | --- | --- |
+| `SdlcDesignDepthRegister` | survive: product evaluate.C carrier | Keep as admitted product carrier; prevent deterministic synthesis as closure truth. |
+| `SdlcReviewGradeEdgeFulfillmentAssessment` | survive: product evaluate.C assessment | Keep as assessment sidecar; do not promote it into a new closure ledger. |
+| `SdlcComponentDepthRegister` | survive: product target carrier | Keep and continue tightening target/role admission. |
+| `SdlcTestDesignRegister` and `SdlcTestExecutionSurfaceRegister` | survive: product target carriers | Keep as target-carrier admissions only. |
+| `SdlcDecompositionTraceRegister` | survive provisionally: product projection | Keep only as domain evidence/read model, not continuation or retry authority. |
+| `SdlcLineageLedger` and `SdlcRequirementClosureRegister` | survive: product read model | Keep over admitted facts; do not let archive scraping become authority. |
+| `SdlcEdgeFulfillmentLedger`, `SdlcEdgeClosureDecision`, `SdlcNextActionProjection` | split ownership | Product owns SDLC meaning; ABG owns final runtime ledger/projection authorship, replay, continuation, and consequence admission. |
+| `SdlcEvaluateContentRegister` | migrate: legacy projection | Replace authority-register naming with `sdlc_evaluate_content_ledger`; keep legacy register artifact only as projection/compatibility where required. |
+| `sdlc_installed_operator_traversal_consequence` | retire or adapter-only | Removed as a shared TypeScript carrier; remaining internal archive payload must move to ABG consequence projection or become non-authoritative projection only. |
+| `SdlcInstalledOperatorStartOutcome` | deleted | Removed from current carrier code and artifact catalog; old archive `run.json` files are not product carrier truth. |
+
+Next cuts:
+
+1. Finish migrating evaluate content authority from register wording to ledger
+   wording across prompts, analysis loaders, and archive fixtures. The code now
+   carries ledger constants, the legacy artifact catalog row is `read_model`,
+   and the guard no longer permits tests that require ledger terminology to be
+   absent.
+2. Split `operator/installed_operator.ts` into product plugin/session code and
+   ABG-owned consequence/archive output.
+3. Split `operator/traversal_consequence.ts` into SDLC product-domain fold
+   functions versus ABG-owned replay, transition, and consequence projection.
+4. Reprice `analysis/*` as product diagnostics over ABG projections or
+   `move_to_abg`; no archive loader may be closure authority.
+5. Add guards rejecting new installed-operator start/consequence truth carriers
+   and rejecting archive JSON scraping as gap/closure authority unless it is
+   explicitly ABG-admitted projection input.
+
+## 2026-06-21 Extended Unmoved SDLC Functionality Inventory
+
+Trigger evidence:
+
+- data-mapper live archive:
+  `build_tenants/typescript/test_env/test_runs/full_external_data_mapper_sandbox/20260620T165425913Z_pid14480`
+- worker transport:
+  `process://codex?model=gpt-5.5&effort=high`
+- command binding:
+  `abg_cli_start_until_converged`
+- `Fg_conform_project` converged.
+- `lite_design_module_implementation` stopped with
+  `abg_reported_lawful_gap_stop`.
+- component-code worker materialized Scala/SBT source and `sbt test` passed.
+- component-code review-grade wrote
+  `review_grade_edge_fulfillment_assessment.status = blocked`, but admission
+  rejected it as `review_grade_assessment_invalid` because the evaluator
+  reviewed only 21 inline obligations while the prompt/admission path still
+  carried the broader review-grade obligation set.
+
+Historical comparison:
+
+| Archive | Component-code review result | Gap code | Retry eligible | Outcome |
+| --- | --- | --- | --- | --- |
+| `20260612T204219281Z_pid13861` first component-code pass | 161 findings, blocked | `review_grade_edge_fulfillment_blocked` | yes | same-edge repair ran |
+| `20260612T204219281Z_pid13861` second component-code pass | 64 fulfilled, 97 `wrong_stage` downstream/adjoined partials | closure `close` | n/a | ABG converged |
+| `20260620T165425913Z_pid14480` component-code pass | 21 findings, blocked | `review_grade_assessment_invalid` | no | ABG stopped at `gap_stop` |
+
+Conclusion:
+
+- the generated data-mapper Scala implementation still had real semantic gaps,
+  but those gaps should have been classified as repairable current-edge
+  pressure, as in the earlier passing lineage.
+- the pipeline root failure is not the Scala product alone. It is an
+  incomplete T-204/T-205 split: review-grade scope ownership and same-edge
+  repair continuation were not fully moved to ABG before local installed
+  executor/retry behavior was removed.
+
+### Newly Discovered Move/Split Defects
+
+| Functionality | Current odd_sdlc surface | Target owner | Current defect |
+| --- | --- | --- | --- |
+| Review-grade scope carrier | `operator/plugins/evaluate/prompts.ts`, `operator/review_grade_edge_fulfillment.ts` | ABG/GTL admission plus odd_sdlc product semantics | Prompt says full admitted edge packet and also says scoped runs use only `invocationPackage.inlineObligationIds`; admission still rejects unreviewed broader obligations. This split made the live assessment invalid instead of retryable. |
+| Same-edge repair continuation | `operator/installed_operator.ts` retry-context adapters | ABG | Old local behavior converted semantic review failure to `retry_same_edge`. After the hard break, ABG did not select an equivalent current-edge repair continuation for the data-mapper failure. |
+| Gap dossier to retry context | `operator/installed_operator.ts#sdlcWorkerRetryContextFromAbgRetryContext`, `deriveSdlcWorkerRetryContextFromPostActionProjection`, `mergeSdlcWorkerRetryContextWithRuntimeGapRegister` | ABG | odd_sdlc still adapts runtime gap dossiers into worker retry context. The adapter exists, but did not preserve the earlier live repair behavior. |
+| Review blocked versus invalid classification | review-grade admission, postflight gap dossier, blocking reason fold | ABG runtime/reentry fold with odd_sdlc product classification plugin | Repairable semantic pressure became `review_grade_assessment_invalid` with `lawfulReentryPoint=triage_gap`, `retryEligible=false`. It should become `review_grade_edge_fulfillment_blocked` or equivalent repairable ABG current-edge pressure when the assessment is semantically valid. |
+| Feature-scope typing | worker invocation package and review-grade prompt/admission | GTL/ABG typed graph | Invocation package reports `featureScope.mode=full_breadth` while basis refs can say `steel_thread`; prompt and admission can legally read the same package differently. Scope mode, inline scope, requirement trace scope, and edge-packet scope need one typed carrier. |
+
+### T-204 Known Unmoved Functionality
+
+| Functionality | Current odd_sdlc surface | Target owner | Required T-204 action |
+| --- | --- | --- | --- |
+| Public start adapter | `start/index.ts`, `start/policy.ts`, `start/public_start.ts` | ABG | Split product start-intent/query data from runtime start. ABG owns `start`, stop predicates, worker attachment, and control-result truth. |
+| Installed operator plugin mega-session | `operator/installed_operator.ts` | split | Keep ABG-consumed plugin/session callbacks and product carrier admission. Move or delete runtime/control/archive/retry/result-ingress behavior. |
+| Runtime event store | `operator/event_store.ts` | ABG runtime/archive | Keep only test/read-model compatibility if explicitly non-authoritative. Runtime event authorship and replay belong to ABG. |
+| Generic effect shells | `effects/archive_store.ts`, `effects/file_store.ts`, `effects/process_runner.ts` | ABG or shared substrate | Move generic IO/process effect mechanics out of odd_sdlc product code, or prove narrow package plumbing. |
+| Traversal consequence final fold | `operator/traversal_consequence.ts`, mirrored consequence writing in `operator/installed_operator.ts` | split with ABG owning final bind | Product may expose SDLC domain interpretation. ABG owns consequence bind, continuation transition, replay, ledger/projection authorship, and final admission. |
+| Workspace/gaps archive rehydration | `workspace_api/entry.ts`, `analysis/carrier_loaders.ts`, `analysis/runtime_gaps.ts` | ABG-admitted projection source plus odd_sdlc read model | Product read models may survive only over admitted ABG projection truth. Raw archive JSON scraping must not be closure or gap authority. |
+| Product materialization replay/archive readers | `operator/product_materialization/replay.ts`, `manifest.ts`, `observation.ts` | split | Keep SDLC product-materialization meaning and target authority. Move generic replay/archive reconstruction to ABG. |
+| Evaluate content register migration | `operator/plugins/evaluate/content_register.ts`, prompts, analysis loaders, archive fixtures | odd_sdlc product ledger with legacy projection | Finish migration from `sdlc_evaluate_content_register` authority language to `sdlc_evaluate_content_ledger`; retain old register only as read-model projection where needed. |
+| Terminal gap and ticket workflow over runtime blocks | `tickets/workflow.ts`, live harness terminal-gap handling | split | Product ticket intake may stay. ABG must own runtime blocking facts, retry eligibility, and terminal-gap status. |
+
+### Surviving odd_sdlc Product Surfaces
+
+These are not T-204 move targets unless they start owning traversal/runtime
+truth:
+
+- GTL graph declarations and target-carrier contracts under `graph/*`.
+- Product plugin contracts, prompt policy, transform/evaluate/consequence
+  callback support under `operator/plugins/*` and `hooks/*`.
+- Product semantic carriers: design-depth register, review-grade assessment,
+  component-depth register, test-design register, and test-execution-surface
+  register.
+- Product materialization authority and target-role policy.
+- `analysis/*` as product closure-proof diagnostics only when reading
+  ABG-admitted facts or clearly labeled non-authoritative archive diagnostics.
+
+### ABG Interface Complexity Rule
+
+Treat `odd_sdlc` as a pure client of ABG services. ABG is currently realized
+locally as a `build_tenant`, but that realization is not the downstream product
+contract. ABG may later be a cloud service, queue-backed runtime, database-backed
+ledger service, hosted worker fabric, or another substrate realization. The
+`odd_sdlc` product boundary must therefore be:
+
+```text
+odd_sdlc domain declaration/plugin/read model
+-> ABG substrate/service interface
+-> concrete ABG realization
+```
+
+and never:
+
+```text
+odd_sdlc domain code
+-> local filesystem/process/archive/ledger/runtime mechanics
+-> reconstructed systems truth
+```
+
+If `odd_sdlc` needs a ledger, store it through ABG ledger interfaces. `odd_sdlc`
+may define the SDLC domain schema, row meaning, product labels, and read-model
+projection for a named ledger, but ABG owns ledger identity, storage, event
+admission, replay, lifecycle, projection roots, and runtime authorship. The
+point of the split is to manage system complexity through ABG interfaces rather
+than rebuilding infrastructure inside each downstream product.
+
+The same rule applies to runtime events, process/effect execution, archive
+truth, retry/reentry state, traversal consequence, and closure projection:
+`odd_sdlc` supplies domain meaning and plugin proposals; ABG supplies the
+system capability that makes those proposals durable, replayable, and lawful.
+
+### Closure Implications
+
+T-204 cannot close while any of the following remain true:
+
+1. review-grade prompt scope, invocation scope, and admission scope can disagree;
+2. current-edge semantic repair pressure can become non-retryable operator
+   triage because the assessment scope is invalid;
+3. same-edge retry/reentry depends on odd_sdlc-installed-operator adapters
+   rather than ABG-owned continuation/retry carriers;
+4. odd_sdlc writes or owns final runtime consequence ledgers, next-action
+   projections, or closure decisions as runtime truth;
+5. read models reconstruct closure/gap truth directly from raw archive JSON
+   instead of ABG-admitted projection facts.

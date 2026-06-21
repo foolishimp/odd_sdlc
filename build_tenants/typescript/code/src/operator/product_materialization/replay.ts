@@ -344,17 +344,17 @@ export function productMaterializationReplayArchives(
   );
 }
 
-export function replayArchivePostflightStatus(
-  archiveRoot: string
+function archiveStatusFileStatus(
+  filePath: string,
+  label: string
 ): "absent" | "blocked" | "invalid" | "passed" {
-  const postflightFile = join(archiveRoot, "postflight.json");
-  if (!existsSync(postflightFile) || !statSync(postflightFile).isFile()) {
+  if (!existsSync(filePath) || !statSync(filePath).isFile()) {
     return "absent";
   }
   try {
     const postflight = parseOpenRecord(
-      JSON.parse(readFileSync(postflightFile, "utf8")),
-      "productMaterializationReplay.postflight"
+      JSON.parse(readFileSync(filePath, "utf8")),
+      label
     );
     return postflight["status"] === "passed"
       ? "passed"
@@ -364,6 +364,28 @@ export function replayArchivePostflightStatus(
   } catch {
     return "invalid";
   }
+}
+
+export function replayArchivePostflightStatus(
+  archiveRoot: string
+): "absent" | "blocked" | "invalid" | "passed" {
+  const postflightStatus = archiveStatusFileStatus(
+    join(archiveRoot, "postflight.json"),
+    "productMaterializationReplay.postflight"
+  );
+  const reviewGradeStatus = archiveStatusFileStatus(
+    join(archiveRoot, "review_grade_postflight.json"),
+    "productMaterializationReplay.reviewGradePostflight"
+  );
+  if (reviewGradeStatus === "blocked" || reviewGradeStatus === "invalid") {
+    return reviewGradeStatus;
+  }
+  if (reviewGradeStatus === "passed") {
+    return postflightStatus === "blocked" || postflightStatus === "invalid"
+      ? postflightStatus
+      : "passed";
+  }
+  return postflightStatus;
 }
 
 function replayArchivePostflightPassedOrAbsent(archiveRoot: string): boolean {

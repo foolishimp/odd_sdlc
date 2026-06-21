@@ -21,8 +21,12 @@ import {
   typecheckSdlcGtlProgramConformanceInput
 } from "../../build/semantic/code/src/index.js";
 import {
-  deriveSdlcInstalledOperatorStatusFromAbgTerminal
-} from "../../build/semantic/code/src/operator/installed_operator.js";
+  SDLC_REGISTER_PURPOSE_CATALOG,
+  sdlcRegisterPurposeForCarrierKind
+} from "../../build/semantic/code/src/operator/register_purpose.js";
+import {
+  SDLC_OPERATOR_RUN_ARTIFACT_CATALOG
+} from "../../build/semantic/code/src/contracts/operator_run_artifact_catalog.js";
 
 const PACKAGE_ROOT = process.cwd();
 const REPO_ROOT = path.resolve(PACKAGE_ROOT, "../..");
@@ -139,6 +143,93 @@ test("T-197 product gate typechecks the live SDLC graph inventory", () => {
   assert.ok(input.expectedCoverage.publicStartTargetCount > 0);
   assert.ok(input.expectedCoverage.sourceIdentitySurfaceCount > 0);
   assert.ok(input.featureCoverageManifest.rows.length >= 26);
+});
+
+test("T-204 register carriers declare one explicit purpose", () => {
+  const rowsByKind = new Map();
+  for (const row of SDLC_REGISTER_PURPOSE_CATALOG) {
+    assert.equal(typeof row.carrierKind, "string");
+    assert.equal(row.carrierKind.length > 0, true);
+    assert.equal(typeof row.carrierName, "string");
+    assert.equal(row.carrierName.length > 0, true);
+    assert.equal(typeof row.purpose, "string");
+    assert.equal(row.purpose.length > 20, true);
+    assert.equal(rowsByKind.has(row.carrierKind), false, row.carrierKind);
+    rowsByKind.set(row.carrierKind, row);
+  }
+
+  for (const carrierKind of [
+    "sdlc_design_depth_register",
+    "sdlc_review_grade_edge_fulfillment_assessment",
+    "sdlc_component_depth_register",
+    "sdlc_test_design_register",
+    "sdlc_test_execution_surface_register",
+    "sdlc_requirement_closure_register",
+    "sdlc_evaluate_content_ledger",
+    "sdlc_evaluate_content_register",
+    "sdlc_edge_fulfillment_ledger",
+    "sdlc_edge_closure_decision",
+    "sdlc_next_action_projection",
+    "sdlc_installed_operator_traversal_consequence"
+  ]) {
+    assert.notEqual(
+      sdlcRegisterPurposeForCarrierKind(carrierKind),
+      null,
+      `${carrierKind} must have an explicit purpose`
+    );
+  }
+
+  assert.equal(
+    rowsByKind.get("sdlc_evaluate_content_register").purposeClass,
+    "legacy_projection"
+  );
+  assert.equal(
+    rowsByKind.get("sdlc_evaluate_content_register").replacementCarrierKind,
+    "sdlc_evaluate_content_ledger"
+  );
+  const contentRegisterArtifact = SDLC_OPERATOR_RUN_ARTIFACT_CATALOG.find(
+    (row) =>
+      row.artifactRef ===
+      "operator-run-artifact://design-depth-fp-evaluator-content-register"
+  );
+  assert.notEqual(contentRegisterArtifact, undefined);
+  assert.equal(contentRegisterArtifact.carrierKind, "sdlc_evaluate_content_register");
+  assert.equal(contentRegisterArtifact.role, "read_model");
+  assert.equal(
+    rowsByKind.get("sdlc_installed_operator_traversal_consequence").purposeClass,
+    "retired_adapter_only"
+  );
+
+  const operatorIndex = repoFile(
+    "build_tenants/typescript/code/src/operator/index.ts"
+  );
+  const carriers = repoFile("build_tenants/typescript/code/src/operator/carriers.ts");
+  const artifactCatalog = repoFile(
+    "build_tenants/typescript/code/src/contracts/operator_run_artifact_catalog.ts"
+  );
+  assert.doesNotMatch(operatorIndex, /\bSdlcInstalledOperatorStartOutcome\b/u);
+  assert.doesNotMatch(carriers, /\bSdlcInstalledOperatorStartOutcome\b/u);
+  assert.doesNotMatch(artifactCatalog, /sdlc_installed_operator_start_outcome/u);
+  assert.doesNotMatch(artifactCatalog, /sdlc_installed_operator_run_compact/u);
+  assert.doesNotMatch(
+    operatorIndex,
+    /\bSdlcInstalledOperatorTraversalConsequence\b/u
+  );
+  assert.doesNotMatch(
+    carriers,
+    /\bSdlcInstalledOperatorTraversalConsequence\b/u
+  );
+});
+
+test("T-204 design-depth predecessor selection does not scrape archive status as authority", () => {
+  const source = repoFile(
+    "build_tenants/typescript/code/src/operator/plugins/evaluate/design_depth_register.ts"
+  );
+
+  assert.doesNotMatch(source, /predecessorDesignRegisterArchiveIsAccepted/u);
+  assert.doesNotMatch(source, /acceptedArchiveRoots/u);
+  assert.doesNotMatch(source, /sdlc_edge_closure_decision\.json/u);
+  assert.doesNotMatch(source, /postflight\.json/u);
 });
 
 test("T-197 product gate fails closed when target-carrier rows are missing", () => {
@@ -411,51 +502,11 @@ test("T-197 A5 gates installed convergence on ABG terminal convergence", () => {
     "abgTraversalTransitionProjectionRef"
   );
 
-  assert.equal(
-    deriveSdlcInstalledOperatorStatusFromAbgTerminal({
-      stateStatus: "worker_invoked",
-      closureDisposition: "close",
-      terminalKind: "gap_stop"
-    }),
-    "blocked"
-  );
-  assert.equal(
-    deriveSdlcInstalledOperatorStatusFromAbgTerminal({
-      stateStatus: "worker_invoked",
-      closureDisposition: "close",
-      terminalKind: "converged"
-    }),
-    "converged"
-  );
-  assert.equal(
-    deriveSdlcInstalledOperatorStatusFromAbgTerminal({
-      stateStatus: "worker_invoked",
-      closureDisposition: "retry",
-      terminalKind: "converged"
-    }),
-    "worker_invoked"
-  );
-  assert.equal(
-    deriveSdlcInstalledOperatorStatusFromAbgTerminal({
-      stateStatus: "worker_invoked",
-      closureDisposition: "close",
-      terminalKind: null
-    }),
-    "worker_invoked"
-  );
-
-  assert.match(
+  assert.doesNotMatch(
     source,
-    /\bfunction abgTerminalAllowsInstalledConvergence\b/u
+    /\bderiveSdlcInstalledOperatorStatusFromAbgTerminal\b/u
   );
-  assert.match(
-    source,
-    /input\.terminalKind === "converged"/u
-  );
-  assert.match(
-    source,
-    /input\.terminalKind === "gap_stop"[\s\S]*?return "blocked";/u
-  );
+  assert.doesNotMatch(source, /\babgTerminalAllowsInstalledConvergence\b/u);
   assert.match(
     source,
     /\bderiveRuntimeContinuationTransitionProjectionFromDisposition\b/u
@@ -618,7 +669,10 @@ test("T-197 A2 keeps SDLC start as shell over one admitted ABG boundary", () => 
   assert.doesNotMatch(runtimePolicy, /\binstalledReentry\b/u);
   assert.doesNotMatch(runtimePolicy, /\binstalledRetryReentryAttemptLimits\b/u);
   assert.doesNotMatch(runtimePolicyConfig, /"installedReentry"/u);
-  assert.match(design, /A2 \| `executeInstalledOperatorStartWithReentry` formerly owned/u);
+  assert.match(
+    design,
+    /A2 \| `executeInstalledOperatorStartWithReentry` and `executeInstalledOperatorStart\(\.\.\.\)` formerly owned local installed start\/control/u
+  );
   assert.match(design, /residual installed-operator control code remains under T-204 audit/u);
   assert.match(design, /product plugin\/session adapters with explicit survival proof/u);
   assert.doesNotMatch(design, /loop may only call the installed-start boundary/u);

@@ -3059,6 +3059,43 @@ test("T-002 component-code materialization ignores tenant-declared build executi
   assert.equal(postflight.status, "passed");
 });
 
+test("T-002 materialization snapshot prunes SDLC runtime cache before hashing", () => {
+  const workspace = makeWorkspace();
+  declareScalaSbtTestRunner(workspace);
+  writeAdmittedStagedAuthoritySurfaces(workspace);
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "t002-component-code-runtime-cache-prune"
+  });
+  const runtimeCacheFile = path.join(
+    manifest.productMaterialization.tenantRoot,
+    ".ai-workspace/runtime/odd_sdlc/tool-cache/sbt-global/java9-rt/rt.jar"
+  );
+  mkdirSync(dirname(runtimeCacheFile), { recursive: true });
+  writeFileSync(runtimeCacheFile, "runtime cache byproduct\n", "utf8");
+  const sourceFile = path.join(
+    manifest.productMaterialization.tenantRoot,
+    "src/main/scala/generated/DataMapper.scala"
+  );
+  mkdirSync(dirname(sourceFile), { recursive: true });
+  writeFileSync(sourceFile, "package generated\nobject DataMapper\n", "utf8");
+
+  const snapshot = snapshotProductMaterializationRoot(manifest.productMaterialization);
+  const relativePaths = snapshot.files.map((file) => file.relativePath);
+
+  assert.equal(relativePaths.includes(
+    ".ai-workspace/runtime/odd_sdlc/tool-cache/sbt-global/java9-rt/rt.jar"
+  ), false);
+  assert.equal(relativePaths.includes("src/main/scala/generated/DataMapper.scala"), true);
+});
+
 test("T-159 post-transform assessments do not flatten every requirement onto every product file", () => {
   const workspace = makeWorkspace();
   writeFileSync(
@@ -3420,6 +3457,392 @@ test("T-158 product materialization repair replays prior same-edge manifest", ()
       `file://${firstManifest.productMaterialization.manifestFile}`
     ),
     true
+  );
+});
+
+test("T-204 product materialization replay restamps current tenant-stack target policy", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t204-replay-policy-"));
+  mkdirSync(path.join(workspace, "specification/requirements"), { recursive: true });
+  mkdirSync(path.join(workspace, ".ai-workspace/context"), { recursive: true });
+  writeFileSync(
+    path.join(workspace, "README.md"),
+    "# T-204 Replay Policy Fixture\n",
+    "utf8"
+  );
+  writeFileSync(
+    path.join(workspace, "specification/INTENT.md"),
+    "# Intent\n\nBuild a Scala tenant stack.\n",
+    "utf8"
+  );
+  writeFileSync(
+    path.join(workspace, "specification/requirements/01-fixture.md"),
+    "# Requirements\n\nREQ-T204-REPLAY: Replay uses current tenant-stack authority.\n",
+    "utf8"
+  );
+  writeFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: t204_replay_policy",
+      "active_tenant: scala_spark",
+      "selected_output_root: build_tenants/scala_spark",
+      "ambiguity_risk_appetite: medium"
+    ].join("\n"),
+    "utf8"
+  );
+  const stackSpecFile = path.join(
+    workspace,
+    "build_tenants/scala_spark/spec/TECH_STACK.json"
+  );
+  mkdirSync(dirname(stackSpecFile), { recursive: true });
+  writeFileSync(
+    stackSpecFile,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        language: "Scala",
+        buildTool: "sbt",
+        buildConfigTargets: ["build.sbt"],
+        sourceFiles: ["src/main/scala/generated/DataMapper.scala"]
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: workspace });
+
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const sourceRelativePath = "src/main/scala/generated/DataMapper.scala";
+  const sourcePath = path.join(
+    workspace,
+    constraints.selectedOutputRoot,
+    sourceRelativePath
+  );
+  const sourceContent = "// Implements: REQ-T204-REPLAY\npackage generated\nobject DataMapper\n";
+  mkdirSync(dirname(sourcePath), { recursive: true });
+  writeFileSync(sourcePath, sourceContent, "utf8");
+
+  const priorManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "20260621T000000000Z_pid204"
+  });
+  writeHandoffFiles(priorManifest);
+  writeFileSync(
+    priorManifest.productMaterialization.manifestFile,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_product_materialization_manifest",
+        contract: priorManifest.productMaterialization,
+        files: [
+          {
+            kind: "sdlc_materialized_product_file",
+            role: "source",
+            relativePath: sourceRelativePath,
+            absolutePath: sourcePath,
+            digest: sha256Text(sourceContent),
+            byteCount: Buffer.byteLength(sourceContent, "utf8"),
+            materializationSource: "current_attempt",
+            rolePolicyRef:
+              "target-role-policy://odd-sdlc/implementation-design/source"
+          }
+        ]
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+
+  const repairManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "20260621T000001000Z_pid204"
+  });
+  const invocationPackage = constructWorkerInvocationPackage({
+    manifest: repairManifest
+  });
+  const tenantStackSourceTarget =
+    invocationPackage.outputContract.declaredProductTargetContracts.find(
+      (target) =>
+        target.path ===
+        "build_tenants/scala_spark/src/main/scala/generated/DataMapper.scala"
+    );
+  assert.notEqual(tenantStackSourceTarget, undefined);
+  assert.equal(
+    tenantStackSourceTarget.policyRef,
+    "target-role-policy://odd-sdlc/tenant-stack/implementation/source"
+  );
+  writeHandoffFiles(repairManifest);
+  const before = snapshotProductMaterializationRoot(
+    repairManifest.productMaterialization
+  );
+  const output = writeOutputSurface(
+    repairManifest,
+    "component_code_surface_replay_policy"
+  );
+  writeReport({
+    manifest: repairManifest,
+    digest: output.digest,
+    summary: "trace-only repair reuses legacy materialization",
+    materializedFiles: []
+  });
+  const repairReport = buildPostTransformWorkerResultReport({
+    manifest: repairManifest,
+    before
+  });
+  const replayedFile = repairReport.materializedFiles.find(
+    (file) => file.relativePath === sourceRelativePath
+  );
+
+  assert.notEqual(replayedFile, undefined);
+  assert.equal(replayedFile.materializationSource, "replay");
+  assert.equal(
+    replayedFile.rolePolicyRef,
+    "target-role-policy://odd-sdlc/tenant-stack/implementation/source"
+  );
+  assert.equal(
+    evaluateSdlcComputeStage({
+      manifest: repairManifest,
+      report: repairReport
+    }).blockingReasons.includes("materialized_product_role_policy_ref_mismatch"),
+    false
+  );
+});
+
+test("T-204 product materialization replay ignores review-grade-blocked archives", () => {
+  const workspace = makeWorkspace();
+  declareScalaSbtTestRunner(workspace);
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_test_surface");
+  const testRelativePath = "src/test/scala/BlockedReplaySpec.scala";
+  const testPath = path.join(
+    workspace,
+    constraints.selectedOutputRoot,
+    testRelativePath
+  );
+  const testContent = [
+    "package generated",
+    "final class BlockedReplaySpec"
+  ].join("\n");
+  mkdirSync(dirname(testPath), { recursive: true });
+  writeFileSync(testPath, `${testContent}\n`, "utf8");
+
+  const priorManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 15,
+    contract,
+    projectConstraints: constraints,
+    runId: "20260621T000000000Z_pid204"
+  });
+  writeHandoffFiles(priorManifest);
+  const priorOutput = writeOutputSurface(
+    priorManifest,
+    "component_test_surface_blocked_replay"
+  );
+  writeReport({
+    manifest: priorManifest,
+    digest: priorOutput.digest,
+    summary: "blocked component-test materialization must not replay",
+    materializedFiles: [
+      {
+        kind: "sdlc_materialized_product_file",
+        role: "test",
+        relativePath: testRelativePath,
+        absolutePath: testPath,
+        digest: sha256Text(`${testContent}\n`),
+        byteCount: Buffer.byteLength(`${testContent}\n`, "utf8")
+      }
+    ]
+  });
+  writeProductMaterializationManifest({
+    manifest: priorManifest,
+    report: readWorkerResultReport(priorManifest)
+  });
+  writeFileSync(
+    path.join(priorManifest.archiveRoot, "postflight.json"),
+    `${JSON.stringify(
+      { kind: "sdlc_operator_postflight_result", status: "passed", blockingReasons: [] },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  writeFileSync(
+    path.join(priorManifest.archiveRoot, "review_grade_postflight.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_operator_postflight_result",
+        status: "blocked",
+        blockingReasons: [
+          "review_grade_edge_fulfillment_blocked:target_asset:component_test_surface:boundary_collapsed"
+        ]
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+
+  const repairManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 15,
+    contract,
+    projectConstraints: constraints,
+    runId: "20260621T000001000Z_pid204"
+  });
+  writeHandoffFiles(repairManifest);
+  const repairOutput = writeOutputSurface(
+    repairManifest,
+    "component_test_surface_retry"
+  );
+  writeReport({
+    manifest: repairManifest,
+    digest: repairOutput.digest,
+    summary: "retry with no current materialization",
+    materializedFiles: []
+  });
+
+  const repairReport = readWorkerResultReport(repairManifest);
+
+  assert.deepEqual(
+    repairReport.materializedFiles.map((file) => file.relativePath),
+    []
+  );
+});
+
+test("T-204 tenant-stack role policy overrides matching design materialization targets", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const stackSpecFile = path.join(
+    workspace,
+    constraints.selectedOutputRoot,
+    "spec/TECH_STACK.json"
+  );
+  mkdirSync(dirname(stackSpecFile), { recursive: true });
+  writeFileSync(
+    stackSpecFile,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        language: "Scala",
+        buildTool: "sbt",
+        buildConfigTargets: ["build.sbt"],
+        sourceFiles: ["src/main/scala/generated/DataMapper.scala"],
+        testingTechStack: {
+          testRunner: "sbt test",
+          testRoots: ["src/test/scala/"],
+          proofCommands: ["sbt test"],
+          evidenceFormat: "process-exit"
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  const designContract = hookContractByEdgeName("derive_implementation_design_surface");
+  const designManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: designContract.edgeName,
+    vectorIndex: 9,
+    contract: designContract,
+    runId: "20260524T000000000Z_pid66"
+  });
+  const designArchiveRoot = designManifest.archiveRoot;
+  const designRegisterRef = pathToFileURL(
+    path.join(designArchiveRoot, "design_depth_fp_evaluator_register.json")
+  ).href;
+  const designContentRegisterRef = pathToFileURL(
+    path.join(designArchiveRoot, "design_depth_fp_evaluator_content_register.json")
+  ).href;
+  const selectedComposition = selectedCompositionForManifest(designManifest);
+  writeFileSync(
+    path.join(designArchiveRoot, "design_depth_fp_evaluator_rule_outcome.json"),
+    `${JSON.stringify(
+      {
+        kind: "evaluation_rule_outcome",
+        status: "accepted",
+        ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+        ruleRole: "semantic_judgment",
+        computeMeans: "F_P",
+        selectedCompositionRef: selectedComposition.compositionRef,
+        selectedCompositionDigest: selectedComposition.compositionDigest,
+        selectedCompositionSelectionRef:
+          selectedComposition.compositionSelectionRef,
+        selectedRegimeBindingRef: selectedComposition.selectedRegimeBindingRef,
+        producedRegisterRefs: [designContentRegisterRef, designRegisterRef],
+        evidenceRefs: [designContentRegisterRef, designRegisterRef],
+        findingRefs: ["finding://t204/design-depth-register"]
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "t204-tenant-stack-overrides-design-policy"
+  });
+  const reconciliation = reconcileSdlcProductMaterializationAuthority(manifest);
+  const targetPath =
+    "build_tenants/scala_spark/src/main/scala/generated/DataMapper.scala";
+  const designTarget = reconciliation.designAssetAuthorityTargetContracts.find(
+    (target) => target.path === targetPath
+  );
+  const tenantTarget = reconciliation.tenantStackAuthorityTargetContracts.find(
+    (target) => target.path === targetPath
+  );
+  const declaredTarget = reconciliation.declaredProductTargetContracts.find(
+    (target) => target.path === targetPath
+  );
+  const invocationPackage = constructWorkerInvocationPackage({ manifest });
+  const packageTarget =
+    invocationPackage.outputContract.declaredProductTargetContracts.find(
+      (target) => target.path === targetPath
+    );
+
+  assert.notEqual(designTarget, undefined);
+  assert.equal(
+    designTarget.policyRef,
+    "target-role-policy://odd-sdlc/implementation-design/source"
+  );
+  assert.notEqual(tenantTarget, undefined);
+  assert.equal(
+    tenantTarget.policyRef,
+    "target-role-policy://odd-sdlc/tenant-stack/implementation/source"
+  );
+  assert.notEqual(declaredTarget, undefined);
+  assert.equal(
+    declaredTarget.policyRef,
+    "target-role-policy://odd-sdlc/tenant-stack/implementation/source"
+  );
+  assert.notEqual(packageTarget, undefined);
+  assert.equal(
+    packageTarget.policyRef,
+    "target-role-policy://odd-sdlc/tenant-stack/implementation/source"
   );
 });
 
@@ -7625,6 +8048,84 @@ test("T-102 cross-archive report discovery rejects unstamped projections", () =>
       (entry) => entry.ref === stampedOutputRef && entry.category === "runtime"
     )
   );
+});
+
+test("T-204 source asset authority carries latest admitted prior report only", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const operatorRunsRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs"
+  );
+  const priorRuns = [
+    "20260621T000000000Z_pid204",
+    "20260621T000001000Z_pid204"
+  ];
+  for (const [index, runId] of priorRuns.entries()) {
+    const runRoot = path.join(operatorRunsRoot, runId);
+    const outputFile = path.join(runRoot, "test_execution_result_surface.md");
+    mkdirSync(runRoot, { recursive: true });
+    writeFileSync(outputFile, `# test_execution_result_surface\n\nrun ${index}\n`, "utf8");
+    writeFileSync(
+      path.join(runRoot, "worker_result_report.json"),
+      stableJsonForTest({
+        kind: "odd_sdlc.worker_result_report",
+        projectionRole: "typed_fp_stage_projection",
+        authoritativeStageResultRef: pathToFileURL(
+          path.join(runRoot, "fp_evaluate_result.json")
+        ).href,
+        graphFunctionName: "derive_test_execution_result_surface",
+        edgeName: "derive_test_execution_result_surface",
+        targetAssetType: "test_execution_result_surface",
+        outputFile,
+        digest: `sha256:t204-${index}`,
+        summary: `prior execution result ${index}`,
+        unresolvedReasons: [],
+        materializedFiles: [],
+        executionEvidence: null,
+        executionEvidenceErrors: [],
+        obligationAssessments: []
+      }),
+      "utf8"
+    );
+  }
+
+  const contract = hookContractByEdgeName("derive_test_run_archive_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 34,
+    contract,
+    projectConstraints: constraints,
+    runId: "t204-latest-source-asset-authority"
+  });
+  const sourceAsset = manifest.traversalObligationContext.obligations.find(
+    (obligation) =>
+      obligation.obligationId === "source_asset:test_execution_result_surface"
+  );
+  const olderReportRef = pathToFileURL(
+    path.join(operatorRunsRoot, priorRuns[0], "worker_result_report.json")
+  ).href;
+  const latestReportRef = pathToFileURL(
+    path.join(operatorRunsRoot, priorRuns[1], "worker_result_report.json")
+  ).href;
+  const olderOutputRef = pathToFileURL(
+    path.join(operatorRunsRoot, priorRuns[0], "test_execution_result_surface.md")
+  ).href;
+  const latestOutputRef = pathToFileURL(
+    path.join(operatorRunsRoot, priorRuns[1], "test_execution_result_surface.md")
+  ).href;
+
+  assert(sourceAsset);
+  assert.equal(sourceAsset.evidenceRefs.includes(olderReportRef), false);
+  assert.equal(sourceAsset.evidenceRefs.includes(olderOutputRef), false);
+  assert(sourceAsset.evidenceRefs.includes(latestReportRef));
+  assert(sourceAsset.evidenceRefs.includes(latestOutputRef));
+  assert.equal(manifest.traversalObligationContext.authorityRefs.includes(olderReportRef), false);
+  assert.equal(manifest.traversalObligationContext.authorityRefs.includes(olderOutputRef), false);
+  assert(manifest.traversalObligationContext.authorityRefs.includes(latestReportRef));
+  assert(manifest.traversalObligationContext.authorityRefs.includes(latestOutputRef));
 });
 
 test("T-188 component repair schedule receives admitted execution result authority", () => {

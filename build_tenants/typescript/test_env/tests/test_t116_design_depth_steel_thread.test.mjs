@@ -4,6 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   writeFileSync
@@ -271,6 +272,34 @@ test("T-116 publishes the consolidated implementation-design edge before realiza
   assert.equal(
     names.filter((name) => name === "derive_implementation_design_surface").length,
     1
+  );
+});
+
+test("T-204 design-depth admission does not publish candidate evidence into a downstream archive", () => {
+  const upstreamRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t204-upstream-"));
+  const downstreamRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t204-downstream-"));
+  const outputFile = path.join(upstreamRoot, "design_depth_fp_evaluator_register.json");
+  mkdirSync(path.dirname(outputFile), { recursive: true });
+  writeFileSync(
+    outputFile,
+    `${JSON.stringify(implementationDesignRegister(), null, 2)}\n`,
+    "utf8"
+  );
+
+  const admission = admitDesignDepthRegisterFromArtifact({
+    targetAssetType: "implementation_design_surface",
+    outputFile,
+    archiveRoot: downstreamRoot
+  });
+
+  assert.equal(admission.status, "admitted");
+  assert.equal(
+    existsSync(path.join(downstreamRoot, "design_depth_candidate_0_raw.json")),
+    false
+  );
+  assert.equal(
+    existsSync(path.join(downstreamRoot, "design_depth_candidate_0_admitted.json")),
+    false
   );
 });
 
