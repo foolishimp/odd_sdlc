@@ -161,11 +161,11 @@ test("T-145 archive-only terminal closure cannot converge public gaps", () => {
   assert.notEqual(result.dossier.edge, FG_MATERIALIZE_DECLARED_PRODUCT_ASSET);
   assert.equal(
     result.requirementFulfillment.archiveRehydration.status,
-    "rehydrated"
+    "not_attempted"
   );
   assert.equal(
     result.requirementFulfillment.edgeClosureDisposition,
-    "close"
+    null
   );
   assert.equal(
     result.dossier.rankingReasonRefs.some((ref) =>

@@ -477,7 +477,7 @@ test("T-139 public projection constructors converge on the same logical state", 
   );
 });
 
-test("T-139 Spec Method gaps rehydrates installed traversal consequence archives", () => {
+test("T-139 Spec Method gaps reports archive diagnostics without rehydrating fulfillment truth", () => {
   const workspace = conformantWorkspace();
   const operatorRunRoot = path.join(
     workspace,
@@ -576,27 +576,25 @@ test("T-139 Spec Method gaps rehydrates installed traversal consequence archives
 
   const result = workspaceGaps(workspace);
 
-  assert.equal(result.requirementFulfillment.counts.fulfilled, 1);
-  assert.equal(result.requirementFulfillment.counts.partial, 1);
-  assert.deepEqual(
-    result.requirementFulfillment.edgeFulfillmentCounts,
-    ledger.counts
-  );
+  assert.deepEqual(result.archiveDiagnostics, []);
+  assert.equal(result.requirementFulfillment.counts.fulfilled, 0);
+  assert.equal(result.requirementFulfillment.counts.partial, 0);
+  assert.equal(result.requirementFulfillment.counts.missing, 2);
+  assert.equal(result.requirementFulfillment.edgeFulfillmentCounts, null);
   assert.equal(
     result.requirementFulfillment.edgeClosureDisposition,
-    closureDecision.disposition
+    null
   );
-  assert.deepEqual(
-    result.dossier.requirementFulfillment.edgeFulfillmentCounts,
-    ledger.counts
-  );
+  assert.equal(result.dossier.requirementFulfillment.edgeFulfillmentCounts, null);
   assert.equal(
     result.requirementFulfillment.archiveRehydration.status,
-    "rehydrated"
+    "not_attempted"
   );
-  assert.match(
-    result.requirementFulfillment.archiveRehydration.archiveRef,
-    /t139-archived-run/
+  assert.equal(result.requirementFulfillment.archiveRehydration.archiveRef, null);
+  assert(
+    result.requirementFulfillment.archiveRehydration.scannedArchiveRefs.some((ref) =>
+      ref.includes("t139-archived-run")
+    )
   );
   assert.deepEqual(
     result.requirementFulfillment.archiveRehydration.missingArtifactRefs,
@@ -604,7 +602,7 @@ test("T-139 Spec Method gaps rehydrates installed traversal consequence archives
   );
 });
 
-test("T-139 Spec Method gaps reports incomplete consequence archive rehydration", () => {
+test("T-139 Spec Method gaps reports incomplete consequence archive diagnostics", () => {
   const workspace = conformantWorkspace();
   const operatorRunRoot = path.join(
     workspace,
@@ -638,7 +636,7 @@ test("T-139 Spec Method gaps reports incomplete consequence archive rehydration"
 
   assert.equal(
     result.requirementFulfillment.archiveRehydration.status,
-    "no_archive_with_consequence_triple"
+    "not_attempted"
   );
   assert(
     result.requirementFulfillment.archiveRehydration.missingArtifactRefs.some(

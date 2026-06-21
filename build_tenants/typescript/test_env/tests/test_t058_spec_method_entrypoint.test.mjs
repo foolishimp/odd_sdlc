@@ -211,7 +211,7 @@ test("T-205 passed compute archive without bind outcome is diagnosed on gaps rea
   assert(diagnostic, JSON.stringify(result, null, 2));
   assert.equal(
     result.requirementFulfillment.archiveRehydration.status,
-    "no_archive_with_consequence_triple"
+    "not_attempted"
   );
   assert.match(
     JSON.stringify(diagnostic.evidenceRefs),

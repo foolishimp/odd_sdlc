@@ -2758,6 +2758,11 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(evaluateDesignDepthSource, /source_asset:implementation_design_surface/u);
   assert.match(evaluateDesignDepthSource, /design_depth_fp_evaluator_register_unadmitted/u);
   assert.match(evaluateDesignDepthSource, /export function admitImplementationDesignRegisterForManifest/u);
+  assert.match(evaluateDesignDepthSource, /record\["status"\] !== "accepted"/u);
+  assert.doesNotMatch(evaluateDesignDepthSource, /predecessorDesignRegisterArchiveIsAccepted/u);
+  assert.doesNotMatch(evaluateDesignDepthSource, /sdlc_edge_closure_decision/u);
+  assert.doesNotMatch(evaluateDesignDepthSource, /postflight\.json/u);
+  assert.doesNotMatch(evaluateDesignDepthSource, /fp_evaluate_result/u);
   assert.doesNotMatch(handoffSource, /export function admitImplementationDesignRegisterForManifest/u);
   assert.match(promptEdgePolicySource, /stagePressure\.designDepthEvaluatorRegisterRefs/u);
 });

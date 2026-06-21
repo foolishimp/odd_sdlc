@@ -1367,6 +1367,12 @@ test("T-160 workspace API keeps overlay replay out of commandless gaps read mode
   assert.doesNotMatch(source, /function startOutcomeFor\(/);
   assert.doesNotMatch(source, /function startOutcomeForObservedReplay/);
   assert.doesNotMatch(source, /request\.target\.kind === "overlay"/);
+  assert.doesNotMatch(
+    source,
+    /projectSdlcRequirementFulfillmentPublicViewFromPriorProjection/
+  );
+  assert.doesNotMatch(source, /requirementAssessmentsFromArchive/);
+  assert.doesNotMatch(source, /edgeClosureDecisionFromArchive/);
 });
 
 test("T-160 cross-graph repair reentry is not replayed by workspace API", () => {

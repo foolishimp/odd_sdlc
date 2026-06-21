@@ -23,12 +23,7 @@ import {
   constructSdlcRequirementFulfillmentArchiveRehydration,
   deriveSdlcGapDossier,
   projectSdlcQueryDomain,
-  projectSdlcRequirementFulfillmentPublicViewFromPriorProjection,
   withSdlcRequirementFulfillmentArchiveRehydration,
-  type SdlcRequirementFulfillmentAssessmentPublicInput,
-  type SdlcRequirementFulfillmentClosureSource,
-  type SdlcRequirementFulfillmentEdgeLedgerSource,
-  type SdlcRequirementFulfillmentNextActionSource,
   type SdlcRequirementFulfillmentPublicProjection
 } from "../projection/index.js";
 import { parseClosedRecord, parseNonEmptyString } from "../shared/validation.js";
@@ -91,11 +86,10 @@ export interface SdlcWorkspaceGapArchiveDiagnostic {
 interface SdlcWorkspaceGapsArchiveReadModel {
   readonly archiveRoot: string;
   readonly archiveRef: string;
-  readonly edgeFulfillmentLedger: SdlcRequirementFulfillmentEdgeLedgerSource | null;
-  readonly edgeClosureDecision: SdlcRequirementFulfillmentClosureSource | null;
-  readonly nextActionProjection: SdlcRequirementFulfillmentNextActionSource | null;
+  readonly edgeFulfillmentLedgerPresent: boolean;
+  readonly edgeClosureDecisionPresent: boolean;
+  readonly nextActionProjectionPresent: boolean;
   readonly passedComputeEvidenceRefs: readonly string[];
-  readonly assessments: readonly SdlcRequirementFulfillmentAssessmentPublicInput[];
 }
 
 const WORKSPACE_API_MODULE_ROOT = dirname(fileURLToPath(import.meta.url));
@@ -306,35 +300,6 @@ function stringField(
   return typeof value === "string" ? value : null;
 }
 
-function numberField(
-  record: Readonly<Record<string, unknown>>,
-  key: string
-): number | null {
-  const value = record[key];
-  return typeof value === "number" ? value : null;
-}
-
-function stringArrayField(
-  record: Readonly<Record<string, unknown>>,
-  key: string
-): readonly string[] {
-  const value = record[key];
-  if (!Array.isArray(value)) {
-    return Object.freeze([]);
-  }
-  return Object.freeze(
-    value.filter((entry): entry is string => typeof entry === "string")
-  );
-}
-
-function childRecord(
-  record: Readonly<Record<string, unknown>>,
-  key: string
-): Readonly<Record<string, unknown>> | null {
-  const value = record[key];
-  return isPlainRecord(value) ? value : null;
-}
-
 function operatorRunArchiveRootsNewestFirst(
   context: OddSdlcWorkspaceApiContext
 ): readonly string[] {
@@ -351,119 +316,6 @@ function operatorRunArchiveRootsNewestFirst(
       .filter((entryPath) => statSync(entryPath).isDirectory())
       .sort((left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs)
   );
-}
-
-function edgeFulfillmentCountsFromRecord(
-  record: Readonly<Record<string, unknown>>
-): SdlcRequirementFulfillmentEdgeLedgerSource["counts"] | null {
-  const counts = childRecord(record, "counts");
-  if (counts === null) {
-    return null;
-  }
-  const expected = numberField(counts, "expected");
-  const fulfilled = numberField(counts, "fulfilled");
-  const partial = numberField(counts, "partial");
-  const blocked = numberField(counts, "blocked");
-  const unfulfilled = numberField(counts, "unfulfilled");
-  const missing = numberField(counts, "missing");
-  const extra = numberField(counts, "extra");
-  if (
-    expected === null ||
-    fulfilled === null ||
-    partial === null ||
-    blocked === null ||
-    unfulfilled === null ||
-    missing === null ||
-    extra === null
-  ) {
-    return null;
-  }
-  return Object.freeze({
-    expected,
-    fulfilled,
-    partial,
-    blocked,
-    unfulfilled,
-    missing,
-    extra
-  });
-}
-
-function edgeFulfillmentLedgerFromArchive(
-  archiveRoot: string
-): SdlcRequirementFulfillmentEdgeLedgerSource | null {
-  const record = jsonRecordFromFile(
-    path.join(archiveRoot, "sdlc_edge_fulfillment_ledger.json")
-  );
-  if (record?.["kind"] !== "sdlc_edge_fulfillment_ledger") {
-    return null;
-  }
-  const ledgerRef = stringField(record, "ledgerRef");
-  const ledgerVersionRef = stringField(record, "ledgerVersionRef");
-  const counts = edgeFulfillmentCountsFromRecord(record);
-  if (ledgerRef === null || ledgerVersionRef === null || counts === null) {
-    return null;
-  }
-  return Object.freeze({
-    ledgerRef,
-    ledgerVersionRef,
-    counts
-  });
-}
-
-function edgeClosureDispositionFromRecord(
-  record: Readonly<Record<string, unknown>>
-): SdlcRequirementFulfillmentClosureSource["disposition"] | null {
-  const disposition = stringField(record, "disposition");
-  return disposition === "close" ||
-    disposition === "yield" ||
-    disposition === "retry" ||
-    disposition === "repair" ||
-    disposition === "re-enter" ||
-    disposition === "reprice" ||
-    disposition === "block"
-    ? disposition
-    : null;
-}
-
-function edgeClosureDecisionFromArchive(
-  archiveRoot: string
-): SdlcRequirementFulfillmentClosureSource | null {
-  const record = jsonRecordFromFile(
-    path.join(archiveRoot, "sdlc_edge_closure_decision.json")
-  );
-  if (record?.["kind"] !== "sdlc_edge_closure_decision") {
-    return null;
-  }
-  const decisionRef = stringField(record, "decisionRef");
-  const disposition = edgeClosureDispositionFromRecord(record);
-  if (decisionRef === null || disposition === null) {
-    return null;
-  }
-  return Object.freeze({
-    decisionRef,
-    disposition
-  });
-}
-
-function nextActionProjectionFromArchive(
-  archiveRoot: string
-): SdlcRequirementFulfillmentNextActionSource | null {
-  const record = jsonRecordFromFile(
-    path.join(archiveRoot, "sdlc_next_action_projection.json")
-  );
-  if (record?.["kind"] !== "sdlc_next_action_projection") {
-    return null;
-  }
-  const nextActionProjectionRef = stringField(record, "nextActionProjectionRef");
-  const selectedActionRef = stringField(record, "selectedActionRef");
-  if (nextActionProjectionRef === null) {
-    return null;
-  }
-  return Object.freeze({
-    nextActionProjectionRef,
-    selectedActionRef
-  });
 }
 
 function archiveRefForRoot(archiveRoot: string): string {
@@ -530,11 +382,22 @@ function operatorRunArchiveReadModel(
   return Object.freeze({
     archiveRoot,
     archiveRef: archiveRefForRoot(archiveRoot),
-    edgeFulfillmentLedger: edgeFulfillmentLedgerFromArchive(archiveRoot),
-    edgeClosureDecision: edgeClosureDecisionFromArchive(archiveRoot),
-    nextActionProjection: nextActionProjectionFromArchive(archiveRoot),
-    passedComputeEvidenceRefs: passedComputeEvidenceRefs(archiveRoot),
-    assessments: requirementAssessmentsFromArchive(archiveRoot)
+    edgeFulfillmentLedgerPresent: archiveRecordHasKind({
+      archiveRoot,
+      fileName: "sdlc_edge_fulfillment_ledger.json",
+      kind: "sdlc_edge_fulfillment_ledger"
+    }),
+    edgeClosureDecisionPresent: archiveRecordHasKind({
+      archiveRoot,
+      fileName: "sdlc_edge_closure_decision.json",
+      kind: "sdlc_edge_closure_decision"
+    }),
+    nextActionProjectionPresent: archiveRecordHasKind({
+      archiveRoot,
+      fileName: "sdlc_next_action_projection.json",
+      kind: "sdlc_next_action_projection"
+    }),
+    passedComputeEvidenceRefs: passedComputeEvidenceRefs(archiveRoot)
   });
 }
 
@@ -542,9 +405,9 @@ function missingBindOutcomeAfterPassedComputeRefs(
   archive: SdlcWorkspaceGapsArchiveReadModel
 ): readonly string[] {
   if (
-    archive.edgeFulfillmentLedger !== null &&
-    archive.edgeClosureDecision !== null &&
-    archive.nextActionProjection !== null
+    archive.edgeFulfillmentLedgerPresent &&
+    archive.edgeClosureDecisionPresent &&
+    archive.nextActionProjectionPresent
   ) {
     return Object.freeze([]);
   }
@@ -554,13 +417,13 @@ function missingBindOutcomeAfterPassedComputeRefs(
   return Object.freeze(
     [
       ...archive.passedComputeEvidenceRefs,
-      archive.edgeFulfillmentLedger === null
+      !archive.edgeFulfillmentLedgerPresent
         ? "sdlc_edge_fulfillment_ledger.json"
         : null,
-      archive.edgeClosureDecision === null
+      !archive.edgeClosureDecisionPresent
         ? "sdlc_edge_closure_decision.json"
         : null,
-      archive.nextActionProjection === null
+      !archive.nextActionProjectionPresent
         ? "sdlc_next_action_projection.json"
         : null
     ]
@@ -580,13 +443,13 @@ function missingTraversalConsequenceArtifactRefs(
   archive: SdlcWorkspaceGapsArchiveReadModel
 ): readonly string[] {
   const missing: string[] = [];
-  if (archive.edgeFulfillmentLedger === null) {
+  if (!archive.edgeFulfillmentLedgerPresent) {
     missing.push("sdlc_edge_fulfillment_ledger.json");
   }
-  if (archive.edgeClosureDecision === null) {
+  if (!archive.edgeClosureDecisionPresent) {
     missing.push("sdlc_edge_closure_decision.json");
   }
-  if (archive.nextActionProjection === null) {
+  if (!archive.nextActionProjectionPresent) {
     missing.push("sdlc_next_action_projection.json");
   }
   return Object.freeze(
@@ -690,48 +553,6 @@ function nextActionProjectionArchiveDiagnostics(input: {
       ]);
 }
 
-function assessmentStatusFromRecord(
-  record: Readonly<Record<string, unknown>>
-): SdlcRequirementFulfillmentAssessmentPublicInput["fulfillmentStatus"] | null {
-  const status = stringField(record, "fulfillmentStatus");
-  return status === "fulfilled" ||
-    status === "partial" ||
-    status === "blocked" ||
-    status === "unassessed"
-    ? status
-    : null;
-}
-
-function requirementAssessmentsFromArchive(
-  archiveRoot: string
-): readonly SdlcRequirementFulfillmentAssessmentPublicInput[] {
-  const report = jsonRecordFromFile(path.join(archiveRoot, "worker_result_report.json"));
-  const assessments = report?.["obligationAssessments"];
-  if (!Array.isArray(assessments)) {
-    return Object.freeze([]);
-  }
-  return Object.freeze(
-    assessments.flatMap((assessment): SdlcRequirementFulfillmentAssessmentPublicInput[] => {
-      if (!isPlainRecord(assessment)) {
-        return [];
-      }
-      const obligationId = stringField(assessment, "obligationId");
-      const fulfillmentStatus = assessmentStatusFromRecord(assessment);
-      if (obligationId === null || fulfillmentStatus === null) {
-        return [];
-      }
-      return [
-        Object.freeze({
-          obligationId,
-          fulfillmentStatus,
-          evidenceRefs: stringArrayField(assessment, "evidenceRefs"),
-          blockingReasons: stringArrayField(assessment, "blockingReasons")
-        })
-      ];
-    })
-  );
-}
-
 function requirementFulfillmentForGaps(input: {
   readonly context: OddSdlcWorkspaceApiContext;
   readonly module: ReturnType<typeof constructSdlcGtlModule>;
@@ -772,9 +593,9 @@ function requirementFulfillmentForGaps(input: {
       continue;
     }
     if (
-      archive.edgeFulfillmentLedger === null ||
-      archive.edgeClosureDecision === null ||
-      archive.nextActionProjection === null
+      !archive.edgeFulfillmentLedgerPresent ||
+      !archive.edgeClosureDecisionPresent ||
+      !archive.nextActionProjectionPresent
     ) {
       const missingTraversalRefs =
         missingTraversalConsequenceArtifactRefs(archive);
@@ -800,29 +621,13 @@ function requirementFulfillmentForGaps(input: {
       archiveDiagnostics.push(...nextActionDiagnostics);
       continue;
     }
-    return Object.freeze({
-      projection: projectSdlcRequirementFulfillmentPublicViewFromPriorProjection({
-        sourceProjection: input.sourceProjection,
-        assessments: archive.assessments,
-        edgeFulfillmentLedger: archive.edgeFulfillmentLedger,
-        edgeClosureDecision: archive.edgeClosureDecision,
-        nextActionProjection: archive.nextActionProjection,
-        sourceRegisterRef: `requirement-fulfillment-public://odd-sdlc/${encodeURIComponent(archiveRoot)}`,
-        archiveRehydration: constructSdlcRequirementFulfillmentArchiveRehydration({
-          status: "rehydrated",
-          archiveRef: archive.archiveRef,
-          scannedArchiveRefs,
-          missingArtifactRefs
-        })
-      }),
-      archiveDiagnostics: Object.freeze([...archiveDiagnostics])
-    });
+    break;
   }
   return Object.freeze({
     projection: withSdlcRequirementFulfillmentArchiveRehydration({
       projection: input.sourceProjection,
       archiveRehydration: constructSdlcRequirementFulfillmentArchiveRehydration({
-        status: "no_archive_with_consequence_triple",
+        status: "not_attempted",
         scannedArchiveRefs,
         missingArtifactRefs
       })

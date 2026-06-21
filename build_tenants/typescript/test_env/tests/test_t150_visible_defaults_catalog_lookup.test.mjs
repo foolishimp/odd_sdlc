@@ -276,7 +276,7 @@ test("T-150 workspace gaps reports incomplete archive consequence on read-only s
   assert(diagnostic, JSON.stringify(result, null, 2));
   assert.equal(
     result.requirementFulfillment.archiveRehydration.status,
-    "no_archive_with_consequence_triple"
+    "not_attempted"
   );
   assert.match(
     JSON.stringify(diagnostic.evidenceRefs),

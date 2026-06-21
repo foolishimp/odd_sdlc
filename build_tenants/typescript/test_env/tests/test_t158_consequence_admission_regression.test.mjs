@@ -714,7 +714,7 @@ test("T-158 replayed Eval_Action must carry graph-vector track authority", () =>
   );
   assert.equal(
     stale.requirementFulfillment.archiveRehydration.status,
-    "no_archive_with_consequence_triple"
+    "not_attempted"
   );
 
   const componentCode = graphTrackRefs("derive_component_code_surface");
@@ -728,11 +728,11 @@ test("T-158 replayed Eval_Action must carry graph-vector track authority", () =>
   assert.deepEqual(replayed.archiveDiagnostics, []);
   assert.equal(
     replayed.requirementFulfillment.archiveRehydration.status,
-    "rehydrated"
+    "not_attempted"
   );
   assert.equal(
     replayed.requirementFulfillment.edgeClosureDisposition,
-    "close"
+    null
   );
 });
 
@@ -783,7 +783,7 @@ test("T-158 replayed Eval_Action boundary refs fail as typed diagnostics", () =>
     );
     assert.equal(
       result.requirementFulfillment.archiveRehydration.status,
-      "no_archive_with_consequence_triple"
+      "not_attempted"
     );
   }
 });

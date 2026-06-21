@@ -338,6 +338,16 @@ function activePostflightBlockingReasonCarriers(
     : postflight.blockingReasonCarriers;
 }
 
+function currentPostflightBlocksReviewGradeEvaluator(
+  reason: SdlcBlockingReason
+): boolean {
+  return (
+    reason.lawfulReentryPoint !== "same_edge_retry" &&
+    reason.lawfulReentryPoint !== "repair_worker_output" &&
+    reason.lawfulReentryPoint !== "escalate_to_fp"
+  );
+}
+
 function jsonRecord(value: unknown): Readonly<Record<string, unknown>> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? Object.freeze(Object.fromEntries(Object.entries(value)))
@@ -4288,7 +4298,9 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
   const currentPostflightBlockers =
     input.currentPostflight === null || input.currentPostflight === undefined
       ? Object.freeze([])
-      : activePostflightBlockingReasonCarriers(input.currentPostflight);
+      : activePostflightBlockingReasonCarriers(input.currentPostflight).filter(
+          currentPostflightBlocksReviewGradeEvaluator
+        );
   if (currentPostflightBlockers.length > 0) {
     const diagnosticRefs = uniqueSorted([
       ...(input.currentPostflight?.evidenceRefs ?? []),

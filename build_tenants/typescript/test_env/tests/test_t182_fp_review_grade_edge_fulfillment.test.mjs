@@ -3482,6 +3482,14 @@ test("T-204 review-grade prompts carry current postflight blockers as admitted p
       "build_tenants/typescript/code/src/operator/installed_operator.ts"
     );
     assert.match(installedOperatorSource, /currentPostflightBlockers\.length > 0/u);
+    assert.match(
+      installedOperatorSource,
+      /currentPostflightBlocksReviewGradeEvaluator[\s\S]*same_edge_retry[\s\S]*repair_worker_output[\s\S]*escalate_to_fp/u
+    );
+    assert.match(
+      installedOperatorSource,
+      /activePostflightBlockingReasonCarriers\(input\.currentPostflight\)\.filter\(\s*currentPostflightBlocksReviewGradeEvaluator\s*\)/u
+    );
     assert.match(installedOperatorSource, /current_postflight_blocked/u);
     assert.match(
       installedOperatorSource,
