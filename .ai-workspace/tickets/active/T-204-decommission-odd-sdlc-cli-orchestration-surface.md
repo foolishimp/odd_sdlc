@@ -2376,3 +2376,60 @@ T-204 cannot close while any of the following remain true:
    projections, or closure decisions as runtime truth;
 5. read models reconstruct closure/gap truth directly from raw archive JSON
    instead of ABG-admitted projection facts.
+
+## 2026-06-21 V3 RC1 Migration Evidence
+
+`odd_sdlc` is being migrated to `3.0.0-rc.1` as the first release candidate over
+the T-204 control-boundary break. This is a release migration checkpoint, not
+T-204 closure. The substrate pin is `@abiogenesis/typescript-tenant@4.1.0-rc.3`
+from:
+
+```text
+/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.1.0-rc.3/abiogenesis-typescript-tenant-4.1.0-rc.3.tgz
+```
+
+The rc3 substrate carries the ABG-owned retry-attempt lever override and
+traced-process live-proof substrate. `odd_sdlc` consumes those capabilities
+through the ABG substrate contract; it does not regain local start/control
+authority for this release.
+
+Validation completed for the migration:
+
+| Check | Result |
+| --- | --- |
+| `npm run build:semantic` | passed |
+| `npm run lint:semantic` | passed |
+| `npm run guard:pack-no-command-artifacts` | passed |
+| T-028/T-180/T-197/T-203 focused boundary gate | passed, 49/49 |
+| T-059 install/release adapter | passed, 11/11 |
+| T-192 evaluation-grid prompt contract | passed, 7/7 |
+| `npm pack --dry-run --json` | passed; package identity `odd-sdlc-typescript-tenant-3.0.0-rc.1.tgz` |
+| T-132 JavaScript hello-world live build loop | passed, 1/1 |
+
+T-132 live run evidence:
+
+```text
+build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260621T161811238Z_pid60714
+```
+
+Stage timing from the live run:
+
+| Step | Target graph function | Start | End | Duration min.sec | Result |
+| --- | --- | --- | --- | ---: | --- |
+| 0 | `Fg_conform_project` | `2026-06-21T16:18:19.614Z` | `2026-06-21T16:18:21.529Z` | 0.02 | converged |
+| 1 | `derive_lite_design_adr_surface` | `2026-06-21T16:18:21.529Z` | `2026-06-21T16:24:06.132Z` | 5.45 | converged |
+| 2 | `derive_lite_component_code_surface` | `2026-06-21T16:24:06.133Z` | `2026-06-21T16:29:53.354Z` | 5.47 | converged |
+| 3 | `derive_lite_test_design_surface` | `2026-06-21T16:29:53.355Z` | `2026-06-21T16:33:49.970Z` | 3.57 | converged |
+| 4 | `derive_lite_component_test_surface` | `2026-06-21T16:33:49.972Z` | `2026-06-21T16:41:00.150Z` | 7.10 | converged |
+| 5 | `derive_lite_uat_test_source_surface` | `2026-06-21T16:41:00.152Z` | `2026-06-21T16:45:28.437Z` | 4.28 | converged |
+| 6 | `prepare_test_execution_surface` | `2026-06-21T16:45:28.439Z` | `2026-06-21T16:45:30.528Z` | 0.02 | converged |
+| 7 | `derive_test_execution_result_surface` | `2026-06-21T16:45:30.530Z` | `2026-06-21T16:45:32.732Z` | 0.02 | converged |
+
+Prompt consistency notes from the run:
+
+- component-code, component-test, and UAT-test source stages each had a single
+  declared product target and no contradictory materialization authority;
+- the component-test worker spent extra time on the `.js`/ESM package boundary,
+  but the scenario workspace root supplied `"type": "module"` and the generated
+  `node --test test/hello.test.js` file passed directly before ABG closure;
+- all closure artifacts for the inspected stages reported passed/converged.

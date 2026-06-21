@@ -25,7 +25,7 @@ import {
   sdlcSelectedAbgFnCompositionIdentityFromEnginePluginInput
 } from "../../build/semantic/code/src/operator/index.js";
 
-const ABG_RC_VERSION = "4.1.0-rc.2";
+const ABG_RC_VERSION = "4.1.0-rc.3";
 const ABG_RELEASE_SNAPSHOT_REF = ABG_RC_VERSION;
 const ABG_DEPENDENCY_REF = `file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/${ABG_RELEASE_SNAPSHOT_REF}/abiogenesis-typescript-tenant-${ABG_RC_VERSION}.tgz`;
 

@@ -30,9 +30,9 @@ for the TypeScript line.
 
 The ABIogenesis TypeScript tenant is substrate evidence consumed through
 explicit release snapshots. The TypeScript line currently consumes the
-immutable `@abiogenesis/typescript-tenant@4.1.0-rc.2` release snapshot at
-`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.1.0-rc.2/abiogenesis-typescript-tenant-4.1.0-rc.2.tgz`.
-The `4.1.0-rc.2` cut proves GTL/ABG carriers, graph-function
+immutable `@abiogenesis/typescript-tenant@4.1.0-rc.3` release snapshot at
+`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.1.0-rc.3/abiogenesis-typescript-tenant-4.1.0-rc.3.tgz`.
+The `4.1.0-rc.3` cut proves GTL/ABG carriers, graph-function
 iteration, traversal probes,
 evented saga-frontier execution, no-compute-basis failure taxonomy,
 bootstrap-lineage slices, selected `abg.fn_composition` identity, canonical
@@ -54,7 +54,7 @@ SDLC prompt authority policy remains product overlay data. It also proves
 segment-scoped evaluation redispatch metadata, so downstream SDLC evaluation
 can preserve segment, dimension-cell, fold, and relation scope across ABG-owned
 redispatch instead of collapsing deep evaluation coverage back to edge-granular
-fallbacks. It also carries the clean ABG 4.1.0-rc.2 consolidation of the
+fallbacks. It also carries the clean ABG 4.1.0-rc.3 consolidation of the
 defaults/lever registry, temporal runtime-scope consolidation, iteration
 state-action algebra, prompt asset interface, and contract-fulfillment binding
 API that `odd_sdlc.TS` consumes. It also carries the ABG-owned
@@ -105,6 +105,10 @@ rows. The consequence stage is the bind boundary: SDLC plugins may return
 admitted evidence and traversal-family candidates, but they may not own
 closure-state enums, replay refresh, continuation transition, or product-local
 iteration dispatch.
+It also carries ABG-owned retry-attempt lever override and traced-process live
+proof substrate repairs. SDLC live scenarios consume retry bounds and
+subprocess proof through ABG substrate capabilities, not through product-local
+retry counters, process wrappers, or harness-owned command authority.
 It is not
 itself `odd_sdlc.TS`, and it does not complete the SDLC product behavior.
 

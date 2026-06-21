@@ -314,7 +314,7 @@ test("T-197 design ratifies owner partition assets before Wave 1 code", () => {
     "### Decommission Register",
     "### W-105 Construct-Site Sufficiency Inventory",
     "ABG route / dependency",
-    "ABI 4.1.0-rc.2",
+    "ABI 4.1.0-rc.3",
     "runtime continuation transition projection refs",
     "22/22 edge-contract tests and 1/1 Rust-service sandbox proof",
     "must-not-name-governed-target",

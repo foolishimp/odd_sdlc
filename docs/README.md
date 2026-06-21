@@ -8,6 +8,10 @@ surfaces under `build_tenants/`.
 
 ## Current Supporting Docs
 
+- [ODD_SDLC_V3_0_0_RC_1_RELEASE_NOTE.md](./ODD_SDLC_V3_0_0_RC_1_RELEASE_NOTE.md)
+  records the first `odd_sdlc` v3.0.0 release-candidate identity, ABG
+  `4.1.0-rc.3` substrate pin, T-204 boundary framing, and qualification
+  bundle
 - [ODD_SDLC_V2_0_0_RELEASE_NOTE.md](./ODD_SDLC_V2_0_0_RELEASE_NOTE.md)
   records the final tapped `odd_sdlc` v2.0.0 release identity, qualification
   boundary, and release-proof framing
@@ -20,7 +24,7 @@ surfaces under `build_tenants/`.
 
 ## Archived Material
 
-`old/` holds prior-wave supporting documents superseded by the v2.0.0-rc.2
+`old/` holds prior-wave supporting documents superseded by the v3.0.0-rc.1
 boundary. They remain in the repository as provenance and read-model history,
 not as current authority. Treat any guidance, strategy, task plan, or
 traceability claim under `old/` as historical until rewritten against the

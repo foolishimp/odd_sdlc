@@ -204,7 +204,7 @@ test("T-192 evaluation grid rejects global coverage as a local cell", () => {
         "evaluation-finding://odd-sdlc/t192/global-coverage"
       ],
       abgOutcomeFoldRef:
-        "package:@abiogenesis/typescript-tenant@4.1.0-rc.2#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows",
+        "package:@abiogenesis/typescript-tenant@4.1.0-rc.3#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows",
       provenanceRefs: ["REQ-F-ODDSDLC-088"]
     }),
     /not cell dimensions/u
