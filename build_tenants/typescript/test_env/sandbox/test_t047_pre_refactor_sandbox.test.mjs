@@ -23,6 +23,7 @@ import {
   advanceSdlcOperationalTransitionOnce,
   bindSdlcRoute,
   classifySdlcGapObservation,
+  conformProjectProfileFromConstraintsText,
   constructSdlcGtlModule,
   deriveSdlcGapDossier,
   deriveSdlcLineageLedger,
@@ -51,7 +52,7 @@ import {
 import { canonicalDataMapperFixtureRoot } from "../fixtures/data_mapper_fixture.mjs";
 import {
   projectSdlcWorkerAttachment,
-  publicStartOnce
+  projectSdlcRuntimeBindingContract
 } from "../../build/semantic/code/src/start/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
@@ -301,7 +302,7 @@ function runComposedSdlcSandboxScenario() {
     "transport://t047/harnessed-fp"
   );
 
-  const start = publicStartOnce({
+  const start = projectSdlcRuntimeBindingContract({
     request: {
       kind: "sdlc_public_start_request",
       workspaceRoot: "/tmp/t047",
@@ -314,6 +315,21 @@ function runComposedSdlcSandboxScenario() {
     },
     module,
     queryDomain,
+    conformedProject: conformProjectProfileFromConstraintsText({
+      workspaceRoot: "/tmp/t047",
+      constraintsText: [
+        "project:",
+        "  name: data_mapper",
+        "  selected_output_root: build_tenants/typescript",
+        "  ambiguity_risk_appetite: medium",
+        "build_tenants:",
+        "  typescript:",
+        "    output_dir: build_tenants/typescript",
+        "    capability_contracts:",
+        "      - build_runner",
+        "      - runtime_return_channel"
+      ].join("\n")
+    }),
     workerAttachment
   });
   recordEvent(
@@ -556,7 +572,7 @@ test("T-047 sandbox archives expected and actual composed traversal evidence", a
     archive.actualEventSequence,
     archive.expectedEventSequence
   );
-  assert.equal(result.start.status, "dispatch_required");
+  assert.equal(result.start.status, "projected");
   assert.equal(result.hookTurn.preflight.status, "passed");
   assert.equal(result.hookTurn.postflight?.status, "passed");
   assert.equal(result.hookTurn.emittedRuntimeEventKinds.length, 0);

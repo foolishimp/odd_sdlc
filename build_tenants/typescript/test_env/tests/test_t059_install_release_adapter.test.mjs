@@ -671,10 +671,10 @@ test("T-059 install and release adapters do not own traversal selection", () => 
     resolve(PACKAGE_ROOT, "code/src/release/release_snapshot.ts"),
     "utf8"
   );
-  assert(!installSource.includes("publicStartOnce"));
+  assert(!installSource.includes("projectSdlcRuntimeBindingContract"));
   assert(!installSource.includes("deriveAdvancementTransition"));
-  assert(!releaseSource.includes("publicStartOnce"));
+  assert(!releaseSource.includes("projectSdlcRuntimeBindingContract"));
   assert(!releaseSource.includes("deriveAdvancementTransition"));
-  assert(!releaseSnapshotSource.includes("publicStartOnce"));
+  assert(!releaseSnapshotSource.includes("projectSdlcRuntimeBindingContract"));
   assert(!releaseSnapshotSource.includes("deriveAdvancementTransition"));
 });

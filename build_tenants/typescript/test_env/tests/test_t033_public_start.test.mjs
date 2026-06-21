@@ -18,7 +18,7 @@ import {
 import {
   admitSdlcPublicStartRequest,
   projectSdlcWorkerAttachment,
-  publicStartOnce,
+  projectSdlcRuntimeBindingContract,
   SDLC_PUBLIC_START_TARGET_POLICY
 } from "../../build/semantic/code/src/start/index.js";
 
@@ -93,7 +93,7 @@ test("T-057 public start target resolution policy is declared data", () => {
 
 test("T-033 F_P public start blocks on unattached worker after execution contract admission", () => {
   const { module, queryDomain, conformedProject } = startContext();
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot: "/workspace/t033",
       target: { kind: "graph_function", handle: "bootstrap_release_self_test" },
@@ -106,18 +106,17 @@ test("T-033 F_P public start blocks on unattached worker after execution contrac
     workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
   });
 
-  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_blocked");
   assert.equal(outcome.blockingReason, "fp_worker_unattached");
   assert.equal(outcome.stopPredicate, "worker_attachment_required");
   assert(outcome.executionContract);
   assert.equal(outcome.executionContract.targetGraphFunction, "bootstrap_release_self_test");
   assert.equal(outcome.executionContract.conformedProject.activeTenant, "typescript");
-  assert.deepStrictEqual(outcome.emittedRuntimeEventKinds, []);
 });
 
 test("T-033 attached public start projects one ABI handoff without iterating internally", () => {
   const { module, queryDomain, conformedProject } = startContext();
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot: "/workspace/t033",
       target: { kind: "asset", handle: "release_surface" },
@@ -132,12 +131,10 @@ test("T-033 attached public start projects one ABI handoff without iterating int
     })
   });
 
-  assert.equal(outcome.kind, "sdlc_public_start_projected");
-  assert.equal(outcome.status, "dispatch_required");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_projected");
+  assert.equal(outcome.status, "projected");
   assert.equal(outcome.executionContract.targetGraphFunction, "prepare_release_surface");
-  assert.equal(outcome.transition.kind, "fp_dispatch");
-  assert.equal(outcome.transition.vectorIndex, 0);
-  assert.deepStrictEqual(outcome.emittedRuntimeEventKinds, []);
+  assert.equal(outcome.executionContract.basis.startIntent.target.handle, "prepare_release_surface");
 });
 
 test("T-044 worker attachment rejects empty transport contracts", () => {
@@ -165,7 +162,7 @@ test("T-033 stale query-domain target blocks instead of throwing during ABI admi
       (graphFunction) => graphFunction.name !== "bootstrap_release_self_test"
     )
   };
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot: "/workspace/t033",
       target: { kind: "graph_function", handle: "bootstrap_release_self_test" },
@@ -180,7 +177,7 @@ test("T-033 stale query-domain target blocks instead of throwing during ABI admi
     })
   });
 
-  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_blocked");
   assert.equal(outcome.blockingReason, "stale_query_domain");
   assert.equal(outcome.executionContract, null);
 });
@@ -206,7 +203,7 @@ test("T-033 stale asset ownership projection also blocks as stale query-domain",
       }
     ]
   };
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot: "/workspace/t033",
       target: { kind: "asset", handle: "fake_surface" },
@@ -221,7 +218,7 @@ test("T-033 stale asset ownership projection also blocks as stale query-domain",
     })
   });
 
-  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_blocked");
   assert.equal(outcome.blockingReason, "stale_query_domain");
 });
 
@@ -230,9 +227,11 @@ test("T-033 public start source has no recursive or loop-owned traversal path", 
     new URL("../../code/src/start/public_start.ts", import.meta.url),
     "utf8"
   );
-  const body = source.slice(source.indexOf("export function publicStartOnce"));
+  const body = source.slice(source.indexOf("export function projectSdlcRuntimeBindingContract"));
 
-  assert.equal([...body.matchAll(/\bpublicStartOnce\s*\(/g)].length, 1);
+  assert.equal([...body.matchAll(/\bprojectSdlcRuntimeBindingContract\s*\(/g)].length, 1);
+  assert.equal(body.includes("deriveAdvancementTransition"), false);
+  assert.equal(body.includes("transition"), false);
   assert.equal(/\bfor\s*\(|\bwhile\s*\(/.test(body), false);
   assert.equal(body.includes("selectedNextGraphFunction"), false);
   assert.equal(body.includes("nextTraversal"), false);

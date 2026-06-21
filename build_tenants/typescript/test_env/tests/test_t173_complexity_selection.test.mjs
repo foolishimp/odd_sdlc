@@ -37,7 +37,7 @@ import {
 import {
   admitSdlcPublicStartRequest,
   projectSdlcWorkerAttachment,
-  publicStartOnce
+  projectSdlcRuntimeBindingContract
 } from "../../build/semantic/code/src/start/index.js";
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -132,7 +132,7 @@ test("T-173 selects single-hop typed-template traversal for admitted framework s
 test("T-173 public start selects framework-smoke Min(F_P) graph from trivial proportionality", () => {
   const { module, queryDomain, conformedProject, workspaceRoot } =
     publicStartContext();
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot,
       target: {
@@ -148,7 +148,7 @@ test("T-173 public start selects framework-smoke Min(F_P) graph from trivial pro
     workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
   });
 
-  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_blocked");
   assert.equal(outcome.blockingReason, "fp_worker_unattached");
   assert(outcome.executionContract);
   assert.equal(
@@ -180,7 +180,7 @@ test("T-173 public start selects framework-smoke Min(F_P) graph from trivial pro
 test("T-173 direct lite overlay start carries reduced traversal selection", () => {
   const { module, queryDomain, conformedProject, workspaceRoot } =
     publicStartContext();
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot,
       target: {
@@ -196,7 +196,7 @@ test("T-173 direct lite overlay start carries reduced traversal selection", () =
     workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
   });
 
-  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_blocked");
   assert.equal(outcome.blockingReason, "fp_worker_unattached");
   assert(outcome.executionContract);
   assert.equal(

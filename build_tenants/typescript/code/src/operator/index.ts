@@ -200,13 +200,6 @@ export type {
 } from "./assurance_gate.js";
 
 export {
-  appendOddSdlcRuntimeEvents,
-  oddSdlcRuntimeEventsPath,
-  readOddSdlcRuntimeEvents,
-  readOddSdlcRuntimeEventsSync
-} from "./event_store.js";
-
-export {
   admitComputeSubworkstreamManifest,
   computeSubworkstreamCounts,
   computeSubworkstreamSelectedEdgeRef,

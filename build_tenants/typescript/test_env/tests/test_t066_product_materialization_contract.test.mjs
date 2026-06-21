@@ -66,9 +66,6 @@ import {
   resolveSdlcEdgeGainClosureContract
 } from "../../build/semantic/code/src/operator/edge_gain_closure.js";
 import {
-  readOddSdlcRuntimeEvents
-} from "../../build/semantic/code/src/operator/event_store.js";
-import {
   deriveSdlcPostCloseOverlayContinuationActionInput,
   deriveSdlcProductLineageYieldResumeBasis,
   edgeAssuranceEvidenceCandidatesFor,
@@ -117,7 +114,7 @@ import {
 } from "../../build/semantic/code/src/operator/traversal_consequence.js";
 import {
   projectSdlcWorkerAttachment,
-  publicStartOnce
+  projectSdlcRuntimeBindingContract
 } from "../../build/semantic/code/src/start/public_start.js";
 import { sha256Text } from "../../build/semantic/code/src/shared/digest.js";
 import { canonicalDataMapperFixtureRoot } from "../fixtures/data_mapper_fixture.mjs";
@@ -840,7 +837,7 @@ function makeStart(workspaceRoot) {
   const queryDomain = projectSdlcQueryDomain({ module, ingressReport });
   const conformedProject =
     deriveSdlcConformProjectProfileFromWorkspace(workspaceRoot);
-  const start = publicStartOnce({
+  const start = projectSdlcRuntimeBindingContract({
     request: {
       kind: "sdlc_public_start_request",
       workspaceRoot,
@@ -858,7 +855,7 @@ function makeStart(workspaceRoot) {
       transportContract: "process://node"
     })
   });
-  assert.equal(start.kind, "sdlc_public_start_projected");
+  assert.equal(start.kind, "sdlc_runtime_binding_contract_projected");
   return start;
 }
 

@@ -30,7 +30,7 @@ import {
 } from "../../build/semantic/code/src/index.js";
 import {
   projectSdlcWorkerAttachment,
-  publicStartOnce
+  projectSdlcRuntimeBindingContract
 } from "../../build/semantic/code/src/start/index.js";
 
 function projectContext(input = {}) {
@@ -106,7 +106,7 @@ test("T-165 publishes bootstrap-entry graph function and contract rows", () => {
 
 test("T-165 public start carries optimized bootstrap outcome for framework-smoke work", () => {
   const { module, queryDomain, conformedProject, workspaceRoot } = projectContext();
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: {
       kind: "sdlc_public_start_request",
       workspaceRoot,
@@ -120,7 +120,7 @@ test("T-165 public start carries optimized bootstrap outcome for framework-smoke
     workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
   });
 
-  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_blocked");
   assert(outcome.executionContract);
   const optimization = outcome.executionContract.bootstrapOptimization;
   assert.equal(optimization.outcome.status, "entry_admitted");
@@ -170,7 +170,7 @@ test("T-203 public start triages thread profile into lite proportional entry", (
   const { module, queryDomain, conformedProject, workspaceRoot } = projectContext({
     overlayStrategy: "thread"
   });
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: {
       kind: "sdlc_public_start_request",
       workspaceRoot,
@@ -189,7 +189,7 @@ test("T-203 public start triages thread profile into lite proportional entry", (
     conformedProject.overlayRef,
     SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
   );
-  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_blocked");
   assert(outcome.executionContract);
   assert.equal(
     outcome.executionContract.targetGraphFunction,
@@ -235,7 +235,7 @@ test("T-165 domain products fall back to generic F_P with explicit non-admission
       "      sdlc_outcome_class: domain_product"
     ]
   });
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: {
       kind: "sdlc_public_start_request",
       workspaceRoot,
@@ -249,7 +249,7 @@ test("T-165 domain products fall back to generic F_P with explicit non-admission
     workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
   });
 
-  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_blocked");
   assert(outcome.executionContract);
   const optimization = outcome.executionContract.bootstrapOptimization;
   assert.equal(optimization.outcome.status, "entry_rejected");

@@ -56,7 +56,7 @@ import {
 import {
   admitSdlcPublicStartRequest,
   projectSdlcWorkerAttachment,
-  publicStartOnce
+  projectSdlcRuntimeBindingContract
 } from "../../build/semantic/code/src/start/index.js";
 
 function startContext(workspaceRoot = "/workspace/t160") {
@@ -634,7 +634,7 @@ test("T-164 bootstrap overlay owns initial conformance when the project is under
     )
   );
 
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot,
       target: {
@@ -650,7 +650,7 @@ test("T-164 bootstrap overlay owns initial conformance when the project is under
     workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
   });
 
-  assert.equal(outcome.kind, "sdlc_public_start_projected");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_projected");
   assert(outcome.executionContract);
   assert.equal(outcome.executionContract.targetGraphFunction, FG_CONFORM_PROJECT);
   assert.equal(
@@ -661,7 +661,7 @@ test("T-164 bootstrap overlay owns initial conformance when the project is under
 
 test("T-160 public start admits overlay binding directly for lite traversal", () => {
   const { module, queryDomain, conformedProject, workspaceRoot } = startContext();
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot,
       target: {
@@ -677,7 +677,7 @@ test("T-160 public start admits overlay binding directly for lite traversal", ()
     workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
   });
 
-  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_blocked");
   assert.equal(outcome.blockingReason, "fp_worker_unattached");
   assert(outcome.executionContract);
   assert.equal(
@@ -705,7 +705,7 @@ test("T-160 public start admits overlay binding directly for lite traversal", ()
 
 test("T-200 explicit deep overlay selection preserves current full traversal shape", () => {
   const { module, queryDomain, conformedProject, workspaceRoot } = startContext();
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot,
       target: {
@@ -721,7 +721,7 @@ test("T-200 explicit deep overlay selection preserves current full traversal sha
     workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
   });
 
-  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_blocked");
   assert.equal(outcome.blockingReason, "fp_worker_unattached");
   assert(outcome.executionContract);
   assert.equal(
@@ -750,7 +750,7 @@ test("T-200 explicit deep overlay selection preserves current full traversal sha
 
 test("T-160 post-action overlay repair selects the lite component-code vector", () => {
   const { module, queryDomain, conformedProject, workspaceRoot } = startContext();
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot,
       target: {
@@ -814,7 +814,7 @@ test("T-170 hello-world profile selects thread overlay for next start", () => {
       "      - hello_world_javascript"
     ].join("\n")
   });
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot,
       target: {
@@ -835,7 +835,7 @@ test("T-170 hello-world profile selects thread overlay for next start", () => {
     conformedProject.overlayRef,
     SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
   );
-  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_blocked");
   assert(outcome.executionContract);
   assert.equal(
     outcome.executionContract.targetGraphFunction,
@@ -873,7 +873,7 @@ test("T-170 data-mapper profile selects full lifecycle and preserves broad press
       "      - cdme-executor"
     ].join("\n")
   });
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot,
       target: {
@@ -891,7 +891,7 @@ test("T-170 data-mapper profile selects full lifecycle and preserves broad press
 
   assert.equal(conformedProject.overlayStrategy, "full_lifecycle");
   assert.equal(conformedProject.overlayRef, SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF);
-  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_blocked");
   assert(outcome.executionContract);
   assert.equal(
     outcome.executionContract.targetGraphFunction,
@@ -913,7 +913,7 @@ test("T-170 data-mapper profile selects full lifecycle and preserves broad press
 
 test("T-170 explicit operator overlay selection admits strategy handles", () => {
   const { module, queryDomain, conformedProject, workspaceRoot } = startContext();
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot,
       target: {
@@ -929,7 +929,7 @@ test("T-170 explicit operator overlay selection admits strategy handles", () => 
     workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
   });
 
-  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_blocked");
   assert(outcome.executionContract);
   assert.equal(
     outcome.executionContract.overlayRef,
@@ -946,7 +946,7 @@ test("T-160 public start binds existing overlay assets as material workspace tru
   mkdirSync(path.dirname(materialPath), { recursive: true });
   writeFileSync(materialPath, "# Component Code Surface\n", "utf8");
   const { module, queryDomain, conformedProject } = startContext(workspaceRoot);
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot,
       target: {
@@ -1018,7 +1018,7 @@ test("T-160 public start carries prior admitted overlay ledger and event refs", 
     "utf8"
   );
   const { module, queryDomain, conformedProject } = startContext(workspaceRoot);
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot,
       target: {
@@ -1055,14 +1055,14 @@ test("T-160 overlay replay keeps stable traversal identity while selecting next 
     until: "first_traversal",
     defaultRegime: "F_P"
   };
-  const first = publicStartOnce({
+  const first = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest(baseRequest),
     module,
     queryDomain,
     conformedProject,
     workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
   });
-  const replay = publicStartOnce({
+  const replay = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       ...baseRequest,
       replayNextActionProjectionRef: "next-action://odd-sdlc/t160/derive-design",
@@ -1121,14 +1121,14 @@ test("T-170 profile next replay keeps public-start identity while selecting next
     until: "first_traversal",
     defaultRegime: "F_P"
   };
-  const first = publicStartOnce({
+  const first = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest(baseRequest),
     module,
     queryDomain,
     conformedProject,
     workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
   });
-  const replay = publicStartOnce({
+  const replay = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       ...baseRequest,
       replayNextActionProjectionRef: "next-action://odd-sdlc/t170/code",
@@ -1167,7 +1167,7 @@ test("T-170 profile next replay keeps public-start identity while selecting next
 
 test("T-160 stale overlay binding replay fails closed", () => {
   const { module, queryDomain, conformedProject, workspaceRoot } = startContext();
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot,
       target: {
@@ -1189,7 +1189,7 @@ test("T-160 stale overlay binding replay fails closed", () => {
     workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
   });
 
-  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_blocked");
   assert.equal(outcome.blockingReason, "stale_query_domain");
   assert.equal(outcome.executionContract, null);
 });

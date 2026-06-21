@@ -2,21 +2,16 @@
 
 import {
   existsSync,
+  mkdirSync,
   readdirSync,
   readFileSync,
-  statSync
+  statSync,
+  writeFileSync
 } from "node:fs";
+import { spawnSync, type SpawnSyncOptionsWithStringEncoding } from "node:child_process";
 import path, { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { sdlcExecutiveEdgeAccountingRowFor } from "../../../graph/index.js";
-import {
-  constructSdlcProcessRunPlan,
-  executeSdlcProcessRunPlan
-} from "../../../effects/process_runner.js";
-import {
-  constructSdlcWriteTextFilePlan,
-  executeSdlcFileStoreEffectPlan
-} from "../../../effects/file_store.js";
 import {
   parseClosedRecord,
   parseEnumValue,
@@ -445,12 +440,8 @@ function writeWorkspaceTargetFile(input: {
   readonly filePath: string;
   readonly content: string;
 }): void {
-  executeSdlcFileStoreEffectPlan(
-    constructSdlcWriteTextFilePlan({
-      absolutePath: input.filePath,
-      content: input.content
-    })
-  );
+  mkdirSync(dirname(input.filePath), { recursive: true });
+  writeFileSync(input.filePath, input.content, "utf8");
 }
 
 function componentDepthSurfaceFile(
@@ -1151,26 +1142,25 @@ function runInstalledOperatorShardCommand(input: {
   readonly stdout: string;
   readonly stderr: string;
 } {
-	const env = installedOperatorShardEnvironment(input.cwd);
-  const result = executeSdlcProcessRunPlan(
-    constructSdlcProcessRunPlan({
-      command: process.execPath,
-      args: Object.freeze([
-        "-e",
-        INSTALLED_OPERATOR_SHARD_RUNNER_SOURCE,
-        JSON.stringify({
-          command: input.command,
-          cwd: input.cwd,
-          timeoutMs: input.timeoutMs,
-          env
-        })
-      ]),
+  const env = installedOperatorShardEnvironment(input.cwd);
+  const args = Object.freeze([
+    "-e",
+    INSTALLED_OPERATOR_SHARD_RUNNER_SOURCE,
+    JSON.stringify({
+      command: input.command,
       cwd: input.cwd,
-      env,
-      maxBufferBytes: 1024 * 1024 * 20,
-      timeoutMs: input.timeoutMs + 5000
+      timeoutMs: input.timeoutMs,
+      env
     })
-  );
+  ]);
+  const options: SpawnSyncOptionsWithStringEncoding = {
+    cwd: input.cwd,
+    env: { ...process.env, ...env },
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 20,
+    timeout: input.timeoutMs + 5000
+  };
+  const result = spawnSync(process.execPath, [...args], options);
   const raw = result.stdout.trim();
   if (raw.length > 0) {
     try {
@@ -1193,15 +1183,17 @@ function runInstalledOperatorShardCommand(input: {
   return Object.freeze({
     status: result.status,
     signal: result.signal,
-    error: result.errorMessage,
-    timedOut: result.errorMessage === "spawnSync node ETIMEDOUT",
+    error: result.error instanceof Error ? result.error.message : null,
+    timedOut:
+      result.error instanceof Error &&
+      result.error.message === "spawnSync node ETIMEDOUT",
     stdout: result.stdout,
     stderr: result.stderr
   });
 }
 
 function installedOperatorShardEnvironment(workspaceRoot: string): Record<string, string> {
-	const env: Record<string, string> = {};
+  const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) {
     if (typeof value !== "string") {
       continue;

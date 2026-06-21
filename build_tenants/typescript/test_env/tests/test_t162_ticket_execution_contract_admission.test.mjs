@@ -22,7 +22,7 @@ import {
 import {
   admitSdlcPublicStartRequest,
   projectSdlcWorkerAttachment,
-  publicStartOnce
+  projectSdlcRuntimeBindingContract
 } from "../../build/semantic/code/src/start/index.js";
 
 function workspace() {
@@ -97,7 +97,7 @@ function context(root) {
 
 function startTicket(root, ticketId) {
   const { module, queryDomain, conformedProject } = context(root);
-  return publicStartOnce({
+  return projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot: root,
       target: { kind: "asset", handle: `ticket/${ticketId}` },
@@ -137,7 +137,7 @@ test("T-162 active valid ticket admits to an execution contract and public start
   assert.deepStrictEqual(contract.sourceDocuments, ["specification/PRODUCT.md"]);
 
   const outcome = startTicket(root, "T-162");
-  assert.equal(outcome.kind, "sdlc_public_start_projected");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_projected");
   assert.equal(outcome.executionContract.targetGraphFunction, "route_ticket_work_item");
   assert.equal(outcome.executionContract.overlayRef, SDLC_TICKET_WORKFLOW_OVERLAY_REF);
   assert.equal(outcome.executionContract.ticketExecutionContract?.ticketId, "T-162");

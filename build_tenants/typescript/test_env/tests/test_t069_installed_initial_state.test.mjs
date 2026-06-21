@@ -89,12 +89,18 @@ test("T-069 validates installed data_mapper initial state before traversal", asy
     readJson(archive.conformedProjectPath).selectedOutputRoot,
     "build_tenants/scala_spark"
   );
+  assert.equal(existsSync(install.installManifestPath), true);
 
   const eventLog = path.join(workspaceRoot, ".ai-workspace/events/events.jsonl");
-  assert.equal(existsSync(eventLog), true);
-  const eventLines = readFileSync(eventLog, "utf8").trim().split(/\r?\n/u);
-  assert.equal(eventLines.length, 1);
-  assert.equal(JSON.parse(eventLines[0]).kind, "workspace_installation_admitted");
+  const eventLines = existsSync(eventLog)
+    ? readFileSync(eventLog, "utf8").trim().split(/\r?\n/u).filter(Boolean)
+    : [];
+  assert.equal(
+    eventLines.some(
+      (line) => JSON.parse(line).kind === "workspace_installation_admitted"
+    ),
+    false
+  );
 });
 
 test("T-069 initial-state validation fails closed without installed topology", () => {

@@ -2,13 +2,15 @@
 
 import {
   existsSync,
+  mkdirSync,
   readFileSync,
-  statSync
+  renameSync,
+  statSync,
+  writeFileSync
 } from "node:fs";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { EnginePluginInput, RuntimeRegime } from "@abiogenesis/typescript-tenant";
-import { writeUtf8FileAtomically } from "../../../effects/archive_store.js";
 import { uniqueLocaleSorted as uniqueSorted } from "../../../shared/collections.js";
 import type { SdlcDesignDepthRegister } from "../../carriers.js";
 import { parseDesignDepthRegisterPayload } from "../../design_depth_register.js";
@@ -23,6 +25,21 @@ export const SDLC_EVALUATE_AUTHORITY_FUNCTIONS = Object.freeze([
 
 export type SdlcEvaluateAuthorityFunction =
   (typeof SDLC_EVALUATE_AUTHORITY_FUNCTIONS)[number];
+
+function writeUtf8FileAtomically(input: {
+  readonly targetPath: string;
+  readonly content: string;
+}): string {
+  const targetDirectory = dirname(input.targetPath);
+  const tempPath = join(
+    targetDirectory,
+    `.${basename(input.targetPath)}.${process.pid}.tmp`
+  );
+  mkdirSync(targetDirectory, { recursive: true });
+  writeFileSync(tempPath, input.content, "utf8");
+  renameSync(tempPath, input.targetPath);
+  return input.targetPath;
+}
 
 export const SDLC_EVALUATE_CONTENT_CARRIER_FAMILIES = Object.freeze([
   "ProductAssetModel",

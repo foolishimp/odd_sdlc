@@ -12,12 +12,9 @@ import {
   admitStartIntent,
   constructConstructionPriorityRule,
   constructConstructionPriorityScheme,
-  deriveAdvancementTransition,
-  type AdvancementTransition,
   type GraphFunction,
   type ExecutionBasis,
   type Module,
-  type RuntimeEvent,
   type RuntimeRegime,
   type StartIntent,
   type StartRuntimeTraversalStrategySelection
@@ -151,9 +148,9 @@ export interface SdlcExecutionContract {
   readonly runtimeTraversalSelections?: readonly StartRuntimeTraversalStrategySelection[];
 }
 
-export type SdlcPublicStartOutcome =
+export type SdlcRuntimeBindingContractProjection =
   | {
-      readonly kind: "sdlc_public_start_blocked";
+      readonly kind: "sdlc_runtime_binding_contract_blocked";
       readonly status: "blocked";
       readonly blockingReason:
         | "fp_worker_unattached"
@@ -163,14 +160,11 @@ export type SdlcPublicStartOutcome =
         | SdlcTicketExecutionBlockingReason;
       readonly stopPredicate: "worker_attachment_required" | "gap_stop";
       readonly executionContract: SdlcExecutionContract | null;
-      readonly emittedRuntimeEventKinds: readonly RuntimeEvent["kind"][];
     }
   | {
-      readonly kind: "sdlc_public_start_projected";
-      readonly status: "dispatch_required" | "advanced" | "converged";
+      readonly kind: "sdlc_runtime_binding_contract_projected";
+      readonly status: "projected";
       readonly executionContract: SdlcExecutionContract;
-      readonly transition: AdvancementTransition;
-      readonly emittedRuntimeEventKinds: readonly RuntimeEvent["kind"][];
     };
 
 export function admitSdlcPublicStartRequest(
@@ -1700,25 +1694,13 @@ function moduleHasGraphFunction(module: Module, graphFunctionName: string): bool
   );
 }
 
-function statusFromTransition(
-  transition: AdvancementTransition
-): "dispatch_required" | "advanced" | "converged" {
-  if (transition.kind === "fp_dispatch" || transition.kind === "fh_escalation") {
-    return "dispatch_required";
-  }
-  if (transition.kind === "terminal") {
-    return "converged";
-  }
-  return "advanced";
-}
-
-export function publicStartOnce(input: {
+export function projectSdlcRuntimeBindingContract(input: {
   readonly request: SdlcPublicStartRequest;
   readonly module: Module;
   readonly queryDomain: SdlcQueryDomainProjection;
   readonly conformedProject: SdlcConformProjectProfile;
   readonly workerAttachment: SdlcWorkerAttachment;
-}): SdlcPublicStartOutcome {
+}): SdlcRuntimeBindingContractProjection {
   assertCurrentSdlcGtlProgramConformance();
   const targetResolution = evaluateInitialPublicStartAction({
     request: input.request,
@@ -1734,12 +1716,11 @@ export function publicStartOnce(input: {
     targetResolution.bootstrapOptimization === null
   ) {
     return Object.freeze({
-      kind: "sdlc_public_start_blocked",
+      kind: "sdlc_runtime_binding_contract_blocked",
       status: "blocked",
       blockingReason: targetResolution.blockingReason ?? "target_unavailable",
       stopPredicate: "gap_stop",
-      executionContract: null,
-      emittedRuntimeEventKinds: Object.freeze([])
+      executionContract: null
     });
   }
   if (
@@ -1747,22 +1728,20 @@ export function publicStartOnce(input: {
     targetResolution.targetGraphFunction !== FG_CONFORM_PROJECT
   ) {
     return Object.freeze({
-      kind: "sdlc_public_start_blocked",
+      kind: "sdlc_runtime_binding_contract_blocked",
       status: "blocked",
       blockingReason: "project_conformance_blocked",
       stopPredicate: "gap_stop",
-      executionContract: null,
-      emittedRuntimeEventKinds: Object.freeze([])
+      executionContract: null
     });
   }
   if (!moduleHasGraphFunction(input.module, targetResolution.targetGraphFunction)) {
     return Object.freeze({
-      kind: "sdlc_public_start_blocked",
+      kind: "sdlc_runtime_binding_contract_blocked",
       status: "blocked",
       blockingReason: "stale_query_domain",
       stopPredicate: "gap_stop",
-      executionContract: null,
-      emittedRuntimeEventKinds: Object.freeze([])
+      executionContract: null
     });
   }
   const executionContract = constructExecutionContract({
@@ -1785,20 +1764,16 @@ export function publicStartOnce(input: {
     targetResolution.targetGraphFunction !== FG_CONFORM_PROJECT
   ) {
     return Object.freeze({
-      kind: "sdlc_public_start_blocked",
+      kind: "sdlc_runtime_binding_contract_blocked",
       status: "blocked",
       blockingReason: "fp_worker_unattached",
       stopPredicate: "worker_attachment_required",
-      executionContract,
-      emittedRuntimeEventKinds: Object.freeze([])
+      executionContract
     });
   }
-  const transition = deriveAdvancementTransition(executionContract.basis);
   return Object.freeze({
-    kind: "sdlc_public_start_projected",
-    status: statusFromTransition(transition),
-    executionContract,
-    transition,
-    emittedRuntimeEventKinds: Object.freeze([])
+    kind: "sdlc_runtime_binding_contract_projected",
+    status: "projected",
+    executionContract
   });
 }

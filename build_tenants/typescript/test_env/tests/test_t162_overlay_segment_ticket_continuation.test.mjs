@@ -32,7 +32,7 @@ import {
 import {
   admitSdlcPublicStartRequest,
   projectSdlcWorkerAttachment,
-  publicStartOnce
+  projectSdlcRuntimeBindingContract
 } from "../../build/semantic/code/src/start/index.js";
 
 function workspace() {
@@ -82,7 +82,7 @@ function queryContext(root) {
 
 function startTicket(root, ticketId) {
   const context = queryContext(root);
-  return publicStartOnce({
+  return projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot: root,
       target: { kind: "asset", handle: `ticket/${ticketId}` },
@@ -237,7 +237,7 @@ overlay_continuation_proof_expectation: route final-node pressure through admitt
   const ticketRefs = sdlcTicketExecutionContractRefs(contract);
 
   const start = startTicket(root, "T-400");
-  assert.equal(start.kind, "sdlc_public_start_projected");
+  assert.equal(start.kind, "sdlc_runtime_binding_contract_projected");
   assert.equal(start.executionContract.targetGraphFunction, "derive_intent_surface");
   assert.equal(start.executionContract.overlayRef, SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF);
   assert.equal(

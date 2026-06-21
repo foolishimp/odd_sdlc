@@ -16,28 +16,15 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
-  admitExecutionBasis,
-  admitResolvedPolicyIdentity,
-  admitResolvedRuntimeIdentity,
-  admitStartIntent,
-  constructFrameOpenedEvent,
-  constructGraphCallOpenedEvent,
-  constructVectorClosedEvent,
-  constructVectorTraversalPlannedEvent
-} from "@abiogenesis/typescript-tenant";
-
-import {
   constructSdlcGtlModule,
   constructSdlcTargetCarrierRegistry,
   hookContractByEdgeName,
   SDLC_T172_FULL_TRAVERSAL_EDGE_ACCOUNTING
 } from "../../build/semantic/code/src/index.js";
 import {
-  appendOddSdlcRuntimeEvents,
   constructPostflightGapDossier,
   constructWorkerProcessFailurePostflight,
   deriveWorkerHandoffManifest,
-  readOddSdlcRuntimeEventsSync,
   SDLC_COMPONENT_DEPTH_REGISTER_CONTRACT_TRACE,
   sdlcEdgeOutputPolicyForTargetAssetType
 } from "../../build/semantic/code/src/operator/index.js";
@@ -62,41 +49,6 @@ function makeWorkspace() {
   mkdirSync(path.join(root, "specification/requirements"), { recursive: true });
   writeFileSync(path.join(root, "README.md"), "# T-184 fixture\n", "utf8");
   return root;
-}
-
-function moduleBasis(handle = "derive_intent_surface") {
-  const module = constructSdlcGtlModule();
-  return admitExecutionBasis({
-    startIntent: admitStartIntent({
-      scope: {
-        kind: "workspace",
-        workspaceRoot: "/workspace/t184",
-        moduleName: module.name
-      },
-      target: {
-        kind: "graph_function",
-        handle
-      },
-      until: "converged"
-    }),
-    module,
-    runtimeIdentity: admitResolvedRuntimeIdentity({
-      workerId: "worker://odd-sdlc/typescript",
-      backendId: "backend://node",
-      buildId: "build://odd-sdlc/typescript",
-      resolvedRuntimeRef: "runtime://abiogenesis/typescript"
-    }),
-    resolvedPolicy: admitResolvedPolicyIdentity({
-      resolvedPolicyBundleRef: "policy://odd-sdlc/t184/F_P",
-      defaultRegime: "F_P",
-      dispatchRef: "dispatch://odd-sdlc/t184",
-      approvalSubjectRef: null
-    }),
-    runId: "run://odd-sdlc/t184",
-    workKey: "wk://odd-sdlc/t184",
-    frameId: null,
-    frameLineageId: null
-  });
 }
 
 function walkTsFiles(root) {
@@ -126,10 +78,17 @@ test("T-184 removes handoff.ts as a public operator surface", () => {
     REPO_ROOT,
     "build_tenants/typescript/code/src/operator"
   );
+  const directWriteAllowed = new Set([
+    "build_tenants/typescript/code/src/operator/system_artifacts.ts",
+    "build_tenants/typescript/code/src/operator/plugins/consequence/edge_projection.ts",
+    "build_tenants/typescript/code/src/operator/plugins/evaluate/content_register.ts"
+  ]);
   for (const filePath of walkTsFiles(operatorSourceRoot)) {
     const source = readFileSync(filePath, "utf8");
+    const relativePath = path.relative(REPO_ROOT, filePath).split(path.sep).join("/");
     assert.doesNotMatch(source, /from "\.\/handoff\.js"/u, filePath);
     assert.doesNotMatch(source, /from "\.\.\/handoff\.js"/u, filePath);
+    assert.doesNotMatch(source, /effects\/(?:archive_store|file_store|process_runner)/u, filePath);
     assert.doesNotMatch(source, /writeOperatorArchiveFile/u, filePath);
     assert.doesNotMatch(source, /writeInstalledOperatorNoDispatchArtifact/u, filePath);
     assert.doesNotMatch(source, /ensureObservedTransformOutput/u, filePath);
@@ -137,7 +96,9 @@ test("T-184 removes handoff.ts as a public operator surface", () => {
     assert.doesNotMatch(source, /target_asset_catalog_fallback/u, filePath);
     assert.doesNotMatch(source, /legacyReplayOnlyCompositionIdentityForInput/u, filePath);
     assert.doesNotMatch(source, /installedOperatorOwnsEvaluationOutput/u, filePath);
-    assert.doesNotMatch(source, /\bwriteFileSync\b/u, filePath);
+    if (!directWriteAllowed.has(relativePath)) {
+      assert.doesNotMatch(source, /\bwriteFileSync\b/u, filePath);
+    }
     assert.doesNotMatch(source, /\bappendFileSync\b/u, filePath);
     assert.doesNotMatch(source, /\bcreateWriteStream\b/u, filePath);
   }
@@ -152,142 +113,17 @@ test("T-184 removes handoff.ts as a public operator surface", () => {
   assert.doesNotMatch(operatorIndex, /handoff\.js/u);
 });
 
-test("T-184 runtime event persistence is an ABG append sink", () => {
-  const eventStoreSource = readRepoFile(
-    "build_tenants/typescript/code/src/operator/event_store.ts"
-  );
-
-  assert.match(eventStoreSource, /\bemit\b/u);
-  assert.match(eventStoreSource, /emit\(input\.events/u);
-  assert.match(eventStoreSource, /\bappendFile\b/u);
-  assert.doesNotMatch(eventStoreSource, /\bwriteFile\b/u);
-  assert.doesNotMatch(eventStoreSource, /uniqueRuntimeEventsInReplayOrder/u);
-  assert.doesNotMatch(eventStoreSource, /eventAdmissionOrdinal/u);
-  assert.doesNotMatch(eventStoreSource, /replayOrderedEvents/u);
-  assert.doesNotMatch(eventStoreSource, /readOddSdlcRuntimeEvents\(input\.workspaceRoot\)/u);
-});
-
-test("T-184 runtime event persistence appends and reads archive order", async () => {
-  const workspaceRoot = makeWorkspace();
-  const basis = moduleBasis();
-  const events = [
-    constructGraphCallOpenedEvent(basis),
-    constructFrameOpenedEvent(basis),
-    constructVectorTraversalPlannedEvent({ basis, vectorIndex: 0 }),
-    constructVectorClosedEvent({ basis, vectorIndex: 0, closureKind: "advanced" })
-  ].map((event, index) => {
-    const eventTime = new Date(Date.UTC(2026, 4, 28, 0, 0, 0, index)).toISOString();
-    return {
-      ...event,
-      eventId: `runtime-event:t184:${index}`,
-      eventTime,
-      eventTimeUnixMs: Date.parse(eventTime),
-      eventAdmissionOrdinal: index
-    };
-  });
-  await appendOddSdlcRuntimeEvents({
-    workspaceRoot,
-    events: [events[2], events[0]]
-  });
-  const eventLogPath = path.join(
-    workspaceRoot,
-    ".ai-workspace",
-    "events",
-    "events.jsonl"
-  );
-  const firstRawEventLog = readFileSync(eventLogPath, "utf8");
-  assert.deepEqual(
-    firstRawEventLog
-      .trim()
-      .split(/\r?\n/u)
-      .map((line) => JSON.parse(line).eventAdmissionOrdinal),
-    [2, 0]
-  );
-
-  await appendOddSdlcRuntimeEvents({
-    workspaceRoot,
-    events: [events[3], events[1]]
-  });
-  const secondRawEventLog = readFileSync(eventLogPath, "utf8");
+test("T-204 removes SDLC-owned runtime event persistence", () => {
   assert.equal(
-    secondRawEventLog.startsWith(firstRawEventLog),
-    true,
-    "runtime event persistence must append to the existing stream"
+    existsSync(path.join(REPO_ROOT, "build_tenants/typescript/code/src/operator/event_store.ts")),
+    false
   );
-  assert.deepEqual(
-    secondRawEventLog
-      .trim()
-      .split(/\r?\n/u)
-      .map((line) => JSON.parse(line).eventAdmissionOrdinal),
-    [2, 0, 3, 1]
+  const operatorIndex = readRepoFile(
+    "build_tenants/typescript/code/src/operator/index.ts"
   );
-
-  const stored = readOddSdlcRuntimeEventsSync(workspaceRoot);
-  assert.deepEqual(
-    stored.map((event) => event.eventAdmissionOrdinal),
-    [2, 0, 3, 1]
-  );
-  assert.deepEqual(
-    stored.map((event) => event.eventId),
-    [events[2], events[0], events[3], events[1]].map((event) => event.eventId)
-  );
-});
-
-test("T-184 runtime event persistence never rewrites or de-dupes existing archive truth", async () => {
-  const workspaceRoot = makeWorkspace();
-  const basis = moduleBasis();
-  const events = [
-    constructGraphCallOpenedEvent(basis),
-    constructFrameOpenedEvent(basis),
-    constructVectorTraversalPlannedEvent({ basis, vectorIndex: 0 })
-  ].map((event, index) => {
-    const eventTime = new Date(Date.UTC(2026, 4, 28, 0, 0, 1, index)).toISOString();
-    return {
-      ...event,
-      eventId: `runtime-event:t184-append-only:${index}`,
-      eventTime,
-      eventTimeUnixMs: Date.parse(eventTime),
-      eventAdmissionOrdinal: 30 - index
-    };
-  });
-  const eventLogPath = path.join(
-    workspaceRoot,
-    ".ai-workspace",
-    "events",
-    "events.jsonl"
-  );
-  mkdirSync(path.dirname(eventLogPath), { recursive: true });
-  const existingArchiveTruth = `${JSON.stringify(events[0])}\n`;
-  writeFileSync(eventLogPath, existingArchiveTruth, "utf8");
-
-  await appendOddSdlcRuntimeEvents({
-    workspaceRoot,
-    events: [events[0], events[2], events[1]]
-  });
-
-  const rawEventLog = readFileSync(eventLogPath, "utf8");
-  assert.equal(
-    rawEventLog.startsWith(existingArchiveTruth),
-    true,
-    "event sink must preserve prior archive bytes exactly"
-  );
-  const rawEvents = rawEventLog
-    .trim()
-    .split(/\r?\n/u)
-    .map((line) => JSON.parse(line));
-  assert.deepEqual(
-    rawEvents.map((event) => event.eventId),
-    [events[0], events[0], events[2], events[1]].map((event) => event.eventId)
-  );
-  assert.deepEqual(
-    rawEvents.map((event) => event.eventAdmissionOrdinal),
-    [30, 30, 28, 29]
-  );
-  assert.equal(
-    rawEvents.filter((event) => event.eventId === events[0].eventId).length,
-    2,
-    "event sink must not perform cross-archive duplicate suppression"
-  );
+  assert.doesNotMatch(operatorIndex, /event_store\.js/u);
+  assert.doesNotMatch(operatorIndex, /appendOddSdlcRuntimeEvents/u);
+  assert.doesNotMatch(operatorIndex, /readOddSdlcRuntimeEvents/u);
 });
 
 test("T-184 product materialization observation and replay live under product modules", () => {

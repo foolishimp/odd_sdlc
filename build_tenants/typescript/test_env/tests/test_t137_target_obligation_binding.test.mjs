@@ -14,7 +14,7 @@ import {
 import {
   admitSdlcPublicStartRequest,
   projectSdlcWorkerAttachment,
-  publicStartOnce
+  projectSdlcRuntimeBindingContract
 } from "../../build/semantic/code/src/start/index.js";
 
 function queryContext() {
@@ -144,7 +144,7 @@ test("T-137 published target action is eligible only when bound to target asset"
 
 test("T-137 public start targets published action rather than broad executive", () => {
   const { module, queryDomain, conformedProject } = queryContext();
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot: "/workspace/t137",
       target: { kind: "asset", handle: "release_surface" },
@@ -159,14 +159,14 @@ test("T-137 public start targets published action rather than broad executive", 
     })
   });
 
-  assert.equal(outcome.kind, "sdlc_public_start_projected");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_projected");
   assert.equal(outcome.executionContract.targetGraphFunction, "prepare_release_surface");
   assert.notEqual(outcome.executionContract.targetGraphFunction, "bootstrap_release_self_test");
 });
 
 test("T-137 public start blocks unpublished product-file target with no broad fallback", () => {
   const { module, queryDomain, conformedProject } = queryContext();
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot: "/workspace/t137",
       target: { kind: "asset", handle: "rust_hello_world_product_files" },
@@ -181,7 +181,7 @@ test("T-137 public start blocks unpublished product-file target with no broad fa
     })
   });
 
-  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_blocked");
   assert.equal(outcome.blockingReason, "target_unavailable");
   assert.equal(outcome.executionContract, null);
 });

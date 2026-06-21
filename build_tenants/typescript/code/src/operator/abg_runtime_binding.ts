@@ -16,7 +16,7 @@ import {
 import { projectSdlcQueryDomain } from "../projection/index.js";
 import {
   projectSdlcWorkerAttachment,
-  publicStartOnce,
+  projectSdlcRuntimeBindingContract,
   type SdlcPublicStartUntil
 } from "../start/index.js";
 import {
@@ -87,7 +87,7 @@ export function createOddSdlcAbgRuntimeBindingPlugins(
     projectConformance: deriveSdlcConformProjectReportFromWorkspace(workspaceRoot)
   });
   const workerTransport = input.workerTransport ?? null;
-  const start = publicStartOnce({
+  const start = projectSdlcRuntimeBindingContract({
     request: {
       kind: "sdlc_public_start_request",
       workspaceRoot,

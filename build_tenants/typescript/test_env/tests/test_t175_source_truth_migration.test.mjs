@@ -44,9 +44,6 @@ import {
   selectSdlcDependencyMapTraversal,
   writeSdlcSystemArtifact
 } from "../../build/semantic/code/src/operator/index.js";
-import {
-  constructSdlcWriteTextFilePlan
-} from "../../build/semantic/code/src/effects/file_store.js";
 
 import { analyzeSdlcFdRunArchive } from "../../build/semantic/code/src/analysis/analyze.js";
 import { readOperatorRunCarriers } from "../../build/semantic/code/src/analysis/carrier_loaders.js";
@@ -602,12 +599,17 @@ test("T-175 tenant stack and postflight decisions are carrier-owned", () => {
     "reprice_requirement_or_design"
   ]);
 
-  const writePlan = constructSdlcWriteTextFilePlan({
-    absolutePath: "/tmp/odd-sdlc-t175-proof.txt",
-    content: "ok"
-  });
-  assert.equal(writePlan.effectKind, "write_text_file");
-  assert.equal(writePlan.createParentDirectories, true);
+  const archiveRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t175-writer-"));
+  try {
+    const writtenPath = writeSdlcSystemArtifact({
+      archiveRoot,
+      relativePath: "diagnostics/proof.txt",
+      payload: "ok"
+    });
+    assert.equal(readFileSync(writtenPath, "utf8"), "ok");
+  } finally {
+    rmSync(archiveRoot, { recursive: true, force: true });
+  }
 });
 
 test("T-175 runtime gaps fail closed on malformed T-174 frontier artifact", () => {

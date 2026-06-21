@@ -32,7 +32,7 @@ import {
 import {
   admitSdlcPublicStartRequest,
   projectSdlcWorkerAttachment,
-  publicStartOnce
+  projectSdlcRuntimeBindingContract
 } from "../../build/semantic/code/src/start/index.js";
 
 function context(activeTenant = "typescript") {
@@ -144,7 +144,7 @@ function featureDecompManifest(workspaceRoot) {
 
 test("T-135 public start admits initial evaluate_next projection and construction intent", () => {
   const { module, queryDomain, conformedProject, workspaceRoot } = context();
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot,
       target: { kind: "graph_function", handle: "bootstrap_release_self_test" },
@@ -157,7 +157,7 @@ test("T-135 public start admits initial evaluate_next projection and constructio
     workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
   });
 
-  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_blocked");
   assert.equal(outcome.blockingReason, "fp_worker_unattached");
   assert(outcome.executionContract);
   assert.equal(
@@ -196,7 +196,7 @@ test("T-135 public start admits initial evaluate_next projection and constructio
 
 test("T-135 asset start target dispatches from admitted construction intent", () => {
   const { module, queryDomain, conformedProject, workspaceRoot } = context();
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot,
       target: { kind: "asset", handle: "release_surface" },
@@ -211,7 +211,7 @@ test("T-135 asset start target dispatches from admitted construction intent", ()
     })
   });
 
-  assert.equal(outcome.kind, "sdlc_public_start_projected");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_projected");
   assert.equal(outcome.executionContract.targetGraphFunction, "prepare_release_surface");
   assert.match(
     outcome.executionContract.constructionIntent.selectedActionRef,
@@ -226,7 +226,7 @@ test("T-135 asset start target dispatches from admitted construction intent", ()
 test("T-135 unpublished target cannot fabricate an executable construction intent", () => {
   const { module, queryDomain, conformedProject, workspaceRoot } =
     context("hello_world_rust");
-  const outcome = publicStartOnce({
+  const outcome = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot,
       target: { kind: "asset", handle: "rust_hello_world_product_files" },
@@ -241,7 +241,7 @@ test("T-135 unpublished target cannot fabricate an executable construction inten
     })
   });
 
-  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert.equal(outcome.kind, "sdlc_runtime_binding_contract_blocked");
   assert.equal(outcome.blockingReason, "target_unavailable");
   assert.equal(outcome.executionContract, null);
 });

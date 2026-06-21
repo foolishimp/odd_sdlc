@@ -103,7 +103,7 @@ import {
   runSdlcHookTurn,
   type SdlcHookTurnOutcome
 } from "../hooks/index.js";
-import type { SdlcPublicStartOutcome } from "../start/index.js";
+import type { SdlcRuntimeBindingContractProjection } from "../start/index.js";
 import type {
   SdlcInstalledOperatorStatus,
   SdlcPostflightGapDossier,
@@ -783,7 +783,7 @@ function postActionProjectionHasExplicitFeatureScope(input: {
 
 function postActionProjectionCarriesRetryContext(input: {
   readonly nextActionProjection: NonNullable<
-    SdlcPublicStartOutcome["executionContract"]
+    SdlcRuntimeBindingContractProjection["executionContract"]
   >["nextActionProjection"];
 }): boolean {
   return (
@@ -843,7 +843,7 @@ function gapDossierFromPostActionArchiveRef(
 
 function postActionGapDossiersFromProjection(input: {
   readonly nextActionProjection: NonNullable<
-    SdlcPublicStartOutcome["executionContract"]
+    SdlcRuntimeBindingContractProjection["executionContract"]
   >["nextActionProjection"];
 }): readonly SdlcPostflightGapDossier[] {
   const byRef = new Map<string, SdlcPostflightGapDossier>();
@@ -873,7 +873,7 @@ function postActionGapDossiersFromProjection(input: {
 
 export function deriveSdlcWorkerRetryContextFromPostActionProjection(input: {
   readonly nextActionProjection: NonNullable<
-    SdlcPublicStartOutcome["executionContract"]
+    SdlcRuntimeBindingContractProjection["executionContract"]
   >["nextActionProjection"];
   readonly vectorIndex: number;
 }): SdlcWorkerRetryContext | undefined {
@@ -7519,7 +7519,7 @@ function abgTraversalTransitionProjectionRef(input: {
 
 function deriveInstalledTraversalConsequence(input: {
   readonly basis: ExecutionBasis;
-  readonly start: SdlcPublicStartOutcome;
+  readonly start: SdlcRuntimeBindingContractProjection;
   readonly state: SdlcAbgOwnedFpDispatchState;
   readonly replayEvents: readonly RuntimeEvent[];
   readonly admittedAssetEvents?: readonly RuntimeEvent[];
@@ -8090,7 +8090,7 @@ function installedDepthTraversalActionBinding(input: {
   readonly basis: ExecutionBasis;
   readonly pluginInput: EnginePluginInput;
   readonly consequence: ReturnType<typeof deriveInstalledTraversalConsequence>;
-  readonly executionContract: NonNullable<SdlcPublicStartOutcome["executionContract"]>;
+  readonly executionContract: NonNullable<SdlcRuntimeBindingContractProjection["executionContract"]>;
   readonly traversalStrategyDecision: SdlcTraversalStrategyDecision;
 }) {
   const nextAction = input.consequence.nextActionProjection;
@@ -8504,7 +8504,7 @@ function workerRuntimeTriageStop(postflight: SdlcPostflightResult): boolean {
 
 export interface SdlcInstalledOperatorAbgPluginSessionInput {
   readonly workspaceRoot: string;
-  readonly start: SdlcPublicStartOutcome;
+  readonly start: SdlcRuntimeBindingContractProjection;
   readonly workerTransport: string | null;
   readonly replayEvents: readonly RuntimeEvent[];
   readonly effectiveReplayEvents: readonly RuntimeEvent[];

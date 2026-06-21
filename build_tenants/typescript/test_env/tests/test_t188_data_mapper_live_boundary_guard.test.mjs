@@ -12,7 +12,6 @@ const RUNTIME_SOURCE_ROOTS = [
   "code/src/admission",
   "code/src/authority",
   "code/src/contracts",
-  "code/src/effects",
   "code/src/graph",
   "code/src/hooks",
   "code/src/operational",

@@ -25,7 +25,7 @@ import {
 import {
   admitSdlcPublicStartRequest,
   projectSdlcWorkerAttachment,
-  publicStartOnce
+  projectSdlcRuntimeBindingContract
 } from "../../build/semantic/code/src/start/index.js";
 
 function writeJson(filePath, payload) {
@@ -73,7 +73,7 @@ function context(root) {
 
 function startTicket(root, ticketId) {
   const { module, queryDomain, conformedProject } = context(root);
-  return publicStartOnce({
+  return projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot: root,
       target: { kind: "asset", handle: `ticket/${ticketId}` },
@@ -306,7 +306,7 @@ test("T-162 retry exhaustion emits gap tickets and admits ticket workflow start"
   }
 
   const start = startTicket(root, intake.parentTicket.ticketId);
-  assert.equal(start.kind, "sdlc_public_start_projected");
+  assert.equal(start.kind, "sdlc_runtime_binding_contract_projected");
   assert.equal(start.executionContract.targetGraphFunction, "route_ticket_work_item");
   assert.equal(start.executionContract.overlayRef, SDLC_TICKET_WORKFLOW_OVERLAY_REF);
   assert.equal(
@@ -352,7 +352,7 @@ test("T-162 terminal assessment-invalid blocking reason emits admitted tickets w
   }
 
   const start = startTicket(root, intake.parentTicket.ticketId);
-  assert.equal(start.kind, "sdlc_public_start_projected");
+  assert.equal(start.kind, "sdlc_runtime_binding_contract_projected");
   assert.equal(start.executionContract.targetGraphFunction, "route_ticket_work_item");
   assert.equal(start.executionContract.overlayRef, SDLC_TICKET_WORKFLOW_OVERLAY_REF);
 });
@@ -400,7 +400,7 @@ test("T-162 review-grade triage block emits gap tickets and admits ticket workfl
   assert.equal(gapContract.bugTriageRows[0].firstMissingLayer, "realization");
 
   const start = startTicket(root, intake.parentTicket.ticketId);
-  assert.equal(start.kind, "sdlc_public_start_projected");
+  assert.equal(start.kind, "sdlc_runtime_binding_contract_projected");
   assert.equal(start.executionContract.targetGraphFunction, "route_ticket_work_item");
   assert.equal(start.executionContract.overlayRef, SDLC_TICKET_WORKFLOW_OVERLAY_REF);
   assert.equal(

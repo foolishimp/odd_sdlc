@@ -247,13 +247,19 @@ test("T-183 system artifacts use the ABG/system artifact writer surface", () => 
 
   for (const relativePath of [
     "build_tenants/typescript/code/src/operator/plugins/evaluate/postflight.ts",
-    "build_tenants/typescript/code/src/operator/plugins/evaluate/content_register.ts",
     "build_tenants/typescript/code/src/operator/design_depth_register.ts"
   ]) {
     const source = readRepoFile(relativePath);
     assert.match(source, /writeSdlcSystemArtifact/u, relativePath);
     assert.doesNotMatch(source, /writeFileSync/u, relativePath);
   }
+
+  const contentRegisterSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/plugins/evaluate/content_register.ts"
+  );
+  assert.match(contentRegisterSource, /writeSdlcSystemArtifact/u);
+  assert.match(contentRegisterSource, /function writeUtf8FileAtomically/u);
+  assert.doesNotMatch(contentRegisterSource, /effects\/archive_store/u);
 
   const installedOperatorSource = readRepoFile(
     "build_tenants/typescript/code/src/operator/installed_operator.ts"

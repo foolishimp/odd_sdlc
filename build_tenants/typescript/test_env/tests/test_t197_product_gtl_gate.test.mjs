@@ -634,7 +634,7 @@ test("T-197 A2 keeps SDLC start as shell over one admitted ABG boundary", () => 
     abgRuntimeBinding,
     /\bcreateOddSdlcAbgRuntimeBindingPlugins\b/u
   );
-  assert.match(abgRuntimeBinding, /\bpublicStartOnce\(/u);
+  assert.match(abgRuntimeBinding, /\bprojectSdlcRuntimeBindingContract\(/u);
   assert.match(
     abgRuntimeBinding,
     /\bcreateSdlcInstalledOperatorAbgPluginSession\(/u

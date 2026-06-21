@@ -31,7 +31,7 @@ import {
 } from "../../build/semantic/code/src/operator/index.js";
 import {
   projectSdlcWorkerAttachment,
-  publicStartOnce
+  projectSdlcRuntimeBindingContract
 } from "../../build/semantic/code/src/start/index.js";
 
 function workspaceGaps(workspaceRoot) {
@@ -495,7 +495,7 @@ function makeStart(workspaceRoot) {
   const queryDomain = projectSdlcQueryDomain({ module, ingressReport });
   const conformedProject =
     deriveSdlcConformProjectProfileFromWorkspace(workspaceRoot);
-  const start = publicStartOnce({
+  const start = projectSdlcRuntimeBindingContract({
     request: {
       kind: "sdlc_public_start_request",
       workspaceRoot,
@@ -513,7 +513,7 @@ function makeStart(workspaceRoot) {
       transportContract: "process://node"
     })
   });
-  assert.equal(start.kind, "sdlc_public_start_projected");
+  assert.equal(start.kind, "sdlc_runtime_binding_contract_projected");
   return start;
 }
 

@@ -254,7 +254,7 @@ test("T-204 workspace API entry stays free of retry/control authority", () => {
     resolve(PACKAGE_ROOT, "code/src/workspace_api/entry.ts"),
     "utf8"
   );
-  assert(!source.includes("publicStartOnce"));
+  assert(!source.includes("projectSdlcRuntimeBindingContract"));
   assert(!source.includes("deriveAdvancementTransition("));
   assert(!source.includes("installAbiogenesis"));
   assert(!source.includes("while ("));

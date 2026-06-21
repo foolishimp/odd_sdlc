@@ -48,7 +48,7 @@ import {
   writeHandoffFiles
 } from "../../build/semantic/code/src/operator/plugins/transform/launch_contract.js";
 import {
-  publicStartOnce
+  projectSdlcRuntimeBindingContract
 } from "../../build/semantic/code/src/start/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));

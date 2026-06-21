@@ -43,7 +43,7 @@ import {
 } from "../../build/semantic/code/src/index.js";
 import {
   projectSdlcWorkerAttachment,
-  publicStartOnce
+  projectSdlcRuntimeBindingContract
 } from "../../build/semantic/code/src/start/index.js";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
@@ -229,7 +229,7 @@ test("T-038 composed harnessed sandbox walks ingress to operational return", () 
   const workerAttachment = projectSdlcWorkerAttachment({
     transportContract: "transport://t038/harnessed-fp"
   });
-  const start = publicStartOnce({
+  const start = projectSdlcRuntimeBindingContract({
     request: {
       kind: "sdlc_public_start_request",
       workspaceRoot: "/tmp/t038",
@@ -246,8 +246,8 @@ test("T-038 composed harnessed sandbox walks ingress to operational return", () 
     workerAttachment
   });
 
-  assert.equal(start.kind, "sdlc_public_start_projected");
-  assert.equal(start.status, "dispatch_required");
+  assert.equal(start.kind, "sdlc_runtime_binding_contract_projected");
+  assert.equal(start.status, "projected");
   assert.equal(start.executionContract.targetGraphFunction, "prepare_release_surface");
 
   const gapDossier = deriveSdlcGapDossier({

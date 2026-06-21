@@ -29,7 +29,7 @@ import {
   admitSdlcPublicStartRequest,
   admitSdlcRuntimeTraversalSelections,
   projectSdlcWorkerAttachment,
-  publicStartOnce
+  projectSdlcRuntimeBindingContract
 } from "../../build/semantic/code/src/start/public_start.js";
 import {
   conformProjectProfileFromConstraintsText
@@ -274,7 +274,7 @@ test("T-203 runtime steel-thread start reaches ABG envelope and SDLC feature sco
   const { module, queryDomain, conformedProject, workspaceRoot } =
     publicStartContext();
   const selection = runtimeSteelThreadSelection();
-  const start = publicStartOnce({
+  const start = projectSdlcRuntimeBindingContract({
     request: admitSdlcPublicStartRequest({
       workspaceRoot,
       target: {
