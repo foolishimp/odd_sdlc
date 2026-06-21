@@ -54,6 +54,26 @@ function makeWorkspace() {
     "utf8"
   );
   materializeSdlcProjectConformance({ workspaceRoot: root });
+  mkdirSync(path.join(root, "build_tenants/scala_spark/spec"), {
+    recursive: true
+  });
+  writeFileSync(
+    path.join(root, "build_tenants/scala_spark/spec/TECH_STACK.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        language: "scala",
+        buildTool: "sbt",
+        sourceTargets: ["src/main/scala/cdme/compiler/ir/package.scala"],
+        testingTechStack: {
+          testTargets: ["src/test/scala/cdme/compiler/ir/IrNodeSpec.scala"]
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
   return root;
 }
 

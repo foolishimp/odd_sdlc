@@ -358,6 +358,26 @@ build_tenants:
       - renderer
 `
   );
+  mkdirSync(path.join(workspace, "build_tenants/node_cli/spec"), {
+    recursive: true
+  });
+  writeFileSync(
+    path.join(workspace, "build_tenants/node_cli/spec/TECH_STACK.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        language: "typescript",
+        buildTool: "npm",
+        sourceTargets: ["parser/src/index.ts", "renderer/src/index.ts"],
+        testingTechStack: {
+          testTargets: ["parser/test/index.test.ts"]
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
   const contract = hookContractByEdgeName("derive_component_code_surface");
   const manifest = deriveWorkerHandoffManifest({
     workspaceRoot: workspace,

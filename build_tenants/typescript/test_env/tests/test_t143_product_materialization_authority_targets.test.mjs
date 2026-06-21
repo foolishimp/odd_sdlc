@@ -1724,7 +1724,7 @@ test("T-143 context expected-file targets are observation beside product authori
     reconciliation.declaredProductTargetContracts.find(
       (target) => target.path === "build_tenants/scala_spark/cdme-compiler/src"
     )?.source,
-    "product_authority"
+    "tenant_stack_authority"
   );
 });
 

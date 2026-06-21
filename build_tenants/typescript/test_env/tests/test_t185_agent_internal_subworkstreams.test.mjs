@@ -374,6 +374,7 @@ test("T-185 evaluate.C prompt and result carry read-only subworkstream observati
     assessmentPath: "review_grade_edge_fulfillment_assessment.json",
     subworkstreamManifestPath: evaluateManifestPath
   });
+  assert.match(prompt, /Optional observation-only subworkstream manifest/u);
   assert.match(prompt, /read-only compute strategy/u);
   assert.match(prompt, /leave write\/output-allocation fields empty/u);
   assert.match(prompt, /do not emit ABG events, write ledgers, close edges/u);

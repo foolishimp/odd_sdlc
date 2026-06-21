@@ -12,7 +12,15 @@
     "src/topology.js",
     "test/topology.test.js"
   ],
+  "sourceTargets": [
+    "src/topology.js"
+  ],
+  "testingTechStack": {
+    "testRunner": "node --test",
+    "testTargets": [
+      "test/topology.test.js"
+    ]
+  },
   "dependencyPolicy": "Prefer Node.js built-ins. Do not add runtime dependencies unless the generated artifact records why they are necessary.",
   "publicApiExpectation": "A topology module that exposes graph construction, morphism registration, cardinality validation, and dot-path validation."
 }
-

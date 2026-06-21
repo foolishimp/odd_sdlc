@@ -2233,6 +2233,7 @@ function workerFailureRuntimeFailureClass(
 
 function actorInvocationForPluginInput(input: {
   readonly pluginInput: EnginePluginInput;
+  readonly basis: ExecutionBasis;
   readonly transport: SdlcWorkerTransportContract;
 }): ActorInvocation {
   const ref = input.pluginInput.actorInvocationRef;
@@ -2245,10 +2246,10 @@ function actorInvocationForPluginInput(input: {
   return Object.freeze({
     kind: "actor_invocation",
     actorInvocationId: ref.actorInvocationId,
-    basisId: input.pluginInput.basisId,
-    graphFunctionId: input.pluginInput.graphFunctionId,
-    runId: null,
-    workKey: null,
+    basisId: input.basis.id,
+    graphFunctionId: input.basis.graphFunction.id,
+    runId: input.basis.runId,
+    workKey: input.basis.workKey,
     graphCallId: input.pluginInput.graphCallId,
     frameId: input.pluginInput.frameId,
     vectorIndex: input.pluginInput.vectorIndex,
@@ -2261,7 +2262,7 @@ function actorInvocationForPluginInput(input: {
     causationEventRefs: Object.freeze([ref.dispatchRef]),
     correlationId: [
       "odd-sdlc-installed-operator",
-      input.pluginInput.basisId,
+      input.basis.id,
       String(input.pluginInput.vectorIndex),
       String(ref.attemptIndex)
     ].join(":")
@@ -3262,6 +3263,7 @@ async function invokeWorkerThroughAbgProcessActor(input: {
     processResult = await invokeSupervisedProcessActor({
       invocation: actorInvocationForPluginInput({
         pluginInput: input.pluginInput,
+        basis: input.basis,
         transport: input.transport
       }),
       command: processLaunch.command,
@@ -3709,13 +3711,14 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
   let processResult: SupervisedProcessActorResult;
   try {
     processResult = await invokeSupervisedProcessActor({
-    invocation: actorInvocationForPluginInput({
-      pluginInput: input.pluginInput,
-      transport: input.transport
-    }),
-    command: processLaunch.command,
-    args: processLaunch.args,
-    cwd: input.manifest.workspaceRoot,
+      invocation: actorInvocationForPluginInput({
+        pluginInput: input.pluginInput,
+        basis: input.basis,
+        transport: input.transport
+      }),
+      command: processLaunch.command,
+      args: processLaunch.args,
+      cwd: input.manifest.workspaceRoot,
 	    environment: {
 	      ...installedOperatorChildProcessEnvironment(),
 	      ...sdlcWorkspaceLocalToolEnvironment(input.manifest.workspaceRoot),
@@ -4255,6 +4258,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
   readonly transport: SdlcWorkerTransportContract;
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly pluginInput: EnginePluginInput;
+  readonly basis: ExecutionBasis;
   readonly currentPostflight?: SdlcPostflightResult | null | undefined;
   readonly eventSink: (event: RuntimeEvent) => void;
 }): Promise<EvaluationRuleOutcome> {
@@ -4514,13 +4518,14 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
   let processResult: SupervisedProcessActorResult;
   try {
     processResult = await invokeSupervisedProcessActor({
-    invocation: actorInvocationForPluginInput({
-      pluginInput: input.pluginInput,
-      transport: input.transport
-    }),
-    command: processLaunch.command,
-    args: processLaunch.args,
-    cwd: input.manifest.workspaceRoot,
+      invocation: actorInvocationForPluginInput({
+        pluginInput: input.pluginInput,
+        basis: input.basis,
+        transport: input.transport
+      }),
+      command: processLaunch.command,
+      args: processLaunch.args,
+      cwd: input.manifest.workspaceRoot,
 	    environment: {
 	      ...installedOperatorChildProcessEnvironment(),
 	      ...sdlcWorkspaceLocalToolEnvironment(input.manifest.workspaceRoot),
@@ -9514,6 +9519,7 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
         transport,
         manifest: dispatchState.current.manifest,
         pluginInput,
+        basis,
         currentPostflight: dispatchState.current.postflight,
         eventSink: (event) => {
           emitRuntimeEvent(event);

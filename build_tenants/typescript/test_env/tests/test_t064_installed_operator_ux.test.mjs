@@ -390,11 +390,11 @@ test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () 
     );
     assert.match(
       start.postflight.blockingReasonCarriers[0].detail,
-      /runtimeLivenessLeaseState=hard_safety_cap_requires_interruption_event/u
+      /runtimeLivenessLeaseState=externally_interrupted/u
     );
     assert.match(
       start.postflight.blockingReasonCarriers[0].detail,
-      /runtimeLivenessDispositionAction=controlled_terminate/u
+      /runtimeLivenessDispositionAction=block/u
     );
     assert.match(
       start.postflight.blockingReasonCarriers[0].detail,
@@ -445,11 +445,11 @@ test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () 
     );
     assert.equal(
       processSummary.runtimeLivenessLeaseState,
-      "hard_safety_cap_requires_interruption_event"
+      "externally_interrupted"
     );
     assert.equal(
       processSummary.runtimeLivenessDispositionAction,
-      "controlled_terminate"
+      "block"
     );
     assert.equal(processSummary.pid > 0, true);
     assert.equal(processSummary.lastHeartbeatElapsedMs >= 0, true);
@@ -470,10 +470,15 @@ test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () 
     assert.equal(livenessProjection.kind, "runtime_liveness_observer_projection");
     assert.equal(
       livenessProjection.leaseState,
-      "hard_safety_cap_requires_interruption_event"
+      "externally_interrupted"
     );
-    assert.equal(livenessProjection.disposition.action, "controlled_terminate");
-    assert.equal(livenessProjection.requiresExternalInterruptionEvent, true);
+    assert.equal(livenessProjection.disposition.action, "block");
+    assert.equal(
+      livenessProjection.disposition.reason,
+      "external_interruption_observed"
+    );
+    assert.equal(livenessProjection.requiresExternalInterruptionEvent, false);
+    assert.equal(livenessProjection.interruptionRows.length > 0, true);
   } finally {
     if (previousTimeout === undefined) {
       delete process.env["ODD_SDLC_WORKER_TIMEOUT_MS"];

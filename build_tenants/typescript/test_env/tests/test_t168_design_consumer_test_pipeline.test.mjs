@@ -601,6 +601,28 @@ test("T-168 component-test handoff declares shard cwd and workspace-only logs", 
     ].join("\n")
   );
   materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  mkdirSync(
+    path.join(workspace, "build_tenants/hello_world_javascript/spec"),
+    { recursive: true }
+  );
+  writeFileSync(
+    path.join(workspace, "build_tenants/hello_world_javascript/spec/TECH_STACK.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        language: "JavaScript",
+        buildTool: "node",
+        sourceTargets: ["src/hello.js"],
+        testingTechStack: {
+          testTargets: ["test/HelloWorldProofBindingTests.test.js"],
+          testRunner: "node --test"
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
 
   const contract = hookContractByEdgeName("derive_component_test_surface");
   const manifest = deriveWorkerHandoffManifest({

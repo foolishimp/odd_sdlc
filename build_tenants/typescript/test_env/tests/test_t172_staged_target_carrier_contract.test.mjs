@@ -69,6 +69,30 @@ function makeWorkspace({ trivialProduct = false } = {}) {
     "utf8"
   );
   materializeSdlcProjectConformance({ workspaceRoot: root });
+  mkdirSync(path.join(root, "build_tenants/typescript/spec"), {
+    recursive: true
+  });
+  writeFileSync(
+    path.join(root, "build_tenants/typescript/spec/TECH_STACK.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        language: "typescript",
+        buildTool: "npm",
+        sourceTargets: ["src/hello.js"],
+        testingTechStack: {
+          testTargets: ["test/hello.test.js"],
+          testRunner: "node --test"
+        },
+        capabilityContracts: {
+          ...(trivialProduct ? { trivialProduct: true } : {})
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
   return root;
 }
 
