@@ -2377,6 +2377,261 @@ T-204 cannot close while any of the following remain true:
 5. read models reconstruct closure/gap truth directly from raw archive JSON
    instead of ABG-admitted projection facts.
 
+## Remaining Work Execution Plan
+
+Each phase must leave a durable audit log under:
+
+```text
+.ai-workspace/comments/codex/T204_phase_<n>_<name>.md
+```
+
+Every phase audit log must include:
+
+- entry commit and worktree status;
+- source and function inventory delta for the phase;
+- files/functions deleted, moved, retained, or reclassified;
+- ABG interface consumed or explicit ABG interface still missing;
+- validation commands and exact results;
+- completion verdict: `complete`, `partial`, or `blocked`.
+
+### Phase 0: Re-Baseline Inventory
+
+Purpose: make the post-`3.0.0-rc.1` T-204 inventory current before more
+deletion or movement.
+
+Work:
+
+- re-run source file/function inventory over `build_tenants/typescript/code/src`;
+- classify each current surface as `gtl_program`, `plugin`,
+  `product_carrier`, `product_projection`, `test_or_release_plumbing`,
+  `move_to_abg`, `delete`, or `survival_pending`;
+- confirm public package exports remain command-free;
+- record line counts for deletion/movement measurement.
+
+Completion gate:
+
+- audit log exists at
+  `.ai-workspace/comments/codex/T204_phase_0_baseline_inventory.md`;
+- no stale rows reference already-deleted command code as active blockers;
+- every remaining `move_to_abg` row has a current file/function pointer.
+
+### Phase 1: Start And Control Executor Boundary
+
+Purpose: remove odd_sdlc-owned start/control execution authority.
+
+Targets:
+
+- `start/index.ts`;
+- `start/policy.ts`;
+- `start/public_start.ts`;
+- `executeInstalledOperatorStart` and any remaining installed start outcome
+  adapters;
+- worker attachment and stop-predicate/`until` control logic.
+
+Target state:
+
+- odd_sdlc may publish product start intent, target carrier data, and plugin
+  declarations;
+- ABG owns start, continue, stop predicates, worker attachment, and
+  control-result truth.
+
+Completion gate:
+
+- no odd_sdlc-local executor can start or continue traversal;
+- T-140 and T-203 pass;
+- no public or internal test proof depends on an odd_sdlc start wrapper.
+
+Audit log:
+
+```text
+.ai-workspace/comments/codex/T204_phase_1_start_control_boundary.md
+```
+
+### Phase 2: Runtime Events, Effects, And Generic Infrastructure
+
+Purpose: move generic runtime mechanics behind ABG interfaces.
+
+Targets:
+
+- `operator/event_store.ts`;
+- `effects/archive_store.ts`;
+- `effects/file_store.ts`;
+- `effects/process_runner.ts`;
+- any odd_sdlc runtime event writers or process/effect wrappers.
+
+Target state:
+
+- ABG owns runtime event authorship, event storage, process execution,
+  archive writes, and replayable system facts;
+- odd_sdlc supplies domain plugin proposals and product schema, not filesystem,
+  process, event, or archive infrastructure.
+
+Completion gate:
+
+- runtime events and process/effect execution flow through ABG substrate
+  interfaces;
+- no odd_sdlc code writes ABG canonical runtime truth directly;
+- product plugin tests still pass through ABG-owned execution plumbing.
+
+Audit log:
+
+```text
+.ai-workspace/comments/codex/T204_phase_2_runtime_effects.md
+```
+
+### Phase 3: Consequence, Retry, Reentry, And Closure Authority
+
+Purpose: move bind consequence and repair continuation truth to ABG.
+
+Targets:
+
+- `operator/traversal_consequence.ts`;
+- consequence writing in `operator/installed_operator.ts`;
+- retry/reentry context adapters;
+- closure decision and next-action projection authorship.
+
+Target state:
+
+- ABG owns consequence bind, continuation transition, retry eligibility,
+  reentry facts, closure decision, and next-action projection;
+- odd_sdlc may classify SDLC product pressure and propose domain repair
+  semantics through plugins.
+
+Completion gate:
+
+- same-edge retry/reentry no longer depends on odd_sdlc-installed-operator
+  adapters;
+- repairable review-grade pressure remains retryable;
+- regression covers the prior downgrade from repairable pressure to
+  non-retryable triage.
+
+Audit log:
+
+```text
+.ai-workspace/comments/codex/T204_phase_3_consequence_retry.md
+```
+
+### Phase 4: Archive-Scrape Authority Removal
+
+Purpose: raw archive JSON must not be authority for closure, gap, retry, or
+next-action truth.
+
+Targets:
+
+- `workspace_api/entry.ts`;
+- `analysis/carrier_loaders.ts`;
+- `analysis/runtime_gaps.ts`;
+- product-materialization replay/archive readers;
+- any code path that reconstructs closure or gaps directly from local archive
+  files.
+
+Target state:
+
+- product read models consume ABG-admitted projection facts;
+- raw archive readers are deleted, moved to ABG, or explicitly diagnostic-only;
+- diagnostic-only readers cannot influence traversal, closure, retry, or
+  product gate truth.
+
+Completion gate:
+
+- guard or regression rejects archive-scrape-as-authority additions;
+- no closure/gap/retry decision path consumes raw archive JSON as authoritative
+  input;
+- workspace gaps remain a read model over admitted ABG facts.
+
+Audit log:
+
+```text
+.ai-workspace/comments/codex/T204_phase_4_archive_projection.md
+```
+
+### Phase 5: Register And Ledger Purpose Cleanup
+
+Purpose: every register or ledger has one owner and one lawful purpose.
+
+Targets:
+
+- `operator/plugins/evaluate/content_register.ts`;
+- evaluate prompt/admission content-register references;
+- analysis loaders and fixtures that treat legacy registers as authority;
+- installed-operator traversal/start legacy carriers;
+- component/test/design registers whose purpose is unclear after T-204.
+
+Target state:
+
+- SDLC product carriers survive only when they express domain meaning;
+- generic runtime ledgers are ABG named ledgers;
+- `sdlc_evaluate_content_register` becomes `sdlc_evaluate_content_ledger`
+  authority or a legacy projection only.
+
+Completion gate:
+
+- register-purpose audit names owner, authority, producer, consumer, and
+  survival reason for each remaining register/ledger;
+- no retired register name remains an authority surface;
+- semantic tests cover the surviving carrier/ledger boundary.
+
+Audit log:
+
+```text
+.ai-workspace/comments/codex/T204_phase_5_register_ledger_purpose.md
+```
+
+### Phase 6: Proof Surface And Test Migration
+
+Purpose: make tests reflect the new product boundary.
+
+Targets:
+
+- stale tests importing removed local executor/start helpers;
+- tests over `move_to_abg` internals that should become ABG tests;
+- live harness continuation logic that still makes local traversal decisions.
+
+Target state:
+
+- traversal/start/retry proof goes through ABG;
+- odd_sdlc tests cover domain plugins, carriers, GTL contracts, prompt policy,
+  product projections, and release/install surfaces;
+- tests for moved infrastructure live with ABG.
+
+Completion gate:
+
+- stale tests are deleted, rewritten as ABG tests, or narrowed to explicit
+  product helper tests;
+- `npm run build:semantic` passes;
+- `npm run lint:semantic` passes;
+- focused T-204 gates pass;
+- broad suite status is recorded with failures categorized or green.
+
+Audit log:
+
+```text
+.ai-workspace/comments/codex/T204_phase_6_test_surface.md
+```
+
+### Phase 7: Closure Proof
+
+Purpose: close T-204 only after the product definition is true in code, tests,
+and release packaging.
+
+Closure gate:
+
+- clean hello-world live run;
+- data-mapper live run or an explicit ratified reason it is not required for
+  this ticket closure;
+- package guard passes;
+- no public or local odd_sdlc command/control truth path remains;
+- no raw archive authority path remains;
+- no odd_sdlc-owned runtime event, process, retry, closure, or next-action
+  system truth remains;
+- final audit log and ticket closure section both record exact evidence.
+
+Audit log:
+
+```text
+.ai-workspace/comments/codex/T204_phase_7_closure_review.md
+```
+
 ## 2026-06-21 V3 RC1 Migration Evidence
 
 `odd_sdlc` is being migrated to `3.0.0-rc.1` as the first release candidate over
