@@ -311,7 +311,7 @@ test("T-197 design ratifies owner partition assets before Wave 1 code", () => {
     "### Decommission Register",
     "### W-105 Construct-Site Sufficiency Inventory",
     "ABG route / dependency",
-    "ABI 4.1.0-rc.3",
+    "ABI 4.1.0-rc.6",
     "runtime continuation transition projection refs",
     "22/22 edge-contract tests and 1/1 Rust-service sandbox proof",
     "must-not-name-governed-target",
@@ -702,7 +702,8 @@ test("T-197 review-grade semantic gaps remain ABG retry pressure, not evaluator 
   );
 
   assert.notEqual(openFindingsBranch, null);
-  assert.match(openFindingsBranch[0], /code:\s*"review_grade_edge_fulfillment_blocked"/u);
+  assert.match(openFindingsBranch[0], /\breviewGradeBlockedPostflightForFindings\b/u);
+  assert.match(source, /code:\s*"review_grade_edge_fulfillment_blocked"/u);
   assert.match(openFindingsBranch[0], /status:\s*"accepted"/u);
   assert.match(openFindingsBranch[0], /\bresidualPressureRefs\b/u);
   assert.doesNotMatch(openFindingsBranch[0], /status:\s*"blocked"/u);

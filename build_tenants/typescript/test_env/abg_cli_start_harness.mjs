@@ -197,13 +197,16 @@ export async function executeOddSdlcWorkspaceStartViaAbgCliForTest(input) {
     });
   }
   const parsedStdout = parseAbgCliStdout(result.stdout);
-  if (
-    parsedStdout.status !== "parsed" &&
-    result.status !== 0 &&
-    result.status !== 4
-  ) {
+  if (parsedStdout.status !== "parsed") {
+    const stderrExcerpt = (result.stderr ?? "").slice(0, 4000);
     throw new Error(
-      `ABG CLI start failed without parseable stdout: status=${String(result.status)} signal=${String(result.signal)} parse=${parsedStdout.status}`
+      [
+        "ABG CLI start failed without parseable stdout",
+        `status=${String(result.status)}`,
+        `signal=${String(result.signal)}`,
+        `parse=${parsedStdout.status}`,
+        `stderr=${stderrExcerpt}`
+      ].join(" ")
     );
   }
   const payload = parsedStdout.payload;

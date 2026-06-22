@@ -35,7 +35,7 @@ function closeDecisionWithPressure(pressureRefs) {
   const ledger = constructSdlcEdgeFulfillmentLedger({
     selectedComposition: SELECTED_COMPOSITION,
     ledgerRef: "ledger://odd-sdlc/t188/fp-open-obligation",
-    registerVersionRef: "ledger-version://odd-sdlc/t188/fp-open-obligation/1",
+    ledgerVersionRef: "ledger-version://odd-sdlc/t188/fp-open-obligation/1",
     edgeRef: "edge://odd-sdlc/t188/derive_test_execution_result_surface",
     attemptRef: "attempt://odd-sdlc/t188/derive_test_execution_result_surface/1",
     targetBindingRefs: ["target-binding://odd-sdlc/t188/test-execution"],
@@ -355,7 +355,7 @@ test("T-188 component repair schedule rows route to repair reentry", () => {
   const ledger = constructSdlcEdgeFulfillmentLedger({
     selectedComposition: SELECTED_COMPOSITION,
     ledgerRef: "ledger://odd-sdlc/t188/component-repair-schedule",
-    registerVersionRef:
+    ledgerVersionRef:
       "ledger-version://odd-sdlc/t188/component-repair-schedule/1",
     edgeRef: "edge://odd-sdlc/t188/derive_component_repair_schedule_surface",
     attemptRef: "attempt://odd-sdlc/t188/component-repair-schedule/1",

@@ -548,6 +548,81 @@ function operatorRunRoots(workspace) {
     .sort();
 }
 
+function latestOperatorRunRoot(workspace) {
+  return operatorRunRoots(workspace).at(-1) ?? null;
+}
+
+function readOptionalJsonFile(filePath) {
+  if (!existsSync(filePath)) {
+    return null;
+  }
+  return readJsonFile(filePath);
+}
+
+function finalSdlcProofAssessment(workspace) {
+  const runRoot = latestOperatorRunRoot(workspace);
+  if (runRoot === null) {
+    return Object.freeze({
+      kind: "data_mapper_final_sdlc_proof_assessment",
+      clean: false,
+      reason: "operator_run_missing",
+      operatorRunRoot: null
+    });
+  }
+  const workerReport = readOptionalJsonFile(path.join(runRoot, "worker_result_report.json"));
+  const postflight = readOptionalJsonFile(path.join(runRoot, "postflight.json"));
+  const closureDecision = readOptionalJsonFile(
+    path.join(runRoot, "sdlc_edge_closure_decision.json")
+  );
+  const residualPressure = readOptionalJsonFile(
+    path.join(runRoot, "sdlc_edge_residual_pressure.json")
+  );
+  const projection = readOptionalJsonFile(
+    path.join(runRoot, "sdlc_next_action_projection.json")
+  );
+  const executionEvidence = workerReport?.executionEvidence ?? null;
+  const failedCount =
+    typeof executionEvidence?.failedCount === "number" ? executionEvidence.failedCount : 0;
+  const executionStatus =
+    typeof executionEvidence?.status === "string" ? executionEvidence.status : null;
+  const closureDisposition =
+    typeof closureDecision?.disposition === "string" ? closureDecision.disposition : null;
+  const residualClear =
+    typeof residualPressure?.clear === "boolean" ? residualPressure.clear : null;
+  const projectionChoosesNext = projection?.choosesNextTraversal === true;
+  const reason =
+    executionStatus === "failed" || failedCount > 0
+      ? "execution_evidence_failed"
+      : closureDisposition === null
+        ? "closure_decision_missing"
+        : closureDisposition !== "close"
+          ? `closure_${closureDisposition}`
+          : residualClear === false
+            ? "residual_pressure_open"
+            : projectionChoosesNext
+              ? "next_action_projection_open"
+              : "clean";
+  return Object.freeze({
+    kind: "data_mapper_final_sdlc_proof_assessment",
+    clean: reason === "clean",
+    reason,
+    operatorRunRoot: runRoot,
+    executionStatus,
+    failedCount,
+    postflightStatus: typeof postflight?.status === "string" ? postflight.status : null,
+    closureDisposition,
+    residualClear,
+    residualPressureRefs: residualPressure?.requiredPressureRefs ?? [],
+    nextActionBasisKind:
+      typeof projection?.nextActionBasisKind === "string"
+        ? projection.nextActionBasisKind
+        : null,
+    nextGraphVectorRef:
+      typeof projection?.nextGraphVectorRef === "string" ? projection.nextGraphVectorRef : null,
+    projectionChoosesNext
+  });
+}
+
 function observedHandoffRecords(workspace) {
   return operatorRunRoots(workspace)
     .map((runRoot) => {
@@ -1179,7 +1254,17 @@ async function main() {
     env: baseEnv,
     archiveRoot
   });
+  summary.finalSdlcProofAssessment = finalSdlcProofAssessment(workspace);
   writeJson(path.join(archiveRoot, "run_summary.json"), summary);
+  if (!summary.finalSdlcProofAssessment.clean) {
+    throw new Error(
+      `data_mapper live proof did not close cleanly: ${JSON.stringify(
+        summary.finalSdlcProofAssessment,
+        null,
+        2
+      )}`
+    );
+  }
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 }
 

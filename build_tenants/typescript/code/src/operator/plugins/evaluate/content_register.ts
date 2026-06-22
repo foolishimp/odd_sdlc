@@ -62,6 +62,20 @@ export const SDLC_EVALUATE_CONTENT_LEDGER_VERSION =
 export const SDLC_EVALUATE_CONTENT_LEDGER_ADMISSION_KIND =
   "sdlc_evaluate_content_ledger_admission" as const;
 
+const SDLC_EVALUATE_CONTENT_LEDGER_ROW_REF_PREFIX =
+  "content-ledger-row://";
+const SDLC_EVALUATE_CONTENT_LEDGER_DRAFT_ROW_REF_PREFIX =
+  "content-ledger-row-draft://";
+const LEGACY_EVALUATE_CONTENT_REGISTER_DRAFT_ROW_REF_PREFIX =
+  "content-register-row-draft://";
+
+function isDraftContentLedgerRowRef(rowRef: string): boolean {
+  return (
+    rowRef.startsWith(SDLC_EVALUATE_CONTENT_LEDGER_DRAFT_ROW_REF_PREFIX) ||
+    rowRef.startsWith(LEGACY_EVALUATE_CONTENT_REGISTER_DRAFT_ROW_REF_PREFIX)
+  );
+}
+
 export interface SdlcEvaluateContentRegisterRow {
   readonly kind: typeof SDLC_EVALUATE_CONTENT_LEDGER_ROW_KIND;
   readonly rowRef: string;
@@ -510,7 +524,7 @@ function designDepthDraftRowsBySection(
   for (const [index, row] of register.contentRows.entries()) {
     if (
       row.contentKind !== SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND &&
-      !row.rowRef.startsWith("content-register-row-draft://")
+      !isDraftContentLedgerRowRef(row.rowRef)
     ) {
       continue;
     }
@@ -530,7 +544,7 @@ function designDepthDraftRowsBySection(
   );
   if (missingSections.length > 0) {
     throw new TypeError(
-      `design-depth draft register missing sections: ${missingSections.join(", ")}`
+      `design-depth draft content ledger missing sections: ${missingSections.join(", ")}`
     );
   }
   return draftRows;
@@ -556,7 +570,7 @@ export function constructDesignDepthDraftFragmentContentRegisterUpdate(input: {
         }
         return Object.freeze({
           kind: SDLC_EVALUATE_CONTENT_LEDGER_ROW_KIND,
-          rowRef: `content-register-row://odd-sdlc/design-depth/${section}`,
+          rowRef: `${SDLC_EVALUATE_CONTENT_LEDGER_ROW_REF_PREFIX}odd-sdlc/design-depth/${section}`,
           authorityFunction: input.draftRegister.authorityFunction,
           carrierFamily: "ProductAssetModel" as const,
           contentKind: SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND,
@@ -639,14 +653,14 @@ export function observeDesignDepthContentRegisterFirstUpdate(input: {
     const draftRowCount = register.contentRows.filter(
       (row) =>
         row.contentKind === SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND ||
-        row.rowRef.startsWith("content-register-row-draft://")
+        isDraftContentLedgerRowRef(row.rowRef)
     ).length;
     const observedSections = uniqueSorted(
       register.contentRows
         .filter(
           (row) =>
             row.contentKind === SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND &&
-            !row.rowRef.startsWith("content-register-row-draft://")
+            !isDraftContentLedgerRowRef(row.rowRef)
         )
         .map((row) => objectRecord(row.payload)?.["section"])
         .filter((section): section is string => typeof section === "string")
@@ -936,7 +950,7 @@ function designDepthRegisterPayloadFromFragments(
       candidate.authorityFunction === "synthesize_model" &&
       candidate.carrierFamily === "ProductAssetModel" &&
       candidate.contentKind === SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND &&
-      !candidate.rowRef.startsWith("content-register-row-draft://")
+      !isDraftContentLedgerRowRef(candidate.rowRef)
   );
   if (fragmentRows.length === 0) {
     return null;
@@ -1021,7 +1035,7 @@ export function writeDesignDepthRegisterProjectionFromEvaluateContentRegister(in
 }): string {
   const payload = designDepthRegisterPayloadFromEvaluateContentRegister(input.register);
   if (payload === null) {
-    throw new TypeError("evaluate content register has no design-depth register payload");
+    throw new TypeError("evaluate content ledger has no design-depth register payload");
   }
   writeSdlcSystemArtifact({
     archiveRoot: input.archiveRoot,

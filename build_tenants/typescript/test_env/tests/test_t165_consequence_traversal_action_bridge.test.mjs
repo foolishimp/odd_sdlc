@@ -13,6 +13,8 @@ import {
   admitResolvedPolicyIdentity,
   admitResolvedRuntimeIdentity,
   compose,
+  constructAllowedConsequenceTraversalCatalog,
+  constructAllowedConsequenceTraversalRow,
   constructConsequenceProjectionOutcome,
   constructEnginePluginContract,
   constructFdEvaluationOutcome,
@@ -26,6 +28,7 @@ import {
   constructSdlcConsequenceTraversalActionBinding,
   constructSdlcConstructionIntent,
   constructSdlcEdgeFulfillmentLedger,
+  constructSdlcGraphReentryTargetRef,
   constructSdlcNextActionProjection,
   constructSdlcWorksiteEvidence,
   deriveSdlcEdgeClosureDecision,
@@ -284,7 +287,7 @@ function selectedComposition(basis) {
   });
 }
 
-function sdlcConsequenceRows(basis) {
+function sdlcConsequenceRows(basis, closureDisposition = "re-enter") {
   const composition = selectedComposition(basis);
   const constructionIntent = constructSdlcConstructionIntent({
     intentRef: "intent://t165/current-edge",
@@ -321,24 +324,33 @@ function sdlcConsequenceRows(basis) {
       extra: 0
     }
   });
+  const closureReasonRefs = [
+    `pressure://t165/depth/${closureDisposition}/requirements-to-design`
+  ];
+  const dispositionReasonRefs = {
+    retry: { retryReasonRefs: closureReasonRefs },
+    repair: { repairReasonRefs: closureReasonRefs },
+    "re-enter": { reenterReasonRefs: closureReasonRefs }
+  }[closureDisposition];
   const edgeClosureDecision = deriveSdlcEdgeClosureDecision({
-    decisionRef: "closure-decision://t165/upstream-reentry",
+    decisionRef: `closure-decision://t165/${closureDisposition}/upstream-reentry`,
     ledger: edgeFulfillmentLedger,
     currentEdgeLawful: true,
-    reenterReasonRefs: ["pressure://t165/depth/requirements-to-design"]
+    ...dispositionReasonRefs
   });
   const nextActionProjection = constructSdlcNextActionProjection({
     selectedComposition: composition,
-    nextActionProjectionRef: "next-action://t165/reenter-requirements-to-design",
+    nextActionProjectionRef:
+      `next-action://t165/${closureDisposition}/reenter-requirements-to-design`,
     intentEventRefs: ["event://t165/current-edge/selected"],
     productAssetModelRef: "product-asset-model://t165/current",
-    gapPressureRefs: ["pressure://t165/depth/requirements-to-design"],
+    gapPressureRefs: closureReasonRefs,
     targetBindingRefs: ["code_surface"],
     closureDecision: edgeClosureDecision,
-    observationRef: "observation://t165/reentry-selected",
+    observationRef: `observation://t165/${closureDisposition}/reentry-selected`,
     policyRefs: ["policy://t165/depth-reentry"],
     actionCatalogRefs: ["action-catalog://t165/depth"],
-    selectedActionRef: "action://t165/reenter-graph-span",
+    selectedActionRef: `action://t165/${closureDisposition}/reenter-graph-span`,
     nextGraphFunctionRef: basis.graphFunction.id,
     nextGraphVectorRef: basis.graph.vectors[1].id
   });
@@ -351,8 +363,13 @@ function sdlcConsequenceRows(basis) {
   });
 }
 
-function buildSdlcTraversalActionBinding(basis, reentryTargetRef = "graph-reentry-point://realization/1") {
-  const rows = sdlcConsequenceRows(basis);
+function buildSdlcTraversalActionBinding(basis, options = {}) {
+  const effectiveOptions =
+    typeof options === "string" ? { reentryTargetRef: options } : options;
+  const reentryTargetRef =
+    effectiveOptions.reentryTargetRef ?? "graph-reentry-point://realization/1";
+  const closureDisposition = effectiveOptions.closureDisposition ?? "re-enter";
+  const rows = sdlcConsequenceRows(basis, closureDisposition);
   const replay = assertSdlcTraversalConsequenceReplayable({
     constructionIntents: [rows.constructionIntent],
     worksiteEvidence: [rows.worksiteEvidence],
@@ -361,12 +378,14 @@ function buildSdlcTraversalActionBinding(basis, reentryTargetRef = "graph-reentr
     nextActionProjections: [rows.nextActionProjection],
     finalNextActionProjectionRef: rows.nextActionProjection.nextActionProjectionRef,
     abgTraversalTransitionRef:
-      "abg-runtime-transition://t165/reenter-requirements-to-design"
+      `abg-runtime-transition://t165/${closureDisposition}/reenter-requirements-to-design`
   });
   const strategyDecision = deriveSdlcTraversalStrategyDecision({
     edgeName: "derive_code_surface",
     targetAssetType: "code_surface",
-    strategyDirectiveRef: "strategy://odd-sdlc/t165/targeted-repair",
+    strategyDirectiveRef:
+      effectiveOptions.strategyDirectiveRef ??
+      "strategy://odd-sdlc/t165/targeted-repair",
     selectedScheduleItemRefs: ["schedule://t165/current-edge"],
     requiredProgressArtifactRefs: ["progress://t165/current-edge/design"]
   });
@@ -386,104 +405,155 @@ function buildSdlcTraversalActionBinding(basis, reentryTargetRef = "graph-reentr
     inputAssetRefs: ["asset://t165/source"],
     expectedOutputAssetRefs: ["asset://t165/code-depth"],
     requiredAuthorityRefs: ["REQ-F-ODDSDLC-165", "REQ-R-ABG3-FPC-004B"],
-    proportionalityBasisRefs: ["proportionality://t165/simple-then-depth"]
+    proportionalityBasisRefs: ["proportionality://t165/simple-then-depth"],
+    allowedConsequenceTraversalCatalog:
+      effectiveOptions.allowedConsequenceTraversalCatalog
   });
 }
 
-test("T-165 SDLC consequence bridge emits an ABG traversal action that the runner consumes", () => {
-  const basis = buildThreeStageBasis();
-  const binding = buildSdlcTraversalActionBinding(basis);
+for (const closureDisposition of ["re-enter", "repair"]) {
+  test(`T-165 SDLC consequence bridge emits an ABG traversal action for ${closureDisposition}`, () => {
+    const basis = buildThreeStageBasis();
+    const binding = buildSdlcTraversalActionBinding(basis, { closureDisposition });
 
-  assert.equal(binding.kind, "sdlc_consequence_traversal_action_binding");
-  assert.equal(binding.traversalAction.kind, "consequence_traversal_action");
-  assert.equal(binding.traversalAction.actionKind, "reenter_graph_span");
-  assert.equal(binding.traversalAction.selectedGraphFunctionRef, basis.graphFunction.id);
-  assert.equal(binding.traversalAction.graphVectorRef, basis.graph.vectors[1].id);
-  assert.equal(binding.traversalAction.reentryTargetRef, "graph-reentry-point://realization/1");
-  assert.match(binding.strategyDecisionRef, /^strategy-decision:\/\/odd-sdlc\//u);
+    assert.equal(binding.kind, "sdlc_consequence_traversal_action_binding");
+    assert.equal(binding.traversalAction.kind, "consequence_traversal_action");
+    assert.equal(binding.traversalAction.actionKind, "reenter_graph_span");
+    assert.equal(binding.traversalAction.selectedGraphFunctionRef, basis.graphFunction.id);
+    assert.equal(binding.traversalAction.graphVectorRef, basis.graph.vectors[1].id);
+    assert.equal(
+      binding.traversalAction.reentryTargetRef,
+      "graph-reentry-point://realization/1"
+    );
+    assert.match(binding.strategyDecisionRef, /^strategy-decision:\/\/odd-sdlc\//u);
 
-  const emittedEvents = [];
-  const fdEdges = [];
-  let traversalActionIssued = false;
-  const result = runEngineIterate({
-    basis,
-    eventSink: (event) => {
-      emittedEvents.push(event);
-    },
-    plugins: {
-      fdEvaluator: Object.freeze({
-        contract: constructEnginePluginContract({
-          ref: "plugin://t165/fd-evaluator",
-          pluginKind: "fd_evaluator",
-          authority: "effect_plugin",
-          inputCarrier: "EnginePluginInput",
-          outputCarrier: "FdEvaluationOutcome"
-        }),
-        evaluate: (input) => {
-          fdEdges.push(input.edge);
-          return constructFdEvaluationOutcome({
-            status: "accepted",
-            evidenceRefs: [input.sourceProjectionRef]
-          });
-        }
-      }),
-      consequenceProjection: Object.freeze({
-        contract: constructEnginePluginContract({
-          ref: "plugin://t165/consequence-projection",
-          pluginKind: "consequence_projection",
-          authority: "effect_plugin",
-          inputCarrier: "EnginePluginInput",
-          outputCarrier: "ConsequenceProjectionOutcome"
-        }),
-        project: (input) => {
-          if (input.vectorIndex === 2 && !traversalActionIssued) {
-            traversalActionIssued = true;
-            return constructConsequenceProjectionOutcome({
-              status: "projected",
-              consequenceRef: binding.consequenceProjectionRef,
-              domainReadModelRefs: [binding.bindingRef],
-              traversalAction: binding.traversalAction,
-              evidenceRefs: ["evidence://t165/consequence-action"]
+    const emittedEvents = [];
+    const fdEdges = [];
+    let traversalActionIssued = false;
+    const result = runEngineIterate({
+      basis,
+      eventSink: (event) => {
+        emittedEvents.push(event);
+      },
+      plugins: {
+        fdEvaluator: Object.freeze({
+          contract: constructEnginePluginContract({
+            ref: "plugin://t165/fd-evaluator",
+            pluginKind: "fd_evaluator",
+            authority: "effect_plugin",
+            inputCarrier: "EnginePluginInput",
+            outputCarrier: "FdEvaluationOutcome"
+          }),
+          evaluate: (input) => {
+            fdEdges.push(input.edge);
+            return constructFdEvaluationOutcome({
+              status: "accepted",
+              evidenceRefs: [input.sourceProjectionRef]
             });
           }
-          return constructConsequenceProjectionOutcome({
-            status: "projected",
-            consequenceRef: `consequence://t165/no-reentry/${input.vectorIndex}`,
-            domainReadModelRefs: [],
-            traversalAction: null,
-            evidenceRefs: [`evidence://t165/no-reentry/${input.vectorIndex}`]
-          });
-        }
+        }),
+        consequenceProjection: Object.freeze({
+          contract: constructEnginePluginContract({
+            ref: "plugin://t165/consequence-projection",
+            pluginKind: "consequence_projection",
+            authority: "effect_plugin",
+            inputCarrier: "EnginePluginInput",
+            outputCarrier: "ConsequenceProjectionOutcome"
+          }),
+          project: (input) => {
+            if (input.vectorIndex === 2 && !traversalActionIssued) {
+              traversalActionIssued = true;
+              return constructConsequenceProjectionOutcome({
+                status: "projected",
+                consequenceRef: binding.consequenceProjectionRef,
+                domainReadModelRefs: [binding.bindingRef],
+                traversalAction: binding.traversalAction,
+                evidenceRefs: ["evidence://t165/consequence-action"]
+              });
+            }
+            return constructConsequenceProjectionOutcome({
+              status: "projected",
+              consequenceRef: `consequence://t165/no-reentry/${input.vectorIndex}`,
+              domainReadModelRefs: [],
+              traversalAction: null,
+              evidenceRefs: [`evidence://t165/no-reentry/${input.vectorIndex}`]
+            });
+          }
+        })
+      }
+    });
+
+    assert.equal(result.transition.kind, "terminal");
+    assert.equal(result.transition.terminalKind, "converged");
+    assert.deepEqual(fdEdges, [
+      "input_to_requirements",
+      "requirements_to_design",
+      "design_to_code",
+      "requirements_to_design",
+      "design_to_code"
+    ]);
+    assert.ok(
+      emittedEvents.some((event) => event.kind === "construction_intent_selected")
+    );
+    assert.ok(
+      emittedEvents.some(
+        (event) => event.kind === "construction_graph_action_invoked"
+      )
+    );
+    assert.ok(
+      emittedEvents.some(
+        (event) =>
+          event.kind === "graph_reentry_applied" && event.targetVectorIndex === 1
+      )
+    );
+    assert.ok(
+      emittedEvents.some(
+        (event) =>
+          event.kind === "construction_delta_observed" &&
+          event.reentryMoved === true
+      )
+    );
+  });
+}
+
+test("T-165 SDLC consequence bridge emits graph-span reentry for full-breadth lite repair", () => {
+  const basis = buildThreeStageBasis();
+  const currentVector = basis.graph.vectors[2];
+  assert.ok(currentVector);
+  const targetVector = basis.graph.vectors[1];
+  assert.ok(targetVector);
+  const catalog = constructAllowedConsequenceTraversalCatalog({
+    catalogRef: "allowed-catalog://t165/lite-graph-span",
+    graphFunctionRef: basis.graphFunction.id,
+    graphVectorRef: currentVector.id,
+    vectorIndex: 2,
+    edgeRef: currentVector.name,
+    rows: [
+      constructAllowedConsequenceTraversalRow({
+        rowRef: "allowed-row://t165/lite-graph-span",
+        traversalFamily: "graph_span_reentry",
+        edgeRef: currentVector.name,
+        graphFunctionRef: basis.graphFunction.id,
+        graphVectorRef: currentVector.id,
+        allowedActionKinds: ["reenter_graph_span"],
+        requiredAuthorityRefs: ["REQ-F-ODDSDLC-165"]
       })
-    }
+    ]
   });
 
-  assert.equal(result.transition.kind, "terminal");
-  assert.equal(result.transition.terminalKind, "converged");
-  assert.deepEqual(fdEdges, [
-    "input_to_requirements",
-    "requirements_to_design",
-    "design_to_code",
-    "requirements_to_design",
-    "design_to_code"
-  ]);
-  assert.ok(
-    emittedEvents.some((event) => event.kind === "construction_intent_selected")
-  );
-  assert.ok(
-    emittedEvents.some((event) => event.kind === "construction_graph_action_invoked")
-  );
-  assert.ok(
-    emittedEvents.some(
-      (event) => event.kind === "graph_reentry_applied" && event.targetVectorIndex === 1
-    )
-  );
-  assert.ok(
-    emittedEvents.some(
-      (event) =>
-        event.kind === "construction_delta_observed" &&
-        event.reentryMoved === true
-    )
+  const binding = buildSdlcTraversalActionBinding(basis, {
+    closureDisposition: "repair",
+    strategyDirectiveRef: "strategy://odd-sdlc/t165/full-breadth",
+    allowedConsequenceTraversalCatalog: catalog
+  });
+
+  assert.equal(binding.traversalAction.actionKind, "reenter_graph_span");
+  assert.equal(binding.traversalAction.selectedTraversalFamily, "graph_span_reentry");
+  assert.equal(binding.traversalAction.graphVectorRef, targetVector.id);
+  assert.equal(binding.traversalAction.selectedRefinementBoundaryRef, null);
+  assert.equal(
+    binding.traversalAction.requiredAuthorityRefs.includes("REQ-F-ODDSDLC-165"),
+    true
   );
 });
 
@@ -493,5 +563,27 @@ test("T-165 SDLC consequence bridge rejects relative cursor movement", () => {
   assert.throws(
     () => buildSdlcTraversalActionBinding(basis, "graph-reentry-point://realization/-2"),
     /absolute graph-reentry-point URI with a numeric vector index/u
+  );
+});
+
+test("T-165 SDLC consequence bridge emits canonical ABG graph reentry target refs", () => {
+  assert.equal(
+    constructSdlcGraphReentryTargetRef({ targetVectorIndex: 6 }),
+    "graph-reentry-point://odd-sdlc/6"
+  );
+  assert.equal(
+    constructSdlcGraphReentryTargetRef({
+      authorityNamespaceRef: "realization",
+      targetVectorIndex: 1
+    }),
+    "graph-reentry-point://realization/1"
+  );
+  assert.throws(
+    () =>
+      constructSdlcGraphReentryTargetRef({
+        authorityNamespaceRef: "graph-function:odd_sdlc:lite_design_module_implementation",
+        targetVectorIndex: 6
+      }),
+    /single graph-reentry-point authority segment/u
   );
 });

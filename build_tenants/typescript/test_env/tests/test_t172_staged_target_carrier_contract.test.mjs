@@ -335,6 +335,17 @@ function testDesignRegister(testcaseIds = ["TC-T172-001"]) {
   };
 }
 
+function testDesignTargetCarrier(manifest, register) {
+  return {
+    kind: manifest.targetCarrierProjection.outputCarrierKind,
+    targetAssetType: manifest.targetAssetType,
+    edgeRef: manifest.edgeName,
+    contractRef: manifest.targetCarrierProjection.targetCarrierContractRef,
+    contractDigest: manifest.targetCarrierProjection.targetCarrierContractDigest,
+    payload: register
+  };
+}
+
 function manifestForEdge(workspaceRoot, edgeName, runId, options = {}) {
   const contract = hookContractByEdgeName(edgeName);
   return deriveWorkerHandoffManifest({
@@ -880,7 +891,15 @@ test("T-172 test-design prompt names closed test-case row fields", () => {
     assert.match(prompt, /uatTestcaseRows and testcaseAuthorityRows/u);
     assert.match(
       prompt,
+      /selected target-carrier envelope with `kind:"sdlc_test_design_surface_target_carrier"`/u
+    );
+    assert.doesNotMatch(
+      prompt,
       /Do not wrap the fenced register in a target-carrier envelope/u
+    );
+    assert.doesNotMatch(
+      prompt,
+      /top-level kind is sdlc_test_design_register/u
     );
     assert.match(
       prompt,
@@ -892,7 +911,7 @@ test("T-172 test-design prompt names closed test-case row fields", () => {
     );
     assert.match(
       prompt,
-      /do not add target-carrier envelope fields such as edgeRef, contractRef, contractDigest, payload, summary, or evidenceRefs/u
+      /Do not put edgeRef, contractRef, contractDigest, summary, or evidenceRefs inside payload/u
     );
     assert.match(
       prompt,
@@ -1365,7 +1384,10 @@ test("T-172 trivial test-design producer admits UAT/integration dual-hop over on
     );
     const outputContent = writeJsonFile(
       manifest.outputFile,
-      testDesignRegister(["TC-T172-UAT", "TC-T172-INTEGRATION"])
+      testDesignTargetCarrier(
+        manifest,
+        testDesignRegister(["TC-T172-UAT", "TC-T172-INTEGRATION"])
+      )
     );
     const report = surfaceReport({ manifest, outputContent });
 
@@ -1393,7 +1415,7 @@ test("T-172 trivial test-design producer admits explicit single-row topology", (
     );
     const outputContent = writeJsonFile(
       manifest.outputFile,
-      testDesignRegister(["TC-T172-001"])
+      testDesignTargetCarrier(manifest, testDesignRegister(["TC-T172-001"]))
     );
     const report = surfaceReport({ manifest, outputContent });
 
@@ -1425,7 +1447,7 @@ test("T-172 test-design admission reads fenced markdown register", () => {
       "# ADR-003 Test Design Surface",
       "",
       "```json test_design_register",
-      JSON.stringify(register, null, 2),
+      JSON.stringify(testDesignTargetCarrier(manifest, register), null, 2),
       "```",
       ""
     ].join("\n");
@@ -1553,10 +1575,7 @@ test("T-172 test-design admission rejects common semantic carrier aliases", () =
       "# ADR-003 Test Design Surface",
       "",
       "```json test_design_register",
-      JSON.stringify({
-        kind: "sdlc_test_design_surface_target_carrier",
-        payload: registerPayload
-      }, null, 2),
+      JSON.stringify(testDesignTargetCarrier(manifest, registerPayload), null, 2),
       "```",
       ""
     ].join("\n");

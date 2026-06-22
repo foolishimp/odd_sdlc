@@ -20,6 +20,10 @@ import type {
 } from "./carriers.js";
 import { isRecord as isPlainRecord } from "../admission/codecs.js";
 
+const ODD_SDLC_RUNTIME_ENTRY_TARBALL_PATH =
+  "package/build/semantic/code/src/index.js";
+const PACKAGE_PACK_ATTEMPTS = 3;
+
 export interface PackNodePackageInput {
   readonly packageSourceRoot: string;
   readonly packDestinationRoot: string;
@@ -111,6 +115,29 @@ function assertSpawnSucceeded(
       `${label} failed with status ${status ?? "null"}\nstdout:\n${stdout}\nstderr:\n${stderr}`
     );
   }
+}
+
+function packageRequiresSemanticRuntime(identity: NodePackageIdentity): boolean {
+  return identity.packageName === "@odd-sdlc/typescript-tenant";
+}
+
+function tarballContainsPath(tarballPath: string, requiredPath: string): boolean {
+  const listRun = spawnSync("tar", ["-tzf", tarballPath], {
+    encoding: "utf8"
+  });
+  assertSpawnSucceeded(
+    listRun.status,
+    listRun.stdout,
+    listRun.stderr,
+    "tar list"
+  );
+  return listRun.stdout
+    .split(/\r?\n/u)
+    .some((entry) => entry.trim() === requiredPath);
+}
+
+async function pauseBeforePackRetry(): Promise<void> {
+  await new Promise((resolvePause) => setTimeout(resolvePause, 250));
 }
 
 async function pathIsDirectory(targetPath: string): Promise<boolean> {
@@ -224,28 +251,47 @@ export async function packNodePackage(
 ): Promise<PackedNodePackage> {
   const identity = await readNodePackageIdentity(input.packageSourceRoot);
   await mkdir(input.packDestinationRoot, { recursive: true });
-  const packRoot = await mkdtemp(join(input.packDestinationRoot, "pack-"));
-  const packRun = spawnSync(
-    "npm",
-    ["pack", "--pack-destination", packRoot, "--silent"],
-    {
-      cwd: input.packageSourceRoot,
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        npm_config_cache: input.npmCacheRoot
+  let lastMissingRuntimeTarball: string | null = null;
+  for (let attempt = 1; attempt <= PACKAGE_PACK_ATTEMPTS; attempt += 1) {
+    const packRoot = await mkdtemp(join(input.packDestinationRoot, "pack-"));
+    const packRun = spawnSync(
+      "npm",
+      ["pack", "--pack-destination", packRoot, "--silent"],
+      {
+        cwd: input.packageSourceRoot,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          npm_config_cache: input.npmCacheRoot
+        }
       }
+    );
+    assertSpawnSucceeded(packRun.status, packRun.stdout, packRun.stderr, "npm pack");
+    const tarballPath = join(packRoot, packedTarballName(packRun.stdout));
+    if (
+      !packageRequiresSemanticRuntime(identity) ||
+      tarballContainsPath(tarballPath, ODD_SDLC_RUNTIME_ENTRY_TARBALL_PATH)
+    ) {
+      return Object.freeze({
+        kind: "packed_node_package",
+        packageSourceRoot: input.packageSourceRoot,
+        packageName: identity.packageName,
+        packageVersion: identity.packageVersion,
+        tarballPath,
+        packRoot
+      });
     }
+    lastMissingRuntimeTarball = tarballPath;
+    await rm(packRoot, { recursive: true, force: true });
+    await pauseBeforePackRetry();
+  }
+  throw new Error(
+    [
+      `packed ${identity.packageName}@${identity.packageVersion} is missing ${ODD_SDLC_RUNTIME_ENTRY_TARBALL_PATH}`,
+      `packageSourceRoot=${input.packageSourceRoot}`,
+      `lastTarball=${lastMissingRuntimeTarball ?? "none"}`
+    ].join("\n")
   );
-  assertSpawnSucceeded(packRun.status, packRun.stdout, packRun.stderr, "npm pack");
-  return Object.freeze({
-    kind: "packed_node_package",
-    packageSourceRoot: input.packageSourceRoot,
-    packageName: identity.packageName,
-    packageVersion: identity.packageVersion,
-    tarballPath: join(packRoot, packedTarballName(packRun.stdout)),
-    packRoot
-  });
 }
 
 export async function installPackedNodePackage(

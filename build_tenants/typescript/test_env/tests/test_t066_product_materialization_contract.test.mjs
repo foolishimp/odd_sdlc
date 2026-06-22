@@ -6177,6 +6177,10 @@ test("T-100 component-test postflight admits materialized tests before execution
   assert.match(prompt, /must be a string array/u);
   assert.match(prompt, /payload\.componentTestRows\[\]\.relativePath must name/);
   assert.match(prompt, /evidence archives, not product test files/);
+  assert.match(prompt, /must not satisfy a source\/domain capability/u);
+  assert.match(prompt, /local product-domain type, algebra, validator, parser, compiler, executor, or guard/u);
+  assert.match(prompt, /call the admitted product source boundary/u);
+  assert.match(prompt, /Do not create test-local validators such as CandidateAggregate or validateAssociativeAggregate/u);
   assert.match(prompt, /On schema-local re-entry, repair the rejected component_depth_register fields first/u);
   assert.match(prompt, /JavaScript test files under admitted ESM module-system authority/u);
   assert.match(prompt, /moduleSystem=esm, generated test files must use ESM imports/u);
@@ -6582,7 +6586,7 @@ function t102Ledger(id, options = {}) {
   return constructSdlcEdgeFulfillmentLedger({
     selectedComposition,
     ledgerRef: `ledger://t102/${id}`,
-    registerVersionRef: `ledger-version://t102/${id}`,
+    ledgerVersionRef: `ledger-version://t102/${id}`,
     edgeRef: "edge://odd-sdlc/derive_test_execution_result_surface/26",
     attemptRef: `attempt://t102/${id}`,
     targetBindingRefs: [`target-binding://t102/${id}`],

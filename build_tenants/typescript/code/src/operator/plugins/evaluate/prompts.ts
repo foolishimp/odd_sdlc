@@ -88,7 +88,7 @@ function edgeAuthorityCompressionPromptLines(): readonly string[] {
 }
 
 const ABG_ITERATION_OUTCOME_FOLD_REF =
-  "package:@abiogenesis/typescript-tenant@4.1.0-rc.3#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows";
+  "package:@abiogenesis/typescript-tenant@4.1.0-rc.6#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows";
 
 interface EvaluatePromptLineGroups {
   readonly preAuthorityLines: readonly string[];
@@ -175,23 +175,64 @@ function reviewGradeCurrentPostflightPromptLines(
   ]);
 }
 
+function reviewGradeDecodedDiagnosticText(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function reviewGradeRetryScopeRequirementIds(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  const activeRequirementIds = manifest.traversalObligationContext.obligations
+    .filter((obligation) => obligation.obligationKind === "requirement")
+    .map((obligation) => obligation.obligationId);
+  if (
+    activeRequirementIds.length === 0 ||
+    manifest.retryContext.priorGapDossiers.length === 0
+  ) {
+    return Object.freeze([]);
+  }
+  const diagnosticTexts = manifest.retryContext.priorGapDossiers.flatMap(
+    (dossier) =>
+      dossier.reasons.flatMap((reason) =>
+        [
+          reason.reason,
+          reason.blockingReason.message,
+          reason.blockingReason.detail ?? ""
+        ].map((value) => reviewGradeDecodedDiagnosticText(value).toLowerCase())
+      )
+  );
+  return Object.freeze(
+    activeRequirementIds.filter((obligationId) =>
+      diagnosticTexts.some((text) => text.includes(obligationId.toLowerCase()))
+    )
+  );
+}
+
 function reviewGradePromptObligationRefs(
   manifest: SdlcWorkerHandoffManifest,
   invocationScope?: SdlcReviewGradeInvocationScope | null | undefined
 ): readonly string[] {
   const fallback = manifestObligationRefs(manifest);
+  const retryScopeRequirementIds = reviewGradeRetryScopeRequirementIds(manifest);
   if (
     invocationScope !== null &&
     invocationScope !== undefined &&
     invocationScope.kind === "sdlc_worker_invocation_package" &&
     invocationScope.inlineObligationIds.length > 0
   ) {
-    return uniquePromptRefs(invocationScope.inlineObligationIds);
+    return uniquePromptRefs([
+      ...invocationScope.inlineObligationIds,
+      ...retryScopeRequirementIds
+    ]);
   }
   if (manifest.featureScope?.mode === "full_breadth") {
-    return fallback;
+    return uniquePromptRefs([...fallback, ...retryScopeRequirementIds]);
   }
-  return Object.freeze([]);
+  return uniquePromptRefs(retryScopeRequirementIds);
 }
 
 function evaluationDimension(input: {
@@ -463,7 +504,17 @@ function reviewGradeTargetAssetRuleLines(
     return Object.freeze([
       "- On component_test_surface, admitted execution_result/runtime_execution proof is not same-edge authority. When generated tests, lineage, and component-test carrier rows realize the reviewed requirement, mark that requirement fulfilled even if later test-execution evidence is absent.",
       "- On component_test_surface, use partial/blocked for a requirement only when the generated test source or component-test carrier fails this edge's owned proof obligation: missing/incorrect testcase lineage, missing requirement/component binding, wrong test semantics, wrong product path, wrong module system, or schema-invalid carrier rows.",
-      "- For component_test_surface, compare generated tests to accepted testcase/test-design authority and source responsibilities."
+      "- For component_test_surface, compare generated tests to accepted testcase/test-design authority and source responsibilities.",
+      "- A generated component test may define fixtures and test-local helpers, but it cannot satisfy a source/domain capability by declaring a local product-domain type, algebra, validator, parser, compiler, executor, or guard that the accepted product source does not expose. If the proof depends on such a shadow implementation, block as test_overlap_missing or semantic_not_realized and use upstream_reentry to the source/code edge.",
+      "- If a test-overlap blocker cannot be lawfully repaired by changing only this edge's declared test/build-config product targets because the accepted source/domain capability is absent or stubbed, do not force a same-edge test-only repair. Mark the finding blocked with failureClass test_overlap_missing or semantic_not_realized and repairSurfaceTriage disposition upstream_reentry, naming the source/code edge that owns the missing product capability."
+    ]);
+  }
+  if (manifest.targetAssetType === "uat_test_source_surface") {
+    return Object.freeze([
+      "- On uat_test_source_surface, admitted test-execution/result proof is not same-edge authority. When generated UAT source, schedule rows, lineage, and declared test files realize the reviewed requirement, mark that requirement fulfilled even if later test-execution evidence is absent.",
+      "- On uat_test_source_surface, missing execution evidence for a declared test command is wrong_stage/downstream_deferred pressure for prepare_test_execution_surface or derive_test_execution_result_surface, not current_edge_repair.",
+      "- On uat_test_source_surface, use partial/blocked only when the generated UAT source or carrier fails this edge's owned proof obligation: missing/incorrect testcase lineage, missing schedule binding, wrong test semantics, wrong product path, wrong module system, or schema-invalid carrier rows.",
+      "- A generated UAT test may define fixtures and test-local helpers, but it cannot satisfy a source/domain capability by declaring a local product-domain type, algebra, validator, parser, compiler, executor, or guard that the accepted product source does not expose. If the proof depends on such a shadow implementation, block as test_overlap_missing or semantic_not_realized and use upstream_reentry to the source/code edge."
     ]);
   }
   return Object.freeze([] as const);
@@ -512,7 +563,7 @@ function compactObligationPromptLines(
       : reviewGradePromptObligationRefs(manifest, invocationScope);
   const coverageLaw =
     coverageTarget === "content_register"
-      ? "- Coverage law: obligationRefs above are fold context only for this content register. Do not add reviewedObligationIds, findings, summary, status, or other assessment fields to sdlc_evaluate_content_ledger; represent semantic judgment only through permitted contentRows/evidenceRefs, and ABG folds coverage/closure from refs."
+      ? "- Coverage law: obligationRefs above are fold context only for this content ledger. Do not add reviewedObligationIds, findings, summary, status, or other assessment fields to sdlc_evaluate_content_ledger; represent semantic judgment only through permitted contentRows/evidenceRefs, and ABG folds coverage/closure from refs."
       : "- Review coverage law: reviewedObligationIds and findings must cover exactly every obligationRef above and no other obligation ids. Worker-report obligation IDs not listed above are evidence/carryover aliases only.";
   return Object.freeze([
     `- graphFunctionName: ${manifest.graphFunctionName}`,
@@ -555,14 +606,14 @@ function compactDesignDepthPromptLineGroups(input: {
       `- Optional observation-only subworkstream manifest: ${input.subworkstreamManifestPath}`,
       "- You may use agent-internal subagents or parallel workstreams as read-only compute strategy for independent modules, interfaces, obligation slices, or evidence packets.",
       `- If you use evaluator subworkstreams, record them in ${input.subworkstreamManifestPath}. Rows must cite authority/dependency inputs, stay read-only over workspace/product files, and remain observation only.`,
-      "- Evaluator subworkstreams do not emit ABG events, write ledgers, close edges, select traversal, publish consequence projections, or create ABG branch leases. The parent evaluate.C result owns the final content-register merge.",
+      "- Evaluator subworkstreams do not emit ABG events, write ledgers, close edges, select traversal, publish consequence projections, or create ABG branch leases. The parent evaluate.C result owns the final content-ledger merge.",
       "",
       "Admitted edge packet:",
       ...compactObligationPromptLines(input.manifest, "content_register"),
       "",
       "Tenant tool boundary:",
       ...tenantToolBoundaryPromptLines(input.tenantToolEnvironment),
-      "- Tool-profile contract: obey the active tool list. If command execution is not exposed, inspect with bounded file reads/writes only. If command execution is exposed by the worker runtime, use it only for bounded workspace-relative read-only inspection or the named content-register update helper when this prompt permits it; do not run product, build, test, framework, traversal, or background commands.",
+      "- Tool-profile contract: obey the active tool list. If command execution is not exposed, inspect with bounded file reads/writes only. If command execution is exposed by the worker runtime, use it only for bounded workspace-relative read-only inspection or the named content-ledger update helper when this prompt permits it; do not run product, build, test, framework, traversal, or background commands.",
       "- Read boundary: use only workspace-relative paths or explicit workspace/run-archive paths named in this prompt; do not read/cite/copy sibling sandboxes, historical test_runs, home memory, /tmp, or outside-workspace absolute paths.",
       "- Read cap: every Read tool call over JSON, Markdown, report, manifest, or source artifacts must set limit <=80; inspect only the lines needed for the current register section."
     ]),
@@ -571,9 +622,9 @@ function compactDesignDepthPromptLineGroups(input: {
       "Read in order:",
       `1. compressed work-category governance (${input.governanceRef}): ${input.governancePath}`,
       `2. construction brief: ${input.constructionBriefPath}`,
-      `3. pre-created draft content register: ${input.contentRegisterPath}`,
+      `3. pre-created draft content ledger: ${input.contentRegisterPath}`,
       "4. worker result summary below; inspect the worker report only for a named missing detail.",
-      `5. bounded inspection of the ADR/output artifact: ${input.manifest.outputFile}; the framework has already written the draft register, so this read is allowed before the first semantic update.`,
+      `5. bounded inspection of the ADR/output artifact: ${input.manifest.outputFile}; the framework has already written the draft ledger, so this read is allowed before the first semantic update.`,
       "",
       "Precomputed worker result report summary:",
       ...input.workerReportSummaryLines.map((line) => `- ${line}`),
@@ -581,12 +632,12 @@ function compactDesignDepthPromptLineGroups(input: {
       "Hard bounds:",
       `- Do not use the Read tool on the handoff manifest (${input.manifestPath}); selected edge facts are in this prompt.`,
       `- Do not inspect ${input.workerReportPath} or ${input.invocationPackagePath} before the first semantic update unless a named missing detail requires it.`,
-      "- The first evaluator update after reading the draft register and ADR must write semantic rows; do not spend the first pass gathering exhaustive context.",
+      "- The first evaluator update after reading the draft ledger and ADR must write semantic rows; do not spend the first pass gathering exhaustive context.",
       "- Prefer one compact complete write for a small fused grid. If uncertain, write partial/blocked verdict axes with reasons instead of hidden synthesis.",
       "- Do not print full files, full JSON objects, full ADR tables, requirement tables, or source files to stdout.",
-      "- Do not write EvaluationFinding rows into the content register. The grid's expected finding refs are prompt-sidecar and ABG-fold refs, not contentRows[].",
+      "- Do not write EvaluationFinding rows into the content ledger. The grid's expected finding refs are prompt-sidecar and ABG-fold refs, not contentRows[].",
       "",
-      "Required content-register envelope:",
+      "Required content-ledger envelope:",
       "- kind: \"sdlc_evaluate_content_ledger\"",
       "- ledgerVersion: \"ts-evaluate-content-ledger-v1\"",
       "- stage: \"evaluate.C\"",
@@ -645,11 +696,11 @@ function compactDesignDepthPromptLineGroups(input: {
       "- For a small product, keep schema/domain/sequence compact: no more than two entities and two operations per module unless authority requires more.",
       "",
       "Self-check before final response:",
-      "- Re-open the content register with bounded Read and verify valid JSON, exact top-level key set, selected identity preservation, row key sets, all required sections, matching component/file paths, and compact size.",
+      "- Re-open the content ledger with bounded Read and verify valid JSON, exact top-level key set, selected identity preservation, row key sets, all required sections, matching component/file paths, and compact size.",
       "- Reject and rewrite if any componentTopologyRows[] or componentRealizationRows[] row has zero requirementIds or more than 8 requirementIds.",
       "- Reject and rewrite if any design-depth row contains field/value/sourceRef summary triples or any key outside the exact row contracts above.",
       "- Reject and rewrite if any nested row kind is sdlc_entity_row, sdlc_attribute_row, sdlc_operation_row, or sdlc_sunny_day_step; the accepted nested kinds are sdlc_domain_entity, sdlc_domain_attribute, sdlc_domain_operation, sdlc_entity_state_transition, sdlc_aggregate_domain_entity, and sdlc_sunny_day_sequence_step.",
-      "- Rewrite until valid. Final response is one compact line; the content register file is the evaluation truth."
+      "- Rewrite until valid. Final response is one compact line; the content ledger file is the evaluation truth."
     ])
   });
 }
@@ -712,9 +763,9 @@ function compactReviewGradePromptLineGroups(input: {
       "- Do not print full files, full JSON objects, full requirement tables, full source files, source excerpts longer than 20 lines, or copied command/tool output to stdout.",
       "- Terminal output is a work trace. The assessment JSON is the evaluation truth.",
       "- First-blocker protocol: once one current-edge semantic blocker is identified, write the blocked assessment artifact before inspecting additional modules or binding fulfilled obligations.",
-      "- If a current-edge blocker is found, write a minimal blocked assessment immediately; mark not-yet-reviewed active obligations unassessed with current_edge_repair triage and stop deeper inspection.",
+      "- If a blocker is found, write a minimal blocked assessment immediately; mark not-yet-reviewed active obligations unassessed with the same lawful repairSurfaceTriage disposition as the blocker and stop deeper inspection. Do not default to current_edge_repair when target-specific rules require upstream_reentry or downstream_deferred.",
       "- Do not issue parallel tool calls, helper-output debugging, source-dumping grep/cat/sed/tail/head/nl commands, background jobs, product execution, build, test, framework, or traversal commands.",
-      "- If command execution is unavailable, evaluate execution requirements only from admitted execution evidence. Missing later test/runtime proof is wrong_stage when the current edge declared no test/execution target.",
+      "- If command execution is unavailable, evaluate execution requirements only from admitted execution evidence. Missing later test/runtime proof is wrong_stage when the current edge declared no test/execution target or when the current edge is a generated test-source surface rather than the execution-result edge.",
       "",
       "Required assessment envelope:",
       "- kind: \"sdlc_review_grade_edge_fulfillment_assessment\"",
@@ -723,7 +774,7 @@ function compactReviewGradePromptLineGroups(input: {
       `- edgeName: ${JSON.stringify(input.manifest.edgeName)}`,
       `- targetAssetType: ${JSON.stringify(input.manifest.targetAssetType)}`,
       "- status: \"passed\" or \"blocked\"",
-      "- reviewedObligationIds: exactly the obligationRefs in the admitted edge packet above. For scoped runs, this is invocationPackage.inlineObligationIds; do not add worker aliases.",
+      "- reviewedObligationIds: exactly the active review-scope obligationRefs in the admitted edge packet above. Scoped runs use invocationPackage.inlineObligationIds plus admitted retry-scope requirements; do not add worker aliases.",
       "- worker_result_report.obligationAssessments may support evidence and rationale, but it cannot enlarge review scope or create findings for generated-artifact requirement aliases.",
       "- findings[]: one finding per reviewed obligation id.",
       "- evidenceRefs: refs for assessment, generated assets, accepted authority, and review evidence.",
@@ -858,7 +909,7 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
       "odd_sdlc evaluate.C/F_P design-depth register rule.",
       "",
       "Purpose:",
-      "- Populate the implementation design-depth content register as the highest semantic design-depth truth for downstream transforms.",
+      "- Populate the implementation design-depth content ledger as the highest semantic design-depth truth for downstream transforms.",
       "- Evaluate the workspace, admitted transform evidence, worker report, construction brief, invocation package, ADR artifact, and residual pressure together.",
       "- Treat depth as the priority F_P judgment: decide whether the component/module decomposition, source ownership, public boundaries, and residual pressure are proportionate to the requirements.",
       "- For each requirement or requirement group, decide whether it requires separable_public_boundary, shared_component, test_boundary, data_contract_boundary, runtime_or_persistence_boundary, human_review, or blocked handling. Encode that decision in component row publicBoundary/rationale text and designCompletenessVerdict reasons.",
@@ -868,14 +919,14 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
       "- This is evaluation work. Do not rewrite the ADR, source files, tests, package files, or product materialization outputs.",
       "- You may use agent-internal subagents or parallel workstreams as read-only compute strategy for independent modules, interfaces, obligation slices, or evidence packets.",
       `- If you use evaluator subworkstreams, record them in ${input.subworkstreamManifestPath}. Rows must cite authority/dependency inputs, stay read-only over workspace/product files, and remain observation only.`,
-      "- Evaluator subworkstreams do not emit ABG events, write ledgers, close edges, select traversal, publish consequence projections, or create ABG branch leases. The parent evaluate.C result owns the final content-register merge.",
-      "- The content register path is the durable evaluation artifact; the task is not a single-shot JSON response.",
+      "- Evaluator subworkstreams do not emit ABG events, write ledgers, close edges, select traversal, publish consequence projections, or create ABG branch leases. The parent evaluate.C result owns the final content-ledger merge.",
+      "- The content ledger path is the durable evaluation artifact; the task is not a single-shot JSON response.",
       `- The system pre-creates that path as a non-admitted draft with selected composition identity and one "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND}" row per register section. Your job is to convert draft rows into semantic "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND}" rows incrementally.`,
       "",
       "Tenant tool boundary:",
       ...tenantToolBoundaryPromptLines(input.tenantToolEnvironment),
       "- Read boundary: use only workspace-relative paths or explicit workspace/run-archive paths named in this prompt; do not read/cite/copy sibling sandboxes, historical test_runs, home memory, /tmp, or outside-workspace absolute paths.",
-      "- Tool-profile contract: obey the active tool list. If command execution is not exposed, inspect with bounded file reads/writes only. If command execution is exposed by the worker runtime, use it only for bounded workspace-relative read-only inspection or the named content-register update helper when this prompt permits it; do not run product, build, test, framework, traversal, or background commands.",
+      "- Tool-profile contract: obey the active tool list. If command execution is not exposed, inspect with bounded file reads/writes only. If command execution is exposed by the worker runtime, use it only for bounded workspace-relative read-only inspection or the named content-ledger update helper when this prompt permits it; do not run product, build, test, framework, traversal, or background commands.",
       "- Read cap: every Read tool call over JSON, Markdown, report, manifest, or source artifacts must set limit <=80; use offset/limit for bounded inspection and inspect only the lines needed for the current section."
     ]),
     postAuthorityLines: Object.freeze([
@@ -883,8 +934,8 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
       "Read in order:",
     `1. compressed work-category governance (${input.governanceRef}): ${input.governancePath}`,
     `2. bounded inspection of construction brief: ${input.constructionBriefPath}`,
-    `3. bounded inspection of the pre-created draft content register at ${input.contentRegisterPath}; preserve its top-level selected composition identity from the embedded selected identity values in this prompt if the file is large.`,
-    `4. bounded inspection of the ADR/output artifact: ${input.manifest.outputFile}; the framework has already written the draft register, so this read is allowed before the first semantic update.`,
+    `3. bounded inspection of the pre-created draft content ledger at ${input.contentRegisterPath}; preserve its top-level selected composition identity from the embedded selected identity values in this prompt if the file is large.`,
+    `4. bounded inspection of the ADR/output artifact: ${input.manifest.outputFile}; the framework has already written the draft ledger, so this read is allowed before the first semantic update.`,
     "5. convert each draft row into a semantic design-depth fragment row from the construction brief, admitted transform evidence, the ADR/output artifact, and selected authority refs.",
     "",
     "Precomputed worker result report summary:",
@@ -894,20 +945,20 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
     `- Do not use the Read tool on the handoff manifest (${input.manifestPath}). It is too large; selected manifest facts needed for this evaluation are projected into the prompt, construction brief, and worker summary.`,
     `- Do not inspect the worker result report (${input.workerReportPath}) before the first evaluator update. Its compact summary is already in this prompt.`,
     `- Do not use the Read tool on the worker invocation package (${input.invocationPackagePath}) before the first evaluator update. Selected invocation pressure is already in the construction brief and worker summary.`,
-    "- Before the first evaluator update, do not inspect extra authority files beyond the governance doc, construction brief, draft content register, and ADR/output artifact named above.",
-    "- The first evaluator content-register update must be your selected evaluate.C/F_P judgment from the draft register plus ADR/output artifact. Do not spend the first pass gathering exhaustive context.",
+    "- Before the first evaluator update, do not inspect extra authority files beyond the governance doc, construction brief, draft content ledger, and ADR/output artifact named above.",
+    "- The first evaluator content-ledger update must be your selected evaluate.C/F_P judgment from the draft ledger plus ADR/output artifact. Do not spend the first pass gathering exhaustive context.",
     "- Do not run a worker-result-report discovery script before the first evaluator update.",
-    "- Do not run any bounded-summary action before the first evaluator update. After reading the governance doc, construction brief, and draft content register, the next tool action must publish the content register update.",
+    "- Do not run any bounded-summary action before the first evaluator update. After reading the governance doc, construction brief, and draft content ledger, the next tool action must publish the content ledger update.",
     "- Do not say you are writing the register until that file write has succeeded.",
     `- First-update carrier helper contract: ${DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_REF} (${DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_PATH}).`,
     "- The helper contract is authority-neutral carrier mechanics: same-path temp-then-rename publication, selected composition preservation, non-draft fragment envelope construction, and compact row counts only. It emits no semantic section values.",
     "- Bounded local automation may support summarization, JSON validation, and that named carrier-helper contract only. Do not deterministically construct later semantic register rows from framework rules.",
     "",
     "First register materialization rule:",
-    "- After reading the governance doc and construction brief, update the pre-created content register file directly as the selected evaluate.C/F_P semantic pressure map.",
+    "- After reading the governance doc and construction brief, update the pre-created content ledger file directly as the selected evaluate.C/F_P semantic pressure map.",
     "- Use admitted upstream design surfaces, dependency pressure, product file targets, tenant stack authority, worker report summary, and specific authority refs as the basis.",
     "- Do not copy a framework-generated register skeleton as semantic truth. If a section is uncertain, emit a partial or blocked axis with explicit reasons and evidence refs instead of inventing rows.",
-    `- The content register carries ProductAssetModel rows. Use contentKind "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND}" rows for incremental section writes while you build the register.`,
+    `- The content ledger carries ProductAssetModel rows. Use contentKind "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND}" rows for incremental section writes while you build the register.`,
     "- F_D assembles admitted fragment rows, sorted by payload.sequence, into the legacy register projection. A final full contentKind \"sdlc_design_depth_register\" row is also valid when the complete register is already available.",
     `- Do not write the legacy projection path directly: ${input.registerProjectionPath}`,
     "- The first register can be compact; after it exists, iterate only if validation fails or a specific axis is partial/blocked.",
@@ -923,35 +974,35 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
     "- Do not use command helpers to display the five primary inputs unless the active tool list explicitly exposes command execution.",
     "- If JSON or Markdown inspection is needed when command execution is unavailable, use Read offset/limit and inspect only bounded line ranges.",
     "- Keep terminal output bounded and purposeful. Stdout is an agent work trace, not evaluation truth.",
-    "- The content register file is the evaluation surface. Prefer file writes and bounded self-check reads over terminal narration.",
+    "- The content ledger file is the evaluation surface. Prefer file writes and bounded self-check reads over terminal narration.",
     "",
     "Agentic F_P work loop:",
     "- After the first evaluator update exists, write a short plan and checklist for the required register sections.",
-    "- Execute the plan incrementally: each iteration should complete one register section or one small cluster of related sections, then overwrite the same content register with accumulated rows.",
-    "- Do not announce, plan, or attempt a full semantic register write in one action after the first update. A hidden full-register synthesis pass violates the content-register visibility contract.",
-    "- After the first update, every exploratory read must be paired with the next tool action that writes at least one named non-empty or explicitly blocked register section back to the same content register file.",
+    "- Execute the plan incrementally: each iteration should complete one register section or one small cluster of related sections, then overwrite the same content ledger with accumulated rows.",
+    "- Do not announce, plan, or attempt a full semantic register write in one action after the first update. A hidden full-register synthesis pass violates the content-ledger visibility contract.",
+    "- After the first update, every exploratory read must be paired with the next tool action that writes at least one named non-empty or explicitly blocked register section back to the same content ledger file.",
     "- The preferred order is stackProfileRows, implementationModuleRows, componentTopologyRows, fileTargetRows, componentRealizationRows, moduleSchemaFragments, moduleStateDiagramFragments, aggregateDomainModelRows, aggregateDomainModel, sunnyDaySequenceRows, aggregateSunnyDaySequence, designCompletenessVerdict.",
     "- When reading the transform ADR after the first update, read only the authority a given section needs and do not print it; then write that section to the register file. How you inspect the authority is your choice; the framework prescribes the carrier schema and the visibility contract, not the extraction method.",
-    "- Time budget is part of correctness: update the draft content register before doing deep exploratory review.",
-    "- After the governance doc, construction brief, and draft content register are read, write the first evaluator update before any ADR summary, worker-report inspection, source-authority lookup, or deep exploratory action.",
+    "- Time budget is part of correctness: update the draft content ledger before doing deep exploratory review.",
+    "- After the governance doc, construction brief, and draft content ledger are read, write the first evaluator update before any ADR summary, worker-report inspection, source-authority lookup, or deep exploratory action.",
     `- First evaluator update: publish one semantic "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND}" row for each pre-seeded draft section. The named carrier helper may build the envelope, but the row values are your evaluation and must be your selected evaluate.C/F_P judgment. Emit null or [] only for whole intentionally empty sections and partial/blocked verdict axes where authority is not yet sufficient; do not emit null inside required scalar fields.`,
     "- There is no framework-authored recipe for deriving register rows from authority: do not parse ADR tables by a fixed procedure, read the authority a section needs and decide that section content yourself.",
     "- The first update must satisfy the named helper contract or an equivalent implementation. F_D seeds the draft scaffolding and admits/projects fragment rows; F_D does not construct semantic register rows for you.",
-    "- Then iterate by editing the content register file in place: inspect only the authority needed for a specific missing/partial section, add or replace the corresponding section row, then validate the file.",
+    "- Then iterate by editing the content ledger file in place: inspect only the authority needed for a specific missing/partial section, add or replace the corresponding section row, then validate the file.",
     "- The next tool action after any post-first-update ADR or authority inspection must write the corresponding section row. Do not collect multiple large sections before writing.",
     "- A valid progress write may be intentionally partial or blocked, but it must replace the target section row with explicit value, evidenceRefs, and reasons instead of leaving the run in hidden synthesis.",
     "- Do not spend the run enumerating every requirement id before writing the register. Use worker_result_report counts and high-signal samples for pressure; full trace remains in admitted evidence refs and source authority surfaces.",
-    "- If time or authority is insufficient, still write a structurally valid content register with partial or blocked designCompletenessVerdict axes and explicit reasons. Draft-row timeout is worse than an admitted pressure map with honest residual pressure.",
-    "- It is acceptable to rewrite the content register multiple times while converging. Do not treat this as a single-shot generation task.",
+    "- If time or authority is insufficient, still write a structurally valid content ledger with partial or blocked designCompletenessVerdict axes and explicit reasons. Draft-row timeout is worse than an admitted pressure map with honest residual pressure.",
+    "- It is acceptable to rewrite the content ledger multiple times while converging. Do not treat this as a single-shot generation task.",
     "- Use only the active tool profile. When command execution is not available, summarize authority by bounded Read ranges and validate shape by bounded self-check reads; do not paste large source or register bodies into stdout.",
     "- Command-helper output budget before first evaluator update: if the active tool profile exposes command helpers, the only pre-update helper allowed is the named carrier-helper update or equivalent same-path temp-then-rename implementation, and it may print only compact row counts.",
     "- If the component/module set is uncertain, encode the uncertainty in partial or blocked designCompletenessVerdict axes and continue with the smallest truthful pressure map.",
     "- If a referenced authority corpus is large, sample the headings/tables needed for module boundaries and requirement ids; do not dump the corpus into the terminal.",
-    "- Final response is irrelevant unless the content register exists and validates. Prioritize writing and validating the file over narrative.",
+    "- Final response is irrelevant unless the content ledger exists and validates. Prioritize writing and validating the file over narrative.",
     "",
     `Durable evaluation artifact to create and validate: ${input.contentRegisterPath}`,
     "",
-    "Required content register shape:",
+    "Required content ledger shape:",
     "- kind: \"sdlc_evaluate_content_ledger\"",
     "- ledgerVersion: \"ts-evaluate-content-ledger-v1\"",
     "- stage: \"evaluate.C\"",
@@ -965,9 +1016,9 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
     `- selectedRegimeBindingRef: ${input.selectedRegimeBindingRef === null ? "null" : JSON.stringify(input.selectedRegimeBindingRef)}`,
     `- compositionContributionRef: "${input.selectedRegimeBindingRef ?? input.selectedCompositionRef}"`,
     "- sourceBasisRefs[], candidateArtifactRefs[], evidenceRefs[], contentRows[].",
-    "- contentRows[] are the incremental register rows. Each row must be a closed carrier with exactly kind, rowRef, authorityFunction, carrierFamily, contentKind, payload, sourceBasisRefs, evidenceRefs.",
+    "- contentRows[] are the incremental ledger rows. Each row must be a closed carrier with exactly kind, rowRef, authorityFunction, carrierFamily, contentKind, payload, sourceBasisRefs, evidenceRefs.",
     "- contentRows[].kind: \"sdlc_evaluate_content_ledger_row\"",
-    "- contentRows[].rowRef: a stable non-empty ref such as \"content-register-row://odd-sdlc/design-depth/<edgeName>/<section>/<sequence>\"",
+    "- contentRows[].rowRef: a stable non-empty ref such as \"content-ledger-row://odd-sdlc/design-depth/<edgeName>/<section>/<sequence>\"",
     "- contentRows[].authorityFunction: \"synthesize_model\"",
     "- contentRows[].carrierFamily: \"ProductAssetModel\"",
     `- Preferred incremental contentRows[].contentKind: "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND}"`,
@@ -985,7 +1036,7 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
     "- value: the exact value for that register section, for example the array for componentTopologyRows or null/object for aggregateDomainModel.",
     "- Multiple writes should preserve prior rows and replace or append the section row being advanced. The final admitted register may contain many fragment rows.",
     "- F_D projects fragment rows only after the register contains at least one fragment for every listed register section; emit null or an empty array explicitly for intentionally empty sections.",
-    `- F_D ignores "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND}" rows and ignores rowRefs beginning "content-register-row-draft://"; draft rows are scaffolding only, not projectable semantic truth.`,
+    `- F_D ignores "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND}" rows and ignores rowRefs beginning "content-ledger-row-draft://"; draft rows are scaffolding only, not projectable semantic truth.`,
     "",
     "Embedded ProductAssetModel payload shape:",
     "- kind: \"sdlc_design_depth_register\"",
@@ -1091,7 +1142,7 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
     "- Before the final response, run a bounded path-integrity self-check: every source-role fileTargetRows[].relativePath and every component source relativePath must either appear in the transform artifact target/component tables or be justified by a higher source authority ref cited in sourceBasisRefs/evidenceRefs.",
     "- The path-integrity self-check is mandatory even when the first register was structurally valid; structural validity alone is not enough if exact product file paths drift from the admitted design/source authority.",
       "- Self-check the size budget before final response: component rows are between 1 and 32, every component row has 1 to 8 requirementIds, aggregate entities are 16 or fewer, aggregate operations are 24 or fewer, and sunny-day steps are 18 or fewer.",
-    "- Required self-check before final response: re-open the content register with bounded Read, verify JSON shape against this contract, and rewrite until it passes.",
+    "- Required self-check before final response: re-open the content ledger with bounded Read, verify JSON shape against this contract, and rewrite until it passes.",
     "- Self-check contentRows[] entries: exactly kind, rowRef, authorityFunction, carrierFamily, contentKind, payload, sourceBasisRefs, evidenceRefs.",
     `- Self-check ${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND} payloads: exactly kind, fragmentVersion, targetAssetType, section, sequence, mergeMode, value.`,
     `- Self-check fragment sections: only ${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.join(", ")}.`,
@@ -1107,10 +1158,10 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
     "- Self-check register arrays contain objects, not strings: stackProfileRows, implementationModuleRows, aggregateDomainModelRows, moduleSchemaFragments, moduleStateDiagramFragments, aggregateDomainModel.entities, aggregateDomainModel.operations, aggregateDomainModel.crossModuleReferences, aggregateSunnyDaySequence.steps, componentTopologyRows, componentRealizationRows, fileTargetRows.",
     "- Self-check nested register arrays contain objects, not strings: moduleSchemaFragments[].entities, moduleSchemaFragments[].entities[].attributes, moduleSchemaFragments[].operations, moduleStateDiagramFragments[].transitions, aggregateDomainModel.entities[].attributes.",
     "- Self-check every moduleStateDiagramFragments[].transitions[] object has exactly kind, transitionId, fromState, toState, operationId, entityId; rewrite if trigger/event/condition/action/summary/description appears.",
-    "- Do not run another exploratory command after deciding the component/module set; write the content register file first, then validate that file.",
+    "- Do not run another exploratory command after deciding the component/module set; write the content ledger file first, then validate that file.",
     `- Self-check target file: ${input.contentRegisterPath}`,
-    "- Do not include Markdown fences, explanation, comments, or trailing prose in the content register file.",
-    "- After writing the content register, respond with a one-line summary only."
+    "- Do not include Markdown fences, explanation, comments, or trailing prose in the content ledger file.",
+    "- After writing the content ledger, respond with a one-line summary only."
     ])
   });
 }
@@ -1317,8 +1368,8 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     "- If the active tool profile cannot produce the assessment safely, stop with the final one-line blocked response and leave the assessment absent so the framework can classify evaluator failure.",
     "- Terminal output is a work trace. The JSON assessment file is the evaluation truth.",
     "- If reviewedObligationIds is large, still write the assessment file directly and keep stdout to compact status counts; do not stream a large findings array through stdout.",
-    "- First-blocker protocol: once one current-edge semantic blocker is identified, write the blocked assessment artifact before inspecting additional modules or binding fulfilled obligations.",
-    "- If you find a current-edge blocker, stop deeper inspection and write a minimal blocked assessment immediately. Include the blocked finding, mark any not-yet-reviewed active obligations unassessed with the same current_edge_repair triage, and keep stdout to the final one-line status.",
+    "- First-blocker protocol: once one semantic blocker is identified, write the blocked assessment artifact before inspecting additional modules or binding fulfilled obligations.",
+    "- If a blocker is found, write a minimal blocked assessment immediately. Include the blocked finding, mark any not-yet-reviewed active obligations unassessed with the same lawful repairSurfaceTriage disposition as the blocker, and keep stdout to the final one-line status. Do not default to current_edge_repair when target-specific rules require upstream_reentry or downstream_deferred.",
     "- Treat JSON collections defensively when reading evidence: worker_construction_brief.obligations may be an object map rather than an array; do not assume array shape when selecting obligation ids.",
     "- Prefer exact string equality, startsWith, includes, endsWith, and split-style reasoning for ref/path classification. Regex quoting mistakes are evaluator failures, not product evidence.",
     "- If pattern matching is unavoidable, validate the pattern against one sample mentally before writing the assessment JSON; do not add helper-output keys or regex debug fields.",
@@ -1343,9 +1394,9 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     `- targetAssetType: ${JSON.stringify(input.manifest.targetAssetType)}`,
     "- status: \"passed\" or \"blocked\"",
     "- reviewedObligationIds: exactly the active review-scope obligationRefs in the admitted edge packet above; do not add worker aliases.",
-    "- When worker_invocation_package.inlineObligationIds is present, it is the active review scope even when the manifest also carries broader full-breadth lineage obligations.",
+    "- When worker_invocation_package.inlineObligationIds is present, active review scope is the admitted edge-packet obligationRefs above: inlineObligationIds plus admitted retry-scope requirements, not broader full-breadth lineage obligations.",
     "- worker_result_report.obligationAssessments may support evidence and rationale, but it cannot enlarge review scope or create findings for generated-artifact requirement aliases.",
-    "- reviewedObligationIds must contain only admitted obligation ids from the active review-scope obligationRefs, invocationPackage.inlineObligationIds[], invocationPackage.obligationIds[], or invocationPackage.inlineObligations[].obligationId.",
+    "- reviewedObligationIds must contain only admitted obligation ids from the active review-scope obligationRefs above.",
     "- Treat invocationPackage.requirementTraceObligationIds, traversalIntentPackage.obligationIds, retrieval hint obligation ids, and omitted obligation ids as lineage/evidence context only unless the id is also present in the active review scope.",
     "- Do not build reviewedObligationIds by recursively collecting every string in JSON. Authority and evidence refs such as workspace://..., file://..., config://..., schema://..., gtl://..., handoff-projection://..., source-digest://..., and review-evidence://... are evidenceRefs or acceptedAuthorityRefs, not obligations and must not become findings.",
     "- findings[]: one sdlc_review_grade_obligation_finding per reviewed obligation id",
@@ -1400,7 +1451,7 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     "- If tenant stack ambiguity was present, verify that the generated artifact or evidence contains a compact stack reconciliation decision before passing stack-dependent product materialization.",
     "- Verify consistency among tenant stack authority, emitted product syntax/files, declared product targets, declared execution commands, and returned execution evidence. This is evaluation only: do not repair generated product files or mutate tenant-stack authority.",
     "- Mark semantic_not_realized or schema_invalid when tenant stack authority contradicts emitted product files, for example declaring one module system while generated source/test syntax requires another. The worker must repair the authority surface or the product files; documenting an override in prose is not enough.",
-    "- Do not execute commands unless the active tool list explicitly exposes command execution. When command execution is not available, evaluate declared executable or test execution contracts from admitted execution evidence; if required execution evidence is absent, mark the relevant obligation partial or blocked with execution_environment or semantic_not_realized instead of passing by inspection.",
+    "- Do not execute commands unless the active tool list explicitly exposes command execution. When command execution is not available, evaluate declared executable or test execution contracts from admitted execution evidence; if required execution evidence is absent on the execution-result edge, mark the relevant obligation partial or blocked with execution_environment or semantic_not_realized instead of passing by inspection.",
     "- Mark test_overlap_missing when accepted depth requires test overlap and the generated tests do not exercise the responsibility.",
     ...reviewGradeTargetAssetRuleLines(input.manifest),
     ...reviewGradeMaterializationRuleLines(input.manifest),

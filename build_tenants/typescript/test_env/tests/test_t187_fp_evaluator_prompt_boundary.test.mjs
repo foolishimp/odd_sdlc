@@ -164,7 +164,7 @@ function designDepthDraftRegister() {
     evidenceRefs: [sourceRef],
     contentRows: SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.map((section, index) => ({
       kind: "sdlc_evaluate_content_ledger_row",
-      rowRef: `content-register-row-draft://odd-sdlc/design-depth/${section}`,
+      rowRef: `content-ledger-row-draft://odd-sdlc/design-depth/${section}`,
       authorityFunction: "synthesize_model",
       carrierFamily: "ProductAssetModel",
       contentKind: SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND,
@@ -263,7 +263,7 @@ test("T-187 design-depth first-update helper is carrier mechanics only", () => {
     draftRegister.selectedRegimeBindingRef
   );
   assert.equal(
-    updated.contentRows.some((row) => row.rowRef.startsWith("content-register-row-draft://")),
+    updated.contentRows.some((row) => row.rowRef.startsWith("content-ledger-row-draft://")),
     false
   );
   assert.equal(
@@ -678,6 +678,41 @@ test("T-187 review-grade prompt renders tenant execution environment details", (
   assert.equal(maxLineLength(prompt) <= 1000, true);
 });
 
+test("T-187 review-grade prompt keeps UAT source separate from execution evidence", () => {
+  const prompt = reviewGradeEdgeFulfillmentPrompt({
+    manifest: {
+      graphFunctionName: "derive_lite_uat_test_source_surface",
+      edgeName: "derive_lite_uat_test_source_surface",
+      targetAssetType: "uat_test_source_surface"
+    },
+    governanceRef: "config://test",
+    governancePath: "config/work-category-governance/unit_test_build.md",
+    constructionBriefPath: "worker_construction_brief.json",
+    invocationPackagePath: "worker_invocation_package.json",
+    workerReportPath: "worker_result_report.json",
+    assessmentPath: "review_grade_edge_fulfillment_assessment.json",
+    subworkstreamManifestPath: "evaluate_compute_subworkstream_manifest.json",
+    tenantToolEnvironment: {
+      kind: "sdlc_tenant_tool_environment_projection",
+      sourceRefs: [],
+      disabledTools: [],
+      allowedTools: [],
+      workspaceLocalDirectories: [],
+      environmentVariableNames: []
+    }
+  });
+
+  assert.match(
+    prompt,
+    /On uat_test_source_surface, admitted test-execution\/result proof is not same-edge authority/u
+  );
+  assert.match(
+    prompt,
+    /missing execution evidence for a declared test command is wrong_stage\/downstream_deferred pressure/u
+  );
+  assert.equal(maxLineLength(prompt) <= 1000, true);
+});
+
 test("T-187 design-depth evaluator prompt projects tenant-declared tool and read boundaries", () => {
   assert.match(
     evaluatorPromptSource,
@@ -736,7 +771,7 @@ test("T-188 evaluator prompts keep generated clauses line-inspectable", () => {
   assert.match(prompt, /Tool-profile contract: obey the active tool list/u);
   assert.match(prompt, /bounded workspace-relative read-only inspection/u);
   assert.match(prompt, /do not run product, build, test, framework, traversal, or background commands/u);
-  assert.match(prompt, /the framework has already written the draft register/u);
+  assert.match(prompt, /the framework has already written the draft ledger/u);
   assert.match(prompt, /ADR\/output artifact/u);
   assert.match(prompt, /first semantic update/u);
   assert.doesNotMatch(prompt, /ADR before the first register write/u);
@@ -1000,6 +1035,14 @@ test("T-187 review-grade evaluator prompt matches the active tool-list contract"
   assert.match(
     componentTestPrompt,
     /mark that requirement fulfilled even if later test-execution evidence is absent/u
+  );
+  assert.match(
+    componentTestPrompt,
+    /cannot satisfy a source\/domain capability by declaring a local product-domain type, algebra, validator, parser, compiler, executor, or guard/u
+  );
+  assert.match(
+    componentTestPrompt,
+    /Do not default to current_edge_repair when target-specific rules require upstream_reentry or downstream_deferred/u
   );
   assert.match(
     prompt,

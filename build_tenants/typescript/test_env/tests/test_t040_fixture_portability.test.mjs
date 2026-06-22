@@ -7,11 +7,20 @@ import { readFileSync } from "node:fs";
 
 test("T-040 semantic lane excludes optional reference fixtures from required closure", () => {
   const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
-  assert.match(packageJson.scripts["test:semantic"], /\*\.test\.mjs/);
+  assert.match(
+    packageJson.scripts["test:semantic"],
+    /run_semantic_tests_serial\.mjs/
+  );
   assert.match(
     packageJson.scripts["test:reference:data-mapper"],
     /test_t031_data_mapper_reference\.reference\.mjs/
   );
+
+  const semanticRunner = readFileSync(
+    "test_env/run_semantic_tests_serial.mjs",
+    "utf8"
+  );
+  assert.match(semanticRunner, /entry\.endsWith\("\.test\.mjs"\)/);
 
   const portableT031 = readFileSync(
     "test_env/tests/test_t031_workspace_ingress.test.mjs",

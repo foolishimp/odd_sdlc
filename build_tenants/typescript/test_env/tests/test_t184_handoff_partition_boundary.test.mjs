@@ -501,7 +501,7 @@ test("T-184 operator summary separates obligation review from semantic admission
   );
 });
 
-test("T-184 F_P evaluator prompt uses incremental content register writes", () => {
+test("T-184 F_P evaluator prompt uses incremental content ledger writes", () => {
   const installedOperatorSource = readRepoFile(
     "build_tenants/typescript/code/src/operator/installed_operator.ts"
   );
@@ -540,7 +540,23 @@ test("T-184 F_P evaluator prompt uses incremental content register writes", () =
   );
   assert.match(
     installedOperatorSource,
-    /reason:\s*workerProcessTextLooksRetryableProviderFailure\(evaluatorProcessText\)[\s\S]*\?\s*"worker_connection_failed"[\s\S]*:\s*processResult\.timedOut[\s\S]*\?\s*"design_depth_fp_evaluator_progress_timeout"[\s\S]*:\s*"design_depth_fp_evaluator_process_failed"/u
+    /const processFailureReason: SdlcBlockingReasonCode =[\s\S]*workerProcessTextLooksRetryableProviderFailure\(evaluatorProcessText\)[\s\S]*\?\s*"worker_connection_failed"[\s\S]*:\s*processResult\.timedOut[\s\S]*\?\s*"design_depth_fp_evaluator_progress_timeout"[\s\S]*:\s*"design_depth_fp_evaluator_process_failed"/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /const processFailureReason: SdlcBlockingReasonCode =[\s\S]*workerProcessTextLooksRetryableProviderFailure\(evaluatorProcessText\)[\s\S]*\?\s*"worker_connection_failed"[\s\S]*:\s*processResult\.timedOut === true[\s\S]*\?\s*"review_grade_evaluator_process_timeout"[\s\S]*:\s*"review_grade_evaluator_process_failed"/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /function evaluationRuleContinuationRefsForBlockingReason[\s\S]*lawfulReentryPoint !== "same_edge_retry"[\s\S]*return Object\.freeze\(\[\]\)[\s\S]*continuation:\/\/odd-sdlc\/\$\{runRef\}\/evaluation-rule/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /continuationRefs: evaluationRuleContinuationRefsForBlockingReason\(\{[\s\S]*ruleRef: DESIGN_DEPTH_FP_EVALUATOR_RULE_REF[\s\S]*code: processFailureReason/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /continuationRefs: evaluationRuleContinuationRefsForBlockingReason\(\{[\s\S]*ruleRef: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF[\s\S]*code: processFailureReason/u
   );
   assert.match(
     installedOperatorSource,
@@ -577,7 +593,7 @@ test("T-184 F_P evaluator prompt uses incremental content register writes", () =
     contentRegisterSource,
     /SDLC_EVALUATE_CONTENT_REGISTER_PROJECTION_KIND/u
   );
-  assert.match(evaluatorPromptSource, /content-register-row-draft:\/\//u);
+  assert.match(evaluatorPromptSource, /content-ledger-row-draft:\/\//u);
   assert.match(evaluatorPromptSource, /sdlc_design_depth_register_fragment/u);
   assert.match(installedOperatorSource, /ODD_SDLC_EVALUATOR_INCREMENTAL_REGISTER/u);
   assert.doesNotMatch(installedOperatorSource, /ODD_SDLC_EVALUATOR_INCREMENTAL_LEDGER/u);

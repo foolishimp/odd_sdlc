@@ -4122,11 +4122,42 @@ function inlineObligationsForPrompt(
   manifest: SdlcWorkerHandoffManifest
 ): readonly SdlcTraversalObligation[] {
   const structural = edgeLocalStructuralObligationsForPrompt(manifest);
-  const requirementSlice = canonicalRequirementTraceObligationsForPrompt(manifest).slice(
-    0,
-    12
+  const retryRequirements = retryGapRequirementObligationsForPrompt(manifest);
+  const retryRequirementIds = new Set(
+    retryRequirements.map((obligation) => obligation.obligationId)
   );
+  const canonicalRequirements = canonicalRequirementTraceObligationsForPrompt(
+    manifest
+  ).filter((obligation) => !retryRequirementIds.has(obligation.obligationId));
+  const requirementSlice = Object.freeze([
+    ...retryRequirements,
+    ...canonicalRequirements.slice(0, Math.max(0, 12 - retryRequirements.length))
+  ]);
   return Object.freeze([...structural, ...requirementSlice]);
+}
+
+function retryGapRequirementObligationsForPrompt(
+  manifest: SdlcWorkerHandoffManifest
+): readonly SdlcTraversalObligation[] {
+  const obligationById = new Map(
+    manifest.traversalObligationContext.obligations
+      .filter((obligation) => obligation.obligationKind === "requirement")
+      .map((obligation) => [obligation.obligationId, obligation])
+  );
+  const ids = new Set<string>();
+  for (const dossier of manifest.retryContext.priorGapDossiers) {
+    for (const obligationId of currentEvaluatedGapRequirementIds(manifest, dossier)) {
+      if (obligationById.has(obligationId)) {
+        ids.add(obligationId);
+      }
+    }
+  }
+  return Object.freeze(
+    [...ids].flatMap((obligationId) => {
+      const obligation = obligationById.get(obligationId);
+      return obligation === undefined ? [] : [obligation];
+    })
+  );
 }
 
 function edgeLocalStructuralObligationsForPrompt(

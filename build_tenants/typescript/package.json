@@ -34,7 +34,7 @@
     "lint:semantic": "eslint --max-warnings=0 \"code/src/**/*.ts\"",
     "lint:test-harness": "eslint --max-warnings=0 \"test_env/{tests,sandbox,live}/**/*.mjs\"",
     "guard:data-mapper-boundary": "node --test test_env/tests/test_t188_data_mapper_live_boundary_guard.test.mjs",
-    "test:semantic": "npm run build:semantic && node --test test_env/tests/*.test.mjs",
+    "test:semantic": "npm run build:semantic && node test_env/run_semantic_tests_serial.mjs",
     "test:t027": "npm run build:semantic && node --test test_env/tests/test_t027_scaffold.test.mjs",
     "test:t028": "npm run build:semantic && node --test test_env/tests/test_t028_abiogenesis_substrate_binding.test.mjs",
     "test:t029": "npm run build:semantic && node --test test_env/tests/test_t029_domain_carriers.test.mjs",
@@ -195,6 +195,6 @@
     "typescript": "6.0.3"
   },
   "dependencies": {
-    "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.1.0-rc.3/abiogenesis-typescript-tenant-4.1.0-rc.3.tgz"
+    "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.1.0-rc.6/abiogenesis-typescript-tenant-4.1.0-rc.6.tgz"
   }
 }

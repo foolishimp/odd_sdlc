@@ -28,10 +28,43 @@ import {
   SDLC_TEST_CASE_KINDS,
   SDLC_TEST_EXECUTION_LANES
 } from "./carriers.js";
+import {
+  constructSdlcGtlModule,
+  constructSdlcTargetCarrierRegistry,
+  FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+  requireSdlcTargetCarrierRow
+} from "../graph/index.js";
 
 const TEST_DESIGN_TARGETS = Object.freeze([
   "test_design_surface"
 ] as const);
+
+export function testDesignTargetCarrierIdentityForEdge(edgeName: string): {
+  readonly edgeRef: string;
+  readonly outputCarrierKind: string;
+  readonly contractRef: string;
+  readonly contractDigest: string;
+} {
+  const edgeRef =
+    edgeName === FG_DERIVE_LITE_TEST_DESIGN_SURFACE ||
+    edgeName === "derive_test_design_surface"
+      ? edgeName
+      : edgeName.startsWith("derive_lite_")
+        ? FG_DERIVE_LITE_TEST_DESIGN_SURFACE
+        : "derive_test_design_surface";
+  const row = requireSdlcTargetCarrierRow({
+    registry: constructSdlcTargetCarrierRegistry({
+      module: constructSdlcGtlModule()
+    }),
+    edgeRef
+  });
+  return Object.freeze({
+    edgeRef,
+    outputCarrierKind: row.outputCarrierKind,
+    contractRef: row.targetCarrierContractRef,
+    contractDigest: row.targetCarrierContractDigest
+  });
+}
 
 type TestDesignTarget = (typeof TEST_DESIGN_TARGETS)[number];
 
@@ -378,6 +411,99 @@ function parseRegister(input: unknown, label: string): SdlcTestDesignRegister {
 
 // F_D test-design admission is exact; schedule/test semantic defaults belong to selected evaluate.C/F_P content registers.
 
+interface TestDesignTargetCarrierEnvelopeInput {
+  readonly targetCarrierKind?: string | null | undefined;
+  readonly edgeRef?: string | null | undefined;
+  readonly contractRef?: string | null | undefined;
+  readonly contractDigest?: string | null | undefined;
+}
+
+function parseEnvelopeString(
+  value: unknown,
+  label: string
+): string {
+  return parseNonEmptyString(value, label);
+}
+
+function parseRegisterCandidate(input: {
+  readonly candidate: unknown;
+  readonly label: string;
+  readonly targetAssetType: string;
+  readonly envelope: TestDesignTargetCarrierEnvelopeInput;
+}): SdlcTestDesignRegister {
+  const candidate = input.candidate;
+  const envelopeKind = input.envelope.targetCarrierKind ?? null;
+  if (
+    candidate !== null &&
+    typeof candidate === "object" &&
+    !Array.isArray(candidate)
+  ) {
+    const envelopeRecord = parseClosedRecord(candidate, input.label, [
+      "kind",
+      "targetAssetType",
+      "edgeRef",
+      "contractRef",
+      "contractDigest",
+      "payload",
+      "summary",
+      "evidenceRefs"
+    ]);
+    const kind = envelopeRecord["kind"];
+    if (envelopeKind !== null && kind === envelopeKind) {
+      const targetAssetType = parseEnvelopeString(
+        envelopeRecord["targetAssetType"],
+        `${input.label}.targetAssetType`
+      );
+      if (targetAssetType !== input.targetAssetType) {
+        throw new TypeError(
+          `${input.label}.targetAssetType: expected ${input.targetAssetType}`
+        );
+      }
+      const edgeRef = input.envelope.edgeRef ?? null;
+      if (edgeRef !== null) {
+        const actual = parseEnvelopeString(
+          envelopeRecord["edgeRef"],
+          `${input.label}.edgeRef`
+        );
+        if (actual !== edgeRef) {
+          throw new TypeError(`${input.label}.edgeRef: expected ${edgeRef}`);
+        }
+      }
+      const contractRef = input.envelope.contractRef ?? null;
+      if (contractRef !== null) {
+        const actual = parseEnvelopeString(
+          envelopeRecord["contractRef"],
+          `${input.label}.contractRef`
+        );
+        if (actual !== contractRef) {
+          throw new TypeError(
+            `${input.label}.contractRef: expected ${contractRef}`
+          );
+        }
+      }
+      const contractDigest = input.envelope.contractDigest ?? null;
+      if (contractDigest !== null) {
+        const actual = parseEnvelopeString(
+          envelopeRecord["contractDigest"],
+          `${input.label}.contractDigest`
+        );
+        if (actual !== contractDigest) {
+          throw new TypeError(
+            `${input.label}.contractDigest: expected ${contractDigest}`
+          );
+        }
+      }
+      return parseRegister(envelopeRecord["payload"], `${input.label}.payload`);
+    }
+  }
+  if (envelopeKind !== null) {
+    throw new TypeError(
+      `${input.label}.kind: expected ${envelopeKind} selected target carrier`
+    );
+  }
+  return parseRegister(candidate, input.label);
+}
+
 function pushParsedJsonCandidate(
   candidates: unknown[],
   content: string
@@ -443,6 +569,10 @@ function requiredRowsPresent(
 export function admitTestDesignRegisterFromArtifact(input: {
   readonly targetAssetType: string;
   readonly outputFile: string;
+  readonly targetCarrierKind?: string | null | undefined;
+  readonly edgeRef?: string | null | undefined;
+  readonly contractRef?: string | null | undefined;
+  readonly contractDigest?: string | null | undefined;
 }): SdlcTestDesignRegisterAdmission {
   const evidenceRefs = Object.freeze([pathToFileURL(input.outputFile).href]);
   if (!isTestDesignTarget(input.targetAssetType)) {
@@ -469,7 +599,17 @@ export function admitTestDesignRegisterFromArtifact(input: {
   const errors: string[] = [];
   for (const candidate of jsonCandidates(content)) {
     try {
-      const register = parseRegister(candidate, "test_design_register");
+      const register = parseRegisterCandidate({
+        candidate,
+        label: "test_design_register",
+        targetAssetType: input.targetAssetType,
+        envelope: {
+          targetCarrierKind: input.targetCarrierKind,
+          edgeRef: input.edgeRef,
+          contractRef: input.contractRef,
+          contractDigest: input.contractDigest
+        }
+      });
       if (register.targetAssetType !== input.targetAssetType) {
         errors.push(`test_design_register_target_mismatch:${register.targetAssetType}`);
         continue;

@@ -106,7 +106,7 @@ function basicPromptSection(textLines, overrides = {}) {
 test("T-191 consumes the released ABI 4 GTL prompt surface", () => {
   assert.match(
     packageJson.dependencies["@abiogenesis/typescript-tenant"],
-    /4\.1\.0-rc\.2/u
+    /4\.1\.0-rc\.3/u
   );
   assert.match(promptAssetSource, /constructAssetSurface/u);
   assert.match(promptAssetSource, /constructNode/u);

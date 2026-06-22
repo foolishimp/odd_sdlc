@@ -1,4 +1,5 @@
 export {
+  createOddSdlcAbgRuntimeAssuranceProvider,
   createOddSdlcAbgRuntimeBindingPlugins,
   oddSdlcAbgRuntimeWorkerTransportFromEnv,
   resolveOddSdlcAbgRuntimeBindingPolicy
@@ -421,6 +422,7 @@ export {
   constructSdlcConsequenceTraversalActionBinding,
   constructSdlcConstructionIntent,
   constructSdlcEdgeFulfillmentLedger,
+  constructSdlcGraphReentryTargetRef,
   constructSdlcNextActionProjection,
   constructSdlcOverlaySegmentCompletion,
   constructSdlcWorksiteEvidence,

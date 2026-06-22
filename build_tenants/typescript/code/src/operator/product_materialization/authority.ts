@@ -20,7 +20,8 @@ import path, {
 } from "../../graph/index.js";import {
   admitComponentDepthRegisterFromArtifact
 } from "../component_depth_register.js";import {
-  admitTestDesignRegisterFromArtifact
+  admitTestDesignRegisterFromArtifact,
+  testDesignTargetCarrierIdentityForEdge
 } from "../test_design_register.js";import {
   admitImplementationDesignRegisterForManifest,
   admitImplementationDesignRegisterForRuntimeEvaluation
@@ -2597,9 +2598,14 @@ function readAdmittedTestDesign(
   if (outputFile === null || !existsSync(outputFile)) {
     return null;
   }
+  const carrier = testDesignTargetCarrierIdentityForEdge(manifest.edgeName);
   const admission = admitTestDesignRegisterFromArtifact({
     targetAssetType: "test_design_surface",
-    outputFile
+    outputFile,
+    targetCarrierKind: carrier.outputCarrierKind,
+    edgeRef: carrier.edgeRef,
+    contractRef: carrier.contractRef,
+    contractDigest: carrier.contractDigest
   });
   if (admission.status !== "admitted" || admission.register === null) {
     return null;

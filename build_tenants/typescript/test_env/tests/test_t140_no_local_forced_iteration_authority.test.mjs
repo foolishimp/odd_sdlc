@@ -13,6 +13,14 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
+  admitExecutionBasis,
+  admitResolvedPolicyIdentity,
+  admitResolvedRuntimeIdentity,
+  admitStartIntent
+} from "@abiogenesis/typescript-tenant";
+
+import {
+  deriveSdlcPostYieldResumeActionInput,
   deriveSdlcWorkerRetryContextFromPostActionProjection,
   mergeSdlcWorkerRetryContextWithRuntimeGapRegister,
   sdlcRequirementObligationBelongsToDownstreamComponentSurface,
@@ -22,6 +30,8 @@ import {
   deriveSdlcEdgeFulfillmentCountsFromAssessments
 } from "../../build/semantic/code/src/operator/traversal_consequence.js";
 import {
+  createOddSdlcAbgRuntimeAssuranceProvider,
+  constructSdlcGtlModule,
   sdlcBlockingReasonFromLegacy
 } from "../../build/semantic/code/src/index.js";
 
@@ -30,6 +40,149 @@ const installedOperatorSource = () =>
     new URL("../../code/src/operator/installed_operator.ts", import.meta.url),
     "utf8"
   );
+
+function liteDesignModuleBasis() {
+  const module = constructSdlcGtlModule();
+  return admitExecutionBasis({
+    startIntent: admitStartIntent({
+      scope: {
+        kind: "workspace",
+        workspaceRoot: "/workspace/odd-sdlc-t140",
+        moduleName: module.name
+      },
+      target: {
+        kind: "graph_function",
+        handle: "lite_design_module_implementation"
+      },
+      until: "converged"
+    }),
+    module,
+    runtimeIdentity: admitResolvedRuntimeIdentity({
+      workerId: "worker://odd-sdlc/t140",
+      backendId: "backend://node",
+      buildId: "build://odd-sdlc/t140",
+      resolvedRuntimeRef: "runtime://abiogenesis/typescript"
+    }),
+    resolvedPolicy: admitResolvedPolicyIdentity({
+      resolvedPolicyBundleRef: "policy://odd-sdlc/t140/F_P",
+      defaultRegime: "F_P",
+      dispatchRef: "dispatch://odd-sdlc/t140",
+      approvalSubjectRef: null
+    }),
+    runId: "run://odd-sdlc/t140",
+    workKey: "wk://odd-sdlc/t140",
+    frameId: null,
+    frameLineageId: null
+  });
+}
+
+test("T-204 upstream review-grade yield resumes admitted repair vector", () => {
+  const action = deriveSdlcPostYieldResumeActionInput({
+    basis: liteDesignModuleBasis(),
+    yieldResumeBasis: {
+      yieldKind: "nonlocal_repair_surface_admitted_upstream_reentry",
+      resumeBasisRef:
+        "resume-basis://odd-sdlc/t204/upstream-reentry/component-code",
+      currentEdgeRef: "derive_lite_component_test_surface",
+      admittedProgressRefs: [
+        "pressure://odd-sdlc/review-grade/t204/req-ldm-004",
+        "graph_function:lite_design_module_implementation",
+        "graph_vector:lite_design_module_implementation/derive_lite_component_code_surface",
+        "source_asset:implementation_design_surface"
+      ],
+      livenessProjectionRef: null,
+      resumePolicyRef:
+        "resume-policy://odd-sdlc/nonlocal-repair-surface/upstream-reentry"
+    }
+  });
+
+  assert.notEqual(action, null);
+  assert.equal(action.actionKind, "reenter_graph_span");
+  assert.equal(action.graphVectorRef, "derive_lite_component_code_surface");
+  assert.notEqual(action.graphVectorRef, "derive_lite_component_test_surface");
+  assert(action.eligibleReasonRefs.includes("graph_vector:lite_design_module_implementation/derive_lite_component_code_surface"));
+});
+
+test("T-204 runtime assurance provider does not author ABG event-ledger truth", () => {
+  const provider = createOddSdlcAbgRuntimeAssuranceProvider();
+
+  assert.equal(typeof provider.authoritySnapshot, "function");
+  assert.equal("eventLedgerValid" in provider, false);
+});
+
+test("T-204 upstream review-grade gap is not current-edge retry context", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t204-upstream-gap-"));
+  const runRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs/20260622T044451596Z_pid64107"
+  );
+  mkdirSync(runRoot, { recursive: true });
+  const gapDossierRef = pathToFileURL(path.join(runRoot, "gap_dossier.json"))
+    .href;
+  const reason =
+    "review_grade_edge_fulfillment_blocked:requirement:data_mapper.requirements.req_ldm_004:test_overlap_missing:Re-enter source/code edge.";
+  const dossier = {
+    kind: "sdlc_postflight_gap_dossier",
+    status: "open",
+    graphFunctionName: "lite_design_module_implementation",
+    edgeName: "derive_lite_component_test_surface",
+    vectorIndex: 3,
+    targetAssetType: "component_test_surface",
+    reasons: [
+      {
+        kind: "sdlc_postflight_gap_reason",
+        reason,
+        reasonClass: "assurance",
+        blockingReason: {
+          ...sdlcBlockingReasonFromLegacy({ reason }),
+          lawfulReentryPoint: "escalate_to_fp"
+        }
+      }
+    ],
+    evidenceRefs: [],
+    priorManifestId: gapDossierRef.replace("gap_dossier.json", "handoff_manifest.json"),
+    currentGapDossierRef: gapDossierRef,
+    retryEligible: true,
+    nextLawfulActions: ["escalate_to_fp"]
+  };
+  writeFileSync(
+    path.join(runRoot, "gap_dossier.json"),
+    JSON.stringify(dossier),
+    "utf8"
+  );
+
+  const retryContext = mergeSdlcWorkerRetryContextWithRuntimeGapRegister({
+    workspaceRoot: workspace,
+    vectorIndex: 3,
+    edgeName: "derive_lite_component_test_surface",
+    targetAssetType: "component_test_surface",
+    projected: {
+      kind: "sdlc_worker_retry_context",
+      retryAttemptRefs: [],
+      priorGapDossiers: []
+    }
+  });
+
+  assert.equal(retryContext.priorGapDossiers.length, 0);
+});
+
+test("T-204 upstream review-grade pressure is carried as F_P continuation basis", () => {
+  const source = installedOperatorSource();
+
+  assert.match(source, /function fpEvaluationContinuationRefsForState/u);
+  assert.match(
+    source,
+    /repairSurfaceTriage\?\.disposition === "upstream_reentry"/u
+  );
+  assert.match(
+    source,
+    /continuation:\/\/odd-sdlc\/\$\{runRef\}\/review-grade\/upstream-reentry/u
+  );
+  assert.match(
+    source,
+    /continuationRefs,\s*[\r\n]+\s*evidenceRefs/u
+  );
+});
 
 test("T-164 post-action retry context restores current gap dossier from pressure refs", () => {
   const archiveRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t140-gap-"));
@@ -1140,6 +1293,28 @@ test("T-204 installed operator does not synthesize gap authority from closure ar
   );
   assert.match(source, /latestRuntimeAttemptRunIdForRetryContext/u);
   assert.match(source, /retryContextWithoutPriorGapDossiers/u);
+});
+
+test("T-204 non-close closure cannot project as a closed ABG consequence", () => {
+  const source = installedOperatorSource();
+
+  assert.match(
+    source,
+    /consequence\.edgeClosureDecision\.disposition !== "close"[\s\S]*traversalAction === null[\s\S]*constructConsequenceProjectionOutcome\(\{[\s\S]*status: "blocked"[\s\S]*reason: `edge_closure_decision_\$\{consequence\.edgeClosureDecision\.disposition\}`/u
+  );
+  assert.doesNotMatch(
+    source,
+    /status: "projected"[\s\S]*traversalAction,[\s\S]*\}\);[\s\S]*consequence\.edgeClosureDecision\.disposition !== "close"/u
+  );
+});
+
+test("T-204 test-design closure admission carries selected target-carrier identity", () => {
+  const source = installedOperatorSource();
+
+  assert.match(
+    source,
+    /if \(input\.state\.manifest\.targetAssetType === "test_design_surface"\) \{[\s\S]*admitTestDesignRegisterFromArtifact\(\{[\s\S]*targetCarrierKind: input\.state\.manifest\.targetCarrierProjection\.outputCarrierKind,[\s\S]*edgeRef: input\.state\.manifest\.edgeName,[\s\S]*contractRef:[\s\S]*input\.state\.manifest\.targetCarrierProjection\.targetCarrierContractRef,[\s\S]*contractDigest:[\s\S]*input\.state\.manifest\.targetCarrierProjection\.targetCarrierContractDigest/u
+  );
 });
 
 test("T-140 installed operator does not dispatch from legacy gap action strings", () => {

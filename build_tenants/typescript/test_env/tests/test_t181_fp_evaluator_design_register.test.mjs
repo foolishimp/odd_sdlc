@@ -660,7 +660,7 @@ function writeDesignDepthFpEvaluatorContentRegister({ manifest, registerPath }) 
         contentRows: [
           {
             kind: "sdlc_evaluate_content_ledger_row",
-            rowRef: `content-register-row://t181/${manifest.runId}/design-depth`,
+            rowRef: `content-ledger-row://t181/${manifest.runId}/design-depth`,
             authorityFunction: "synthesize_model",
             carrierFamily: "ProductAssetModel",
             contentKind: "sdlc_design_depth_register",
@@ -678,7 +678,7 @@ function writeDesignDepthFpEvaluatorContentRegister({ manifest, registerPath }) 
   return contentRegisterRef;
 }
 
-test("T-181 design-depth content register normalizes root version aliases during projection", () => {
+test("T-181 design-depth content ledger normalizes root version aliases during projection", () => {
   const workspaceRoot = makeWorkspace();
   try {
     const manifest = manifestForImplementationDesign(
@@ -761,7 +761,7 @@ test("T-181 design-depth content register normalizes root version aliases during
           contentRows: [
             {
               kind: "sdlc_evaluate_content_ledger_row",
-              rowRef: `content-register-row://t181/${manifest.runId}/design-depth`,
+              rowRef: `content-ledger-row://t181/${manifest.runId}/design-depth`,
               authorityFunction: "synthesize_model",
               carrierFamily: "ProductAssetModel",
               contentKind: "sdlc_design_depth_register",
@@ -822,12 +822,12 @@ test("T-181 design-depth content register normalizes root version aliases during
   }
 });
 
-test("T-181 design-depth content register supports incremental fragment projection", () => {
+test("T-181 design-depth content ledger supports incremental fragment projection", () => {
   const workspaceRoot = makeWorkspace();
   try {
     const manifest = manifestForImplementationDesign(
       workspaceRoot,
-      "t181-incremental-content-register"
+      "t181-incremental-content-ledger"
     );
     mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
     writeFileSync(
@@ -881,7 +881,7 @@ test("T-181 design-depth content register supports incremental fragment projecti
           evidenceRefs: [evidenceRef],
           contentRows: sections.map((section, index) => ({
             kind: "sdlc_evaluate_content_ledger_row",
-            rowRef: `content-register-row://t181/incremental/${section}`,
+            rowRef: `content-ledger-row://t181/incremental/${section}`,
             authorityFunction: "synthesize_model",
             carrierFamily: "ProductAssetModel",
             contentKind: "sdlc_design_depth_register_fragment",
@@ -1011,7 +1011,7 @@ test("T-181 design-depth fragment projection canonicalizes legacy verdict axis a
           evidenceRefs: [evidenceRef],
           contentRows: sections.map((section, index) => ({
             kind: "sdlc_evaluate_content_ledger_row",
-            rowRef: `content-register-row://t181/axis-alias/${section}`,
+            rowRef: `content-ledger-row://t181/axis-alias/${section}`,
             authorityFunction: "synthesize_model",
             carrierFamily: "ProductAssetModel",
             contentKind: "sdlc_design_depth_register_fragment",
@@ -1071,7 +1071,7 @@ test("T-181 design-depth fragment projection canonicalizes legacy verdict axis a
   }
 });
 
-test("T-181 design-depth content register canonicalizes numeric tranche ids", () => {
+test("T-181 design-depth content ledger canonicalizes numeric tranche ids", () => {
   const workspaceRoot = makeWorkspace();
   try {
     const manifest = manifestForImplementationDesign(
@@ -1139,7 +1139,7 @@ test("T-181 design-depth content register canonicalizes numeric tranche ids", ()
           evidenceRefs: [evidenceRef],
           contentRows: sections.map((section, index) => ({
             kind: "sdlc_evaluate_content_ledger_row",
-            rowRef: `content-register-row://t181/numeric-tranche/${section}`,
+            rowRef: `content-ledger-row://t181/numeric-tranche/${section}`,
             authorityFunction: "synthesize_model",
             carrierFamily: "ProductAssetModel",
             contentKind: "sdlc_design_depth_register_fragment",
@@ -1261,7 +1261,7 @@ test("T-184 evaluator projection rejects object-valued invariants before writing
           contentRows: [
             {
               kind: "sdlc_evaluate_content_ledger_row",
-              rowRef: `content-register-row://t184/${manifest.runId}/design-depth`,
+              rowRef: `content-ledger-row://t184/${manifest.runId}/design-depth`,
               authorityFunction: "synthesize_model",
               carrierFamily: "ProductAssetModel",
               contentKind: "sdlc_design_depth_register",
@@ -1309,7 +1309,7 @@ test("T-181 incomplete design-depth fragments remain observable but not projecte
   try {
     const manifest = manifestForImplementationDesign(
       workspaceRoot,
-      "t181-incomplete-content-register"
+      "t181-incomplete-content-ledger"
     );
     mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
     writeFileSync(
@@ -1347,7 +1347,7 @@ test("T-181 incomplete design-depth fragments remain observable but not projecte
           contentRows: [
             {
               kind: "sdlc_evaluate_content_ledger_row",
-              rowRef: "content-register-row://t181/incomplete/stack",
+              rowRef: "content-ledger-row://t181/incomplete/stack",
               authorityFunction: "synthesize_model",
               carrierFamily: "ProductAssetModel",
               contentKind: "sdlc_design_depth_register_fragment",
@@ -1390,19 +1390,19 @@ test("T-181 incomplete design-depth fragments remain observable but not projecte
           archiveRoot: manifest.archiveRoot,
           registerPath
         }),
-      /evaluate content register has no design-depth register payload/u
+      /evaluate content ledger has no design-depth register payload/u
     );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
   }
 });
 
-test("T-183 evaluate content register rejects bridge-shaped extra semantic surfaces", () => {
+test("T-183 evaluate content ledger rejects bridge-shaped extra semantic surfaces", () => {
   const workspaceRoot = makeWorkspace();
   try {
     const manifest = manifestForImplementationDesign(
       workspaceRoot,
-      "t183-content-register-closed-shape"
+      "t183-content-ledger-closed-shape"
     );
     mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
     writeFileSync(manifest.outputFile, implementationDesignAdr("fp-sidecar"), "utf8");
@@ -2611,21 +2611,21 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(evaluatorPromptSource, /Do not display worker_invocation_package\.json/u);
   assert.match(evaluatorPromptSource, /Do not use command helpers to display the five primary inputs/u);
   assert.match(evaluatorPromptSource, /use Read offset\/limit and inspect only bounded line ranges/u);
-  assert.match(evaluatorPromptSource, /The content register path is the durable evaluation artifact/u);
+  assert.match(evaluatorPromptSource, /The content ledger path is the durable evaluation artifact/u);
   assert.match(evaluatorPromptSource, /system pre-creates that path as a non-admitted draft/u);
   assert.match(evaluatorPromptSource, /not a single-shot JSON response/u);
   assert.match(evaluatorPromptSource, /Agentic F_P work loop/u);
   assert.match(evaluatorPromptSource, /After the first evaluator update exists, write a short plan and checklist/u);
-  assert.match(evaluatorPromptSource, /update the draft content register before doing deep exploratory review/u);
+  assert.match(evaluatorPromptSource, /update the draft content ledger before doing deep exploratory review/u);
   assert.match(evaluatorPromptSource, /Do not use the Read tool on the handoff manifest/u);
   assert.match(evaluatorPromptSource, /Precomputed worker result report summary/u);
   assert.match(evaluatorPromptSource, /Do not inspect the worker result report/u);
   assert.match(evaluatorPromptSource, /Do not use the Read tool on the worker invocation package/u);
   assert.match(evaluatorPromptSource, /Do not run any bounded-summary action before the first evaluator update/u);
-  assert.match(evaluatorPromptSource, /the next tool action must publish the content register update/u);
+  assert.match(evaluatorPromptSource, /the next tool action must publish the content ledger update/u);
   assert.match(evaluatorPromptSource, /before any ADR summary, worker-report inspection, source-authority lookup/u);
   assert.doesNotMatch(evaluatorPromptSource, /At most one bounded summary script is allowed/u);
-  assert.match(evaluatorPromptSource, /the next tool action must publish the content register update/u);
+  assert.match(evaluatorPromptSource, /the next tool action must publish the content ledger update/u);
   assert.match(evaluatorPromptSource, /Do not say .*writing the register.* until that file write has succeeded/u);
   assert.doesNotMatch(evaluatorPromptSource, /Use the provided .*seed script/u);
   assert.doesNotMatch(evaluatorPromptSource, /First register materialization recipe/u);
@@ -2671,7 +2671,7 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(evaluatorPromptSource, /First-update carrier helper contract/u);
   assert.match(evaluatorPromptSource, /DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_REF/u);
   assert.match(evaluatorPromptSource, /Bounded first-pass register target/u);
-  assert.match(evaluatorPromptSource, /It is acceptable to rewrite the content register multiple times while converging/u);
+  assert.match(evaluatorPromptSource, /It is acceptable to rewrite the content ledger multiple times while converging/u);
   assert.match(evaluatorPromptSource, /Stdout is an agent work trace, not evaluation truth/u);
   assert.match(evaluatorPromptSource, /compressed work-category governance/u);
   assert.match(source, /selectSdlcWorkCategoryGovernance/u);
@@ -2685,13 +2685,13 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
     /ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_STDOUT_BUDGET_BYTES/u
   );
   assert.match(source, /stdoutBudgetBytes/u);
-  assert.match(evaluatorPromptSource, /write the content register file first, then validate that file/u);
+  assert.match(evaluatorPromptSource, /write the content ledger file first, then validate that file/u);
   assert.match(evaluatorPromptSource, /highest semantic design-depth truth/u);
   assert.match(evaluatorPromptSource, /sdlc_evaluate_content_ledger/u);
   assert.match(evaluatorPromptSource, /contentRows\[\]\.rowRef/u);
   assert.match(evaluatorPromptSource, /contentRows\[\]\.sourceBasisRefs\[\]/u);
   assert.match(evaluatorPromptSource, /contentRows\[\]\.evidenceRefs\[\]/u);
-  assert.match(evaluatorPromptSource, /contentRows\[\] are the incremental register/u);
+  assert.match(evaluatorPromptSource, /contentRows\[\] are the incremental ledger/u);
   assert.match(evaluatorPromptSource, /sdlc_design_depth_register_fragment/u);
   assert.match(evaluatorPromptSource, /F_D assembles admitted fragment rows/u);
   assert.match(evaluatorPromptSource, /at least one fragment for every listed register section/u);

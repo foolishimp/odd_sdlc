@@ -315,10 +315,16 @@ test("T-188 data_mapper release proof completion is not reported as overlay no-p
     "utf8"
   );
   assert.match(runnerSource, /function releaseProofStopSatisfied\(workspace\)/u);
+  assert.match(runnerSource, /function finalSdlcProofAssessment\(workspace\)/u);
   assert.match(runnerSource, /function releaseDepthParityMet\(workspace\)/u);
   assert.match(runnerSource, /releaseDepthParity\?\.status === "met"/u);
   assert.match(runnerSource, /function releaseSurfacePresent\(workspace\)/u);
   assert.match(runnerSource, /sdlc_release_proof_converged/u);
+  assert.match(runnerSource, /summary\.finalSdlcProofAssessment = finalSdlcProofAssessment\(workspace\)/u);
+  assert.match(runnerSource, /data_mapper live proof did not close cleanly/u);
+  assert.match(runnerSource, /closureDisposition !== "close"/u);
+  assert.match(runnerSource, /execution_evidence_failed/u);
+  assert.match(runnerSource, /next_action_projection_open/u);
   assert.match(runnerSource, /summary\.releaseProofConverged = releaseProofStopSatisfied\(workspace\)/u);
   assert.match(
     runnerSource,

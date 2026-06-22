@@ -412,6 +412,8 @@ function compactComponentDepthDirective(
         "componentTestRows[].requirementIds is the carrier field and must be a string array; product-file materialization records may use requirementTraceObligationIds, but componentTestRows must not.",
         "Every admitted requirement obligation in workerInvocationPackage.traversalObligationContext.obligations must be traceable from at least one generated test file comment, one payload.componentTestRows[].requirementIds entry, or one worker_result_report/materialization-manifest evidence row; do not rely on test success or file existence as lineage.",
         "For component_test_surface, do not copy source componentTopologyRows or componentRealizationRows from component_code_surface; bind tests to source ownership only through componentTestRows[].componentIds.",
+        "Generated component tests may define fixtures and non-domain helpers, but they must not satisfy a source/domain capability by declaring a local product-domain type, algebra, validator, parser, compiler, executor, or guard that the accepted product source does not expose.",
+        "When testing domain validation, call the admitted product source boundary such as the compiler, parser, executor, engine, or public validator. Do not create test-local validators such as CandidateAggregate or validateAssociativeAggregate to stand in for product behavior.",
         "Represent unused component-depth fields as payload.componentTopologyRows=[], payload.componentRealizationRows=[], payload.testComponentTopologyRows=[], payload.componentTestQualificationRows=[], payload.componentExecutionFailureRegister=null, payload.componentRepairSchedule=null, and payload.releaseDepthParity=null.",
         "Materialize tests only against the admitted testcase authority, test stack profile, test decomposition summary, and test dependency map named by targetCarrierProjection.requiredStagedAuthorityRefs.",
         "For JavaScript test files under admitted ESM module-system authority, use ESM import syntax for node:test, node:assert/strict, node:child_process, and local modules; do not emit CommonJS require/module.exports syntax unless the admitted tenant stack authority declares CommonJS.",
@@ -426,6 +428,8 @@ function compactComponentDepthDirective(
         "componentTestRows[].componentIds is required and must be a string array naming the source component ids covered by the UAT test; do not omit it even when the UAT testcase is requirement-scoped.",
         "UAT test source is requirement/testcase specific: bind every row to testcaseIds and requirementIds, and do not require implementation module-specific source shape as the generation basis.",
         "Use the admitted test stack profile, testcase authority, UAT testcase rows, and expected-result bindings to create framework-discoverable role=test files.",
+        "Generated UAT tests may define fixtures and non-domain helpers, but they must not satisfy a source/domain capability by declaring a local product-domain type, algebra, validator, parser, compiler, executor, or guard that the accepted product source does not expose.",
+        "When testing domain validation, call the admitted product source boundary such as the compiler, parser, executor, engine, or public validator. Do not create test-local validators such as CandidateAggregate or validateAssociativeAggregate to stand in for product behavior.",
         "Do not copy component source topology rows into this carrier. Component/module consistency is checked later by qualification fan-in.",
         "Represent unused component-depth fields as payload.componentTopologyRows=[], payload.componentRealizationRows=[], payload.testComponentTopologyRows=[], payload.componentTestQualificationRows=[], payload.componentExecutionFailureRegister=null, payload.componentRepairSchedule=null, and payload.releaseDepthParity=null."
       ].join("\n");
@@ -465,9 +469,10 @@ function compactTestDesignDirective(
   return [
     `Materialize the target test-design ADR at ${workerFacingPath(manifest, manifest.outputFile)} with bounded editor operations. If the file already exists, update it with targeted Edit operations, not a whole-file Write replacement. Use the edit operation as the drafting surface; assistant-visible output is only compact progress.`,
     "Use worker_construction_brief.targetCarrierProjection construction refs and the row fields listed here as the authoritative test-design carrier shape; do not derive row field names from prose tables.",
-    "Emit a fenced `json test_design_register` carrier with `kind:\"sdlc_test_design_register\"`, `registerVersion:\"ts-test-design-v1\"`, and `targetAssetType:\"test_design_surface\"`.",
-    "The fenced `sdlc_test_design_register` top-level field set is closed to the register fields named here. Do not wrap the fenced register in a target-carrier envelope, and do not add target-carrier envelope fields such as edgeRef, contractRef, contractDigest, payload, summary, or evidenceRefs inside the fenced register.",
-    "Use one composite test design carrier with designConsumptionRows, uatTestcaseRows, testcaseAuthorityRows, testStackProfileRows, testModuleRows, testComponentTopologyRows, testDataBindings, expectedResultBindings, uatIntegrationBindings, and testExecutionScheduleRows.",
+    `Emit a fenced \`json test_design_register\` selected target-carrier envelope with \`kind:"${manifest.targetCarrierProjection.outputCarrierKind}"\`, \`targetAssetType:"${manifest.targetAssetType}"\`, \`edgeRef:"${manifest.edgeName}"\`, \`contractRef:"${manifest.targetCarrierProjection.targetCarrierContractRef}"\`, \`contractDigest:"${manifest.targetCarrierProjection.targetCarrierContractDigest}"\`, and \`payload.kind:"sdlc_test_design_register"\`, \`payload.registerVersion:"ts-test-design-v1"\`, \`payload.targetAssetType:"test_design_surface"\`.`,
+    "The envelope fixed protocol fields are closed to kind, targetAssetType, edgeRef, contractRef, contractDigest, and payload; optional envelope evidenceRefs and summary may cite the generated carrier but must not replace payload rows.",
+    "The payload field set is closed to the register fields named here. Do not put edgeRef, contractRef, contractDigest, summary, or evidenceRefs inside payload.",
+    "Use one composite test design payload with designConsumptionRows, uatTestcaseRows, testcaseAuthorityRows, testStackProfileRows, testModuleRows, testComponentTopologyRows, testDataBindings, expectedResultBindings, uatIntegrationBindings, and testExecutionScheduleRows.",
     "testComponentTopologyRows[].relativePath names the planned generated test product file under the tenant-declared test root; it must not point at the source-under-test path.",
     "Bound the carrier for first-pass construction: do not duplicate every scenario row, every component row, or full source/design text. Preserve breadth by module and requirement family, carry sourceDesignObligationRefs/evidenceRefs to the complete upstream surfaces, and keep row counts small enough to fit in bounded write/edit payloads.",
     "Prefer one representative executable unit/integration case per module family plus UAT-to-integration bindings over a giant exhaustive register. Later graph edges and residual pressure may expand coverage; this edge must create the typed test-design authority without exhausting worker output.",
@@ -866,7 +871,7 @@ export function outcomeDirectivesForWorker(
     if (manifest.targetAssetType === "test_design_surface") {
       directives.push(
         "Generated test plan rows must define discoverable tests for the declared test execution contract.",
-        "Emit a fenced ```test_design_register JSON block whose top-level kind is sdlc_test_design_register and whose row fields match the prompt-listed row contract exactly."
+        `Emit a fenced \`json test_design_register\` selected target-carrier envelope whose top-level kind is ${manifest.targetCarrierProjection.outputCarrierKind}; put the sdlc_test_design_register row contract inside payload.`
       );
     }
     if (manifest.targetAssetType === "component_code_surface") {
@@ -926,10 +931,11 @@ export function outcomeDirectivesForWorker(
 	        "When declared product file targets are empty, derive test product file targets from admitted composite test design and materialize them under selected output root. Choose framework-discoverable test paths from the admitted tenant test stack authority or design rows; do not use a language-specific default in the SDLC prompt.",
 	        "payload.componentTestRows[].relativePath must name the tenant-relative or selected-output-root-prefixed product test file path. Do not point componentTestRows at .ai-workspace/runtime asset paths; those paths are evidence archives, not product test files.",
 	        "Generated test files are authored for the matching workerInvocationPackage.productMaterialization.executionShards[].workingDirectory; the installed operator executes the declared shard command after this transform returns.",
-	        "Generated tests must derive paths and module/runtime syntax from the admitted tenant test stack authority, design rows, and shard workingDirectory; keep runtime compatibility inside declared source/test files or admitted design-declared support files.",
-	        "If admitted JavaScript tenant stack authority declares moduleSystem=esm, generated test files must use ESM imports; CommonJS require/module.exports syntax is a materialized product module-system mismatch.",
-	        "Materialized tests must preserve declared testClassId; avoid local identifiers that collide with matcher words; prefer shouldEqual or parenthesized shouldBe RHS."
-	      );
+        "Generated tests must derive paths and module/runtime syntax from the admitted tenant test stack authority, design rows, and shard workingDirectory; keep runtime compatibility inside declared source/test files or admitted design-declared support files.",
+        "If admitted JavaScript tenant stack authority declares moduleSystem=esm, generated test files must use ESM imports; CommonJS require/module.exports syntax is a materialized product module-system mismatch.",
+        "Materialized tests must preserve declared testClassId; avoid local identifiers that collide with matcher words; prefer shouldEqual or parenthesized shouldBe RHS.",
+        "Generated tests must not prove product behavior through test-local domain algebras, validators, parsers, compilers, executors, or guards. Use product source APIs for semantic checks and keep local helpers limited to fixtures or assertion plumbing."
+      );
     }
   }
   for (const directive of [

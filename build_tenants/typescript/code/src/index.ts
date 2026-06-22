@@ -61,6 +61,7 @@ export * from "./package_binding/index.js";
 export * from "./package_api/index.js";
 export * from "./install/index.js";
 export {
+  createOddSdlcAbgRuntimeAssuranceProvider,
   createOddSdlcAbgRuntimeBindingPlugins,
   oddSdlcAbgRuntimeWorkerTransportFromEnv,
   resolveOddSdlcAbgRuntimeBindingPolicy,

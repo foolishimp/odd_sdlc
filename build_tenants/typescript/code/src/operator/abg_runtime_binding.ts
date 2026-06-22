@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type {
   ExecutionBasis,
+  EngineAssuranceProvider,
   EngineRunnerPluginSet,
   RuntimeEvent,
   RuntimeRegime
@@ -54,6 +55,12 @@ export function oddSdlcAbgRuntimeWorkerTransportFromEnv(
 
 function defaultRegimeForGraphFunction(graphFunctionName: string): RuntimeRegime {
   return graphFunctionName === FG_CONFORM_PROJECT ? "F_D" : "F_P";
+}
+
+export function createOddSdlcAbgRuntimeAssuranceProvider(): EngineAssuranceProvider {
+  return Object.freeze({
+    authoritySnapshot: () => null
+  });
 }
 
 export function resolveOddSdlcAbgRuntimeBindingPolicy(

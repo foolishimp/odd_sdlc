@@ -3,6 +3,7 @@
 
 import type {
   AllowedConsequenceTraversalCatalog,
+  AllowedConsequenceTraversalFamily,
   ConsequenceTraversalAction,
   GtlAdmittedStateRef,
   GtlConsequenceProjectionRef
@@ -47,6 +48,30 @@ export type SdlcNextActionBasisKind =
   | "post_reenter"
   | "post_reprice"
   | "post_block";
+
+type SdlcConstructiveClosureDisposition = Extract<
+  SdlcEdgeClosureDisposition,
+  "retry" | "repair" | "re-enter"
+>;
+
+function constructiveNextActionBasisKindForClosure(
+  disposition: SdlcConstructiveClosureDisposition
+): SdlcNextActionBasisKind {
+  switch (disposition) {
+    case "retry":
+      return "post_retry";
+    case "repair":
+      return "post_repair";
+    case "re-enter":
+      return "post_reenter";
+  }
+}
+
+function isConstructiveClosureDisposition(
+  disposition: SdlcEdgeClosureDisposition
+): disposition is SdlcConstructiveClosureDisposition {
+  return disposition === "retry" || disposition === "repair" || disposition === "re-enter";
+}
 
 export interface SdlcTraversalConsequenceRefs {
   readonly kind: "sdlc_traversal_consequence_refs";
@@ -306,6 +331,11 @@ export interface SdlcConsequenceTraversalActionBinding {
   readonly predecessorRefs: readonly string[];
 }
 
+type SdlcReentryTraversalFamily = Extract<
+  AllowedConsequenceTraversalFamily,
+  "depth_traversal" | "graph_span_reentry"
+>;
+
 function requireNonEmptyString(value: string, label: string): string {
   if (value.trim().length === 0) {
     throw new TypeError(`${label} must be non-empty`);
@@ -405,6 +435,30 @@ function requireAbsoluteGraphReentryTarget(ref: string): string {
   return normalized;
 }
 
+export function constructSdlcGraphReentryTargetRef(input: {
+  readonly authorityNamespaceRef?: string | undefined;
+  readonly targetVectorIndex: number;
+}): string {
+  const authorityNamespaceRef =
+    input.authorityNamespaceRef === undefined
+      ? "odd-sdlc"
+      : requireNonEmptyString(input.authorityNamespaceRef, "authorityNamespaceRef");
+  if (!/^[a-z][a-z0-9-]*$/u.test(authorityNamespaceRef)) {
+    throw new TypeError(
+      "authorityNamespaceRef must be a single graph-reentry-point authority segment"
+    );
+  }
+  if (
+    !Number.isInteger(input.targetVectorIndex) ||
+    input.targetVectorIndex < 0
+  ) {
+    throw new TypeError("targetVectorIndex must be a non-negative integer");
+  }
+  return requireAbsoluteGraphReentryTarget(
+    `graph-reentry-point://${authorityNamespaceRef}/${String(input.targetVectorIndex)}`
+  );
+}
+
 function traversalStrategyDecisionRef(
   decision: SdlcTraversalStrategyDecision
 ): string {
@@ -415,6 +469,43 @@ function traversalStrategyDecisionRef(
     encodeURIComponent(decision.selectedStrategy),
     encodeURIComponent(decision.decisionSource)
   ].join("/");
+}
+
+function catalogHasReentryFamily(
+  catalog: AllowedConsequenceTraversalCatalog | undefined,
+  family: SdlcReentryTraversalFamily
+): boolean {
+  return catalog?.rows.some((row) => row.traversalFamily === family) ?? false;
+}
+
+function selectedReentryTraversalFamily(input: {
+  readonly traversalStrategyDecision: SdlcTraversalStrategyDecision;
+  readonly selectedTraversalFamily?: SdlcReentryTraversalFamily | undefined;
+  readonly allowedConsequenceTraversalCatalog?:
+    | AllowedConsequenceTraversalCatalog
+    | undefined;
+}): SdlcReentryTraversalFamily {
+  if (input.selectedTraversalFamily !== undefined) {
+    return input.selectedTraversalFamily;
+  }
+  const catalog = input.allowedConsequenceTraversalCatalog;
+  const catalogAllowsDepth = catalogHasReentryFamily(catalog, "depth_traversal");
+  const catalogAllowsGraphSpan = catalogHasReentryFamily(catalog, "graph_span_reentry");
+  if (
+    input.traversalStrategyDecision.selectedStrategy !== "full_breadth" &&
+    catalogAllowsDepth
+  ) {
+    return "depth_traversal";
+  }
+  if (catalogAllowsGraphSpan) {
+    return "graph_span_reentry";
+  }
+  if (catalogAllowsDepth) {
+    return "depth_traversal";
+  }
+  return input.traversalStrategyDecision.selectedStrategy === "full_breadth"
+    ? "graph_span_reentry"
+    : "depth_traversal";
 }
 
 function requireRefsContain(input: {
@@ -1918,6 +2009,7 @@ export function constructSdlcConsequenceTraversalActionBinding(input: {
   readonly reentryTargetRef: string;
   readonly targetOutcomeRef?: string | undefined;
   readonly selectedOverlayRef?: string | null | undefined;
+  readonly selectedTraversalFamily?: SdlcReentryTraversalFamily | undefined;
   readonly selectedCandidateFamilyRef?: string | null | undefined;
   readonly selectedRefinementBoundaryRef?: string | null | undefined;
   readonly selectedTraversalTargetRef?: string | null | undefined;
@@ -1933,14 +2025,17 @@ export function constructSdlcConsequenceTraversalActionBinding(input: {
 }): SdlcConsequenceTraversalActionBinding {
   const { replay, traversalStrategyDecision } = input;
   const { edgeClosureDecision, nextActionProjection } = replay;
-  if (edgeClosureDecision.disposition !== "re-enter") {
+  if (!isConstructiveClosureDisposition(edgeClosureDecision.disposition)) {
     throw new TypeError(
-      "SDLC consequence traversal action binding requires a re-enter closure decision"
+      "SDLC consequence traversal action binding requires retry, repair, or re-enter closure decision"
     );
   }
-  if (nextActionProjection.nextActionBasisKind !== "post_reenter") {
+  const expectedNextActionBasisKind = constructiveNextActionBasisKindForClosure(
+    edgeClosureDecision.disposition
+  );
+  if (nextActionProjection.nextActionBasisKind !== expectedNextActionBasisKind) {
     throw new TypeError(
-      "SDLC consequence traversal action binding requires post_reenter next-action basis"
+      `SDLC consequence traversal action binding requires ${expectedNextActionBasisKind} next-action basis`
     );
   }
   if (!nextActionProjection.choosesNextTraversal) {
@@ -1948,12 +2043,12 @@ export function constructSdlcConsequenceTraversalActionBinding(input: {
       "SDLC consequence traversal action binding requires an explicit selected next traversal"
     );
   }
-  if (traversalStrategyDecision.selectedStrategy === "full_breadth") {
-    throw new TypeError(
-      "SDLC consequence traversal action binding requires a depth-scoped traversal strategy"
-    );
-  }
   const decisionRef = traversalStrategyDecisionRef(traversalStrategyDecision);
+  const selectedTraversalFamily = selectedReentryTraversalFamily({
+    traversalStrategyDecision,
+    selectedTraversalFamily: input.selectedTraversalFamily,
+    allowedConsequenceTraversalCatalog: input.allowedConsequenceTraversalCatalog
+  });
   const selectedActionRef = firstNonEmpty(
     [nextActionProjection.selectedActionRef],
     "selectedActionRef"
@@ -2032,12 +2127,17 @@ export function constructSdlcConsequenceTraversalActionBinding(input: {
     strategyDecisionRef: decisionRef,
     parentObligationRef,
     actionKind: "reenter_graph_span",
-    selectedTraversalFamily: "depth_traversal",
+    selectedTraversalFamily,
     selectedGraphFunctionRef,
     selectedOverlayRef: input.selectedOverlayRef ?? nextActionProjection.overlayRef,
-    selectedCandidateFamilyRef: input.selectedCandidateFamilyRef ?? null,
+    selectedCandidateFamilyRef:
+      selectedTraversalFamily === "depth_traversal"
+        ? input.selectedCandidateFamilyRef ?? null
+        : null,
     selectedRefinementBoundaryRef:
-      input.selectedRefinementBoundaryRef ?? null,
+      selectedTraversalFamily === "depth_traversal"
+        ? input.selectedRefinementBoundaryRef ?? null
+        : null,
     selectedTraversalTargetRef,
     sourceNodeRef: requireNonEmptyString(input.sourceNodeRef, "sourceNodeRef"),
     targetNodeRef: requireNonEmptyString(input.targetNodeRef, "targetNodeRef"),

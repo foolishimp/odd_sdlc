@@ -37,11 +37,11 @@ const ABG_TYPESCRIPT_ROOT = resolve(
   REPO_ROOT,
   "../abiogenesis/build_tenants/abiogenesis/typescript"
 );
-const ABG_RELEASE_VERSION = "4.1.0-rc.3";
+const ABG_RELEASE_VERSION = "4.1.0-rc.6";
 const ABG_RELEASE_SOURCE_REF = "main";
-const ABG_RELEASE_SOURCE_COMMIT = "fcf9fa699c4b3bc334397606950e2eac343e2a1c";
+const ABG_RELEASE_SOURCE_COMMIT = "44b3698a067346e9e14301a22c06a5a5dbc8cd54";
 const ABG_RELEASE_TARBALL_SHA256 =
-  "5dbe270e017a3a9fce031a4d8fffa0de69fe19a4cbf3c2a6aa47d2a4d7728b28";
+  "dec3d22ecdfc29404e2c30f2a4d342d3836ce82fea9e6857e9522d8bdb3ecf7b";
 const ABG_RELEASE_SNAPSHOT_REF = ABG_RELEASE_VERSION;
 const ABG_RELEASE_SNAPSHOT_ROOT = resolve(
   REPO_ROOT,
@@ -173,6 +173,8 @@ async function assertInstalledAbgRuntimeBinding(input) {
   assert(bindingSource.includes(`from "${installedPackageName}"`));
   assert(bindingSource.includes("createPlugins(input)"));
   assert(bindingSource.includes("createOddSdlcAbgRuntimeBindingPlugins"));
+  assert(bindingSource.includes("createOddSdlcAbgRuntimeAssuranceProvider"));
+  assert(bindingSource.includes("assuranceProvider: createOddSdlcAbgRuntimeAssuranceProvider()"));
   assert(bindingSource.includes("oddSdlcAbgRuntimeWorkerTransportFromEnv"));
   assert(bindingSource.includes("resolvePolicy(input)"));
   assert(bindingSource.includes("resolveOddSdlcAbgRuntimeBindingPolicy"));
@@ -183,6 +185,11 @@ async function assertInstalledAbgRuntimeBinding(input) {
   assert.equal(typeof imported.runtimeBinding, "object");
   assert.equal(typeof imported.runtimeBinding.createPlugins, "function");
   assert.equal(typeof imported.runtimeBinding.resolvePolicy, "function");
+  assert.equal(typeof imported.runtimeBinding.assuranceProvider, "object");
+  assert.equal(
+    "eventLedgerValid" in imported.runtimeBinding.assuranceProvider,
+    false
+  );
   assert.equal(imported.runtimeBinding.fallbackConfigPath, ".abiogenesis/config/abg.config.json");
   assert.equal(imported.runtimeBinding.resolvedPolicy.defaultRegime, "F_P");
   const conformancePolicy = imported.runtimeBinding.resolvePolicy({

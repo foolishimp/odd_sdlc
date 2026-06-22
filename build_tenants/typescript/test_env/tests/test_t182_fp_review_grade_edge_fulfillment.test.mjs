@@ -33,6 +33,7 @@ import {
   admitReviewGradeEdgeFulfillmentAssessmentFromArtifact,
   admitSdlcEdgeEvidence,
   buildPostTransformWorkerResultReport,
+  constructWorkerInvocationPackage,
   deriveSdlcEdgeAssuranceCloseDecision,
   deriveSdlcEdgeObligations,
   deriveSdlcEdgeResidualPressure,
@@ -42,6 +43,7 @@ import {
   reviewGradeEdgeFulfillmentAssessmentPressureRefs,
   reviewGradeEdgeFulfillmentAssessmentRequired,
   reviewGradeEdgeFulfillmentOpenPressureRefs,
+  reviewGradeEdgeFulfillmentRepairSurfaceTriageRows,
   reviewGradeFindingsAreDownstreamStagePressure,
   reviewGradeReadOnlyInputMutationReasons,
   sdlcFpEvaluateOpenObligationPressureRefs,
@@ -56,7 +58,10 @@ import {
   designDepthFpEvaluatorRegisterPath
 } from "../../build/semantic/code/src/operator/plugins/evaluate/design_depth_register.js";
 import { evaluateSdlcComputeStage } from "../../build/semantic/code/src/operator/plugins/evaluate/postflight.js";
-import { reviewGradeEdgeFulfillmentPrompt } from "../../build/semantic/code/src/operator/plugins/evaluate/prompts.js";
+import {
+  reviewGradeEdgeFulfillmentPrompt,
+  reviewGradeEdgeFulfillmentPromptProjection
+} from "../../build/semantic/code/src/operator/plugins/evaluate/prompts.js";
 import { makeSdlcBlockingReason } from "../../build/semantic/code/src/shared/blocking_reason.js";
 
 const PACKAGE_ROOT = process.cwd();
@@ -336,6 +341,51 @@ function writeInvocationPackageScope(manifest, inlineObligationIds) {
     )}\n`,
     "utf8"
   );
+}
+
+function retryContextForReviewGradeRequirement(manifest, obligationId) {
+  const evidenceRef = pathToFileURL(
+    path.join(manifest.archiveRoot, "review_grade_edge_fulfillment_assessment.json")
+  ).href;
+  const blockingReason = makeSdlcBlockingReason({
+    code: "review_grade_edge_fulfillment_blocked",
+    detail:
+      `${obligationId}:semantic_not_realized:Repair the prior blocked requirement on this same edge.`,
+    lawfulReentryPoint: "same_edge_retry",
+    evidenceRefs: [evidenceRef]
+  });
+  const currentGapDossierRef = pathToFileURL(
+    path.join(manifest.archiveRoot, "gap_dossier.json")
+  ).href;
+  return {
+    kind: "sdlc_worker_retry_context",
+    retryAttemptRefs: [],
+    priorGapDossiers: [
+      {
+        kind: "sdlc_postflight_gap_dossier",
+        status: "open",
+        graphFunctionName: manifest.graphFunctionName,
+        edgeName: manifest.edgeName,
+        vectorIndex: manifest.vectorIndex,
+        targetAssetType: manifest.targetAssetType,
+        reasons: [
+          {
+            kind: "sdlc_postflight_gap_reason",
+            reason: `review_grade_edge_fulfillment_blocked:${obligationId}`,
+            reasonClass: "assurance",
+            blockingReason
+          }
+        ],
+        evidenceRefs: [evidenceRef],
+        priorManifestId: pathToFileURL(
+          path.join(manifest.archiveRoot, "handoff_manifest.json")
+        ).href,
+        currentGapDossierRef,
+        retryEligible: true,
+        nextLawfulActions: ["retry_same_edge"]
+      }
+    ]
+  };
 }
 
 function writeValidCodeBuilderFrontier(manifest) {
@@ -1941,7 +1991,11 @@ test("T-203 scoped review-grade admission uses invocation package inline obligat
       invocationScope
     });
 
-    assert.equal(admission.status, "admitted");
+    assert.equal(
+      admission.status,
+      "admitted",
+      admission.blockingReasons.join("\n")
+    );
     assert.deepStrictEqual(
       admission.assessment.reviewedObligationIds,
       inlineObligationIds
@@ -2051,7 +2105,143 @@ test("T-204 review-grade admission uses invocation scope over full-breadth linea
   }
 });
 
-test("T-203 scoped review-grade prompt makes inline obligations the only review scope", () => {
+test("T-204 review-grade retry keeps prior blocked requirement in active scope", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_code_surface",
+      "t204-retry-review-scope"
+    );
+    writeValidCodeBuilderFrontier(manifest);
+    const allObligationIds =
+      manifest.traversalObligationContext.obligations.map(
+        (obligation) => obligation.obligationId
+      );
+    const inlineObligationIds = allObligationIds.slice(0, 2);
+    const retryObligationId = allObligationIds.find(
+      (obligationId) =>
+        obligationId.startsWith("requirement:") &&
+        !inlineObligationIds.includes(obligationId)
+    );
+    assert.ok(retryObligationId);
+    const retryManifest = {
+      ...manifest,
+      retryContext: retryContextForReviewGradeRequirement(
+        manifest,
+        retryObligationId
+      )
+    };
+    const invocationPackage = constructWorkerInvocationPackage({
+      manifest: retryManifest
+    });
+    assert.ok(
+      invocationPackage.inlineObligationIds.includes(retryObligationId),
+      `retry requirement missing from inline scope: ${retryObligationId}`
+    );
+    const staleInvocationScope = {
+      kind: "sdlc_worker_invocation_package",
+      featureScope: retryManifest.featureScope,
+      inlineObligationIds
+    };
+    const retryPrompt = reviewGradeEdgeFulfillmentPromptProjection({
+      manifest: retryManifest,
+      invocationScope: staleInvocationScope,
+      currentPostflight: null,
+      governanceRef: "config://odd-sdlc/work-category-governance/coding-build/v1",
+      governancePath: path.join(workspaceRoot, "governance.md"),
+      constructionBriefPath: path.join(
+        retryManifest.archiveRoot,
+        "worker_construction_brief.json"
+      ),
+      invocationPackagePath: path.join(
+        retryManifest.archiveRoot,
+        "worker_invocation_package.json"
+      ),
+      workerReportPath: path.join(retryManifest.archiveRoot, "worker_result_report.json"),
+      assessmentPath: path.join(
+        retryManifest.archiveRoot,
+        REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE
+      ),
+      subworkstreamManifestPath: path.join(
+        retryManifest.archiveRoot,
+        "evaluate_compute_subworkstream_manifest.json"
+      )
+    });
+    assert.ok(
+      retryPrompt.promptText.includes(retryObligationId),
+      "retry requirement missing from rendered review prompt"
+    );
+    assert.ok(
+      retryPrompt.promptText.includes(`obligationCount: ${inlineObligationIds.length + 1}`),
+      "rendered review prompt did not enlarge active retry scope"
+    );
+    assert.doesNotMatch(
+      retryPrompt.promptText,
+      /For scoped runs, this is invocationPackage\.inlineObligationIds/u
+    );
+
+    const base = reviewGradeAssessment(retryManifest);
+    const omittedAssessment = {
+      ...base,
+      reviewedObligationIds: inlineObligationIds,
+      findings: base.findings.filter((finding) =>
+        inlineObligationIds.includes(finding.obligationId)
+      ),
+      summary:
+        "Invalid scoped retry review omits the prior blocked requirement from direct findings."
+    };
+    const omittedOutputFile = writeAssessment(retryManifest, omittedAssessment);
+    const omittedAdmission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest: retryManifest,
+      outputFile: omittedOutputFile,
+      invocationScope: {
+        kind: "sdlc_worker_invocation_package",
+        featureScope: retryManifest.featureScope,
+        inlineObligationIds
+      }
+    });
+    assert.equal(omittedAdmission.status, "rejected");
+    assert.ok(
+      omittedAdmission.blockingReasons.includes(
+        `review_grade_obligation_unreviewed:${retryObligationId}`
+      )
+    );
+
+    const repairedInlineObligationIds = [
+      ...inlineObligationIds,
+      retryObligationId
+    ];
+    const repairedAssessment = {
+      ...base,
+      reviewedObligationIds: repairedInlineObligationIds,
+      findings: base.findings.filter((finding) =>
+        repairedInlineObligationIds.includes(finding.obligationId)
+      ),
+      summary:
+        "Valid scoped retry review directly reassesses the prior blocked requirement."
+    };
+    const repairedOutputFile = writeAssessment(retryManifest, repairedAssessment);
+    const repairedAdmission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest: retryManifest,
+      outputFile: repairedOutputFile,
+      invocationScope: {
+        kind: "sdlc_worker_invocation_package",
+        featureScope: retryManifest.featureScope,
+        inlineObligationIds: repairedInlineObligationIds
+      }
+    });
+    assert.equal(
+      repairedAdmission.status,
+      "admitted",
+      repairedAdmission.blockingReasons.join("\n")
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-203 scoped review-grade prompt names admitted active review scope", () => {
   const source = readRepoFile(
     "build_tenants/typescript/code/src/operator/plugins/evaluate/prompts.ts"
   );
@@ -2061,6 +2251,10 @@ test("T-203 scoped review-grade prompt makes inline obligations the only review 
     /reviewedObligationIds: exactly the active review-scope obligationRefs in the admitted edge packet above; do not add worker aliases/u
   );
   assert.match(
+    source,
+    /inlineObligationIds plus admitted retry-scope requirements/u
+  );
+  assert.doesNotMatch(
     source,
     /worker_invocation_package\.inlineObligationIds is present, it is the active review scope/u
   );
@@ -2111,11 +2305,157 @@ test("T-182 admits blocked semantic review as retry pressure with required actio
       manifest,
       outputFile
     });
-    assert.equal(admission.status, "admitted");
+    assert.equal(
+      admission.status,
+      "admitted",
+      admission.blockingReasons.join("\n")
+    );
     assert.equal(admission.assessment.status, "blocked");
     assert.equal(
       admission.assessment.findings[0].requiredAction,
       "Add a test that executes the accepted component responsibility and cites the requirement id."
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-204 review-grade escalates repeated test-only source-capability pressure upstream", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const firstManifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_test_surface",
+      "t204-first-test-only-source-capability-pressure"
+    );
+    const base = reviewGradeAssessment(firstManifest);
+    const blockedObligationId =
+      base.findings.find((finding) => finding.obligationId.startsWith("requirement:"))
+        ?.obligationId ?? base.findings[0].obligationId;
+    const requiredAction =
+      "Update the generated test and carrier so the test validates the accepted source/domain capability before execution.";
+    const priorGapDossierRef =
+      "workspace://.ai-workspace/runtime/odd_sdlc/operator-runs/t204-first/gap_dossier.json";
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_test_surface",
+      "t204-repeated-test-only-source-capability-pressure",
+      {
+        retryContext: {
+          kind: "sdlc_worker_retry_context",
+          retryAttemptRefs: [],
+          priorGapDossiers: [
+            {
+              kind: "sdlc_postflight_gap_dossier",
+              status: "open",
+              graphFunctionName: firstManifest.graphFunctionName,
+              edgeName: firstManifest.edgeName,
+              vectorIndex: firstManifest.vectorIndex,
+              targetAssetType: firstManifest.targetAssetType,
+              reasons: [
+                {
+                  kind: "sdlc_postflight_gap_reason",
+                  reason:
+                    `review_grade_edge_fulfillment_blocked:${blockedObligationId}:test_overlap_missing:${requiredAction}`,
+                  reasonClass: "assurance",
+                  blockingReason: makeSdlcBlockingReason({
+                    code: "review_grade_edge_fulfillment_blocked",
+                    detail: `${blockedObligationId}:test_overlap_missing:${requiredAction}`,
+                    lawfulReentryPoint: "same_edge_retry",
+                    evidenceRefs: [priorGapDossierRef]
+                  }),
+                  evidenceRefs: [priorGapDossierRef]
+                }
+              ],
+              evidenceRefs: [priorGapDossierRef],
+              priorManifestId: "manifest://t204/first",
+              currentGapDossierRef: priorGapDossierRef,
+              retryEligible: true,
+              nextLawfulActions: ["retry_same_edge"]
+            }
+          ]
+        }
+      }
+    );
+    const manifestAssessment = reviewGradeAssessment(manifest);
+    const repeatedAssessment = {
+      ...manifestAssessment,
+      status: "blocked",
+      findings: manifestAssessment.findings.map((finding) =>
+        finding.obligationId === blockedObligationId
+          ? {
+              ...finding,
+              fulfillmentStatus: "blocked",
+              failureClass: "test_overlap_missing",
+              requiredAction,
+              repairSurfaceTriage: {
+                kind: "sdlc_repair_surface_triage",
+                disposition: "current_edge_repair",
+                repairGraphFunctionRef: null,
+                repairGraphVectorRef: null,
+                repairAssetRef: null,
+                evidenceRefs: [...finding.evidenceRefs, priorGapDossierRef],
+                rationale:
+                  "Evaluator initially classified the failure as same-edge test repair."
+              },
+              rationale:
+                "The generated test still does not prove the accepted source/domain capability."
+            }
+          : finding
+      )
+    };
+    const outputFile = writeAssessment(manifest, repeatedAssessment);
+    const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest,
+      outputFile,
+      invocationScope: {
+        kind: "sdlc_worker_invocation_package",
+        featureScope: manifest.featureScope,
+        inlineObligationIds: manifestAssessment.reviewedObligationIds
+      }
+    });
+
+    assert.equal(
+      admission.status,
+      "admitted",
+      admission.blockingReasons.join("\n")
+    );
+    const finding = admission.assessment.findings.find(
+      (row) => row.obligationId === blockedObligationId
+    );
+    assert.equal(finding.repairSurfaceTriage?.disposition, "upstream_reentry");
+    assert.match(
+      finding.repairSurfaceTriage?.repairAssetRef ?? "",
+      /component_code_surface/u
+    );
+    assert.match(
+      finding.repairSurfaceTriage?.repairGraphVectorRef ?? "",
+      /component_code_surface/u
+    );
+    const triageRows = reviewGradeEdgeFulfillmentRepairSurfaceTriageRows({
+      runRef: "t204-repeated-test-only-source-capability-pressure",
+      targetAssetType: manifest.targetAssetType,
+      assessment: admission.assessment
+    });
+    assert.equal(
+      triageRows.find((row) => row.obligationId === blockedObligationId)?.triage
+        .disposition,
+      "upstream_reentry"
+    );
+    const installedOperatorSource = readRepoFile(
+      "build_tenants/typescript/code/src/operator/installed_operator.ts"
+    );
+    assert.match(
+      installedOperatorSource,
+      /function reviewGradeBlockedPostflightForFindings/u
+    );
+    assert.match(
+      installedOperatorSource,
+      /lawfulReentryPointForRepairSurfaceTriage\(triage\)/u
+    );
+    assert.match(
+      installedOperatorSource,
+      /const postflight = reviewGradeBlockedPostflightForFindings\(\{[\s\S]*findings: postflightFindings/u
     );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
@@ -2687,6 +3027,42 @@ test("T-182 wrong-stage review findings are downstream pressure, not same-edge r
       }),
       []
     );
+    const uatSourceExecutionFinding = {
+      ...downstreamExecutionFinding,
+      obligationId: "target_asset:uat_test_source_surface",
+      failureClass: "execution_environment",
+      requiredAction:
+        "Provide admitted sbt test execution evidence for the materialized UAT test source surface under this edge.",
+      repairSurfaceTriage: {
+        kind: "sdlc_repair_surface_triage",
+        disposition: "current_edge_repair",
+        repairGraphFunctionRef: null,
+        repairGraphVectorRef: null,
+        repairAssetRef: null,
+        evidenceRefs: downstreamExecutionFinding.evidenceRefs,
+        rationale:
+          "Legacy evaluator misclassified generated UAT test-source execution proof as same-edge repair."
+      }
+    };
+    assert.equal(
+      reviewGradeFindingsAreDownstreamStagePressure([uatSourceExecutionFinding], {
+        targetAssetType: "uat_test_source_surface"
+      }),
+      true
+    );
+    assert.deepEqual(
+      reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+        runRef: "t182-uat-source-downstream-execution-pressure",
+        targetAssetType: "uat_test_source_surface",
+        assessment: {
+          ...base,
+          targetAssetType: "uat_test_source_surface",
+          status: "blocked",
+          findings: [uatSourceExecutionFinding]
+        }
+      }),
+      []
+    );
     assert.deepEqual(
       reviewGradeEdgeFulfillmentOpenPressureRefs({
         runRef: "t182-wrong-stage-pressure",
@@ -3231,11 +3607,15 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
     );
     assert.match(
       promptSource,
-      /If you find a current-edge blocker, stop deeper inspection and write a minimal blocked assessment immediately/u
+      /If a blocker is found, write a minimal blocked assessment immediately/u
     );
     assert.match(
       promptSource,
-      /First-blocker protocol: once one current-edge semantic blocker is identified/u
+      /First-blocker protocol: once one semantic blocker is identified/u
+    );
+    assert.match(
+      promptSource,
+      /Do not default to current_edge_repair when target-specific rules require upstream_reentry or downstream_deferred/u
     );
     assert.match(
       promptSource,

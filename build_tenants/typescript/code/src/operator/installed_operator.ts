@@ -129,6 +129,7 @@ import type {
   SdlcDecompositionSummary,
   SdlcRepairSurfaceTriageCarrier,
   SdlcReviewGradeEdgeFulfillmentAssessment,
+  SdlcReviewGradeObligationFinding,
   SdlcTraversalHopSelection,
   SdlcTraversalStrategyDecision,
   SdlcTraversalOutcomeClass,
@@ -277,6 +278,7 @@ import {
 } from "./composition_identity.js";
 import {
   constructSdlcEdgeFulfillmentLedger,
+  constructSdlcGraphReentryTargetRef,
   constructSdlcNextActionProjection,
   constructSdlcOverlaySegmentCompletion,
   constructSdlcConsequenceTraversalActionBinding,
@@ -877,7 +879,19 @@ function postActionGapDossiersFromProjection(input: {
     }
   }
   return compactSdlcPriorGapDossiersForRetryContext(
-    [...byRef.values()].filter((dossier) => dossier.retryEligible === true)
+    [...byRef.values()].filter(gapDossierEligibleForWorkerRetryContext)
+  );
+}
+
+function gapDossierEligibleForWorkerRetryContext(
+  dossier: SdlcPostflightGapDossier
+): boolean {
+  return (
+    dossier.retryEligible === true &&
+    dossier.nextLawfulActions.some(
+      (action) =>
+        action === "retry_same_edge" || action === "repair_worker_output"
+    )
   );
 }
 
@@ -1246,7 +1260,10 @@ export function mergeSdlcWorkerRetryContextWithRuntimeGapRegister(input: {
   });
   const latestRuntimeAttemptRunId = latestRuntimeAttemptRunIdForRetryContext(input);
   const latestGapDossier = latestRuntimeGapDossierForRetryContext(input);
-  if (latestGapDossier === null || latestGapDossier.retryEligible !== true) {
+  if (
+    latestGapDossier === null ||
+    !gapDossierEligibleForWorkerRetryContext(latestGapDossier)
+  ) {
     if (
       retryContextLagsRuntimeAttempt({
         retryContext: projected,
@@ -3461,7 +3478,7 @@ function writeDesignDepthFpEvaluatorDraftContentRegister(input: {
     SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.map((section, index) =>
       Object.freeze({
         kind: SDLC_EVALUATE_CONTENT_LEDGER_ROW_KIND,
-        rowRef: `content-register-row-draft://odd-sdlc/design-depth/${section}`,
+        rowRef: `content-ledger-row-draft://odd-sdlc/design-depth/${section}`,
         authorityFunction: "synthesize_model" as const,
         carrierFamily: "ProductAssetModel" as const,
         contentKind: SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND,
@@ -3840,12 +3857,25 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
     ...evaluatorTraceEvidenceRefs
   ]);
   if (processResult.status !== 0) {
+    const processFailureReason: SdlcBlockingReasonCode =
+      workerProcessTextLooksRetryableProviderFailure(evaluatorProcessText)
+        ? "worker_connection_failed"
+        : processResult.timedOut && firstUpdateObservation.status === "pending"
+          ? "design_depth_fp_evaluator_first_update_timeout"
+          : processResult.timedOut
+            ? "design_depth_fp_evaluator_progress_timeout"
+            : "design_depth_fp_evaluator_process_failed";
     return constructEvaluationRuleOutcome({
       status: "blocked",
       ruleRef: DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
       ruleRole: "semantic_judgment",
       computeMeans: "F_P",
       evidenceRefs,
+      continuationRefs: evaluationRuleContinuationRefsForBlockingReason({
+        manifest: input.manifest,
+        ruleRef: DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
+        code: processFailureReason
+      }),
       diagnosticRefs: evidenceRefs,
       selectedCompositionRef: input.pluginInput.selectedCompositionRef,
       selectedCompositionDigest: input.pluginInput.selectedCompositionDigest,
@@ -3855,14 +3885,7 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
       compositionContributionRef:
         input.pluginInput.selectedRegimeBindingRef ??
         input.pluginInput.selectedCompositionRef,
-      reason:
-        workerProcessTextLooksRetryableProviderFailure(evaluatorProcessText)
-          ? "worker_connection_failed"
-          : processResult.timedOut && firstUpdateObservation.status === "pending"
-            ? "design_depth_fp_evaluator_first_update_timeout"
-            : processResult.timedOut
-              ? "design_depth_fp_evaluator_progress_timeout"
-              : "design_depth_fp_evaluator_process_failed"
+      reason: processFailureReason
     });
   }
   const contentRegisterAdmission = admitSdlcEvaluateContentRegisterArtifact({
@@ -4538,30 +4561,30 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       command: processLaunch.command,
       args: processLaunch.args,
       cwd: input.manifest.workspaceRoot,
-	    environment: {
-	      ...installedOperatorChildProcessEnvironment(),
-	      ...sdlcWorkspaceLocalToolEnvironment(input.manifest.workspaceRoot),
-	      ODD_SDLC_EVALUATE_STAGE: "review_grade_edge_fulfillment",
-      ODD_SDLC_EVALUATOR_ASSESSMENT: assessmentPath,
-      ODD_SDLC_EVALUATOR_PROMPT: promptPath,
-      ODD_SDLC_EVALUATOR_WORKER_REPORT: workerReportPath
-    },
-    environmentPolicy: environmentPolicyForTransport(input.transport),
-    stdin: processLaunch.stdin,
-    stdoutPath,
-    stderrPath,
-    stdoutRef: pathToFileURL(stdoutPath).href,
-    stderrRef: pathToFileURL(stderrPath).href,
-    processStartedPath,
-    processEventsPath,
-    parser: parserForWorkerTransport(input.transport),
-    executorProfile,
-    timeoutMs: evaluatorTimeoutMs,
-    inactivityTimeoutMs: evaluatorInactivityTimeoutMs,
-    terminationGraceMs: inactivityPolicy.terminationGraceMs,
-    heartbeatMs: inactivityPolicy.heartbeatMs,
-    eventSink: input.eventSink
-  });
+      environment: {
+        ...installedOperatorChildProcessEnvironment(),
+        ...sdlcWorkspaceLocalToolEnvironment(input.manifest.workspaceRoot),
+        ODD_SDLC_EVALUATE_STAGE: "review_grade_edge_fulfillment",
+        ODD_SDLC_EVALUATOR_ASSESSMENT: assessmentPath,
+        ODD_SDLC_EVALUATOR_PROMPT: promptPath,
+        ODD_SDLC_EVALUATOR_WORKER_REPORT: workerReportPath
+      },
+      environmentPolicy: environmentPolicyForTransport(input.transport),
+      stdin: processLaunch.stdin,
+      stdoutPath,
+      stderrPath,
+      stdoutRef: pathToFileURL(stdoutPath).href,
+      stderrRef: pathToFileURL(stderrPath).href,
+      processStartedPath,
+      processEventsPath,
+      parser: parserForWorkerTransport(input.transport),
+      executorProfile,
+      timeoutMs: evaluatorTimeoutMs,
+      inactivityTimeoutMs: evaluatorInactivityTimeoutMs,
+      terminationGraceMs: inactivityPolicy.terminationGraceMs,
+      heartbeatMs: inactivityPolicy.heartbeatMs,
+      eventSink: input.eventSink
+    });
   } finally {
     disposeReviewGradeInterruptionArtifact();
   }
@@ -4599,6 +4622,24 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       traceResultRef: fileRef(traceResultPath(traceRoot))
     })
   });
+  const evaluatorTraceProjection = traceProjectionFor(traceRoot);
+  const traceResultRef = fileRef(traceResultPath(traceRoot));
+  const evaluatorTraceEvidenceRefs = uniqueSorted([
+    traceResultRef,
+    ...(evaluatorTraceProjection.finalOutputRef === null
+      ? []
+      : [evaluatorTraceProjection.finalOutputRef]),
+    ...(evaluatorTraceProjection.terminalTranscriptRef === null
+      ? []
+      : [evaluatorTraceProjection.terminalTranscriptRef])
+  ]);
+  const evaluatorProcessText = [
+    readOptionalWorkerTextRef(evaluatorTraceProjection.finalOutputRef),
+    readOptionalWorkerTextRef(evaluatorTraceProjection.terminalTranscriptRef),
+    readOptionalWorkerTextRef(traceResultRef),
+    readOptionalWorkerTextPath(stdoutPath),
+    readOptionalWorkerTextPath(stderrPath)
+  ].join("\n");
   const evidenceRefs = uniqueSorted([
     pathToFileURL(promptPath).href,
     pathToFileURL(workerReportPath).href,
@@ -4607,7 +4648,8 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
     pathToFileURL(stderrPath).href,
     pathToFileURL(processEventsPath).href,
     pathToFileURL(processStartedPath).href,
-    runRef
+    runRef,
+    ...evaluatorTraceEvidenceRefs
   ]);
   const evaluatorMutationReasons = reviewGradeReadOnlyInputMutationReasons({
     snapshot: readOnlyInputSnapshot
@@ -4658,10 +4700,12 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
     });
   }
   if (processResult.status !== 0) {
-    const processFailureReason =
-      processResult.timedOut === true
-        ? "review_grade_evaluator_process_timeout"
-        : "review_grade_evaluator_process_failed";
+    const processFailureReason: SdlcBlockingReasonCode =
+      workerProcessTextLooksRetryableProviderFailure(evaluatorProcessText)
+        ? "worker_connection_failed"
+        : processResult.timedOut === true
+          ? "review_grade_evaluator_process_timeout"
+          : "review_grade_evaluator_process_failed";
     const postflight = reviewGradePostflight({
       manifest: input.manifest,
       code: processFailureReason,
@@ -4694,6 +4738,11 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       computeMeans: "F_P",
       evidenceRefs,
       residualPressureRefs,
+      continuationRefs: evaluationRuleContinuationRefsForBlockingReason({
+        manifest: input.manifest,
+        ruleRef: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
+        code: processFailureReason
+      }),
       diagnosticRefs: evidenceRefs,
       selectedCompositionRef: input.pluginInput.selectedCompositionRef,
       selectedCompositionDigest: input.pluginInput.selectedCompositionDigest,
@@ -4803,13 +4852,8 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
     );
     const postflightFindings =
       concreteRepairFindings.length > 0 ? concreteRepairFindings : openFindings;
-    const postflight = reviewGradePostflight({
-      manifest: input.manifest,
-      code: "review_grade_edge_fulfillment_blocked",
-      details: postflightFindings.map(
-        (finding) =>
-          `${finding.obligationId}:${finding.failureClass ?? "open"}:${finding.requiredAction ?? "required_action_missing"}`
-      ),
+    const postflight = reviewGradeBlockedPostflightForFindings({
+      findings: postflightFindings,
       evidenceRefs: uniqueSorted([...evidenceRefs, ...admission.evidenceRefs])
     });
     writeSdlcSystemArtifact({
@@ -5259,6 +5303,45 @@ function messageForRepairSurfaceTriage(
   }
 }
 
+function reviewGradeBlockingReasonForFinding(input: {
+  readonly finding: SdlcReviewGradeObligationFinding;
+  readonly evidenceRefs: readonly string[];
+}): SdlcBlockingReason {
+  const triage = input.finding.repairSurfaceTriage ?? null;
+  return makeSdlcBlockingReason({
+    code: "review_grade_edge_fulfillment_blocked",
+    detail:
+      `${input.finding.obligationId}:${input.finding.failureClass ?? "open"}:${input.finding.requiredAction ?? "required_action_missing"}`,
+    lawfulReentryPoint:
+      triage === null ? undefined : lawfulReentryPointForRepairSurfaceTriage(triage),
+    message: triage === null ? undefined : messageForRepairSurfaceTriage(triage),
+    evidenceRefs: uniqueSorted([
+      ...input.evidenceRefs,
+      ...input.finding.evidenceRefs,
+      ...(triage?.evidenceRefs ?? Object.freeze([]))
+    ])
+  });
+}
+
+function reviewGradeBlockedPostflightForFindings(input: {
+  readonly findings: readonly SdlcReviewGradeObligationFinding[];
+  readonly evidenceRefs: readonly string[];
+}): SdlcPostflightResult {
+  const carriers = input.findings.map((finding) =>
+    reviewGradeBlockingReasonForFinding({
+      finding,
+      evidenceRefs: input.evidenceRefs
+    })
+  );
+  return Object.freeze({
+    kind: "sdlc_operator_postflight_result" as const,
+    status: "blocked" as const,
+    blockingReasons: Object.freeze(carriers.map(legacyBlockingReasonCode)),
+    blockingReasonCarriers: Object.freeze(carriers),
+    evidenceRefs: input.evidenceRefs
+  });
+}
+
 function reviewGradeResidualPressureCarriersForState(
   state: SdlcAbgOwnedFpDispatchState
 ): readonly ReturnType<typeof makeSdlcClosureResidualPressureCarrier>[] {
@@ -5384,6 +5467,33 @@ function fpEvaluationResidualPressureRefsForState(
   ]);
 }
 
+function fpEvaluationContinuationRefsForState(
+  state: SdlcAbgOwnedFpDispatchState
+): readonly string[] {
+  const runRef = manifestRefSegment(state.manifest);
+  const refs: string[] = [];
+  for (const carrier of reviewGradeResidualPressureCarriersForState(state)) {
+    const triage = carrier.repairSurfaceTriage;
+    if (triage?.disposition !== "upstream_reentry") {
+      continue;
+    }
+    refs.push(
+      `continuation://odd-sdlc/${runRef}/review-grade/upstream-reentry/${encodeURIComponent(triage.repairGraphVectorRef ?? carrier.pressureRef)}`,
+      carrier.pressureRef
+    );
+    if (triage.repairGraphFunctionRef !== null) {
+      refs.push(triage.repairGraphFunctionRef);
+    }
+    if (triage.repairGraphVectorRef !== null) {
+      refs.push(triage.repairGraphVectorRef);
+    }
+    if (triage.repairAssetRef !== null) {
+      refs.push(triage.repairAssetRef);
+    }
+  }
+  return uniqueSorted(refs);
+}
+
 function fpEvaluationOutcomeForDispatchState(input: {
   readonly pluginInput: EnginePluginInput;
   readonly state: SdlcAbgOwnedFpDispatchState;
@@ -5392,6 +5502,7 @@ function fpEvaluationOutcomeForDispatchState(input: {
   const closeDisposition = fpEvaluationCloseDispositionForState(input.state);
   const residualPressureRefs =
     fpEvaluationResidualPressureRefsForState(input.state);
+  const continuationRefs = fpEvaluationContinuationRefsForState(input.state);
   const fpEvaluateResultRefs = fpEvaluateResultRefsForState(input.state);
   const evidenceRefs = uniqueSorted([
     input.pluginInput.sourceProjectionRef,
@@ -5419,7 +5530,7 @@ function fpEvaluationOutcomeForDispatchState(input: {
         metricRefs: [`metric://odd-sdlc/${runRef}/evaluate/fp/obligations`],
         closeDisposition,
         residualPressureRefs,
-        continuationRefs: Object.freeze([]),
+        continuationRefs,
         evidenceRefs,
         authorityRefs,
         compositionContributionRef:
@@ -5429,6 +5540,7 @@ function fpEvaluationOutcomeForDispatchState(input: {
         compositionDigest: input.pluginInput.selectedCompositionDigest,
         diagnosticRefs: uniqueSorted([
           ...residualPressureRefs,
+          ...continuationRefs,
           ...input.pluginInput.stageSetDependencyRefs,
           ...traversalConsequenceEvidenceRefs({ state: input.state })
         ])
@@ -5577,6 +5689,21 @@ function shouldDeferDispatchConsequenceToFpEvaluator(
 
 function manifestRefSegment(manifest: SdlcWorkerHandoffManifest): string {
   return encodeURIComponent(pathToFileURL(manifest.archiveRoot).href);
+}
+
+function evaluationRuleContinuationRefsForBlockingReason(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly ruleRef: string;
+  readonly code: SdlcBlockingReasonCode;
+}): readonly string[] {
+  const blockingReason = makeSdlcBlockingReason({ code: input.code });
+  if (blockingReason.lawfulReentryPoint !== "same_edge_retry") {
+    return Object.freeze([]);
+  }
+  const runRef = manifestRefSegment(input.manifest);
+  return Object.freeze([
+    `continuation://odd-sdlc/${runRef}/evaluation-rule/${encodeURIComponent(input.ruleRef)}/same-edge/${encodeURIComponent(input.code)}`
+  ]);
 }
 
 function materializedFileRef(file: {
@@ -6387,6 +6514,60 @@ function postActionCandidateFor(input: {
   });
 }
 
+export function deriveSdlcPostYieldResumeActionInput(input: {
+  readonly basis: ExecutionBasis;
+  readonly yieldResumeBasis: Omit<SdlcYieldResumeBasis, "kind"> | null;
+}): OddSdlcEvaluateNextActionInput | null {
+  const yieldResumeBasis = input.yieldResumeBasis;
+  if (
+    yieldResumeBasis === null ||
+    yieldResumeBasis.yieldKind !==
+      "nonlocal_repair_surface_admitted_upstream_reentry"
+  ) {
+    return null;
+  }
+  const repairGraphVectorRefs = yieldResumeBasis.admittedProgressRefs.filter(
+    (ref) =>
+      ref.startsWith("graph_vector:") || ref.startsWith("graph-vector://")
+  );
+  for (const repairGraphVectorRef of repairGraphVectorRefs) {
+    const targetVectorCandidates = uniqueSorted([
+      repairGraphVectorRef,
+      repairGraphVectorRef.includes("/")
+        ? repairGraphVectorRef.slice(repairGraphVectorRef.lastIndexOf("/") + 1)
+        : repairGraphVectorRef
+    ]);
+    const targetVectorIndex =
+      targetVectorCandidates
+        .map((edgeName) =>
+          vectorIndexByEdgeName({
+            basis: input.basis,
+            edgeName
+          })
+        )
+        .find((index): index is number => index !== null) ?? null;
+    if (targetVectorIndex === null) {
+      continue;
+    }
+    return postActionCandidateFor({
+      basis: input.basis,
+      vectorIndex: targetVectorIndex,
+      basisKind: "post_yield_resume",
+      actionKind: "reenter_graph_span",
+      eligibleReasonRefs: uniqueSorted([
+        yieldResumeBasis.yieldKind,
+        yieldResumeBasis.resumeBasisRef,
+        yieldResumeBasis.currentEdgeRef,
+        ...(yieldResumeBasis.resumePolicyRef === null
+          ? []
+          : [yieldResumeBasis.resumePolicyRef]),
+        ...yieldResumeBasis.admittedProgressRefs
+      ])
+    });
+  }
+  return null;
+}
+
 function postRepairGraphFunctionCandidateForPlan(input: {
   readonly plan: ReturnType<typeof componentRepairReentryPlansForGapDossier>[number];
   readonly runRef: string;
@@ -6883,12 +7064,22 @@ function postActionCandidates(input: {
   readonly downstreamPressureRefs: readonly string[];
   readonly downstreamTargetBindingRefs: readonly string[];
   readonly admittedAssetTypes: readonly string[];
+  readonly yieldResumeBasis: Omit<SdlcYieldResumeBasis, "kind"> | null;
 }) {
   const nextVectorIndex = normalizePostCloseContinuationVectorIndex({
     closureDecisionDisposition: input.closureDecisionDisposition,
     currentVectorIndex: input.state.manifest.vectorIndex,
     nextVectorIndex: input.nextVectorIndex
   });
+  if (input.closureDecisionDisposition === "yield") {
+    const yieldResumeCandidate = deriveSdlcPostYieldResumeActionInput({
+      basis: input.basis,
+      yieldResumeBasis: input.yieldResumeBasis
+    });
+    return Object.freeze(
+      yieldResumeCandidate === null ? [] : [yieldResumeCandidate]
+    );
+  }
   const nextDeferredModule =
     input.closureDecisionDisposition === "close"
       ? deferredProductMaterializationModuleFor(input.state)
@@ -7376,7 +7567,13 @@ function targetCarrierPayloadForState(input: {
   if (input.state.manifest.targetAssetType === "test_design_surface") {
     const admission = admitTestDesignRegisterFromArtifact({
       targetAssetType: input.state.manifest.targetAssetType,
-      outputFile: report.outputFile
+      outputFile: report.outputFile,
+      targetCarrierKind: input.state.manifest.targetCarrierProjection.outputCarrierKind,
+      edgeRef: input.state.manifest.edgeName,
+      contractRef:
+        input.state.manifest.targetCarrierProjection.targetCarrierContractRef,
+      contractDigest:
+        input.state.manifest.targetCarrierProjection.targetCarrierContractDigest
     });
     return Object.freeze({
       payload: admission.register ?? Object.freeze({}),
@@ -7499,16 +7696,6 @@ function abgTraversalTransitionProjectionRef(input: {
       reasonRefs: Object.freeze(["edge-closure-decision:close"])
     }).projectionRef;
   }
-  if (terminalKind === "converged" || terminalKind === "nothing_to_do") {
-    return deriveRuntimeContinuationTransitionProjectionFromDisposition({
-      basis: input.basis,
-      runtimeProjection: input.runtimeProjection,
-      vectorIndex: input.currentVectorIndex,
-      disposition: "close",
-      reason: "edge_close",
-      reasonRefs: terminalReason === null ? Object.freeze([]) : [terminalReason]
-    }).projectionRef;
-  }
   if (input.nextVectorIndex !== null) {
     return deriveRuntimeContinuationTransitionProjectionFromDisposition({
       basis: input.basis,
@@ -7519,6 +7706,61 @@ function abgTraversalTransitionProjectionRef(input: {
       reasonRefs: [`next-vector:${input.nextVectorIndex}`]
     }).projectionRef;
   }
+  if (input.closureDisposition === "retry") {
+    return deriveRuntimeContinuationTransitionProjectionFromDisposition({
+      basis: input.basis,
+      runtimeProjection: input.runtimeProjection,
+      vectorIndex: input.currentVectorIndex,
+      disposition: "retry_same_edge",
+      reason: "traversal_retry",
+      reasonRefs: Object.freeze(["edge-closure-decision:retry"])
+    }).projectionRef;
+  }
+  if (
+    input.closureDisposition === "repair" ||
+    input.closureDisposition === "re-enter"
+  ) {
+    return deriveRuntimeContinuationTransitionProjectionFromDisposition({
+      basis: input.basis,
+      runtimeProjection: input.runtimeProjection,
+      vectorIndex: input.currentVectorIndex,
+      disposition: "yield_continuation",
+      reason: "graph_reentry",
+      reasonRefs: Object.freeze([
+        `edge-closure-decision:${input.closureDisposition}`
+      ])
+    }).projectionRef;
+  }
+  if (input.closureDisposition === "reprice") {
+    return deriveRuntimeContinuationTransitionProjectionFromDisposition({
+      basis: input.basis,
+      runtimeProjection: input.runtimeProjection,
+      vectorIndex: input.currentVectorIndex,
+      disposition: "reprice",
+      reason: "typed_reprice",
+      reasonRefs: Object.freeze(["edge-closure-decision:reprice"])
+    }).projectionRef;
+  }
+  if (input.closureDisposition === "block") {
+    return deriveRuntimeContinuationTransitionProjectionFromDisposition({
+      basis: input.basis,
+      runtimeProjection: input.runtimeProjection,
+      vectorIndex: input.currentVectorIndex,
+      disposition: "block",
+      reason: "typed_block",
+      reasonRefs: Object.freeze(["edge-closure-decision:block"])
+    }).projectionRef;
+  }
+  if (input.closureDisposition === "yield") {
+    return deriveRuntimeContinuationTransitionProjectionFromDisposition({
+      basis: input.basis,
+      runtimeProjection: input.runtimeProjection,
+      vectorIndex: input.currentVectorIndex,
+      disposition: "yield_continuation",
+      reason: "traversal_yield",
+      reasonRefs: Object.freeze(["edge-closure-decision:yield"])
+    }).projectionRef;
+  }
   return deriveRuntimeContinuationTransitionProjectionFromDisposition({
     basis: input.basis,
     runtimeProjection: input.runtimeProjection,
@@ -7527,6 +7769,25 @@ function abgTraversalTransitionProjectionRef(input: {
     reason: "edge_close",
     reasonRefs: Object.freeze(["no-next-vector"])
   }).projectionRef;
+}
+
+function constructiveClosureDecisionMatchesNextAction(input: {
+  readonly disposition: SdlcEdgeClosureDisposition;
+  readonly nextActionBasisKind: string;
+}): boolean {
+  switch (input.disposition) {
+    case "retry":
+      return input.nextActionBasisKind === "post_retry";
+    case "repair":
+      return input.nextActionBasisKind === "post_repair";
+    case "re-enter":
+      return input.nextActionBasisKind === "post_reenter";
+    case "yield":
+    case "block":
+    case "close":
+    case "reprice":
+      return false;
+  }
 }
 
 function deriveInstalledTraversalConsequence(input: {
@@ -7918,7 +8179,8 @@ function deriveInstalledTraversalConsequence(input: {
     runRef,
     downstreamPressureRefs: ledger.downstreamPressureRefs,
     downstreamTargetBindingRefs: ledger.downstreamTargetBindingRefs,
-    admittedAssetTypes
+    admittedAssetTypes,
+    yieldResumeBasis: closureStateTransition.yieldResumeBasis
   });
   const pressureRef =
     `pressure://odd-sdlc/post-action/${runRef}/${closureDecision.disposition}`;
@@ -8106,8 +8368,10 @@ function installedDepthTraversalActionBinding(input: {
 }) {
   const nextAction = input.consequence.nextActionProjection;
   if (
-    input.consequence.edgeClosureDecision.disposition !== "re-enter" ||
-    nextAction.nextActionBasisKind !== "post_reenter" ||
+    !constructiveClosureDecisionMatchesNextAction({
+      disposition: input.consequence.edgeClosureDecision.disposition,
+      nextActionBasisKind: nextAction.nextActionBasisKind
+    }) ||
     !nextAction.choosesNextTraversal ||
     nextAction.nextGraphFunctionRef === null ||
     nextAction.nextGraphVectorRef === null
@@ -8164,8 +8428,9 @@ function installedDepthTraversalActionBinding(input: {
     targetNodeRef: targetVector.target.id,
     graphSpanRef:
       `graph-span://odd-sdlc/consequence-depth/${encodeURIComponent(input.pluginInput.edge)}/${String(input.pluginInput.vectorIndex)}/${String(targetVectorIndex)}`,
-    reentryTargetRef:
-      `graph-reentry-point://odd-sdlc/${encodeURIComponent(nextAction.nextGraphFunctionRef)}/${String(targetVectorIndex)}`,
+    reentryTargetRef: constructSdlcGraphReentryTargetRef({
+      targetVectorIndex
+    }),
     targetOutcomeRef: nextAction.nextActionProjectionRef,
     selectedOverlayRef: input.executionContract.overlayRef,
     selectedRefinementBoundaryRef:
@@ -8315,7 +8580,7 @@ function workerRunOutputLimitExceeded(workerRun: SdlcWorkerRunResult): boolean {
 }
 
 function workerProcessTextLooksRetryableProviderFailure(text: string): boolean {
-  return /ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|EPIPE|socket connection was closed|socket hang up|Unable to connect to API|network error|fetch failed|API Error:\s*5\d\d\b|Internal server error|server-side issue/u.test(
+  return /ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|EPIPE|socket connection was closed|socket hang up|Stream idle timeout|partial response received|Unable to connect to API|network error|fetch failed|API Error:\s*5\d\d\b|Internal server error|server-side issue/u.test(
     text
   );
 }
@@ -8333,6 +8598,7 @@ function workerRunConnectionFailed(workerRun: SdlcWorkerRunResult): boolean {
 function workerFailureCode(input: {
   readonly workerRun: SdlcWorkerRunResult;
   readonly silentInactivity: boolean;
+  readonly activeInactivity: boolean;
 }): SdlcBlockingReasonCode {
   if (workerRunOutputLimitExceeded(input.workerRun)) {
     return "worker_output_limit_exceeded";
@@ -8345,6 +8611,9 @@ function workerFailureCode(input: {
   }
   if (input.workerRun.outcome?.kind === "hard_timeout") {
     return "worker_hard_timeout";
+  }
+  if (input.activeInactivity) {
+    return "worker_connection_failed";
   }
   if (input.silentInactivity || input.workerRun.outcome?.kind === "inactivity_timeout") {
     return "silent_worker_inactivity";
@@ -8405,6 +8674,13 @@ export function constructWorkerProcessFailurePostflight(input: {
     processSummaryAdmission.kind === "admitted"
       ? processSummaryAdmission.summary
       : null;
+  const activeInactivity =
+    silentInactivity &&
+    priorSilentInactivityCount(input.manifest) === 0 &&
+    workerRunObservedProgress({
+      workerRun: input.workerRun,
+      processSummary
+    });
   const signalSequence =
     processSummary === null || processSummary.signalSequence.length === 0
       ? "none"
@@ -8424,10 +8700,12 @@ export function constructWorkerProcessFailurePostflight(input: {
   const carrier = makeSdlcBlockingReason({
     code: workerFailureCode({
       workerRun: input.workerRun,
-      silentInactivity
+      silentInactivity,
+      activeInactivity
     }),
     lawfulReentryPoint: silentInactivity
-      ? priorSilentInactivityCount(input.manifest) === 0 && silentRetryAvailable
+      ? activeInactivity ||
+        (priorSilentInactivityCount(input.manifest) === 0 && silentRetryAvailable)
         ? "same_edge_retry"
         : "triage_gap"
       : undefined,
@@ -8449,6 +8727,7 @@ export function constructWorkerProcessFailurePostflight(input: {
           `signalSequence=${signalSequence}`,
           ...livenessDetail,
           `priorSilentAttempts=${String(priorSilentInactivityCount(input.manifest))}`,
+          `activeInactivity=${String(activeInactivity)}`,
           `sharpenedRetryAvailable=${String(silentRetryAvailable)}`,
           `executionShards=${String(input.manifest.productMaterialization.executionShards.length)}`,
           `executionShardIds=${input.manifest.productMaterialization.executionShards
@@ -8480,6 +8759,20 @@ function silentInactivitySharpenedRetryAvailable(
   manifest: SdlcWorkerHandoffManifest
 ): boolean {
   return manifest.productMaterialization.executionShards.length > 0;
+}
+
+function workerRunObservedProgress(input: {
+  readonly workerRun: SdlcWorkerRunResult;
+  readonly processSummary: SdlcWorkerProcessSummary | null;
+}): boolean {
+  return (
+    input.workerRun.stdoutByteCount > 0 ||
+    input.workerRun.stderrByteCount > 0 ||
+    (input.workerRun.toolCallCount ?? 0) > 0 ||
+    (input.workerRun.structuredEventCount ?? 0) > 0 ||
+    (input.processSummary?.toolCallCount ?? 0) > 0 ||
+    (input.processSummary?.structuredEventCount ?? 0) > 0
+  );
 }
 
 function isSilentWorkerRuntimeReason(
@@ -9285,11 +9578,11 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
         declaredEdgeProjectionRefs = writeDeclaredEdgeProjectionFromConsequence({
           manifest: dispatchState.current.manifest
         });
-      } catch (error: unknown) {
-        return constructConsequenceProjectionOutcome({
-          status: "blocked",
-          reason:
-            error instanceof Error
+	      } catch (error: unknown) {
+	        return constructConsequenceProjectionOutcome({
+	          status: "blocked",
+	          reason:
+	            error instanceof Error
               ? error.message
               : "declared edge-output projection failed"
         });
@@ -9349,26 +9642,39 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
           evidenceRefs: uniqueSorted([
             pluginInput.sourceProjectionRef,
             consequence.consequenceProjection.consequenceRef,
-            pluginInput.allowedConsequenceTraversalCatalog.catalogRef
-          ])
-        });
-      }
-      return constructConsequenceProjectionOutcome({
-        status: "projected",
-        consequenceRef: consequence.consequenceProjection.consequenceRef,
-        domainReadModelRefs: uniqueSorted([
-          ...consequence.consequenceProjection.domainReadModelRefs,
-          ...declaredEdgeProjectionRefs
-        ]),
-        traversalAction,
-        evidenceRefs: uniqueSorted([
-          pluginInput.sourceProjectionRef,
-          consequence.admittedStateRef.compositionRef,
-          consequence.consequenceProjection.consequenceRef,
-          ...consequence.consequenceProjection.domainReadModelRefs,
-          ...declaredEdgeProjectionRefs
-        ])
-      });
+	            pluginInput.allowedConsequenceTraversalCatalog.catalogRef
+	          ])
+	        });
+	      }
+	      const domainReadModelRefs = uniqueSorted([
+	        ...consequence.consequenceProjection.domainReadModelRefs,
+	        ...declaredEdgeProjectionRefs
+	      ]);
+	      const evidenceRefs = uniqueSorted([
+	        pluginInput.sourceProjectionRef,
+	        consequence.admittedStateRef.compositionRef,
+	        consequence.consequenceProjection.consequenceRef,
+	        ...domainReadModelRefs
+	      ]);
+	      if (
+	        consequence.edgeClosureDecision.disposition !== "close" &&
+	        traversalAction === null
+	      ) {
+	        return constructConsequenceProjectionOutcome({
+	          status: "blocked",
+	          consequenceRef: consequence.consequenceProjection.consequenceRef,
+	          domainReadModelRefs,
+	          reason: `edge_closure_decision_${consequence.edgeClosureDecision.disposition}`,
+	          evidenceRefs
+	        });
+	      }
+	      return constructConsequenceProjectionOutcome({
+	        status: "projected",
+	        consequenceRef: consequence.consequenceProjection.consequenceRef,
+	        domainReadModelRefs,
+	        traversalAction,
+	        evidenceRefs
+	      });
   };
   const evaluateDesignDepthForInstalledOperatorState = async (
     pluginInput: EnginePluginInput

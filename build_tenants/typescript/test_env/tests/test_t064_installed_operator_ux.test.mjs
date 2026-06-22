@@ -374,7 +374,7 @@ test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () 
     );
     assert.match(
       start.postflight.blockingReasonCarriers[0].detail,
-      /lastHeartbeatElapsedMs=\d+/u
+      /lastHeartbeatElapsedMs=(?:\d+|none)/u
     );
     assert.match(
       start.postflight.blockingReasonCarriers[0].detail,
@@ -740,6 +740,283 @@ test("T-171 allowed rate-limit telemetry does not mask socket failures", () => {
   );
 });
 
+test("T-204 provider stream idle timeout remains same-edge retry", () => {
+  const workspace = makeWorkspace();
+  const contract = hookContractByEdgeName("derive_implementation_design_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 25,
+    contract,
+    runId: "t204-worker-stream-idle-timeout"
+  });
+  writeHandoffFiles(manifest);
+  const stdoutPath = path.join(manifest.archiveRoot, "worker_stdout.log");
+  const stderrPath = path.join(manifest.archiveRoot, "worker_stderr.log");
+  const finalOutputPath = path.join(manifest.archiveRoot, "final_output.txt");
+  writeFileSync(
+    stdoutPath,
+    "API Error: Stream idle timeout - partial response received\n",
+    "utf8"
+  );
+  writeFileSync(stderrPath, "", "utf8");
+  writeFileSync(
+    finalOutputPath,
+    "API Error: Stream idle timeout - partial response received\n",
+    "utf8"
+  );
+  const workerRun = {
+    kind: "sdlc_worker_run_result",
+    command: "claude",
+    args: [],
+    cwd: workspace,
+    outcome: { kind: "exited", status: 1 },
+    executorProfile: "pty-terminal",
+    streamModel: "terminal-transcript",
+    finalOutputRef: pathToFileURL(finalOutputPath).href,
+    status: 1,
+    signal: null,
+    elapsedMs: 186189,
+    timedOut: false,
+    stdoutByteCount: 6860,
+    stderrByteCount: 0,
+    stdoutPath,
+    stderrPath,
+    outputLastMessagePath: null,
+    error: null,
+    apiRetryCount: 0
+  };
+
+  const postflight = constructWorkerProcessFailurePostflight({
+    manifest,
+    workerRun
+  });
+
+  assert.equal(postflight.blockingReasonCarriers[0].code, "worker_connection_failed");
+  assert.equal(
+    postflight.blockingReasonCarriers[0].lawfulReentryPoint,
+    "same_edge_retry"
+  );
+});
+
+test("T-204 active worker inactivity remains same-edge retry", () => {
+  const workspace = makeWorkspace();
+  const contract = hookContractByEdgeName("derive_implementation_design_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 25,
+    contract,
+    runId: "t204-worker-active-inactivity-timeout"
+  });
+  writeHandoffFiles(manifest);
+  const stdoutPath = path.join(manifest.archiveRoot, "worker_stdout.log");
+  const stderrPath = path.join(manifest.archiveRoot, "worker_stderr.log");
+  writeFileSync(
+    stdoutPath,
+    "I have all the authority I need. The output directory does not exist yet.\n",
+    "utf8"
+  );
+  writeFileSync(stderrPath, "", "utf8");
+  writeFileSync(
+    path.join(manifest.archiveRoot, "worker_process_summary.json"),
+    JSON.stringify({
+      kind: "sdlc_worker_process_summary",
+      processStartedRef: pathToFileURL(
+        path.join(manifest.archiveRoot, "worker_process_started.json")
+      ).href,
+      processEventsRef: pathToFileURL(
+        path.join(manifest.archiveRoot, "worker_process_events.jsonl")
+      ).href,
+      manifestRef: pathToFileURL(path.join(manifest.archiveRoot, "handoff_manifest.json")).href,
+      promptRef: pathToFileURL(path.join(manifest.archiveRoot, "worker_prompt.md")).href,
+      reportRef: pathToFileURL(manifest.reportFile).href,
+      outputRef: pathToFileURL(manifest.outputFile).href,
+      stdoutRef: pathToFileURL(stdoutPath).href,
+      stderrRef: pathToFileURL(stderrPath).href,
+      pid: 70150,
+      command: "claude",
+      args: [],
+      cwd: workspace,
+      executorProfile: "local-spawn",
+      streamModel: "stdio",
+      outcome: {
+        kind: "inactivity_timeout",
+        inactivityTimeoutMs: 180000,
+        signal: null
+      },
+      traceResultRef: pathToFileURL(
+        path.join(manifest.archiveRoot, "worker_process_events.jsonl.trace/result.json")
+      ).href,
+      toolCallCount: 9,
+      timeoutMs: 900000,
+      inactivityTimeoutMs: 180000,
+      heartbeatMs: 30000,
+      runtimeLivenessAuthority: "abiogenesis_runtime_liveness_observer_projection",
+      runtimeLivenessProjectionRef: pathToFileURL(
+        path.join(manifest.archiveRoot, "runtime_liveness_observer_projection.json")
+      ).href,
+      runtimeLivenessPolicyRef: "policy://odd-sdlc/installed-worker-runtime/default",
+      runtimeLivenessLeaseState: "externally_interrupted",
+      runtimeLivenessDispositionAction: "block",
+      runtimeLivenessDispositionReason: "external_interruption_observed",
+      lastHeartbeatIndex: null,
+      lastHeartbeatElapsedMs: null,
+      signalSequence: [{ signal: "SIGTERM", elapsedMs: 270021 }],
+      status: 143,
+      signal: null,
+      elapsedMs: 270367,
+      timedOut: false,
+      error: null
+    }) + "\n",
+    "utf8"
+  );
+  const workerRun = {
+    kind: "sdlc_worker_run_result",
+    command: "claude",
+    args: [],
+    cwd: workspace,
+    outcome: {
+      kind: "inactivity_timeout",
+      inactivityTimeoutMs: 180000,
+      signal: null
+    },
+    executorProfile: "local-spawn",
+    streamModel: "stdio",
+    status: 143,
+    signal: null,
+    elapsedMs: 270367,
+    timedOut: false,
+    stdoutByteCount: 89651,
+    stderrByteCount: 0,
+    stdoutPath,
+    stderrPath,
+    outputLastMessagePath: null,
+    error: null,
+    toolCallCount: 9,
+    apiRetryCount: 0
+  };
+
+  const postflight = constructWorkerProcessFailurePostflight({
+    manifest,
+    workerRun
+  });
+
+  assert.equal(postflight.blockingReasonCarriers[0].code, "worker_connection_failed");
+  assert.equal(
+    postflight.blockingReasonCarriers[0].lawfulReentryPoint,
+    "same_edge_retry"
+  );
+  assert.match(postflight.blockingReasonCarriers[0].detail, /activeInactivity=true/u);
+  assert.match(postflight.blockingReasonCarriers[0].detail, /outcome=inactivity_timeout/u);
+});
+
+test("T-204 zero-output inactivity remains triage", () => {
+  const workspace = makeWorkspace();
+  const contract = hookContractByEdgeName("derive_implementation_design_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 25,
+    contract,
+    runId: "t204-worker-zero-output-inactivity-timeout"
+  });
+  writeHandoffFiles(manifest);
+  const stdoutPath = path.join(manifest.archiveRoot, "worker_stdout.log");
+  const stderrPath = path.join(manifest.archiveRoot, "worker_stderr.log");
+  writeFileSync(stdoutPath, "", "utf8");
+  writeFileSync(stderrPath, "", "utf8");
+  writeFileSync(
+    path.join(manifest.archiveRoot, "worker_process_summary.json"),
+    JSON.stringify({
+      kind: "sdlc_worker_process_summary",
+      processStartedRef: pathToFileURL(
+        path.join(manifest.archiveRoot, "worker_process_started.json")
+      ).href,
+      processEventsRef: pathToFileURL(
+        path.join(manifest.archiveRoot, "worker_process_events.jsonl")
+      ).href,
+      manifestRef: pathToFileURL(path.join(manifest.archiveRoot, "handoff_manifest.json")).href,
+      promptRef: pathToFileURL(path.join(manifest.archiveRoot, "worker_prompt.md")).href,
+      reportRef: pathToFileURL(manifest.reportFile).href,
+      outputRef: pathToFileURL(manifest.outputFile).href,
+      stdoutRef: pathToFileURL(stdoutPath).href,
+      stderrRef: pathToFileURL(stderrPath).href,
+      pid: 70151,
+      command: "claude",
+      args: [],
+      cwd: workspace,
+      executorProfile: "local-spawn",
+      streamModel: "stdio",
+      outcome: {
+        kind: "inactivity_timeout",
+        inactivityTimeoutMs: 180000,
+        signal: null
+      },
+      timeoutMs: 900000,
+      inactivityTimeoutMs: 180000,
+      heartbeatMs: 30000,
+      runtimeLivenessAuthority: "abiogenesis_runtime_liveness_observer_projection",
+      runtimeLivenessProjectionRef: pathToFileURL(
+        path.join(manifest.archiveRoot, "runtime_liveness_observer_projection.json")
+      ).href,
+      runtimeLivenessPolicyRef: "policy://odd-sdlc/installed-worker-runtime/default",
+      runtimeLivenessLeaseState: "expired",
+      runtimeLivenessDispositionAction: "block",
+      runtimeLivenessDispositionReason: "inactivity_timeout",
+      lastHeartbeatIndex: null,
+      lastHeartbeatElapsedMs: null,
+      signalSequence: [{ signal: "SIGTERM", elapsedMs: 180001 }],
+      status: 143,
+      signal: null,
+      elapsedMs: 180367,
+      timedOut: false,
+      error: null
+    }) + "\n",
+    "utf8"
+  );
+  const workerRun = {
+    kind: "sdlc_worker_run_result",
+    command: "claude",
+    args: [],
+    cwd: workspace,
+    outcome: {
+      kind: "inactivity_timeout",
+      inactivityTimeoutMs: 180000,
+      signal: null
+    },
+    executorProfile: "local-spawn",
+    streamModel: "stdio",
+    status: 143,
+    signal: null,
+    elapsedMs: 180367,
+    timedOut: false,
+    stdoutByteCount: 0,
+    stderrByteCount: 0,
+    stdoutPath,
+    stderrPath,
+    outputLastMessagePath: null,
+    error: null,
+    toolCallCount: 0,
+    apiRetryCount: 0
+  };
+
+  const postflight = constructWorkerProcessFailurePostflight({
+    manifest,
+    workerRun
+  });
+
+  assert.equal(postflight.blockingReasonCarriers[0].code, "silent_worker_inactivity");
+  assert.equal(
+    postflight.blockingReasonCarriers[0].lawfulReentryPoint,
+    "triage_gap"
+  );
+  assert.match(postflight.blockingReasonCarriers[0].detail, /activeInactivity=false/u);
+});
+
 test("T-102 worker output limits stay inside same-edge retry law", () => {
   const workspace = makeWorkspace();
   const contract = hookContractByEdgeName("prepare_test_execution_surface");
@@ -920,9 +1197,12 @@ test("T-204 installed operator does not expose a local start executor", async ()
   );
   const rootModule = await import("../../build/semantic/code/src/index.js");
   const operatorModule = await import("../../build/semantic/code/src/operator/index.js");
-  const installedModule = await import(
-    "../../build/semantic/code/src/operator/installed_operator.js"
+  const installedModulePath = fileURLToPath(
+    new URL("../../build/semantic/code/src/operator/installed_operator.js", import.meta.url)
   );
+  const installedModule = existsSync(installedModulePath)
+    ? await import(pathToFileURL(installedModulePath).href)
+    : {};
 
   assert.equal(source.includes("executeInstalledOperatorStart"), false);
   assert.equal(source.includes("runEngineIterateAsync"), false);

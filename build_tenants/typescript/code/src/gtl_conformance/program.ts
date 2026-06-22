@@ -4,10 +4,15 @@
 
 import {
   existsSync,
+  mkdirSync,
+  mkdtempSync,
   readdirSync,
   readFileSync,
+  rmSync,
+  writeFileSync,
   statSync
 } from "node:fs";
+import { tmpdir } from "node:os";
 import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -49,12 +54,18 @@ import {
   publicSdlcOverlayStartTargets,
   SDLC_EDGE_GAIN_CLOSURE_CONTRACTS
 } from "../graph/index.js";
+import { hookContractByEdgeName } from "../hooks/catalog.js";
 import { ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT } from "../runtime/index.js";
+import { materializeSdlcProjectConformance } from "../workspace/project_profile.js";
 import {
   constructSdlcEvaluationGridContract,
   constructSdlcPromptInvocationProjection,
   sdlcPromptSectionFromLines
 } from "../operator/prompt_assets.js";
+import {
+  deriveWorkerHandoffManifest,
+  promptForHandoff
+} from "../operator/plugins/transform/launch_contract.js";
 import {
   consequenceProjectionPluginContract,
   designDepthFpEvaluatorRuleContract,
@@ -435,6 +446,150 @@ function promptProjectionRows() {
         "workspace://build_tenants/typescript/code/src/operator/plugins/evaluate/prompts.ts"
       ])
     })));
+}
+
+interface SdlcPromptProjectionReviewIssue {
+  readonly edgeRef: string;
+  readonly code:
+    | "prompt_missing_selected_target_carrier_envelope"
+    | "prompt_contradicts_selected_target_carrier_envelope"
+    | "prompt_inner_register_claims_top_level_authority";
+  readonly detail: string;
+}
+
+const SEMANTIC_PROMPT_PROJECTION_REVIEW_EDGE_REFS = Object.freeze([
+  "derive_test_design_surface"
+] as const);
+
+function makeSemanticPromptReviewWorkspace(): string {
+  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-prompt-review-"));
+  mkdirSync(path.join(root, "specification"), { recursive: true });
+  mkdirSync(path.join(root, ".ai-workspace/context"), { recursive: true });
+  writeFileSync(path.join(root, "README.md"), "# Prompt Review Fixture\n", "utf8");
+  writeFileSync(
+    path.join(root, "specification/INTENT.md"),
+    "# Intent\n\nINT-PROMPT-REVIEW: Prove prompt projections before runtime.\n",
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, "specification/REQUIREMENTS.md"),
+    "# Requirements\n\nREQ-PROMPT-REVIEW-001: Rendered prompts must not contradict target-carrier contract law.\n",
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: prompt_review_fixture",
+      "active_tenant: typescript",
+      "build_tenants:",
+      "  typescript:",
+      "    output_dir: build_tenants/typescript",
+      "    language: typescript",
+      "    build_tool: npm"
+    ].join("\n"),
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: root });
+  return root;
+}
+
+function reviewRenderedPromptProjection(input: {
+  readonly edgeRef: string;
+  readonly promptText: string;
+  readonly outputCarrierKind: string;
+  readonly contractRef: string;
+  readonly contractDigest: string;
+}): readonly SdlcPromptProjectionReviewIssue[] {
+  const issues: SdlcPromptProjectionReviewIssue[] = [];
+  const selectedEnvelopeDirective =
+    `selected target-carrier envelope with \`kind:"${input.outputCarrierKind}"\``;
+  if (!input.promptText.includes(selectedEnvelopeDirective)) {
+    issues.push({
+      edgeRef: input.edgeRef,
+      code: "prompt_missing_selected_target_carrier_envelope",
+      detail: `rendered prompt does not name ${selectedEnvelopeDirective}`
+    });
+  }
+  for (const required of [
+    `edgeRef:"${input.edgeRef}"`,
+    `contractRef:"${input.contractRef}"`,
+    `contractDigest:"${input.contractDigest}"`,
+    'payload.kind:"sdlc_test_design_register"'
+  ]) {
+    if (!input.promptText.includes(required)) {
+      issues.push({
+        edgeRef: input.edgeRef,
+        code: "prompt_missing_selected_target_carrier_envelope",
+        detail: `rendered prompt does not carry ${required}`
+      });
+    }
+  }
+  if (
+    input.promptText.includes("Do not wrap the fenced register in a target-carrier envelope")
+  ) {
+    issues.push({
+      edgeRef: input.edgeRef,
+      code: "prompt_contradicts_selected_target_carrier_envelope",
+      detail:
+        "rendered prompt requests the selected target-carrier envelope and also forbids wrapping the fenced register"
+    });
+  }
+  if (input.promptText.includes("top-level kind is sdlc_test_design_register")) {
+    issues.push({
+      edgeRef: input.edgeRef,
+      code: "prompt_inner_register_claims_top_level_authority",
+      detail:
+        "rendered prompt assigns top-level authority to the inner register instead of the selected target-carrier envelope"
+    });
+  }
+  return Object.freeze(issues);
+}
+
+function semanticPromptProjectionReviewIssues(): readonly SdlcPromptProjectionReviewIssue[] {
+  const workspaceRoot = makeSemanticPromptReviewWorkspace();
+  try {
+    const issues: SdlcPromptProjectionReviewIssue[] = [];
+    for (const edgeRef of SEMANTIC_PROMPT_PROJECTION_REVIEW_EDGE_REFS) {
+      const contract = hookContractByEdgeName(edgeRef);
+      const manifest = deriveWorkerHandoffManifest({
+        workspaceRoot,
+        graphFunctionName: edgeRef,
+        edgeName: contract.edgeName,
+        vectorIndex: 0,
+        contract,
+        runId: `semantic-prompt-review-${edgeRef}`
+      });
+      issues.push(
+        ...reviewRenderedPromptProjection({
+          edgeRef,
+          promptText: promptForHandoff(manifest),
+          outputCarrierKind: manifest.targetCarrierProjection.outputCarrierKind,
+          contractRef:
+            manifest.targetCarrierProjection.targetCarrierContractRef,
+          contractDigest:
+            manifest.targetCarrierProjection.targetCarrierContractDigest
+        })
+      );
+    }
+    return Object.freeze(issues);
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+}
+
+function assertSemanticPromptProjectionReviewPassed(): void {
+  const issues = semanticPromptProjectionReviewIssues();
+  if (issues.length > 0) {
+    throw new TypeError(
+      [
+        "SDLC semantic prompt projection review failed:",
+        ...issues.map(
+          (issue) => `- ${issue.edgeRef}: ${issue.code}: ${issue.detail}`
+        )
+      ].join("\n")
+    );
+  }
 }
 
 function materializedGraphVectorRows(module: Module): readonly MaterializedGraphVectorRow[] {
@@ -1440,6 +1595,7 @@ export function constructCurrentSdlcGtlProgramConformanceInput(
     }))
   );
   const promptAssets = promptProjectionRows();
+  assertSemanticPromptProjectionReviewPassed();
   const pluginContracts = Object.freeze([
     fpDispatchPluginContract(),
     fpEvaluatorPluginContract(),

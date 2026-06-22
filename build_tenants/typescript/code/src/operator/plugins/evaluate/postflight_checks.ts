@@ -52,7 +52,8 @@ import {
   type SdlcBlockingReason,
   type SdlcBlockingReasonCode
 } from "../../../shared/blocking_reason.js";import {
-  admitTestDesignRegisterFromArtifact
+  admitTestDesignRegisterFromArtifact,
+  testDesignTargetCarrierIdentityForEdge
 } from "../../test_design_register.js";import {
   deriveSdlcConformProjectProfileFromWorkspace
 } from "../../../workspace/index.js";import {
@@ -2047,7 +2048,12 @@ function evaluateTestDesignProducerAuthority(input: {
   }
   const admission = admitTestDesignRegisterFromArtifact({
     targetAssetType: "test_design_surface",
-    outputFile
+    outputFile,
+    targetCarrierKind: input.manifest.targetCarrierProjection?.outputCarrierKind,
+    edgeRef: input.manifest.edgeName,
+    contractRef: input.manifest.targetCarrierProjection?.targetCarrierContractRef,
+    contractDigest:
+      input.manifest.targetCarrierProjection?.targetCarrierContractDigest
   });
   if (admission.status !== "admitted" || admission.register === null) {
     pushStagedTopologyBlockingReason({
@@ -2335,9 +2341,14 @@ function readAdmittedTestDesign(
   if (outputFile === null || !existsSync(outputFile)) {
     return null;
   }
+  const carrier = testDesignTargetCarrierIdentityForEdge(manifest.edgeName);
   const admission = admitTestDesignRegisterFromArtifact({
     targetAssetType: "test_design_surface",
-    outputFile
+    outputFile,
+    targetCarrierKind: carrier.outputCarrierKind,
+    edgeRef: carrier.edgeRef,
+    contractRef: carrier.contractRef,
+    contractDigest: carrier.contractDigest
   });
   return admission.status === "admitted" ? admission.register : null;
 }

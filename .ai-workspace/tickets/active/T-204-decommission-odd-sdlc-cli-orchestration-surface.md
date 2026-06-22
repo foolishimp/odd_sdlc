@@ -2688,3 +2688,129 @@ Prompt consistency notes from the run:
   but the scenario workspace root supplied `"type": "module"` and the generated
   `node --test test/hello.test.js` file passed directly before ABG closure;
 - all closure artifacts for the inspected stages reported passed/converged.
+
+## 2026-06-22 Data-Mapper Prompt Projection Review
+
+During the active data-mapper live run, `derive_lite_test_design_surface`
+exposed a contradictory test-design transform prompt. The selected
+target-carrier contract required a top-level
+`sdlc_test_design_surface_target_carrier` envelope, while legacy prompt text
+still told the worker not to wrap the fenced register and another directive
+described `sdlc_test_design_register` as the top-level kind.
+
+Root cause:
+
+- odd_sdlc prompt policy had two independent test-design carrier truth surfaces:
+  the target-carrier projection directive and older register-shaped outcome
+  directives;
+- the existing semantic conformance gate materialized prompt assets as GTL
+  surfaces, but did not review rendered edge prompts for semantic
+  contradictions before runtime;
+- the failure therefore appeared first as live review-grade pressure instead of
+  failing fast during `build:semantic`.
+
+Applied fix:
+
+- collapsed the test-design prompt policy to one selected target-carrier
+  envelope instruction;
+- updated test-design register admission to require and unwrap the selected
+  envelope when the manifest declares target-carrier identity;
+- added a semantic prompt projection review to
+  `assertCurrentSdlcGtlProgramConformance()` that materializes representative
+  handoff prompts and rejects contradictory selected-envelope instructions;
+- extended T-172 prompt coverage so the old contradictory phrases are negative
+  assertions, not only absent by implication.
+
+Validation:
+
+| Check | Result |
+| --- | --- |
+| `npm run build:semantic` | passed; includes the new semantic prompt projection review |
+| T-172 test-design/prompt carrier suite | passed, 22/22 |
+| T-169 target-carrier contract suite | passed, 5/5 |
+| `git diff --check` | passed |
+
+T-204 implication: this is a lawful projection-review lane. The compiler is not
+type-checking prose directly; it materializes the exact agent-facing prompt
+projection from typed graph/manifest inputs and rejects semantic contradictions
+before dispatch. This closes the observed prompt contradiction class without
+adding a data-mapper-specific workaround.
+
+## 2026-06-22 ABG RC6 Evaluation Retry And Hello-World Proof
+
+This is a stabilization checkpoint over the T-204 split. It does not declare
+strict T-204 closure. It proves the current `odd_sdlc` product-client boundary
+can complete the hello-world live path while consuming ABG-owned traversal and
+retry semantics.
+
+Root cause of the prior hello-world instability:
+
+- `odd_sdlc` correctly classified provider/stream idle evaluator failures as
+  retryable same-edge pressure;
+- ABG evaluation-set folding still terminalized blocked required
+  `EvaluationRuleOutcome` rows before the retry continuation could be consumed;
+- the result was a false terminal `gap_stop` on a repairable evaluator/provider
+  failure, not a data-mapper-specific defect.
+
+Applied fix:
+
+- ABG `4.1.0-rc.6` adds an evaluation-set retry bridge: blocked required
+  evaluation-rule outcomes with admitted `continuationRefs` fold to same-edge
+  retry repair; missing continuation refs still fail fast;
+- `odd_sdlc` now emits continuation refs for same-edge retry evaluator process
+  failures and pins `@abiogenesis/typescript-tenant@4.1.0-rc.6`;
+- compact review-grade prompt wording was corrected so the first-blocker
+  protocol remains current-edge scoped.
+
+Important boundary note:
+
+- the full syntactic/materialized prompt compiler evaluation is not built in
+  this checkpoint;
+- the current implemented compiler gate is a narrow semantic prompt-projection
+  review inside `build:semantic`, materializing representative prompt
+  projections and rejecting observed contradiction classes.
+
+Validation:
+
+| Check | Result |
+| --- | --- |
+| ABI `npm run build:semantic` | passed |
+| ABI T-145/T-084/T-152 focused retry/consequence suite | passed, 32/32 |
+| ABI `npm run snapshot:release` | passed; produced `4.1.0-rc.6` |
+| odd_sdlc `npm run build:semantic` | passed |
+| odd_sdlc focused RC6/T-204/T-192/T-197 gate | passed, 118/118 |
+| `git diff --check` | passed before live run |
+| T-132 JavaScript hello-world live build loop | passed, 1/1 |
+
+T-132 live run evidence:
+
+```text
+build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260622T133631077Z_pid89692
+```
+
+The run was continued in place and completed without starting a replacement
+session.
+
+Stage timing from the live run:
+
+| Step | Target graph function | Start | End | Duration min.sec | Result |
+| --- | --- | --- | --- | ---: | --- |
+| 0 | `Fg_conform_project` | `2026-06-22T13:36:38.191Z` | `2026-06-22T13:36:39.929Z` | 0.02 | converged |
+| 1 | `derive_lite_design_adr_surface` | `2026-06-22T13:36:39.929Z` | `2026-06-22T13:43:02.643Z` | 6.23 | converged |
+| 2 | `derive_lite_component_code_surface` | `2026-06-22T13:43:02.643Z` | `2026-06-22T13:49:49.811Z` | 6.47 | converged |
+| 3 | `derive_lite_test_design_surface` | `2026-06-22T13:49:49.812Z` | `2026-06-22T13:53:59.224Z` | 4.09 | converged |
+| 4 | `derive_lite_component_test_surface` | `2026-06-22T13:53:59.225Z` | `2026-06-22T14:00:19.461Z` | 6.20 | converged |
+| 5 | `derive_lite_uat_test_source_surface` | `2026-06-22T14:00:19.463Z` | `2026-06-22T14:04:44.308Z` | 4.25 | converged |
+| 6 | `prepare_test_execution_surface` | `2026-06-22T14:04:44.310Z` | `2026-06-22T14:04:46.363Z` | 0.02 | converged |
+| 7 | `derive_test_execution_result_surface` | `2026-06-22T14:04:46.365Z` | `2026-06-22T14:04:48.434Z` | 0.02 | converged |
+
+Prompt consistency notes from the run:
+
+- component-test and UAT-test source prompts were compact and bounded to the
+  current edge; both had a single declared product test target and one selected
+  carrier envelope;
+- the component-test worker briefly interpreted the `.js`/ESM package boundary,
+  but the live workspace and Node runtime accepted the generated ESM test and
+  execution passed downstream;
+- review-grade assessments for component-test and UAT-test source passed with
+  exact scoped obligation coverage and no closure/status divergence.

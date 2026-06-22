@@ -169,18 +169,29 @@ function reviewGradeFindingIsDownstreamStagePressure(input: {
   readonly targetAssetType?: string | undefined;
   readonly workerAssessments?: readonly SdlcWorkerObligationAssessment[] | undefined;
 }): boolean {
-  const nonMaterializedPlanningSurface = reviewGradeTargetAllowsRequirementCarryover(
-    input.targetAssetType
-  );
   const carryoverStatus =
     input.finding.fulfillmentStatus === "partial" ||
     input.finding.fulfillmentStatus === "blocked";
+  const action = input.finding.requiredAction?.toLowerCase() ?? "";
+  if (
+    carryoverStatus &&
+    reviewGradeFindingNamesGeneratedTestSourceExecutionStage({
+      targetAssetType: input.targetAssetType,
+      finding: input.finding,
+      action
+    })
+  ) {
+    return true;
+  }
   if (
     !input.finding.obligationId.startsWith("requirement:") ||
     !carryoverStatus
   ) {
     return false;
   }
+  const nonMaterializedPlanningSurface = reviewGradeTargetAllowsRequirementCarryover(
+    input.targetAssetType
+  );
   if (input.finding.repairSurfaceTriage?.disposition === "downstream_deferred") {
     return true;
   }
@@ -195,7 +206,6 @@ function reviewGradeFindingIsDownstreamStagePressure(input: {
   ) {
     return true;
   }
-  const action = input.finding.requiredAction?.toLowerCase() ?? "";
   const actionNamesDownstreamTestOrExecution =
     (action.includes("downstream") ||
       action.includes("later") ||
@@ -261,6 +271,35 @@ function reviewGradeFindingIsDownstreamStagePressure(input: {
     );
   }
   return false;
+}
+
+function reviewGradeFindingNamesGeneratedTestSourceExecutionStage(input: {
+  readonly targetAssetType: string | undefined;
+  readonly finding: SdlcReviewGradeObligationFinding;
+  readonly action: string;
+}): boolean {
+  if (
+    input.targetAssetType !== "component_test_surface" &&
+    input.targetAssetType !== "uat_test_source_surface"
+  ) {
+    return false;
+  }
+  if (
+    input.finding.failureClass !== "wrong_stage" &&
+    input.finding.failureClass !== "execution_environment"
+  ) {
+    return false;
+  }
+  return (
+    input.action.includes("test-execution") ||
+    input.action.includes("test execution") ||
+    input.action.includes("execution evidence") ||
+    input.action.includes("executionevidence") ||
+    input.action.includes("execution_result_surface") ||
+    input.action.includes("runtime_execution_surface") ||
+    input.action.includes("derive_test_execution_result_surface") ||
+    input.action.includes("prepare_test_execution_surface")
+  );
 }
 
 function reviewGradePlanningTargetActionNamesLawfulDownstream(input: {
@@ -394,6 +433,179 @@ function defaultRepairSurfaceTriageForFinding(input: {
   });
 }
 
+function reviewGradeTargetIsTestOnlyMaterializationEdge(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+}): boolean {
+  if (
+    input.manifest.targetAssetType !== "component_test_surface" &&
+    input.manifest.targetAssetType !== "uat_test_source_surface"
+  ) {
+    return false;
+  }
+  const roles = input.manifest.productMaterialization.requiredRoles;
+  return roles.includes("test") && !roles.includes("source");
+}
+
+function reviewGradeFindingNamesSourceCapabilityAbsence(
+  finding: SdlcReviewGradeObligationFinding
+): boolean {
+  const text = [
+    finding.requiredAction ?? "",
+    finding.rationale,
+    ...finding.evidenceRefs,
+    ...finding.acceptedAuthorityRefs,
+    finding.repairSurfaceTriage?.rationale ?? ""
+  ]
+    .join(" ")
+    .toLowerCase();
+  return (
+    text.includes("source/domain capability") ||
+    text.includes("domain capability is absent") ||
+    text.includes("source capability is absent") ||
+    text.includes("source capability absent") ||
+    text.includes("accepted source") ||
+    text.includes("source/code edge") ||
+    text.includes("cannot be lawfully repaired by changing only this edge")
+  );
+}
+
+function reviewGradePriorGapRepeatsFinding(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly finding: SdlcReviewGradeObligationFinding;
+}): boolean {
+  if (input.finding.failureClass === null || input.finding.requiredAction === null) {
+    return false;
+  }
+  const action = input.finding.requiredAction.toLowerCase();
+  return input.manifest.retryContext.priorGapDossiers.some((dossier) =>
+    dossier.reasons.some((reason) => {
+      const detail = (reason.blockingReason.detail ?? "").toLowerCase();
+      return (
+        reason.blockingReason.lawfulReentryPoint === "same_edge_retry" &&
+        detail.includes(input.finding.obligationId.toLowerCase()) &&
+        detail.includes(input.finding.failureClass ?? "") &&
+        detail.includes(action.slice(0, 80))
+      );
+    })
+  );
+}
+
+function reviewGradeFindingShouldEscalateFromTestOnlyEdge(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly finding: SdlcReviewGradeObligationFinding;
+}): boolean {
+  if (!reviewGradeTargetIsTestOnlyMaterializationEdge(input)) {
+    return false;
+  }
+  if (
+    input.finding.fulfillmentStatus === "fulfilled" ||
+    (input.finding.failureClass !== "test_overlap_missing" &&
+      input.finding.failureClass !== "semantic_not_realized")
+  ) {
+    return false;
+  }
+  const disposition =
+    input.finding.repairSurfaceTriage?.disposition ?? "current_edge_repair";
+  if (disposition !== "current_edge_repair") {
+    return false;
+  }
+  return (
+    reviewGradeFindingNamesSourceCapabilityAbsence(input.finding) ||
+    reviewGradePriorGapRepeatsFinding(input)
+  );
+}
+
+function upstreamRepairAssetTypeForTestOnlyEdge(
+  targetAssetType: string
+): string {
+  switch (targetAssetType) {
+    case "component_test_surface":
+    case "uat_test_source_surface":
+      return "component_code_surface";
+    default:
+      return "upstream_product_surface";
+  }
+}
+
+function upstreamRepairTriageForReviewFinding(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly finding: SdlcReviewGradeObligationFinding;
+}): SdlcRepairSurfaceTriageCarrier {
+  const repairAssetType = upstreamRepairAssetTypeForTestOnlyEdge(
+    input.manifest.targetAssetType
+  );
+  const graphFunctionRef =
+    input.manifest.fpTransformRequest?.graphFunctionId ??
+    `graph-function://odd-sdlc/${input.manifest.graphFunctionName}`;
+  const graphVectorRef =
+    `graph-vector://odd-sdlc/${input.manifest.graphFunctionName}/${repairAssetType}`;
+  const repairAssetRef =
+    `asset://odd-sdlc/${input.manifest.graphFunctionName}/${repairAssetType}`;
+  const evidenceRefs = uniqueSorted([
+    ...input.finding.evidenceRefs,
+    ...input.finding.acceptedAuthorityRefs,
+    graphFunctionRef,
+    graphVectorRef,
+    repairAssetRef,
+    ...input.manifest.retryContext.priorGapDossiers.flatMap((dossier) => [
+      dossier.currentGapDossierRef,
+      ...dossier.evidenceRefs
+    ])
+  ]);
+  return Object.freeze({
+    kind: "sdlc_repair_surface_triage" as const,
+    disposition: "upstream_reentry" as const,
+    repairGraphFunctionRef: graphFunctionRef,
+    repairGraphVectorRef: graphVectorRef,
+    repairAssetRef,
+    evidenceRefs,
+    rationale:
+      "Review-grade pressure cannot lawfully remain same-edge repair on a test-only materialization edge after source-capability absence or repeated identical same-edge pressure; ABG must re-enter the upstream product source surface."
+  });
+}
+
+function canonicalizeReviewAssessmentRepairSurfaceTriage(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly assessment: SdlcReviewGradeEdgeFulfillmentAssessment;
+}): SdlcReviewGradeEdgeFulfillmentAssessment {
+  let changed = false;
+  const findings = input.assessment.findings.map((finding) => {
+    if (
+      !reviewGradeFindingShouldEscalateFromTestOnlyEdge({
+        manifest: input.manifest,
+        finding
+      })
+    ) {
+      return finding;
+    }
+    changed = true;
+    return Object.freeze({
+      ...finding,
+      repairSurfaceTriage: upstreamRepairTriageForReviewFinding({
+        manifest: input.manifest,
+        finding
+      })
+    });
+  });
+  if (!changed) {
+    return input.assessment;
+  }
+  return Object.freeze({
+    ...input.assessment,
+    findings: Object.freeze(findings),
+    evidenceRefs: uniqueSorted([
+      ...input.assessment.evidenceRefs,
+      ...findings.flatMap((finding) =>
+        finding.repairSurfaceTriage?.disposition === "upstream_reentry"
+          ? finding.repairSurfaceTriage.evidenceRefs
+          : Object.freeze([])
+      )
+    ]),
+    summary:
+      `${input.assessment.summary} Review-grade admission canonicalized repeated or source-capability test-only repair pressure to upstream re-entry.`
+  });
+}
+
 export function reviewGradeEdgeFulfillmentRepairSurfaceTriageRows(input: {
   readonly runRef: string;
   readonly targetAssetType?: string | undefined;
@@ -403,21 +615,23 @@ export function reviewGradeEdgeFulfillmentRepairSurfaceTriageRows(input: {
   return Object.freeze(
     input.assessment.findings
       .filter((finding) => finding.fulfillmentStatus !== "fulfilled")
-      .map((finding) =>
-        Object.freeze({
+      .map((finding) => {
+        const canonicalTriage = defaultRepairSurfaceTriageForFinding({
+          finding,
+          targetAssetType: input.targetAssetType,
+          workerAssessments: input.workerAssessments
+        });
+        return Object.freeze({
           kind: "sdlc_review_grade_repair_surface_triage_row" as const,
           pressureRef:
             `pressure://odd-sdlc/review-grade/${input.runRef}/${encodeURIComponent(finding.obligationId)}`,
           obligationId: finding.obligationId,
           triage:
-            finding.repairSurfaceTriage ??
-            defaultRepairSurfaceTriageForFinding({
-              finding,
-              targetAssetType: input.targetAssetType,
-              workerAssessments: input.workerAssessments
-            })
-        })
-      )
+            canonicalTriage.disposition === "downstream_deferred"
+              ? canonicalTriage
+              : finding.repairSurfaceTriage ?? canonicalTriage
+        });
+      })
   );
 }
 
@@ -1521,15 +1735,19 @@ function canonicalizeReviewAssessmentFulfillmentBindings(input: {
     manifest: input.manifest,
     assessment: input.assessment
   });
+  const triagedAssessment = canonicalizeReviewAssessmentRepairSurfaceTriage({
+    manifest: input.manifest,
+    assessment: frontierAssessment
+  });
   if (input.manifest.targetAssetType !== "component_code_surface") {
-    return frontierAssessment;
+    return triagedAssessment;
   }
   const admission = admitComponentDepthRegisterFromArtifact({
     targetAssetType: input.manifest.targetAssetType,
     outputFile: input.manifest.outputFile
   });
   if (admission.status !== "admitted" || admission.register === null) {
-    return frontierAssessment;
+    return triagedAssessment;
   }
   const register = admission.register;
   const declaredRequirementRefs = input.manifest.traversalObligationContext.obligations
@@ -1540,9 +1758,9 @@ function canonicalizeReviewAssessmentFulfillmentBindings(input: {
       )
       .map((obligation) => obligation.obligationId);
   const boundAssessment = Object.freeze({
-    ...frontierAssessment,
+    ...triagedAssessment,
     findings: Object.freeze(
-      frontierAssessment.findings.map((finding) => {
+      triagedAssessment.findings.map((finding) => {
         if (finding.fulfillmentStatus !== "fulfilled") {
           return finding;
         }
@@ -1576,21 +1794,64 @@ function expectedReviewObligationIdsForManifest(input: {
   const fallback = input.manifest.traversalObligationContext.obligations.map(
     (obligation) => obligation.obligationId
   );
+  const retryScopeRequirementIds = reviewGradeRetryScopeRequirementIds(
+    input.manifest
+  );
   if (
     input.invocationScope !== null &&
     input.invocationScope !== undefined &&
     input.invocationScope.kind === "sdlc_worker_invocation_package" &&
     input.invocationScope.inlineObligationIds.length > 0
   ) {
-    return uniqueSorted(input.invocationScope.inlineObligationIds);
+    return uniqueSorted([
+      ...input.invocationScope.inlineObligationIds,
+      ...retryScopeRequirementIds
+    ]);
   }
   if (input.manifest.featureScope.mode === "full_breadth") {
-    return Object.freeze(fallback);
+    return uniqueSorted([...fallback, ...retryScopeRequirementIds]);
   }
   if (input.invocationScope === undefined || input.invocationScope === null) {
+    return uniqueSorted(retryScopeRequirementIds);
+  }
+  return uniqueSorted(retryScopeRequirementIds);
+}
+
+function reviewGradeDecodedDiagnosticText(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function reviewGradeRetryScopeRequirementIds(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  const activeRequirementIds = manifest.traversalObligationContext.obligations
+    .filter((obligation) => obligation.obligationKind === "requirement")
+    .map((obligation) => obligation.obligationId);
+  if (
+    activeRequirementIds.length === 0 ||
+    manifest.retryContext.priorGapDossiers.length === 0
+  ) {
     return Object.freeze([]);
   }
-  return Object.freeze([]);
+  const diagnosticTexts = manifest.retryContext.priorGapDossiers.flatMap(
+    (dossier) =>
+      dossier.reasons.flatMap((reason) =>
+        [
+          reason.reason,
+          reason.blockingReason.message,
+          reason.blockingReason.detail ?? ""
+        ].map((value) => reviewGradeDecodedDiagnosticText(value).toLowerCase())
+      )
+  );
+  return uniqueSorted(
+    activeRequirementIds.filter((obligationId) =>
+      diagnosticTexts.some((text) => text.includes(obligationId.toLowerCase()))
+    )
+  );
 }
 
 function assessmentValidationErrors(input: {

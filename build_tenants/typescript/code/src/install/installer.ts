@@ -156,6 +156,7 @@ function installedAbgRuntimeBindingSource(input: {
 }): string {
   return `import {
   constructSdlcGtlModule,
+  createOddSdlcAbgRuntimeAssuranceProvider,
   createOddSdlcAbgRuntimeBindingPlugins,
   oddSdlcAbgRuntimeWorkerTransportFromEnv,
   resolveOddSdlcAbgRuntimeBindingPolicy
@@ -178,6 +179,7 @@ export const runtimeBinding = {
   fallbackConfigPath: ".abiogenesis/config/abg.config.json",
   runId: "run://odd-sdlc/public-start",
   workKey: "wk://odd-sdlc/public-start",
+  assuranceProvider: createOddSdlcAbgRuntimeAssuranceProvider(),
   resolvePolicy(input) {
     return resolveOddSdlcAbgRuntimeBindingPolicy({
       targetGraphFunction: input.target.graphFunctionHandle

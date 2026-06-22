@@ -17,6 +17,7 @@ import { fileURLToPath,
   pathToFileURL } from "node:url";
 
 import {
+  FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
   FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
   admitSdlcProjectConstraints,
@@ -39,6 +40,9 @@ import {
   observeProductMaterializationDelta,
   snapshotProductMaterializationRoot
 } from "../../build/semantic/code/src/operator/product_materialization/observation.js";
+import {
+  testDesignTargetCarrierIdentityForEdge
+} from "../../build/semantic/code/src/operator/test_design_register.js";
 import {
   sdlcOperatorRuntimePolicy,
   sdlcOperatorRuntimePolicyConfigPath
@@ -667,6 +671,139 @@ function writeComponentTestSurfaceCarrier(workspaceRoot, rows) {
   );
 }
 
+function writeTestDesignSurfaceCarrier(workspaceRoot, rows) {
+  const carrier = testDesignTargetCarrierIdentityForEdge(
+    "derive_lite_test_design_surface"
+  );
+  const outputFile = path.join(
+    workspaceRoot,
+    "build_tenants/scala_spark/design/adrs/ADR-003-test-design-surface.md"
+  );
+  mkdirSync(path.dirname(outputFile), { recursive: true });
+  writeFileSync(
+    outputFile,
+    [
+      "# ADR-003 Test Design Surface",
+      "",
+      "```json test_design_register",
+      JSON.stringify(
+        {
+          kind: carrier.outputCarrierKind,
+          targetAssetType: "test_design_surface",
+          edgeRef: carrier.edgeRef,
+          contractRef: carrier.contractRef,
+          contractDigest: carrier.contractDigest,
+          payload: {
+            kind: "sdlc_test_design_register",
+            registerVersion: "ts-test-design-v1",
+            targetAssetType: "test_design_surface",
+            designConsumptionRows: [
+              {
+                kind: "sdlc_design_consumption_contract",
+                contractRef: "design-consumption://t143/test-design",
+                sourceDesignObligationRefs: [
+                  "requirement:data_mapper.requirements.req_ldm_003"
+                ],
+                authorityBasisRefs: ["workspace://specification/PRODUCT.md"],
+                consumerGraphFunctionRefs: ["graph_function:lite_design_module_implementation"]
+              }
+            ],
+            uatTestcaseRows: [
+              {
+                kind: "sdlc_test_case_row",
+                testCaseRef: "testcase://scala_spark/uat/compiler-topology",
+                caseKind: "uat",
+                executionLane: "uat",
+                sourceDesignObligationRefs: [
+                  "requirement:data_mapper.requirements.req_ldm_003"
+                ],
+                testcaseAuthorityRefs: ["workspace://specification/PRODUCT.md"],
+                expectedBehavior: "compiler topology behavior is exercised"
+              }
+            ],
+            testcaseAuthorityRows: [
+              {
+                kind: "sdlc_test_case_row",
+                testCaseRef: "testcase://scala_spark/unit/compiler-topology",
+                caseKind: "positive",
+                executionLane: "unit",
+                sourceDesignObligationRefs: [
+                  "requirement:data_mapper.requirements.req_ldm_003"
+                ],
+                testcaseAuthorityRefs: ["workspace://specification/PRODUCT.md"],
+                expectedBehavior: "compiler topology behavior is unit-testable"
+              }
+            ],
+            testStackProfileRows: [
+              {
+                kind: "sdlc_test_stack_profile_row",
+                stackRef: "stack://scala-sbt-scalatest",
+                frameworkRef: "framework://scala/scalatest",
+                buildTool: "sbt"
+              }
+            ],
+            testModuleRows: [
+              {
+                kind: "sdlc_test_module_row",
+                moduleName: "cdme-compiler",
+                moduleRef: "module://scala_spark/cdme-compiler-tests",
+                testRoot: "cdme-compiler/src/test/scala"
+              }
+            ],
+            testComponentTopologyRows: rows,
+            testDataBindings: [
+              {
+                kind: "sdlc_test_data_binding",
+                testDataRef: "test-data://scala_spark/compiler/topology",
+                testCaseRef: "testcase://scala_spark/unit/compiler-topology",
+                inputFixtureRefs: ["fixture://scala_spark/compiler/topology"],
+                generationPolicyRef: "policy://odd-sdlc/t143/static-fixture",
+                expectedResultRef: "expected-result://scala_spark/compiler/topology",
+                sourceDesignObligationRefs: [
+                  "requirement:data_mapper.requirements.req_ldm_003"
+                ]
+              }
+            ],
+            expectedResultBindings: [
+              {
+                kind: "sdlc_expected_result_binding",
+                expectedResultRef: "expected-result://scala_spark/compiler/topology",
+                testCaseRef: "testcase://scala_spark/unit/compiler-topology",
+                assertionRefs: ["assertion://scala_spark/compiler/topology"],
+                expectedResultSummary: "compiler topology test passes",
+                verificationPolicyRef: "policy://odd-sdlc/t143/assertions"
+              }
+            ],
+            uatIntegrationBindings: [
+              {
+                kind: "sdlc_uat_integration_binding",
+                uatTestCaseRef: "testcase://scala_spark/uat/compiler-topology",
+                integrationTestCaseRef: "testcase://scala_spark/unit/compiler-topology",
+                executionLane: "integration"
+              }
+            ],
+            testExecutionScheduleRows: [
+              {
+                kind: "sdlc_test_execution_schedule_row",
+                scheduleRef: "test-schedule://scala_spark/sbt/unit",
+                testCaseRefs: ["testcase://scala_spark/unit/compiler-topology"],
+                command: "sbt test",
+                frameworkRef: "framework://scala/scalatest",
+                shardId: "unit-compiler"
+              }
+            ]
+          }
+        },
+        null,
+        2
+      ),
+      "```",
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+}
+
 function writeExecutionLog(manifest, filename, content) {
   const absolutePath = path.join(manifest.archiveRoot, filename);
   mkdirSync(path.dirname(absolutePath), { recursive: true });
@@ -804,6 +941,63 @@ test("T-143 derives declared product targets from conformed PRODUCT authority", 
       (target) => target.path === "build_tenants/scala_spark/cdme-compiler/src"
     )?.targetKind,
     "directory"
+  );
+});
+
+test("T-143 component-test launch consumes enveloped test-design target rows", () => {
+  const workspace = workspaceWithProductAuthority();
+  writeTestDesignSurfaceCarrier(workspace, [
+    {
+      kind: "sdlc_test_component_topology_row",
+      testClassId: "cdme.compiler.TopologyCompilerSpec",
+      relativePath:
+        "cdme-compiler/src/test/scala/cdme/compiler/TopologyCompilerSpec.scala",
+      testcaseIds: ["testcase://scala_spark/unit/compiler-topology"],
+      componentIds: ["compiler-topology"],
+      requirementIds: ["requirement:data_mapper.requirements.req_ldm_003"],
+      shardId: "unit-compiler"
+    },
+    {
+      kind: "sdlc_test_component_topology_row",
+      testClassId: "cdme.engine.PureAttributeSynthesisSpec",
+      relativePath:
+        "cdme-engine/src/test/scala/cdme/engine/PureAttributeSynthesisSpec.scala",
+      testcaseIds: ["testcase://scala_spark/integration/pure-attribute-synthesis"],
+      componentIds: ["engine-facade"],
+      requirementIds: ["requirement:data_mapper.requirements.req_int_001"],
+      shardId: "integration-engine"
+    }
+  ]);
+  const contract = hookContractByEdgeName(FG_DERIVE_LITE_COMPONENT_TEST_SURFACE);
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "lite_design_module_implementation",
+    edgeName: contract.edgeName,
+    vectorIndex: 3,
+    contract,
+    runId: "t143-component-test-targets"
+  });
+  const reconciliation = reconcileSdlcProductMaterializationAuthority(manifest);
+
+  assert.equal(
+    sdlcProductMaterializationLaunchBlocker({
+      manifest,
+      authority: reconciliation
+    }),
+    null
+  );
+  assertSdlcProductMaterializationLaunchable({
+    manifest,
+    authority: reconciliation
+  });
+  assert.deepEqual(
+    reconciliation.declaredProductTargetContracts
+      .filter((target) => target.requiredRole === "test")
+      .map((target) => target.path),
+    [
+      "build_tenants/scala_spark/cdme-compiler/src/test/scala/cdme/compiler/TopologyCompilerSpec.scala",
+      "build_tenants/scala_spark/cdme-engine/src/test/scala/cdme/engine/PureAttributeSynthesisSpec.scala"
+    ]
   );
 });
 
