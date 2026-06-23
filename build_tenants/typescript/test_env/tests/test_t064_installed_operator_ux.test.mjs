@@ -851,7 +851,7 @@ test("T-204 active worker inactivity remains same-edge retry", () => {
         path.join(manifest.archiveRoot, "worker_process_events.jsonl.trace/result.json")
       ).href,
       toolCallCount: 9,
-      timeoutMs: 900000,
+      timeoutMs: 1200000,
       inactivityTimeoutMs: 180000,
       heartbeatMs: 30000,
       runtimeLivenessAuthority: "abiogenesis_runtime_liveness_observer_projection",
@@ -956,7 +956,7 @@ test("T-204 zero-output inactivity remains triage", () => {
         inactivityTimeoutMs: 180000,
         signal: null
       },
-      timeoutMs: 900000,
+      timeoutMs: 1200000,
       inactivityTimeoutMs: 180000,
       heartbeatMs: 30000,
       runtimeLivenessAuthority: "abiogenesis_runtime_liveness_observer_projection",

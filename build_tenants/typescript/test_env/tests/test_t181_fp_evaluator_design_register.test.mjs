@@ -170,13 +170,17 @@ test("T-181 common config carries one compressed governance doc per work categor
     runtimePolicy.worker.inactivityTimeoutMs,
     runtimePolicy.minimumOperatorTimeoutMs
   );
-  assert.equal(
-    runtimePolicy.designDepthFpEvaluator.timeoutMs,
-    600000
-  );
-  assert.ok(
-    runtimePolicy.designDepthFpEvaluator.timeoutMs <
-      runtimePolicy.minimumOperatorTimeoutMs
+	  assert.equal(
+	    runtimePolicy.designDepthFpEvaluator.timeoutMs,
+	    600000
+	  );
+	  assert.equal(
+	    runtimePolicy.designDepthFpEvaluator.maxEffort,
+	    "medium"
+	  );
+	  assert.ok(
+	    runtimePolicy.designDepthFpEvaluator.timeoutMs <
+	      runtimePolicy.minimumOperatorTimeoutMs
   );
   assert.equal(
     runtimePolicy.executionShard.timeoutMs,
@@ -2613,19 +2617,29 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(evaluatorPromptSource, /use Read offset\/limit and inspect only bounded line ranges/u);
   assert.match(evaluatorPromptSource, /The content ledger path is the durable evaluation artifact/u);
   assert.match(evaluatorPromptSource, /system pre-creates that path as a non-admitted draft/u);
-  assert.match(evaluatorPromptSource, /not a single-shot JSON response/u);
-  assert.match(evaluatorPromptSource, /Agentic F_P work loop/u);
-  assert.match(evaluatorPromptSource, /After the first evaluator update exists, write a short plan and checklist/u);
-  assert.match(evaluatorPromptSource, /update the draft content ledger before doing deep exploratory review/u);
+	  assert.match(evaluatorPromptSource, /not a single-shot JSON response/u);
+	  assert.match(evaluatorPromptSource, /Agentic F_P work loop/u);
+	  assert.match(evaluatorPromptSource, /do not write a plan or checklist/u);
+	  assert.match(evaluatorPromptSource, /second content-ledger Write/u);
+	  assert.doesNotMatch(evaluatorPromptSource, /write a short plan and checklist/u);
+	  assert.match(evaluatorPromptSource, /update the draft content ledger before doing deep exploratory review/u);
   assert.match(evaluatorPromptSource, /Do not use the Read tool on the handoff manifest/u);
   assert.match(evaluatorPromptSource, /Precomputed worker result report summary/u);
   assert.match(evaluatorPromptSource, /Do not inspect the worker result report/u);
   assert.match(evaluatorPromptSource, /Do not use the Read tool on the worker invocation package/u);
   assert.match(evaluatorPromptSource, /Do not run any bounded-summary action before the first evaluator update/u);
-  assert.match(evaluatorPromptSource, /the next tool action must publish the content ledger update/u);
-  assert.match(evaluatorPromptSource, /before any ADR summary, worker-report inspection, source-authority lookup/u);
+  assert.match(evaluatorPromptSource, /First tool action: Read only the existing draft content ledger/u);
+	  assert.match(evaluatorPromptSource, /Second tool action: write the exact first-update JSON packet/u);
+	  assert.match(evaluatorPromptSource, /Third tool action: write the exact second-update JSON packet/u);
+	  assert.match(evaluatorPromptSource, /Fourth tool action: write the exact full partial checkpoint JSON packet/u);
+	  assert.match(evaluatorPromptSource, /read-before-write policy/u);
+	  assert.match(evaluatorPromptSource, /First-update JSON packet/u);
+	  assert.match(evaluatorPromptSource, /Second-update JSON packet/u);
+	  assert.match(evaluatorPromptSource, /Full partial checkpoint JSON packet/u);
+	  assert.match(evaluatorPromptSource, /Do not inspect the construction brief, ADR\/output artifact/u);
+  assert.match(evaluatorPromptSource, /only allowed prior Read is the existing draft content ledger slot/u);
   assert.doesNotMatch(evaluatorPromptSource, /At most one bounded summary script is allowed/u);
-  assert.match(evaluatorPromptSource, /the next tool action must publish the content ledger update/u);
+  assert.match(evaluatorPromptSource, /The first non-read tool action must publish the content ledger update/u);
   assert.match(evaluatorPromptSource, /Do not say .*writing the register.* until that file write has succeeded/u);
   assert.doesNotMatch(evaluatorPromptSource, /Use the provided .*seed script/u);
   assert.doesNotMatch(evaluatorPromptSource, /First register materialization recipe/u);
@@ -2637,14 +2651,14 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.doesNotMatch(evaluatorPromptSource, /stack:scala-spark-sbt/u);
   assert.doesNotMatch(evaluatorPromptSource, /model:cdme-data-mapper/u);
   assert.match(evaluatorPromptSource, /First register materialization rule/u);
-  assert.match(evaluatorPromptSource, /selected evaluate\.C\/F_P semantic pressure map/u);
+  assert.match(evaluatorPromptSource, /selected evaluate\.C\/F_P partial designCompletenessVerdict carrier/u);
   assert.doesNotMatch(evaluatorPromptSource, /Exact first update command pattern/u);
   assert.doesNotMatch(evaluatorPromptSource, /Exact second update command pattern/u);
   assert.doesNotMatch(evaluatorPromptSource, /node --input-type=module/u);
   assert.doesNotMatch(evaluatorPromptSource, /await rename\(tmp, file\)/u);
   assert.doesNotMatch(evaluatorPromptSource, /tableRows|sectionText/u);
   assert.match(evaluatorPromptSource, /no framework-authored recipe for deriving register rows/u);
-  assert.match(evaluatorPromptSource, /the row values are your evaluation/u);
+  assert.match(evaluatorPromptSource, /The row value is your selected evaluate\.C\/F_P judgment/u);
   assert.match(evaluatorPromptSource, /F_D does not construct semantic register rows/u);
   assert.match(evaluatorPromptSource, /mandatory bounded target-path reconciliation pass/u);
   assert.match(evaluatorPromptSource, /If those sources name exact product paths, the final register must preserve those exact paths/u);
@@ -2686,6 +2700,7 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   );
   assert.match(source, /stdoutBudgetBytes/u);
   assert.match(evaluatorPromptSource, /write the content ledger file first, then validate that file/u);
+  assert.match(evaluatorPromptSource, /partial designCompletenessVerdict carrier/u);
   assert.match(evaluatorPromptSource, /highest semantic design-depth truth/u);
   assert.match(evaluatorPromptSource, /sdlc_evaluate_content_ledger/u);
   assert.match(evaluatorPromptSource, /contentRows\[\]\.rowRef/u);
@@ -2773,6 +2788,7 @@ test("T-181 evaluator artifacts are cataloged operator-run truth", () => {
   );
   const expected = [
     "design_depth_fp_evaluator_run.json",
+    "design_depth_fp_evaluator_first_update.json",
     "design_depth_fp_evaluator_content_register.json",
     "design_depth_fp_evaluator_rule_outcome.json",
     "design_depth_fp_evaluator_register.json",

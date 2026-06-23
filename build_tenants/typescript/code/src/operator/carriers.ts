@@ -2034,6 +2034,7 @@ export interface SdlcWorkerHandoffManifest {
   readonly productMaterialization: SdlcProductMaterializationContract;
   readonly traversalStrategyDecision: SdlcTraversalStrategyDecision;
   readonly featureScope: SdlcFeatureScope;
+  readonly activeReportObligationIds?: readonly string[];
   readonly traversalObligationContext: SdlcTraversalObligationContext;
   readonly traversalIntentPackage: SdlcTraversalIntentPackage;
   readonly traversalAttemptEnvelope: TraversalAttemptEnvelope | null;

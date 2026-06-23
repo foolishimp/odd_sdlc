@@ -4053,8 +4053,12 @@ export function deriveWorkerHandoffManifest(input: {
     methodRefs,
     resultReportSchema
   });
+  const activeReportObligationIds = inlineObligationsForPrompt(manifest).map(
+    (obligation) => obligation.obligationId
+  );
   return Object.freeze({
     ...manifest,
+    activeReportObligationIds,
     allowedWriteRoots: materializationAuthorityRepairWriteRoots(
       manifest,
       scopedMaterializationWriteRoots(
@@ -5702,6 +5706,7 @@ function promptForHandoffSections(
           "- Requirement-surface trace closure exception: include a compact Trace Index with every active obligation id from inlineObligations, requirementTraceObligationIds, retryRepairInstructions, repairReentryPlans, and prior review gaps. Grouped domain rows are not enough; each id must appear verbatim or the edge will retry."
         ]
       : [];
+  const activeReportScopeCount = inlineObligationsForPrompt(manifest).length;
   return Object.freeze([
     sdlcPromptSectionFromLines({
       role: "purpose",
@@ -5733,7 +5738,7 @@ function promptForHandoffSections(
         `- ${declaredProductFileTargetLine}`,
         `- execution contracts: build=${manifest.productMaterialization.buildExecutionContract}; test=${manifest.productMaterialization.testExecutionContract}`,
         ...tenantToolBoundaryLines,
-        `- obligations in scope: ${manifest.traversalObligationContext.obligations.length}; feature scope=${manifest.featureScope.mode}; included modules=${listForPrompt(manifest.featureScope.includedModuleNames)}`,
+        `- authority obligations visible: ${manifest.traversalObligationContext.obligations.length}; active report scope from inlineObligationIds: ${activeReportScopeCount}; feature scope=${manifest.featureScope.mode}; included modules=${listForPrompt(manifest.featureScope.includedModuleNames)}`,
         "This section is the core F_P transform. The construction brief carries structured facts."
       ]),
       intent:

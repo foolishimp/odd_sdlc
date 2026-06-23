@@ -156,10 +156,18 @@ test("T-188 data_mapper live harness worker binding comes from runtime policy", 
   const runtimePolicy = JSON.parse(
     readFileSync(path.join(PACKAGE_ROOT, "config/operator-runtime-policy.json"), "utf8")
   );
-  assert.equal(
-    runtimePolicy.liveHarness.dataMapperWorkerTransport,
-    "process://claude?model=claude-sonnet-4-6&effort=max"
-  );
+	  assert.equal(
+	    runtimePolicy.liveHarness.dataMapperWorkerTransport,
+	    "process://claude?model=claude-sonnet-4-6&effort=max"
+	  );
+	  assert.equal(
+	    runtimePolicy.designDepthFpEvaluator.maxEffort,
+	    "medium"
+	  );
+	  assert.equal(
+	    runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.maxEffort,
+	    "medium"
+	  );
 
   const runnerSource = readFileSync(
     path.join(PACKAGE_ROOT, "test_env/live/run_full_external_data_mapper_sandbox.mjs"),

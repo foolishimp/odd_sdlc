@@ -1699,7 +1699,11 @@ function observedRequirementIds(input: {
 function observedRequirementEvidenceContents(input: {
   readonly outputFile: string;
   readonly materializedFiles: readonly SdlcMaterializedProductFile[];
-}): readonly { readonly ref: string; readonly content: string }[] {
+}): readonly {
+  readonly ref: string;
+  readonly content: string;
+  readonly normalizedMarkers: ReadonlySet<string>;
+}[] {
   const candidatePaths = uniqueSorted([
     input.outputFile,
     ...input.materializedFiles.map((file) => file.absolutePath)
@@ -1709,10 +1713,12 @@ function observedRequirementEvidenceContents(input: {
       if (!existsSync(filePath) || !statSync(filePath).isFile()) {
         return [];
       }
+      const content = readFileSync(filePath, "utf8");
       return [
         Object.freeze({
           ref: pathToFileURL(filePath).href,
-          content: readFileSync(filePath, "utf8")
+          content,
+          normalizedMarkers: normalizedRequirementMarkersForContent(content)
         })
       ];
     })
@@ -1725,6 +1731,7 @@ function evidenceRefsCarryingRequirement(input: {
   readonly evidenceContents: readonly {
     readonly ref: string;
     readonly content: string;
+    readonly normalizedMarkers: ReadonlySet<string>;
   }[];
   readonly obligationId: string;
   readonly displayId: string | null;
@@ -1737,8 +1744,9 @@ function evidenceRefsCarryingRequirement(input: {
         input.obligationId,
         ...equivalentObligationIds.filter((id) => id !== input.obligationId)
       ].some((obligationId) =>
-        contentCarriesRequirementObligation({
+        contentCarriesRequirementObligationWithMarkers({
           content: entry.content,
+          normalizedMarkers: entry.normalizedMarkers,
           obligationId,
           displayId: input.displayId
         })
@@ -1769,8 +1777,17 @@ function requirementDisplayIdByObligationId(
 
 
 
-function contentCarriesRequirementObligation(input: {
+function normalizedRequirementMarkersForContent(content: string): ReadonlySet<string> {
+  return new Set(
+    (content.match(REQUIREMENT_MARKER_EXPRESSION) ?? [])
+      .filter((marker) => !isPlaceholderRequirementMarker(marker))
+      .map((marker) => normalizeRequirementId(marker))
+  );
+}
+
+function contentCarriesRequirementObligationWithMarkers(input: {
   readonly content: string;
+  readonly normalizedMarkers: ReadonlySet<string>;
   readonly obligationId: string;
   readonly displayId: string | null;
 }): boolean {
@@ -1786,13 +1803,7 @@ function contentCarriesRequirementObligation(input: {
   if (input.displayId === null) {
     return false;
   }
-  const normalizedDisplayId = normalizeRequirementId(input.displayId);
-  return (input.content.match(REQUIREMENT_MARKER_EXPRESSION) ?? []).some((marker) => {
-    if (isPlaceholderRequirementMarker(marker)) {
-      return false;
-    }
-    return normalizeRequirementId(marker) === normalizedDisplayId;
-  });
+  return input.normalizedMarkers.has(normalizeRequirementId(input.displayId));
 }
 
 
@@ -1815,6 +1826,32 @@ function materializedFileRequirementLineage(input: {
       pathToFileURL(resolve(file.absolutePath)).href
     ])
   );
+  const fileContentByPath = new Map<string, string>();
+  const requirementMarkersByPath = new Map<string, ReadonlySet<string>>();
+  const contentForPath = (absolutePath: string): string => {
+    const existing = fileContentByPath.get(absolutePath);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const content =
+      existsSync(absolutePath) && statSync(absolutePath).isFile()
+        ? readFileSync(absolutePath, "utf8")
+        : "";
+    fileContentByPath.set(absolutePath, content);
+    requirementMarkersByPath.set(
+      absolutePath,
+      normalizedRequirementMarkersForContent(content)
+    );
+    return content;
+  };
+  const markersForPath = (absolutePath: string): ReadonlySet<string> => {
+    const existing = requirementMarkersByPath.get(absolutePath);
+    if (existing !== undefined) {
+      return existing;
+    }
+    contentForPath(absolutePath);
+    return requirementMarkersByPath.get(absolutePath) ?? new Set<string>();
+  };
   for (const file of input.report.materializedFiles) {
     if (file.requirementTraceObligationIds !== undefined) {
       const existing = lineageByPath.get(resolve(file.absolutePath)) ?? new Set<string>();
@@ -1842,10 +1879,8 @@ function materializedFileRequirementLineage(input: {
       if (!fileAliases.some((alias) => evidenceRefs.has(alias))) {
         continue;
       }
-      const content =
-        existsSync(absolutePath) && statSync(absolutePath).isFile()
-          ? readFileSync(absolutePath, "utf8")
-          : "";
+      const content = contentForPath(absolutePath);
+      const normalizedMarkers = markersForPath(absolutePath);
       const canonicalRequirementId =
         canonicalByObligationId.get(assessment.obligationId) ??
         assessment.obligationId;
@@ -1854,8 +1889,9 @@ function materializedFileRequirementLineage(input: {
         Object.freeze([assessment.obligationId, canonicalRequirementId]);
       if (
         !equivalentIds.some((obligationId) =>
-          contentCarriesRequirementObligation({
+          contentCarriesRequirementObligationWithMarkers({
             content,
+            normalizedMarkers,
             obligationId,
             displayId:
               requirementDisplayIds.get(obligationId) ??
@@ -2026,7 +2062,10 @@ function postTransformObligationAssessments(input: {
     manifest: input.manifest,
     canonicalByObligationId
   });
-  const assessments = input.manifest.traversalObligationContext.obligations.map((obligation) => {
+  const activeReportObligations = activeReportObligationsForPostTransform(
+    input.manifest
+  );
+  const assessments = activeReportObligations.map((obligation) => {
       const requirementId = requirementIdForObligation(obligation.obligationId);
     if (requirementId !== null) {
         const displayId = displayIdForRequirementObligation(obligation);
@@ -2148,7 +2187,11 @@ function postTransformObligationAssessments(input: {
     });
   if (input.manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY) {
     const existingRequirementIds = new Set<string>();
-    for (const obligation of input.manifest.traversalObligationContext.obligations) {
+    const activeReportScopeDeclared =
+      (input.manifest.activeReportObligationIds?.length ?? 0) > 0;
+    for (const obligation of activeReportScopeDeclared
+      ? activeReportObligations
+      : input.manifest.traversalObligationContext.obligations) {
       const requirementId = requirementIdForObligation(obligation.obligationId);
       if (requirementId !== null) {
         existingRequirementIds.add(requirementId);
@@ -2163,6 +2206,12 @@ function postTransformObligationAssessments(input: {
     }
     for (const requirementId of [...observedRequirements].sort()) {
       if (existingRequirementIds.has(requirementId)) {
+        continue;
+      }
+      if (
+        activeReportScopeDeclared &&
+        input.manifest.targetAssetType !== "requirement_surface"
+      ) {
         continue;
       }
       const evidenceRefs = evidenceRefsCarryingRequirement({
@@ -2182,6 +2231,27 @@ function postTransformObligationAssessments(input: {
     }
   }
   return Object.freeze(assessments);
+}
+
+function activeReportObligationsForPostTransform(
+  manifest: SdlcWorkerHandoffManifest
+): readonly SdlcTraversalObligation[] {
+  const activeIds = manifest.activeReportObligationIds ?? Object.freeze([]);
+  if (activeIds.length === 0) {
+    return manifest.traversalObligationContext.obligations;
+  }
+  const byId = new Map(
+    manifest.traversalObligationContext.obligations.map((obligation) => [
+      obligation.obligationId,
+      obligation
+    ])
+  );
+  return Object.freeze(
+    activeIds.flatMap((obligationId) => {
+      const obligation = byId.get(obligationId);
+      return obligation === undefined ? [] : [obligation];
+    })
+  );
 }
 
 

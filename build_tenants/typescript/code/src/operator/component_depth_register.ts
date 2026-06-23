@@ -759,15 +759,51 @@ function embeddedJsonObjectCandidates(content: string): readonly unknown[] {
   return Object.freeze([]);
 }
 
-function jsonCandidates(content: string): readonly unknown[] {
-  const wholeFileCandidates = parseJsonCandidates(content, "component_depth_register");
+function wholeFileJsonCandidates(content: string): readonly unknown[] {
+  const firstNonWhitespace = content.search(/\S/u);
+  if (firstNonWhitespace < 0 || content[firstNonWhitespace] !== "{") {
+    return Object.freeze([
+      invalidComponentDepthCandidate(
+        "component_depth_register_whole_file_json_required"
+      )
+    ]);
+  }
+  try {
+    return parsedComponentDepthCandidates(
+      JSON.parse(content),
+      "component_depth_register"
+    );
+  } catch (error) {
+    return Object.freeze([
+      invalidComponentDepthCandidate(
+        error instanceof SyntaxError
+          ? "component_depth_register_whole_file_json_invalid"
+          : error instanceof Error
+            ? error.message
+            : String(error)
+      )
+    ]);
+  }
+}
+
+function jsonCandidates(input: {
+  readonly content: string;
+  readonly requireWholeFileJson: boolean;
+}): readonly unknown[] {
+  if (input.requireWholeFileJson) {
+    return wholeFileJsonCandidates(input.content);
+  }
+  const wholeFileCandidates = parseJsonCandidates(
+    input.content,
+    "component_depth_register"
+  );
   if (wholeFileCandidates.length > 0) {
     return wholeFileCandidates;
   }
-  const sectionCandidates = targetCarrierSectionCandidates(content);
+  const sectionCandidates = targetCarrierSectionCandidates(input.content);
   return sectionCandidates.length > 0
     ? sectionCandidates
-    : embeddedJsonObjectCandidates(content);
+    : embeddedJsonObjectCandidates(input.content);
 }
 
 function requiredRowsPresent(input: {
@@ -848,6 +884,7 @@ function targetStageOccupancyReasons(input: {
 export function admitComponentDepthRegisterFromArtifact(input: {
   readonly targetAssetType: string;
   readonly outputFile: string;
+  readonly requireWholeFileJson?: boolean | undefined;
 }): SdlcComponentDepthRegisterAdmission {
   const evidenceRefs = Object.freeze([pathToFileURL(input.outputFile).href]);
   if (!isComponentDepthTarget(input.targetAssetType)) {
@@ -872,7 +909,10 @@ export function admitComponentDepthRegisterFromArtifact(input: {
   }
   const content = readFileSync(input.outputFile, "utf8");
   const errors: string[] = [];
-  for (const candidate of jsonCandidates(content)) {
+  for (const candidate of jsonCandidates({
+    content,
+    requireWholeFileJson: input.requireWholeFileJson === true
+  })) {
     if (isInvalidComponentDepthCandidate(candidate)) {
       errors.push(candidate.reason);
       continue;

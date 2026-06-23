@@ -373,6 +373,66 @@ test("T-141 assurance gate does not retry requirement rows carried to product ma
   assert.deepEqual(gate.satisfaction.gapReasons, []);
 });
 
+test("T-204 post-transform report assessments follow admitted active report scope", () => {
+  const baseManifest = requirementSurfaceManifest(writeRequirementWorkspace());
+  const targetObligation = baseManifest.traversalObligationContext.obligations.find(
+    (obligation) => obligation.obligationKind === "target_asset"
+  );
+  const requirementObligation =
+    baseManifest.traversalObligationContext.obligations.find((obligation) =>
+      obligation.obligationId.startsWith("requirement:")
+    );
+  assert(targetObligation);
+  assert(requirementObligation);
+
+  const aliasObligation = Object.freeze({
+    ...requirementObligation,
+    obligationId:
+      "requirement:data_mapper.ai_workspace_context_project_bootstrap.req_t141_001"
+  });
+  const activeReportObligationIds = Object.freeze([
+    targetObligation.obligationId,
+    requirementObligation.obligationId
+  ]);
+  const manifest = Object.freeze({
+    ...baseManifest,
+    targetAssetType: "component_code_surface",
+    activeReportObligationIds,
+    traversalObligationContext: Object.freeze({
+      ...baseManifest.traversalObligationContext,
+      obligations: Object.freeze([
+        targetObligation,
+        requirementObligation,
+        aliasObligation
+      ])
+    })
+  });
+  const before = snapshotProductMaterializationRoot(manifest.productMaterialization);
+  mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+  writeFileSync(
+    manifest.outputFile,
+    [
+      "# Scoped Report",
+      "",
+      "REQ-T141-001: Generate a Rust Cargo tenant that prints Hello, world!."
+    ].join("\n"),
+    "utf8"
+  );
+
+  const report = buildPostTransformWorkerResultReport({ manifest, before });
+
+  assert.deepEqual(
+    report.obligationAssessments.map((assessment) => assessment.obligationId),
+    activeReportObligationIds
+  );
+  assert.equal(
+    report.obligationAssessments.some(
+      (assessment) => assessment.obligationId === aliasObligation.obligationId
+    ),
+    false
+  );
+});
+
 test("T-141 evaluate_next selects materialization action from carried requirement pressure", () => {
   const { basis, module } = moduleBasis();
   const materializeGraphFunction = module.graphFunctions.find(

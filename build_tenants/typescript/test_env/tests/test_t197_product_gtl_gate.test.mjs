@@ -137,7 +137,7 @@ test("T-197 product gate typechecks the live SDLC graph inventory", () => {
     input.expectedCoverage.graphVectorCount,
     input.expectedCoverage.edgeClosureContractCount
   );
-  assert.equal(input.expectedCoverage.promptAssetCount, 3);
+  assert.equal(input.expectedCoverage.promptAssetCount, 102);
   assert.equal(input.expectedCoverage.pluginContractCount, 6);
   assert.ok(input.expectedCoverage.overlayCount > 0);
   assert.ok(input.expectedCoverage.publicStartTargetCount > 0);
@@ -275,7 +275,7 @@ test("T-197 product entry points call the GTL conformance gate", () => {
   );
 });
 
-test("T-197 product gate keeps installed-package source identity nonempty", () => {
+test("T-197 product gate keeps installed-package source identities nonempty", () => {
   const input = constructCurrentSdlcGtlProgramConformanceInput({
     packageRoot: path.join(REPO_ROOT, "build_tenants/typescript"),
     repoRoot: path.join(REPO_ROOT, "test_env/no-source-checkout"),
@@ -284,11 +284,19 @@ test("T-197 product gate keeps installed-package source identity nonempty", () =
   const report = typecheckSdlcGtlProgramConformanceInput(input);
 
   assertConformancePassed(report);
-  assert.equal(input.expectedCoverage.sourceIdentitySurfaceCount, 1);
   assert.equal(
-    input.sourceIdentitySurfaces[0]?.surfaceRef,
-    "package://@odd-sdlc/typescript-tenant/current"
+    input.expectedCoverage.sourceIdentitySurfaceCount,
+    input.sourceIdentitySurfaces.length
   );
+  assert.ok(input.sourceIdentitySurfaces.length > 0);
+  for (const surface of input.sourceIdentitySurfaces) {
+    assert.ok(surface.surfaceRef.length > 0);
+    assert.ok(surface.text.length > 0);
+    assert.ok(
+      surface.evidenceRefs.some((ref) => ref.startsWith("package://")),
+      `${surface.surfaceRef} must carry installed-package evidence`
+    );
+  }
 });
 
 test("T-197 design ratifies owner partition assets before Wave 1 code", () => {
@@ -311,7 +319,7 @@ test("T-197 design ratifies owner partition assets before Wave 1 code", () => {
     "### Decommission Register",
     "### W-105 Construct-Site Sufficiency Inventory",
     "ABG route / dependency",
-    "ABI 4.1.0-rc.6",
+    "ABI 4.1.0-rc.7",
     "runtime continuation transition projection refs",
     "22/22 edge-contract tests and 1/1 Rust-service sandbox proof",
     "must-not-name-governed-target",
@@ -615,9 +623,9 @@ test("T-197 A2 keeps SDLC start as shell over one admitted ABG boundary", () => 
   const runtimePolicy = repoFile(
     "build_tenants/typescript/code/src/operator/runtime_policy.ts"
   );
-  const runtimePolicyConfig = repoFile(
-    "build_tenants/typescript/config/operator-runtime-policy.json"
-  );
+	  const runtimePolicyConfig = repoFile(
+	    "build_tenants/typescript/config/operator-runtime-policy.json"
+	  );
   const design = repoFile(
     "build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_STAGED_COMPUTE_BOUNDARY.md"
   );
@@ -625,11 +633,21 @@ test("T-197 A2 keeps SDLC start as shell over one admitted ABG boundary", () => 
     "build_tenants/typescript/code/src/install/instruction_files.ts"
   );
 
-  assert.match(product, /control remains in ABG until ABG exits/u);
-  assert.match(product, /must not implement a product-local loop/u);
-  assert.match(
-    abgRuntimeBinding,
-    /\bcreateOddSdlcAbgRuntimeBindingPlugins\b/u
+	  assert.match(product, /control remains in ABG until ABG exits/u);
+	  assert.match(product, /must not implement a product-local loop/u);
+	  assert.match(runtimePolicyConfig, /"maxEffort": "medium"/u);
+	  assert.match(installedOperator, /capWorkerTransportEffort/u);
+		  assert.match(
+		    installedOperator,
+		    /maxEffort: designDepthFpEvaluatorMaxEffort\(\)/u
+		  );
+		  assert.match(
+		    installedOperator,
+		    /maxEffort: reviewGradeEdgeFulfillmentEvaluatorMaxEffort\(\)/u
+		  );
+		  assert.match(
+		    abgRuntimeBinding,
+		    /\bcreateOddSdlcAbgRuntimeBindingPlugins\b/u
   );
   assert.match(abgRuntimeBinding, /\bprojectSdlcRuntimeBindingContract\(/u);
   assert.match(
@@ -740,7 +758,14 @@ test("T-197 B3 keeps prompt assets as GTL AssetSurface rows plus SDLC policy", (
   assert.match(source, /rendered Markdown is a view over a GTL Node\/AssetSurface/u);
   assert.doesNotMatch(source, /export\s+interface\s+AssetSurface\b/u);
 
-  assert.equal(input.promptAssets.length, 3);
+  assert.equal(input.promptAssets.length, 102);
+  assert.ok(
+    input.promptAssets.some((row) =>
+      row.surfaceRef.includes(
+        "prompt://odd-sdlc/materialized/bootstrap_release_self_test"
+      )
+    )
+  );
   for (const row of input.promptAssets) {
     assert.match(row.assetSurface.kind, /^gtl\.asset_surface\/odd_sdlc\.prompt\//u);
     assert.equal(row.gtlNode.assetSurface, row.assetSurface);

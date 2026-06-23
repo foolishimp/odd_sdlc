@@ -165,7 +165,7 @@
     "test:t197": "npm run build:semantic && node --test test_env/tests/test_t197_product_gtl_gate.test.mjs",
     "test:t199": "npm run build:semantic && node --test test_env/tests/test_t199_data_mapper_code_depth_resume.test.mjs",
     "test:t199:data-mapper-code-depth-resume-live": "npm run build:semantic && npm run guard:data-mapper-boundary && node test_env/live/run_t199_data_mapper_code_depth_resume.mjs",
-    "test:t200:hello-world-js-zoom-live": "npm run build:semantic && ODD_SDLC_TEST_ONLY_MINIMUM_OPERATOR_TIMEOUT_MS=60000 ODD_SDLC_WORKER_TIMEOUT_MS=900000 ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS=180000 ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_TIMEOUT_MS=900000 ODD_SDLC_TS_T200_HELLO_WORLD_JS_ZOOM_SCENARIO_LIVE=1 node --test --test-name-pattern \"T-200 JavaScript hello-world deep SDLC zoom live build loop\" test_env/sandbox/test_scenario_sandbox.test.mjs",
+    "test:t200:hello-world-js-zoom-live": "npm run build:semantic && ODD_SDLC_TEST_ONLY_MINIMUM_OPERATOR_TIMEOUT_MS=60000 ODD_SDLC_WORKER_TIMEOUT_MS=900000 ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS=180000 ODD_SDLC_TS_T200_HELLO_WORLD_JS_ZOOM_SCENARIO_LIVE=1 node --test --test-name-pattern \"T-200 JavaScript hello-world deep SDLC zoom live build loop\" test_env/sandbox/test_scenario_sandbox.test.mjs",
     "test:t200:rust-detailed-live": "npm run test:t133:rust-live",
     "test:t200:data-mapper-detailed-live": "npm run build:semantic && npm run guard:data-mapper-boundary && ODD_SDLC_TS_DATA_MAPPER_LANE_NAME=data_mapper_deep_sdlc_detail_sandbox ODD_SDLC_TS_DATA_MAPPER_START_TARGET=overlay:deep-sdlc-traversal node test_env/live/run_full_external_data_mapper_sandbox.mjs",
     "test:t202": "npm run build:semantic && node --test test_env/tests/test_t202_consequence_traversal_overlay_catalog.test.mjs",
@@ -175,8 +175,8 @@
     "test:scenario-sandbox": "npm run build:semantic && node --test test_env/sandbox/test_scenario_sandbox.test.mjs",
     "test:scenario:t131-odd-chat-live": "ODD_SDLC_TS_T131_ODD_CHAT_SCENARIO_LIVE=1 npm run test:scenario-sandbox",
     "test:scenario:hello-world-rust-minimum-live": "npm run build:semantic && ODD_SDLC_TS_HELLO_WORLD_RUST_MINIMUM_INDUCTION_SCENARIO_LIVE=1 node --test --test-name-pattern \"minimum Rust hello-world live build loop\" test_env/sandbox/test_scenario_sandbox.test.mjs",
-    "test:scenario:t132-hello-world-js-live": "npm run build:semantic && ODD_SDLC_TEST_ONLY_MINIMUM_OPERATOR_TIMEOUT_MS=60000 ODD_SDLC_WORKER_TIMEOUT_MS=900000 ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS=180000 ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_TIMEOUT_MS=900000 ODD_SDLC_TS_T132_HELLO_WORLD_JS_SCENARIO_LIVE=1 node --test --test-name-pattern \"T-132 JavaScript hello-world live build loop\" test_env/sandbox/test_scenario_sandbox.test.mjs",
-    "test:scenario:t132-hello-world-js-live:pty": "npm run build:semantic && ODD_SDLC_TEST_ONLY_MINIMUM_OPERATOR_TIMEOUT_MS=60000 ODD_SDLC_WORKER_TIMEOUT_MS=900000 ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS=180000 ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_TIMEOUT_MS=900000 ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE=pty-terminal ABG_TS_AGENT_EXECUTOR_PROFILE=pty-terminal ODD_SDLC_TS_T132_HELLO_WORLD_JS_SCENARIO_LIVE=1 node --test --test-name-pattern \"T-132 JavaScript hello-world live build loop\" test_env/sandbox/test_scenario_sandbox.test.mjs",
+    "test:scenario:t132-hello-world-js-live": "npm run build:semantic && ODD_SDLC_TEST_ONLY_MINIMUM_OPERATOR_TIMEOUT_MS=60000 ODD_SDLC_WORKER_TIMEOUT_MS=900000 ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS=180000 ODD_SDLC_TS_T132_HELLO_WORLD_JS_SCENARIO_LIVE=1 node --test --test-name-pattern \"T-132 JavaScript hello-world live build loop\" test_env/sandbox/test_scenario_sandbox.test.mjs",
+    "test:scenario:t132-hello-world-js-live:pty": "npm run build:semantic && ODD_SDLC_TEST_ONLY_MINIMUM_OPERATOR_TIMEOUT_MS=60000 ODD_SDLC_WORKER_TIMEOUT_MS=900000 ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS=180000 ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE=pty-terminal ABG_TS_AGENT_EXECUTOR_PROFILE=pty-terminal ODD_SDLC_TS_T132_HELLO_WORLD_JS_SCENARIO_LIVE=1 node --test --test-name-pattern \"T-132 JavaScript hello-world live build loop\" test_env/sandbox/test_scenario_sandbox.test.mjs",
     "test:scenario:t133-hello-world-rust-live": "npm run build:semantic && ODD_SDLC_TS_T133_HELLO_WORLD_RUST_SCENARIO_LIVE=1 node --test --test-name-pattern \"T-133 Rust hello-world live build loop\" test_env/sandbox/test_scenario_sandbox.test.mjs",
     "test:scenario:t160-hello-world-js-lite-live": "npm run build:semantic && ODD_SDLC_TS_T160_HELLO_WORLD_JS_LITE_SCENARIO_LIVE=1 node --test --test-name-pattern \"T-160 JavaScript hello-world lite live build loop\" test_env/sandbox/test_scenario_sandbox.test.mjs",
     "test:scenario:t160-hello-world-rust-lite-live": "npm run build:semantic && ODD_SDLC_TS_T160_HELLO_WORLD_RUST_LITE_SCENARIO_LIVE=1 node --test --test-name-pattern \"T-160 Rust hello-world lite live build loop\" test_env/sandbox/test_scenario_sandbox.test.mjs",
@@ -195,6 +195,6 @@
     "typescript": "6.0.3"
   },
   "dependencies": {
-    "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.1.0-rc.6/abiogenesis-typescript-tenant-4.1.0-rc.6.tgz"
+    "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.1.0-rc.7/abiogenesis-typescript-tenant-4.1.0-rc.7.tgz"
   }
 }

@@ -630,6 +630,68 @@ test("T-132 admits Markdown Target Carrier envelope with component-depth payload
   );
 });
 
+test("T-204 strict component-depth admission rejects Markdown Target Carrier envelopes", () => {
+  const register = {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_code_surface",
+    componentTopologyRows: [
+      {
+        kind: "sdlc_component_topology_row",
+        componentId: "hello_program",
+        moduleName: "hello_world_javascript",
+        relativePath: "build_tenants/hello_world_javascript/src/hello.js",
+        publicBoundary: "build_tenants/hello_world_javascript/src/hello.js",
+        concernRole: "other",
+        requirementIds: [
+          "requirement:t132_hello_world_single_tenant.bootstrap.req_t132_001"
+        ],
+        sourceAssetRefs: [
+          "workspace://build_tenants/hello_world_javascript/design/adrs/ADR-002-implementation-design-surface.md"
+        ]
+      }
+    ],
+    componentRealizationRows: [
+      {
+        kind: "sdlc_component_realization_row",
+        componentId: "hello_program",
+        moduleName: "hello_world_javascript",
+        relativePath: "build_tenants/hello_world_javascript/src/hello.js",
+        publicBoundary: "build_tenants/hello_world_javascript/src/hello.js",
+        requirementIds: [
+          "requirement:t132_hello_world_single_tenant.bootstrap.req_t132_001"
+        ],
+        sourceAssetRefs: [
+          "workspace://build_tenants/hello_world_javascript/design/adrs/ADR-002-implementation-design-surface.md"
+        ]
+      }
+    ],
+    testComponentTopologyRows: [],
+    componentTestRows: [],
+    componentTestQualificationRows: [],
+    componentExecutionFailureRegister: null,
+    componentRepairSchedule: null,
+    releaseDepthParity: null
+  };
+  const { outputFile } = writeTargetCarrierSectionArtifact(
+    register,
+    "component_code_surface",
+    "derive_lite_component_code_surface"
+  );
+
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: "component_code_surface",
+    outputFile,
+    requireWholeFileJson: true
+  });
+
+  assert.equal(admission.status, "rejected");
+  assert.match(
+    admission.blockingReasons.join("\n"),
+    /component_depth_register_whole_file_json_required/u
+  );
+});
+
 test("T-132 admits raw unfenced target-carrier envelope embedded in Markdown", () => {
   const register = {
     kind: "sdlc_component_depth_register",
@@ -689,6 +751,68 @@ test("T-132 admits raw unfenced target-carrier envelope embedded in Markdown", (
   assert.equal(
     admission.register.componentRealizationRows[0].relativePath,
     "src/hello.js"
+  );
+});
+
+test("T-204 strict component-depth admission rejects embedded JSON carriers", () => {
+  const register = {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_code_surface",
+    componentTopologyRows: [
+      {
+        kind: "sdlc_component_topology_row",
+        componentId: "hello_main",
+        moduleName: "hello_world_javascript",
+        relativePath: "src/hello.js",
+        publicBoundary: "direct stdout: Hello, world!",
+        concernRole: "other",
+        requirementIds: [
+          "requirement:t132_hello_world_single_tenant.bootstrap.req_t132_001"
+        ],
+        sourceAssetRefs: [
+          "workspace://build_tenants/hello_world_javascript/design/adrs/ADR-002-implementation-design-surface.md"
+        ]
+      }
+    ],
+    componentRealizationRows: [
+      {
+        kind: "sdlc_component_realization_row",
+        componentId: "hello_main",
+        moduleName: "hello_world_javascript",
+        relativePath: "src/hello.js",
+        publicBoundary: "direct stdout: Hello, world!",
+        requirementIds: [
+          "requirement:t132_hello_world_single_tenant.bootstrap.req_t132_001"
+        ],
+        sourceAssetRefs: [
+          "workspace://build_tenants/hello_world_javascript/design/adrs/ADR-002-implementation-design-surface.md"
+        ]
+      }
+    ],
+    testComponentTopologyRows: [],
+    componentTestRows: [],
+    componentTestQualificationRows: [],
+    componentExecutionFailureRegister: null,
+    componentRepairSchedule: null,
+    releaseDepthParity: null
+  };
+  const { outputFile } = writeUnfencedEmbeddedCarrierArtifact(
+    register,
+    "component_code_surface",
+    "derive_lite_component_code_surface"
+  );
+
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: "component_code_surface",
+    outputFile,
+    requireWholeFileJson: true
+  });
+
+  assert.equal(admission.status, "rejected");
+  assert.match(
+    admission.blockingReasons.join("\n"),
+    /component_depth_register_whole_file_json_required/u
   );
 });
 

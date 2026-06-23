@@ -376,13 +376,17 @@ test("T-184 operator timeout policy is tenant configuration, not handoff glue", 
     runtimePolicy.designDepthFpEvaluator.timeoutMs,
     600000
   );
+  assert.equal(
+    runtimePolicy.designDepthFpEvaluator.maxEffort,
+    "medium"
+  );
   assert.ok(
     runtimePolicy.designDepthFpEvaluator.timeoutMs <
       runtimePolicy.minimumOperatorTimeoutMs
   );
   assert.equal(
     runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.timeoutMs,
-    900000
+    1200000
   );
   assert.ok(
     runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.timeoutMs <
@@ -395,6 +399,10 @@ test("T-184 operator timeout policy is tenant configuration, not handoff glue", 
   assert.equal(
     runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.inactivityTimeoutMs,
     420000
+  );
+  assert.equal(
+    runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.maxEffort,
+    "medium"
   );
   assert.ok(
     runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.inactivityTimeoutMs <
@@ -426,6 +434,10 @@ test("T-184 operator timeout policy is tenant configuration, not handoff glue", 
   assert.match(
     installedOperatorSource,
     /reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /reviewGradeEdgeFulfillmentEvaluatorMaxEffort/u
   );
   assert.match(launchContractSource, /sdlcOperatorRuntimePolicy/u);
   assert.match(runtimePolicySource, /operator-runtime-policy\.json/u);
@@ -517,9 +529,12 @@ test("T-184 F_P evaluator prompt uses incremental content ledger writes", () => 
 
   assert.match(
     evaluatorPromptSource,
-    /After the first evaluator update exists, write a short plan/u
+    /After the first evaluator update exists, do not write a plan or checklist/u
   );
-  assert.match(evaluatorPromptSource, /Execute the plan incrementally/u);
+  assert.match(
+    evaluatorPromptSource,
+    /fixed second-update packet, full partial checkpoint packet, and section order below are the plan/u
+  );
   assert.match(evaluatorPromptSource, /First-update carrier helper contract/u);
   assert.match(evaluatorPromptSource, /same-path temp-then-rename publication/u);
   assert.match(evaluatorPromptSource, /named carrier-helper contract only/u);

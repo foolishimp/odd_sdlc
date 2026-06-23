@@ -204,7 +204,7 @@ test("T-192 evaluation grid rejects global coverage as a local cell", () => {
         "evaluation-finding://odd-sdlc/t192/global-coverage"
       ],
       abgOutcomeFoldRef:
-        "package:@abiogenesis/typescript-tenant@4.1.0-rc.6#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows",
+        "package:@abiogenesis/typescript-tenant@4.1.0-rc.7#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows",
       provenanceRefs: ["REQ-F-ODDSDLC-088"]
     }),
     /not cell dimensions/u
@@ -234,6 +234,111 @@ test("T-192 evaluator prompt sidecars carry fused logical grids", () => {
       false
     );
   }
+});
+
+test("T-192 broad design-depth prompt front-loads first update and summarizes grid refs", () => {
+  const obligations = Array.from({ length: 40 }, (_, index) => ({
+    obligationId: `requirement:req_t192_design_broad_${String(index + 1).padStart(3, "0")}`
+  }));
+  const projection = designDepthFpEvaluatorPromptProjection({
+    manifest: minimalManifest("implementation_design_surface", {
+      traversalObligationContext: {
+        obligations
+      }
+    }),
+    manifestPath: "handoff_manifest.json",
+    governanceRef: "config://test/design-depth",
+    governancePath: "config/work-category-governance/design_build.md",
+    constructionBriefPath: "worker_construction_brief.json",
+    invocationPackagePath: "worker_invocation_package.json",
+    workerReportPath: "worker_result_report.json",
+    workerReportSummaryLines: ["status=passed"],
+    contentRegisterPath: "design_depth_fp_evaluator_content_register.json",
+    registerProjectionPath: "design_depth_fp_evaluator_register.json",
+    subworkstreamManifestPath: "evaluate_compute_subworkstream_manifest.json",
+    selectedCompositionRef: "composition://t192/selected",
+    selectedCompositionDigest: "sha256:t192",
+    selectedCompositionSelectionRef: "selection://t192",
+    selectedRegimeBindingRef: null,
+    tenantToolEnvironment: null
+  });
+
+  assert(
+    projection.promptText.indexOf("Immediate first-update protocol:") <
+      projection.promptText.indexOf("Evaluation grid contract:")
+  );
+  assert.match(
+    projection.promptText,
+    /First tool action: Read only the existing draft content ledger/u
+  );
+  assert.match(
+    projection.promptText,
+    /Second tool action: write the exact first-update JSON packet/u
+  );
+  assert.match(
+    projection.promptText,
+    /Do not inspect the construction brief, ADR\/output artifact/u
+  );
+  assert.match(
+    projection.promptText,
+    /read-before-write policy/u
+  );
+  assert.match(
+    projection.promptText,
+    /"contentKind": "sdlc_design_depth_register_fragment"/u
+  );
+	  assert.match(
+	    projection.promptText,
+	    /"section": "designCompletenessVerdict"/u
+	  );
+	  assert.match(
+	    projection.promptText,
+	    /Progress-timeout protection:/u
+	  );
+	  assert.match(
+	    projection.promptText,
+	    /Second-update JSON packet:/u
+	  );
+	  assert.match(
+	    projection.promptText,
+	    /"section": "stackProfileRows"/u
+	  );
+	  assert.match(
+	    projection.promptText,
+	    /Full partial checkpoint JSON packet:/u
+	  );
+	  assert.match(
+	    projection.promptText,
+	    /"section": "componentTopologyRows"/u
+	  );
+	  assert.match(
+	    projection.promptText,
+	    /The next progress checkpoint after the first update is the exact second content-ledger Write/u
+	  );
+	  assert.match(
+	    projection.promptText,
+	    /do not write a plan or checklist/u
+	  );
+	  assert.doesNotMatch(
+	    projection.promptText,
+	    /write a short plan and checklist/u
+	  );
+	  assert.doesNotMatch(
+	    projection.promptText,
+	    /intentionally carries empty\/null partial values/u
+	  );
+  assert.match(
+    projection.promptText,
+    /obligationRefs=count=40; head=requirement:req_t192_design_broad_001/u
+  );
+  assert.match(
+    projection.promptText,
+    /tail=requirement:req_t192_design_broad_038, requirement:req_t192_design_broad_039, requirement:req_t192_design_broad_040/u
+  );
+  assert.doesNotMatch(
+    projection.promptText,
+    /requirement:req_t192_design_broad_025/u
+  );
 });
 
 test("T-192 small admitted handoffs render compact fused-grid prompts", () => {
@@ -281,6 +386,16 @@ test("T-192 small admitted handoffs render compact fused-grid prompts", () => {
   assert.match(compactDesign.promptText, /Small fused evaluation grid mode:/u);
   assert.match(compactReview.promptText, /fulfillmentBinding shape for fulfilled component_code_surface findings/u);
   assert.match(compactReview.promptText, /evaluatorFindingRef: stable finding ref inside this fulfillmentBinding only/u);
+  assert.match(compactReview.promptText, /Progress-timeout protection:/u);
+  assert.match(compactReview.promptText, /First assessment checkpoint:/u);
+  assert.match(
+    compactReview.promptText,
+    /First assessment checkpoint JSON must be valid whole-file JSON/u
+  );
+  assert.match(
+    compactReview.promptText,
+    /Do not write a plan or checklist before the first assessment checkpoint/u
+  );
   assert.doesNotMatch(
     compactReview.promptText,
     /carrier selection, authority compression, trace binding/u

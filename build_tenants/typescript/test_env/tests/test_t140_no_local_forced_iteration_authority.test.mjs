@@ -243,6 +243,140 @@ test("T-164 post-action retry context restores current gap dossier from pressure
   assert.equal(retryContext.priorGapDossiers[0].reasons[0].reason, reason);
 });
 
+test("T-204 post-repair overlay reentry carries closure gap dossier into worker handoff", () => {
+  const archiveRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t204-overlay-repair-"));
+  const gapDossierRef = pathToFileURL(path.join(archiveRoot, "gap_dossier.json"))
+    .href;
+  const reason =
+    "test_execution_result_failed:installed_operator_execution/test-shard-01-scala-spark.summary.json";
+  const blockingReason = {
+    kind: "sdlc_blocking_reason",
+    code: "edge_closure_residual_pressure",
+    reasonClass: "assurance",
+    lawfulReentryPoint: "repair_worker_output",
+    message: "Test execution failure pressure requires repair re-entry.",
+    detail:
+      "pressure://odd-sdlc/test_execution_result_failed/run%3A%2F%2Ft204%2Foverlay/failed/failed-count:1",
+    evidenceRefs: [
+      pathToFileURL(
+        path.join(
+          archiveRoot,
+          "installed_operator_execution/test-shard-01-scala-spark.summary.json"
+        )
+      ).href
+    ]
+  };
+  const gapDossier = {
+    kind: "sdlc_postflight_gap_dossier",
+    status: "open",
+    graphFunctionName: "lite_design_module_implementation",
+    edgeName: "derive_test_execution_result_surface",
+    vectorIndex: 6,
+    targetAssetType: "test_execution_result_surface",
+    reasons: [
+      {
+        kind: "sdlc_postflight_gap_reason",
+        reason,
+        reasonClass: "assurance",
+        blockingReason
+      }
+    ],
+    evidenceRefs: blockingReason.evidenceRefs,
+    priorManifestId: pathToFileURL(path.join(archiveRoot, "handoff_manifest.json"))
+      .href,
+    currentGapDossierRef: gapDossierRef,
+    retryEligible: true,
+    nextLawfulActions: ["repair_worker_output"]
+  };
+  mkdirSync(path.join(archiveRoot, "installed_operator_execution"), {
+    recursive: true
+  });
+  writeFileSync(
+    path.join(archiveRoot, "gap_dossier.json"),
+    JSON.stringify(gapDossier),
+    "utf8"
+  );
+
+  const closureDecisionRef = `closure-decision://odd-sdlc/${encodeURIComponent(
+    pathToFileURL(archiveRoot).href
+  )}/edge-fulfillment/1`;
+  const retryContext = deriveSdlcWorkerRetryContextFromPostActionProjection({
+    vectorIndex: 1,
+    nextActionProjection: {
+      nextActionBasisKind: "post_repair",
+      choosesNextTraversal: true,
+      selectedActionRef:
+        "construction-action://odd-sdlc/post-action/lite_design_module_implementation/post_repair_overlay_reentry/derive_lite_component_code_surface",
+      nextActionProjectionRef:
+        "construction-priority-projection://odd-sdlc/post-action/lite_design_module_implementation",
+      closureDecisionRef,
+      gapPressureRefs: [
+        "pressure://odd-sdlc/test_execution_result_failed/run%3A%2F%2Ft204%2Foverlay/failed/failed-count:1"
+      ]
+    }
+  });
+
+  assert(retryContext);
+  assert.equal(retryContext.priorGapDossiers.length, 1);
+  assert.equal(retryContext.priorGapDossiers[0].currentGapDossierRef, gapDossierRef);
+  assert.equal(retryContext.retryAttemptRefs[0].priorAuthorityRef, gapDossierRef);
+  assert.equal(retryContext.priorGapDossiers[0].reasons[0].reason, reason);
+});
+
+test("T-204 post-repair closure pressure without gap dossier still reaches worker handoff", () => {
+  const archiveRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t204-closure-pressure-"));
+  const closureDecisionRef = `closure-decision://odd-sdlc/${encodeURIComponent(
+    pathToFileURL(archiveRoot).href
+  )}/edge-fulfillment/1`;
+  const pressureRef = `pressure://odd-sdlc/test_execution_result_failed/${encodeURIComponent(
+    pathToFileURL(archiveRoot).href
+  )}/failed/failed-count:1`;
+  const retryContext = deriveSdlcWorkerRetryContextFromPostActionProjection({
+    vectorIndex: 1,
+    nextActionProjection: {
+      selectedComposition: {
+        graphFunctionRef: "graph-function:odd_sdlc:lite_design_module_implementation",
+        graphVectorRef:
+          "abg.graph_vector://selected/job%3Aodd_sdlc%3Alite_design_module_implementation/vector-6/derive_test_execution_result_surface"
+      },
+      compositionRef:
+        "abg.fn_composition://odd-sdlc/derive_test_execution_result_surface",
+      edgeAssuranceContractRef:
+        "edge-assurance-contract://odd-sdlc/derive_test_execution_result_surface/test_execution_result_surface",
+      nextActionBasisKind: "post_repair",
+      choosesNextTraversal: true,
+      selectedActionRef:
+        "construction-action://odd-sdlc/post-action/lite_design_module_implementation/post_repair_overlay_reentry/derive_lite_component_code_surface",
+      nextActionProjectionRef:
+        "construction-priority-projection://odd-sdlc/post-action/lite_design_module_implementation",
+      closureDecisionRef,
+      gapPressureRefs: [
+        `pressure://odd-sdlc/post-action/${encodeURIComponent(
+          pathToFileURL(archiveRoot).href
+        )}/repair`
+      ],
+      edgeResidualPressureRefs: [pressureRef]
+    }
+  });
+
+  assert(retryContext);
+  assert.equal(retryContext.priorGapDossiers.length, 1);
+  assert.match(
+    retryContext.priorGapDossiers[0].currentGapDossierRef,
+    /^closure-gap-dossier:\/\/odd-sdlc\//
+  );
+  assert.equal(
+    retryContext.priorGapDossiers[0].edgeName,
+    "derive_test_execution_result_surface"
+  );
+  assert.equal(
+    retryContext.priorGapDossiers[0].targetAssetType,
+    "test_execution_result_surface"
+  );
+  assert.equal(retryContext.priorGapDossiers[0].reasons[0].reason, "test_execution_result_failed");
+  assert.equal(retryContext.retryAttemptRefs[0].priorAuthorityRef, retryContext.priorGapDossiers[0].currentGapDossierRef);
+});
+
 test("T-188 post-action retry context ignores non-retryable triage dossiers", () => {
   const archiveRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t188-triage-"));
   const gapDossierRef = pathToFileURL(path.join(archiveRoot, "gap_dossier.json"))

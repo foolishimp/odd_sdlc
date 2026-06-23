@@ -634,11 +634,24 @@ export function sdlcPromptSectionForEvaluationGridContract(input: {
   readonly evaluationGridContract: SdlcEvaluationGridContract;
 }): SdlcPromptSectionConstructionInput {
   const grid = input.evaluationGridContract;
+  const listForGridPrompt = (values: readonly string[]): string => {
+    if (values.length === 0) {
+      return "none";
+    }
+    if (values.length <= 24) {
+      return values.join(", ");
+    }
+    return [
+      `count=${values.length}`,
+      `head=${values.slice(0, 12).join(", ")}`,
+      `tail=${values.slice(-3).join(", ")}`
+    ].join("; ");
+  };
   const unitLines = grid.transformUnits.flatMap((unit) => [
     `- unitRef=${unit.unitRef}; segmentKey=${unit.segmentKey}`,
-    `  sourceAssetRefs=${unit.sourceAssetRefs.join(", ") || "none"}`,
-    `  targetAssetRefs=${unit.targetAssetRefs.join(", ") || "none"}`,
-    `  obligationRefs=${unit.obligationRefs.join(", ") || "none"}`
+    `  sourceAssetRefs=${listForGridPrompt(unit.sourceAssetRefs)}`,
+    `  targetAssetRefs=${listForGridPrompt(unit.targetAssetRefs)}`,
+    `  obligationRefs=${listForGridPrompt(unit.obligationRefs)}`
   ]);
   const dimensionLines = grid.evaluationDimensions.map(
     (dimension) =>

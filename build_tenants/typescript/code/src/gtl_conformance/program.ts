@@ -60,11 +60,12 @@ import { materializeSdlcProjectConformance } from "../workspace/project_profile.
 import {
   constructSdlcEvaluationGridContract,
   constructSdlcPromptInvocationProjection,
-  sdlcPromptSectionFromLines
+  sdlcPromptSectionFromLines,
+  type SdlcRenderedPromptProjection
 } from "../operator/prompt_assets.js";
 import {
   deriveWorkerHandoffManifest,
-  promptForHandoff
+  promptForHandoffProjection
 } from "../operator/plugins/transform/launch_contract.js";
 import {
   consequenceProjectionPluginContract,
@@ -74,6 +75,7 @@ import {
   reviewGradeEdgeFulfillmentRuleContract,
   ticketWorkflowFdRuleContract
 } from "../operator/plugins/plugin_contracts.js";
+import { sha256Text } from "../shared/digest.js";
 const PACKAGE_ROOT_FROM_BUILD = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../../../../.."
@@ -173,7 +175,130 @@ interface MaterializedGraphVectorRow {
   readonly graphFunction: GraphFunction;
   readonly graph: Graph;
   readonly vector: GraphVector;
+  readonly vectorIndex: number;
 }
+
+interface SemanticPromptProjectionReviewCase {
+  readonly graphFunctionName: string;
+  readonly edgeRef: string;
+  readonly graphFunctionId: string;
+  readonly graphId: string;
+  readonly graphVectorId: string;
+  readonly vectorIndex: number;
+  readonly targetAssetType: string;
+  readonly outputCarrierKind: string;
+  readonly contractRef: string;
+  readonly contractDigest: string;
+  readonly promptProjection: SdlcRenderedPromptProjection;
+}
+
+interface SemanticPromptProjectionReviewSummary {
+  readonly graphVectorCount: number;
+  readonly promptProjectionCount: number;
+  readonly nonPromptVectorCount: number;
+  readonly promptCases: readonly SemanticPromptProjectionReviewCase[];
+  readonly nonPromptVectorRefs: readonly string[];
+  readonly issues: readonly SdlcPromptProjectionReviewIssue[];
+}
+
+export interface SdlcSemanticCompilerPromptReviewPackage {
+  readonly kind: "sdlc_semantic_compiler_prompt_review_package";
+  readonly packageVersion: "ts-semantic-compiler-prompt-review-v1";
+  readonly subjectRef: string;
+  readonly deterministicReportDigest: string;
+  readonly graphVectorCount: number;
+  readonly promptProjectionCount: number;
+  readonly nonPromptVectorCount: number;
+  readonly deterministicIssueCount: number;
+  readonly deterministicIssues: readonly SdlcPromptProjectionReviewIssue[];
+  readonly promptProjections: readonly {
+    readonly graphFunctionName: string;
+    readonly edgeRef: string;
+    readonly vectorIndex: number;
+    readonly targetAssetType: string;
+    readonly outputCarrierKind: string;
+    readonly contractRef: string;
+    readonly contractDigest: string;
+    readonly promptFamily: string;
+    readonly stage: string;
+    readonly renderedPromptDigest: string;
+    readonly promptText: string;
+  }[];
+}
+
+export interface SdlcSemanticCompilerFpReviewGateReport {
+  readonly kind: "sdlc_semantic_compiler_fp_review_gate_report";
+  readonly gateVersion: "ts-semantic-compiler-fp-review-gate-v1";
+  readonly mode: "skipped" | "required";
+  readonly passed: boolean;
+  readonly reviewResultPath: string | null;
+  readonly deterministicReportDigest: string;
+  readonly reason: string;
+}
+
+export interface SdlcSemanticSourceAuthorityIssue {
+  readonly code:
+    | "design_depth_archive_status_authority"
+    | "review_grade_retryable_postflight_short_circuit"
+    | "workspace_gaps_read_model_authors_runtime_truth"
+    | "workspace_gaps_read_model_invokes_runtime_control"
+    | "post_transform_report_uses_broad_manifest_scope"
+    | "product_materialization_lineage_unbounded_requirement_marker_scan"
+    | "consequence_reentry_target_uses_abg_graph_reentry_point";
+  readonly surfaceRef: string;
+  readonly detail: string;
+}
+
+interface SdlcSemanticSourceAuthoritySurface {
+  readonly surfaceRef: string;
+  readonly text: string;
+}
+
+interface SdlcGtlProgramSourceAuthorityPolicyRow {
+  readonly policyRef: string;
+  readonly sourceSurfaceRefs: readonly string[];
+  readonly sourceSurfaceRefPrefixes: readonly string[];
+  readonly forbiddenTokens: readonly string[];
+  readonly forbiddenMatch: "any" | "all";
+  readonly requiredMitigationTokens: readonly string[];
+  readonly message: string;
+  readonly evidenceRefs: readonly string[];
+}
+
+interface SdlcGtlProgramSemanticReviewGateRow {
+  readonly gateRef: string;
+  readonly subjectRef: string;
+  readonly deterministicReportDigest: string;
+  readonly reviewResultKind: "sdlc_semantic_compiler_fp_review_result";
+  readonly reviewVersion: "ts-semantic-compiler-fp-review-result-v1";
+  readonly status: "passed";
+  readonly findingCount: 0;
+  readonly reviewerProfileRef: string;
+  readonly reviewedAt: string;
+  readonly evidenceRefs: readonly string[];
+}
+
+const SDLC_SOURCE_AUTHORITY_DESIGN_DEPTH_REGISTER_REF =
+  "build_tenants/typescript/code/src/operator/plugins/evaluate/design_depth_register.ts";
+const SDLC_SOURCE_AUTHORITY_INSTALLED_OPERATOR_REF =
+  "build_tenants/typescript/code/src/operator/installed_operator.ts";
+const SDLC_SOURCE_AUTHORITY_WORKSPACE_API_ENTRY_REF =
+  "build_tenants/typescript/code/src/workspace_api/entry.ts";
+const SDLC_SOURCE_AUTHORITY_TRANSFORM_RESULT_PROJECTION_REF =
+  "build_tenants/typescript/code/src/operator/plugins/transform/result_projection.ts";
+const SDLC_SOURCE_AUTHORITY_POSTFLIGHT_CHECKS_REF =
+  "build_tenants/typescript/code/src/operator/plugins/evaluate/postflight_checks.ts";
+const SDLC_SOURCE_AUTHORITY_TRAVERSAL_CONSEQUENCE_REF =
+  "build_tenants/typescript/code/src/operator/traversal_consequence.ts";
+
+const SDLC_PACKAGED_SOURCE_AUTHORITY_SURFACE_REFS = Object.freeze([
+  SDLC_SOURCE_AUTHORITY_DESIGN_DEPTH_REGISTER_REF,
+  SDLC_SOURCE_AUTHORITY_INSTALLED_OPERATOR_REF,
+  SDLC_SOURCE_AUTHORITY_WORKSPACE_API_ENTRY_REF,
+  SDLC_SOURCE_AUTHORITY_TRANSFORM_RESULT_PROJECTION_REF,
+  SDLC_SOURCE_AUTHORITY_POSTFLIGHT_CHECKS_REF,
+  SDLC_SOURCE_AUTHORITY_TRAVERSAL_CONSEQUENCE_REF
+] as const);
 
 export interface SdlcGtlProgramConformanceInputOptions {
   readonly packageRoot?: string | undefined;
@@ -256,6 +381,60 @@ function walkActiveFiles(input: {
   return Object.freeze(files.sort());
 }
 
+function packagedBuildSurfacePathForSourceRef(input: {
+  readonly packageRoot: string;
+  readonly sourceRef: string;
+}): string | null {
+  const sourcePrefix = "build_tenants/typescript/code/src/";
+  if (!input.sourceRef.startsWith(sourcePrefix)) {
+    return null;
+  }
+  const semanticRelative = input.sourceRef
+    .slice(sourcePrefix.length)
+    .replace(/\.ts$/u, ".js");
+  return path.join(
+    input.packageRoot,
+    "build/semantic/code/src",
+    semanticRelative
+  );
+}
+
+function packagedSourceAuthoritySurfaces(input: {
+  readonly packageRoot: string;
+}): readonly (SdlcSemanticSourceAuthoritySurface & {
+  readonly evidenceRefs: readonly string[];
+})[] {
+  const rows = [];
+  for (const sourceRef of SDLC_PACKAGED_SOURCE_AUTHORITY_SURFACE_REFS) {
+    const filePath = packagedBuildSurfacePathForSourceRef({
+      packageRoot: input.packageRoot,
+      sourceRef
+    });
+    if (
+      filePath === null ||
+      !existsSync(filePath) ||
+      !statSync(filePath).isFile()
+    ) {
+      continue;
+    }
+    const packageRelative = path
+      .relative(input.packageRoot, filePath)
+      .split(path.sep)
+      .join("/");
+    rows.push(
+      Object.freeze({
+        surfaceRef: sourceRef,
+        text: readFileSync(filePath, "utf8"),
+        evidenceRefs: Object.freeze([
+          `workspace://${sourceRef}`,
+          `package://@odd-sdlc/typescript-tenant/${packageRelative}`
+        ])
+      })
+    );
+  }
+  return Object.freeze(rows);
+}
+
 export function activeSdlcSourceIdentitySurfaces(
   input: SdlcGtlProgramConformanceInputOptions = {}
 ) {
@@ -283,6 +462,12 @@ export function activeSdlcSourceIdentitySurfaces(
       );
     }
   }
+  const scannedSurfaceRefs = new Set(rows.map((row) => row.surfaceRef));
+  rows.push(
+    ...packagedSourceAuthoritySurfaces({
+      packageRoot
+    }).filter((row) => !scannedSurfaceRefs.has(row.surfaceRef))
+  );
   if (rows.length === 0) {
     const packageJsonPath = path.join(packageRoot, "package.json");
     const packageJsonText = existsSync(packageJsonPath)
@@ -309,6 +494,437 @@ export function activeSdlcSourceIdentitySurfaces(
     );
   }
   return Object.freeze(rows);
+}
+
+function sourceAuthoritySurfaceForPath(
+  surfaces: readonly SdlcSemanticSourceAuthoritySurface[],
+  relativePath: string
+): SdlcSemanticSourceAuthoritySurface | null {
+  return (
+    surfaces.find(
+      (surface) =>
+        surface.surfaceRef === relativePath ||
+        surface.surfaceRef.endsWith(`/${relativePath}`)
+    ) ?? null
+  );
+}
+
+function functionSourceForName(input: {
+  readonly source: string;
+  readonly functionName: string;
+}): string | null {
+  const nameIndex = input.source.indexOf(`function ${input.functionName}`);
+  if (nameIndex < 0) {
+    return null;
+  }
+  const bodyStart = input.source.indexOf("{", nameIndex);
+  if (bodyStart < 0) {
+    return null;
+  }
+  let depth = 0;
+  for (let index = bodyStart; index < input.source.length; index += 1) {
+    const char = input.source[index];
+    if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return input.source.slice(nameIndex, index + 1);
+      }
+    }
+  }
+  return null;
+}
+
+function assignmentWindow(input: {
+  readonly source: string;
+  readonly startToken: string;
+  readonly endToken: string;
+}): string | null {
+  const start = input.source.indexOf(input.startToken);
+  if (start < 0) {
+    return null;
+  }
+  const end = input.source.indexOf(input.endToken, start);
+  return input.source.slice(start, end < 0 ? undefined : end);
+}
+
+function sourceIncludesAny(
+  source: string,
+  tokens: readonly string[]
+): boolean {
+  return tokens.some((token) => source.includes(token));
+}
+
+export function semanticSourceAuthorityIssuesForSurfaces(
+  surfaces: readonly SdlcSemanticSourceAuthoritySurface[]
+): readonly SdlcSemanticSourceAuthorityIssue[] {
+  const issues: SdlcSemanticSourceAuthorityIssue[] = [];
+  const designDepthRegister = sourceAuthoritySurfaceForPath(
+    surfaces,
+    "build_tenants/typescript/code/src/operator/plugins/evaluate/design_depth_register.ts"
+  );
+  if (
+    designDepthRegister !== null &&
+    sourceIncludesAny(designDepthRegister.text, [
+      "predecessorDesignRegisterArchiveIsAccepted",
+      "acceptedArchiveRoots",
+      "sdlc_edge_closure_decision.json",
+      "postflight.json"
+    ])
+  ) {
+    issues.push({
+      code: "design_depth_archive_status_authority",
+      surfaceRef: designDepthRegister.surfaceRef,
+      detail:
+        "design-depth predecessor selection must not treat archive status files as acceptance authority"
+    });
+  }
+
+  const installedOperator = sourceAuthoritySurfaceForPath(
+    surfaces,
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+  if (installedOperator !== null) {
+    const filterBody = functionSourceForName({
+      source: installedOperator.text,
+      functionName: "currentPostflightBlocksReviewGradeEvaluator"
+    });
+    const blockerAssignment = assignmentWindow({
+      source: installedOperator.text,
+      startToken: "const currentPostflightBlockers",
+      endToken: "if (currentPostflightBlockers.length > 0)"
+    });
+    const retryableReentriesRemainExcluded =
+      filterBody !== null &&
+      filterBody.includes('lawfulReentryPoint !== "same_edge_retry"') &&
+      filterBody.includes('lawfulReentryPoint !== "repair_worker_output"') &&
+      filterBody.includes('lawfulReentryPoint !== "escalate_to_fp"') &&
+      blockerAssignment !== null &&
+      blockerAssignment.includes(".filter(") &&
+      blockerAssignment.includes("currentPostflightBlocksReviewGradeEvaluator");
+    if (
+      installedOperator.text.includes("currentPostflightBlockers") &&
+      installedOperator.text.includes(
+        "activePostflightBlockingReasonCarriers(input.currentPostflight)"
+      ) &&
+      !retryableReentriesRemainExcluded
+    ) {
+      issues.push({
+        code: "review_grade_retryable_postflight_short_circuit",
+        surfaceRef: installedOperator.surfaceRef,
+        detail:
+          "review-grade current-postflight short-circuit must exclude retryable reentry before constructing a triage gap"
+      });
+    }
+  }
+
+  const workspaceApi = sourceAuthoritySurfaceForPath(
+    surfaces,
+    "build_tenants/typescript/code/src/workspace_api/entry.ts"
+  );
+  if (
+    workspaceApi !== null &&
+    sourceIncludesAny(workspaceApi.text, [
+      "sdlc_edge_closure_decision.json",
+      "sdlc_next_action_projection.json",
+      "postflight.json",
+      "fp_evaluate_result.json"
+    ])
+  ) {
+    if (
+      sourceIncludesAny(workspaceApi.text, [
+        "writeSdlcSystemArtifact",
+        "constructSdlcEdgeClosureDecision",
+        "deriveSdlcNextActionProjection"
+      ])
+    ) {
+      issues.push({
+        code: "workspace_gaps_read_model_authors_runtime_truth",
+        surfaceRef: workspaceApi.surfaceRef,
+        detail:
+          "workspace gaps archive reads may be diagnostic read-model input only; they must not author closure, next-action, or artifact truth"
+      });
+    }
+    if (
+      sourceIncludesAny(workspaceApi.text, [
+        "executeInstalledOperatorStart",
+        "publicStartOnce",
+        "runEngineIterate"
+      ])
+    ) {
+      issues.push({
+        code: "workspace_gaps_read_model_invokes_runtime_control",
+        surfaceRef: workspaceApi.surfaceRef,
+        detail:
+          "workspace gaps archive reads may not invoke local traversal/start/control"
+      });
+    }
+  }
+
+  const transformResultProjection = sourceAuthoritySurfaceForPath(
+    surfaces,
+    "build_tenants/typescript/code/src/operator/plugins/transform/result_projection.ts"
+  );
+  if (transformResultProjection !== null) {
+    const lineageBody = functionSourceForName({
+      source: transformResultProjection.text,
+      functionName: "materializedFileRequirementLineage"
+    });
+    if (
+      lineageBody !== null &&
+      lineageBody.includes("contentCarriesRequirementObligation({") &&
+      !lineageBody.includes("contentCarriesRequirementObligationWithMarkers({")
+    ) {
+      issues.push({
+        code: "product_materialization_lineage_unbounded_requirement_marker_scan",
+        surfaceRef: transformResultProjection.surfaceRef,
+        detail:
+          "product-materialization lineage projection must cache requirement markers per materialized file before checking obligation equivalence"
+      });
+    }
+    const postTransformAssessmentBody = functionSourceForName({
+      source: transformResultProjection.text,
+      functionName: "postTransformObligationAssessments"
+    });
+    if (
+      postTransformAssessmentBody !== null &&
+      postTransformAssessmentBody.includes(
+        "traversalObligationContext.obligations.map"
+      ) &&
+      !postTransformAssessmentBody.includes(
+        "activeReportObligationsForPostTransform"
+      )
+    ) {
+      issues.push({
+        code: "post_transform_report_uses_broad_manifest_scope",
+        surfaceRef: transformResultProjection.surfaceRef,
+        detail:
+          "post-transform worker_result_report assessments must use admitted active report scope, not broad traversal obligations"
+      });
+    }
+    if (
+      postTransformAssessmentBody !== null &&
+      postTransformAssessmentBody.includes("contentCarriesRequirementObligation({") &&
+      !postTransformAssessmentBody.includes("contentCarriesRequirementObligationWithMarkers({")
+    ) {
+      issues.push({
+        code: "product_materialization_lineage_unbounded_requirement_marker_scan",
+        surfaceRef: transformResultProjection.surfaceRef,
+        detail:
+          "post-transform obligation assessment must cache requirement markers per evidence file before checking every obligation"
+      });
+    }
+  }
+
+  const postflightChecks = sourceAuthoritySurfaceForPath(
+    surfaces,
+    "build_tenants/typescript/code/src/operator/plugins/evaluate/postflight_checks.ts"
+  );
+  if (postflightChecks !== null) {
+    const productFileBody = functionSourceForName({
+      source: postflightChecks.text,
+      functionName: "evaluateMaterializedProductFiles"
+    });
+    if (
+      productFileBody !== null &&
+      productFileBody.includes("contentCarriesRequirementObligation({") &&
+      !productFileBody.includes("contentCarriesRequirementObligationWithMarkers({")
+    ) {
+      issues.push({
+        code: "product_materialization_lineage_unbounded_requirement_marker_scan",
+        surfaceRef: postflightChecks.surfaceRef,
+        detail:
+          "product-materialization postflight must cache requirement markers per materialized file before checking obligation equivalence"
+      });
+    }
+  }
+
+  const traversalConsequence = sourceAuthoritySurfaceForPath(
+    surfaces,
+    "build_tenants/typescript/code/src/operator/traversal_consequence.ts"
+  );
+  if (traversalConsequence !== null) {
+    const graphReentryTargetBody = functionSourceForName({
+      source: traversalConsequence.text,
+      functionName: "constructSdlcGraphReentryTargetRef"
+    });
+    if (
+      graphReentryTargetBody !== null &&
+      (graphReentryTargetBody.includes('? "odd-sdlc"') ||
+        !traversalConsequence.text.includes("GRAPH_REENTRY_POINT_VALUES"))
+    ) {
+      issues.push({
+        code: "consequence_reentry_target_uses_abg_graph_reentry_point",
+        surfaceRef: traversalConsequence.surfaceRef,
+        detail:
+          "consequence traversal re-entry target refs must use ABG GraphReentryPoint values, not product namespaces"
+      });
+    }
+  }
+
+  return Object.freeze(issues);
+}
+
+function assertSemanticSourceAuthorityReviewPassed(
+  surfaces: readonly SdlcSemanticSourceAuthoritySurface[]
+): void {
+  const issues = semanticSourceAuthorityIssuesForSurfaces(surfaces);
+  if (issues.length > 0) {
+    throw new TypeError(
+      [
+        "SDLC semantic source-authority compiler review failed:",
+        ...issues.map(
+          (issue) =>
+            `- ${issue.code} at ${issue.surfaceRef}: ${issue.detail}`
+        )
+      ].join("\n")
+    );
+  }
+}
+
+function sourceAuthorityPolicyRows(): readonly SdlcGtlProgramSourceAuthorityPolicyRow[] {
+  return Object.freeze([
+    Object.freeze({
+      policyRef:
+        "abg://gtl-program/source-authority/no-design-depth-archive-status-acceptance",
+      sourceSurfaceRefs: Object.freeze([
+        SDLC_SOURCE_AUTHORITY_DESIGN_DEPTH_REGISTER_REF
+      ]),
+      sourceSurfaceRefPrefixes: Object.freeze([]),
+      forbiddenTokens: Object.freeze([
+        "predecessorDesignRegisterArchiveIsAccepted",
+        "acceptedArchiveRoots",
+        "sdlc_edge_closure_decision.json",
+        "postflight.json"
+      ]),
+      forbiddenMatch: "any" as const,
+      requiredMitigationTokens: Object.freeze([]),
+      message:
+        "design-depth predecessor selection must not treat archive status files as acceptance authority",
+      evidenceRefs: Object.freeze(["ticket://odd-sdlc/T-204"])
+    }),
+    Object.freeze({
+      policyRef:
+        "abg://gtl-program/source-authority/no-unfiltered-current-postflight-review-grade-downgrade",
+      sourceSurfaceRefs: Object.freeze([
+        SDLC_SOURCE_AUTHORITY_INSTALLED_OPERATOR_REF
+      ]),
+      sourceSurfaceRefPrefixes: Object.freeze([]),
+      forbiddenTokens: Object.freeze([
+        "activePostflightBlockingReasonCarriers(input.currentPostflight)",
+        "currentPostflightBlockers"
+      ]),
+      forbiddenMatch: "all" as const,
+      requiredMitigationTokens: Object.freeze([
+        'lawfulReentryPoint !== "same_edge_retry"',
+        'lawfulReentryPoint !== "repair_worker_output"',
+        'lawfulReentryPoint !== "escalate_to_fp"'
+      ]),
+      message:
+        "review-grade current-postflight shortcut must exclude retryable reentry before constructing triage pressure",
+      evidenceRefs: Object.freeze(["ticket://odd-sdlc/T-204"])
+    }),
+    Object.freeze({
+      policyRef:
+        "abg://gtl-program/source-authority/workspace-gaps-read-model-does-not-author-runtime-truth",
+      sourceSurfaceRefs: Object.freeze([
+        SDLC_SOURCE_AUTHORITY_WORKSPACE_API_ENTRY_REF
+      ]),
+      sourceSurfaceRefPrefixes: Object.freeze([]),
+      forbiddenTokens: Object.freeze([
+        "writeSdlcSystemArtifact",
+        "constructSdlcEdgeClosureDecision",
+        "deriveSdlcNextActionProjection"
+      ]),
+      forbiddenMatch: "any" as const,
+      requiredMitigationTokens: Object.freeze([]),
+      message:
+        "workspace gaps archive reads may be diagnostic input only; they must not author closure, next-action, or artifact truth",
+      evidenceRefs: Object.freeze(["ticket://odd-sdlc/T-204"])
+    }),
+    Object.freeze({
+      policyRef:
+        "abg://gtl-program/source-authority/workspace-gaps-read-model-does-not-invoke-runtime-control",
+      sourceSurfaceRefs: Object.freeze([
+        SDLC_SOURCE_AUTHORITY_WORKSPACE_API_ENTRY_REF
+      ]),
+      sourceSurfaceRefPrefixes: Object.freeze([]),
+      forbiddenTokens: Object.freeze([
+        "executeInstalledOperatorStart",
+        "publicStartOnce",
+        "runEngineIterate"
+      ]),
+      forbiddenMatch: "any" as const,
+      requiredMitigationTokens: Object.freeze([]),
+      message:
+        "workspace gaps archive reads may not invoke local traversal, start, or iteration control",
+      evidenceRefs: Object.freeze(["ticket://odd-sdlc/T-204"])
+    }),
+    Object.freeze({
+      policyRef:
+        "abg://gtl-program/source-authority/product-materialization-lineage-caches-requirement-markers",
+      sourceSurfaceRefs: Object.freeze([
+        SDLC_SOURCE_AUTHORITY_TRANSFORM_RESULT_PROJECTION_REF,
+        SDLC_SOURCE_AUTHORITY_POSTFLIGHT_CHECKS_REF
+      ]),
+      sourceSurfaceRefPrefixes: Object.freeze([]),
+      forbiddenTokens: Object.freeze([
+        "contentCarriesRequirementObligation({",
+        "REQUIREMENT_MARKER_EXPRESSION"
+      ]),
+      forbiddenMatch: "all" as const,
+      requiredMitigationTokens: Object.freeze([
+        "normalizedRequirementMarkersForContent",
+        "contentCarriesRequirementObligationWithMarkers"
+      ]),
+      message:
+        "product-materialization lineage checks must not rescan requirement markers for every obligation/file pairing",
+      evidenceRefs: Object.freeze(["ticket://odd-sdlc/T-204"])
+    }),
+    Object.freeze({
+      policyRef:
+        "abg://gtl-program/source-authority/post-transform-report-uses-active-report-scope",
+      sourceSurfaceRefs: Object.freeze([
+        SDLC_SOURCE_AUTHORITY_TRANSFORM_RESULT_PROJECTION_REF
+      ]),
+      sourceSurfaceRefPrefixes: Object.freeze([]),
+      forbiddenTokens: Object.freeze([
+        "traversalObligationContext.obligations.map",
+        "postTransformObligationAssessments"
+      ]),
+      forbiddenMatch: "all" as const,
+      requiredMitigationTokens: Object.freeze([
+        "activeReportObligationsForPostTransform",
+        "activeReportObligationIds"
+      ]),
+      message:
+        "post-transform worker_result_report assessments must use admitted active report scope, not broad traversal obligations",
+      evidenceRefs: Object.freeze(["ticket://odd-sdlc/T-204"])
+    }),
+    Object.freeze({
+      policyRef:
+        "abg://gtl-program/source-authority/consequence-reentry-target-uses-abg-graph-reentry-point",
+      sourceSurfaceRefs: Object.freeze([
+        SDLC_SOURCE_AUTHORITY_TRAVERSAL_CONSEQUENCE_REF
+      ]),
+      sourceSurfaceRefPrefixes: Object.freeze([]),
+      forbiddenTokens: Object.freeze([
+        '? "odd-sdlc"',
+        "graph-reentry-point://"
+      ]),
+      forbiddenMatch: "all" as const,
+      requiredMitigationTokens: Object.freeze([
+        "GRAPH_REENTRY_POINT_VALUES"
+      ]),
+      message:
+        "consequence traversal re-entry target refs must use ABG GraphReentryPoint values, not product namespaces",
+      evidenceRefs: Object.freeze([
+        "ticket://odd-sdlc/T-204",
+        "ticket://abiogenesis/T-159"
+      ])
+    })
+  ]);
 }
 
 function promptSection(title: string) {
@@ -373,7 +989,34 @@ function evaluationGridContractForConformance() {
   });
 }
 
-function promptProjectionRows() {
+function promptAssetRowFromProjection(input: {
+  readonly surfaceRef: string;
+  readonly projection: SdlcRenderedPromptProjection;
+  readonly evidenceRefs?: readonly string[] | undefined;
+}) {
+  return Object.freeze({
+    surfaceRef: input.surfaceRef,
+    assetSurface: input.projection.invocationAsset.gtlNode.assetSurface,
+    gtlNode: input.projection.invocationAsset.gtlNode,
+    renderedViewDigest: input.projection.invocationAsset.renderedPromptDigest,
+    currentAbgFoldRefs:
+      input.projection.invocationAsset.evaluationGridContract === null
+        ? Object.freeze([])
+        : Object.freeze([
+            input.projection.invocationAsset.evaluationGridContract.abgOutcomeFoldRef
+          ]),
+    evidenceRefs: Object.freeze([
+      ...(input.evidenceRefs ?? Object.freeze([
+        "workspace://build_tenants/typescript/code/src/operator/prompt_assets.ts",
+        "workspace://build_tenants/typescript/code/src/operator/plugins/evaluate/prompts.ts"
+      ]))
+    ])
+  });
+}
+
+function promptProjectionRows(
+  promptCases: readonly SemanticPromptProjectionReviewCase[]
+) {
   const transformProjection = constructSdlcPromptInvocationProjection({
     promptFamily: "transform",
     stage: "transform.C",
@@ -427,44 +1070,63 @@ function promptProjectionRows() {
     promptSections: [promptSection("SDLC Design-Depth Prompt Boundary")]
   });
 
-  return Object.freeze([transformProjection, designDepthProjection, evaluationProjection]
-    .map((projection) => Object.freeze({
+  const genericPromptRows = [transformProjection, designDepthProjection, evaluationProjection]
+    .map((projection) =>
+      promptAssetRowFromProjection({
+        surfaceRef:
+          `prompt://odd-sdlc/${projection.invocationAsset.promptFamily}` +
+          `/${projection.invocationAsset.stage}`,
+        projection
+      })
+    );
+  const materializedPromptRows = promptCases.map((promptCase) =>
+    promptAssetRowFromProjection({
       surfaceRef:
-        `prompt://odd-sdlc/${projection.invocationAsset.promptFamily}` +
-        `/${projection.invocationAsset.stage}`,
-      assetSurface: projection.invocationAsset.gtlNode.assetSurface,
-      gtlNode: projection.invocationAsset.gtlNode,
-      renderedViewDigest: projection.invocationAsset.renderedPromptDigest,
-      currentAbgFoldRefs:
-        projection.invocationAsset.evaluationGridContract === null
-          ? Object.freeze([])
-          : Object.freeze([
-              projection.invocationAsset.evaluationGridContract.abgOutcomeFoldRef
-            ]),
+        `prompt://odd-sdlc/materialized` +
+        `/${stringForRef(promptCase.graphFunctionName)}` +
+        `/${promptCase.vectorIndex}` +
+        `/${stringForRef(promptCase.edgeRef)}`,
+      projection: promptCase.promptProjection,
       evidenceRefs: Object.freeze([
-        "workspace://build_tenants/typescript/code/src/operator/prompt_assets.ts",
-        "workspace://build_tenants/typescript/code/src/operator/plugins/evaluate/prompts.ts"
+        "workspace://build_tenants/typescript/code/src/gtl_conformance/program.ts",
+        "workspace://build_tenants/typescript/code/src/operator/plugins/transform/launch_contract.ts",
+        "workspace://build_tenants/typescript/code/src/operator/prompt_assets.ts"
       ])
-    })));
+    })
+  );
+  return Object.freeze([...genericPromptRows, ...materializedPromptRows]);
 }
 
-interface SdlcPromptProjectionReviewIssue {
+export interface SdlcPromptProjectionReviewIssue {
   readonly edgeRef: string;
   readonly code:
+    | "prompt_materialization_failed"
+    | "prompt_asset_missing_target_carrier_ref"
+    | "prompt_asset_missing_work_category"
+    | "prompt_asset_missing_sections"
     | "prompt_missing_selected_target_carrier_envelope"
     | "prompt_contradicts_selected_target_carrier_envelope"
-    | "prompt_inner_register_claims_top_level_authority";
+    | "prompt_inner_register_claims_top_level_authority"
+    | "prompt_contradicts_worker_tool_write_policy"
+    | "prompt_empty_liveness_packet_claims_semantic_progress"
+    | "prompt_missing_design_depth_incremental_progress_protocol"
+    | "prompt_missing_review_grade_progress_protocol"
+    | "prompt_missing_review_grade_immediate_final_write_protocol"
+    | "prompt_missing_review_grade_final_output_ban"
+    | "prompt_missing_review_grade_read_only_workspace_boundary"
+    | "prompt_missing_component_depth_whole_file_carrier_boundary"
+    | "prompt_component_test_scope_contradiction"
+    | "prompt_transform_scope_label_contradiction"
+    | "fp_review_gate_result_missing"
+    | "fp_review_gate_result_invalid";
   readonly detail: string;
 }
 
-const SEMANTIC_PROMPT_PROJECTION_REVIEW_EDGE_REFS = Object.freeze([
-  "derive_test_design_surface"
-] as const);
-
 function makeSemanticPromptReviewWorkspace(): string {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-prompt-review-"));
-  mkdirSync(path.join(root, "specification"), { recursive: true });
+  mkdirSync(path.join(root, "specification/requirements"), { recursive: true });
   mkdirSync(path.join(root, ".ai-workspace/context"), { recursive: true });
+  mkdirSync(path.join(root, "build_tenants/typescript/spec"), { recursive: true });
   writeFileSync(path.join(root, "README.md"), "# Prompt Review Fixture\n", "utf8");
   writeFileSync(
     path.join(root, "specification/INTENT.md"),
@@ -477,6 +1139,30 @@ function makeSemanticPromptReviewWorkspace(): string {
     "utf8"
   );
   writeFileSync(
+    path.join(root, "specification/requirements/01-prompt-review.md"),
+    "# Prompt Review Requirements\n\nREQ-PROMPT-REVIEW-001: Rendered prompts must not contradict target-carrier contract law.\n",
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, "specification/PRODUCT.md"),
+    [
+      "# Product",
+      "",
+      "## Active Tenant",
+      "",
+      "- **Tenant**: typescript",
+      "- **Output Root**: `build_tenants/typescript`",
+      "",
+      "## Expected Files",
+      "",
+      "- `build_tenants/typescript/package.json` (role: `build_config`)",
+      "- `build_tenants/typescript/src/index.ts` (role: `source`)",
+      "- `build_tenants/typescript/test/index.test.ts` (role: `test`)",
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
     path.join(root, ".ai-workspace/context/project_constraints.yml"),
     [
       "project:",
@@ -486,8 +1172,31 @@ function makeSemanticPromptReviewWorkspace(): string {
       "  typescript:",
       "    output_dir: build_tenants/typescript",
       "    language: typescript",
-      "    build_tool: npm"
+      "    build_tool: npm",
+      "    build_command: npm run build",
+      "    test_command: npm test",
+      "    module_structure:",
+      "      - app"
     ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, "build_tenants/typescript/spec/TECH_STACK.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        buildConfigTargets: ["package.json"],
+        moduleLayout: { sourceRoots: ["src"] },
+        testingTechStack: {
+          testRoots: ["test"],
+          testRunner: "npm test",
+          proofCommands: ["npm test"],
+          evidenceFormat: "tap"
+        }
+      },
+      null,
+      2
+    )}\n`,
     "utf8"
   );
   materializeSdlcProjectConformance({ workspaceRoot: root });
@@ -500,29 +1209,62 @@ function reviewRenderedPromptProjection(input: {
   readonly outputCarrierKind: string;
   readonly contractRef: string;
   readonly contractDigest: string;
+  readonly promptProjection: SdlcRenderedPromptProjection;
+  readonly promptFamily?: string | undefined;
 }): readonly SdlcPromptProjectionReviewIssue[] {
   const issues: SdlcPromptProjectionReviewIssue[] = [];
-  const selectedEnvelopeDirective =
-    `selected target-carrier envelope with \`kind:"${input.outputCarrierKind}"\``;
-  if (!input.promptText.includes(selectedEnvelopeDirective)) {
+  const invocationAsset = input.promptProjection.invocationAsset;
+  const promptFamily = input.promptFamily ?? invocationAsset.promptFamily;
+  for (const required of [input.outputCarrierKind, input.contractRef]) {
+    if (!invocationAsset.outputCarrierRefs.includes(required)) {
+      issues.push({
+        edgeRef: input.edgeRef,
+        code: "prompt_asset_missing_target_carrier_ref",
+        detail:
+          `prompt asset outputCarrierRefs does not carry ${required}`
+      });
+    }
+  }
+  if (invocationAsset.workCategory !== input.edgeRef) {
     issues.push({
       edgeRef: input.edgeRef,
-      code: "prompt_missing_selected_target_carrier_envelope",
-      detail: `rendered prompt does not name ${selectedEnvelopeDirective}`
+      code: "prompt_asset_missing_work_category",
+      detail:
+        `prompt asset workCategory=${invocationAsset.workCategory ?? "<null>"} does not match edge ${input.edgeRef}`
     });
   }
-  for (const required of [
-    `edgeRef:"${input.edgeRef}"`,
-    `contractRef:"${input.contractRef}"`,
-    `contractDigest:"${input.contractDigest}"`,
-    'payload.kind:"sdlc_test_design_register"'
-  ]) {
-    if (!input.promptText.includes(required)) {
+  if (invocationAsset.promptSections.length === 0) {
+    issues.push({
+      edgeRef: input.edgeRef,
+      code: "prompt_asset_missing_sections",
+      detail: "prompt invocation asset has no typed prompt sections"
+    });
+  }
+  if (
+    input.outputCarrierKind === "sdlc_test_design_surface_target_carrier"
+  ) {
+    const selectedEnvelopeDirective =
+      `selected target-carrier envelope with \`kind:"${input.outputCarrierKind}"\``;
+    if (!input.promptText.includes(selectedEnvelopeDirective)) {
       issues.push({
         edgeRef: input.edgeRef,
         code: "prompt_missing_selected_target_carrier_envelope",
-        detail: `rendered prompt does not carry ${required}`
+        detail: `rendered prompt does not name ${selectedEnvelopeDirective}`
       });
+    }
+    for (const required of [
+      `edgeRef:"${input.edgeRef}"`,
+      `contractRef:"${input.contractRef}"`,
+      `contractDigest:"${input.contractDigest}"`,
+      'payload.kind:"sdlc_test_design_register"'
+    ]) {
+      if (!input.promptText.includes(required)) {
+        issues.push({
+          edgeRef: input.edgeRef,
+          code: "prompt_missing_selected_target_carrier_envelope",
+          detail: `rendered prompt does not carry ${required}`
+        });
+      }
     }
   }
   if (
@@ -543,48 +1285,269 @@ function reviewRenderedPromptProjection(input: {
         "rendered prompt assigns top-level authority to the inner register instead of the selected target-carrier envelope"
     });
   }
+  if (
+    input.outputCarrierKind === "sdlc_component_test_surface_target_carrier" &&
+    input.promptText.includes(
+      "Every admitted requirement obligation in workerInvocationPackage.traversalObligationContext.obligations"
+    )
+  ) {
+    issues.push({
+      edgeRef: input.edgeRef,
+      code: "prompt_component_test_scope_contradiction",
+      detail:
+        "component-test prompt expands scoped test lineage to every traversal requirement obligation"
+    });
+  }
+  if (
+    promptFamily === "transform" &&
+    input.promptText.includes("obligations in scope:") &&
+    !input.promptText.includes("active report scope from inlineObligationIds:")
+  ) {
+    issues.push({
+      edgeRef: input.edgeRef,
+      code: "prompt_transform_scope_label_contradiction",
+      detail:
+        "transform prompt labels broad traversal obligations as in-scope without naming the admitted inlineObligationIds report scope"
+    });
+  }
+  if (
+    promptFamily === "transform" &&
+    input.promptText.includes("whole-file JSON component_depth_register")
+  ) {
+    for (const required of [
+      "The output file content must be exactly that selected-carrier JSON object",
+      "first non-whitespace character `{`",
+      "final non-whitespace character `}`",
+      "no Markdown headings, tables, prose preamble, fenced code blocks, or trailing text outside the JSON object"
+    ]) {
+      if (!input.promptText.includes(required)) {
+        issues.push({
+          edgeRef: input.edgeRef,
+          code: "prompt_missing_component_depth_whole_file_carrier_boundary",
+          detail:
+            `component-depth transform prompt does not carry exact whole-file selected-carrier boundary marker: ${required}`
+        });
+      }
+    }
+  }
+  if (promptFamily === "evaluate_design_depth") {
+    if (input.promptText.includes("Do not Read anything before this Write")) {
+      issues.push({
+        edgeRef: input.edgeRef,
+        code: "prompt_contradicts_worker_tool_write_policy",
+        detail:
+          "design-depth evaluator prompt forbids the read required before overwriting the pre-created ledger slot"
+      });
+    }
+    if (input.promptText.includes("intentionally carries empty/null partial values")) {
+      issues.push({
+        edgeRef: input.edgeRef,
+        code: "prompt_empty_liveness_packet_claims_semantic_progress",
+        detail:
+          "design-depth evaluator prompt treats an empty/null liveness packet as semantic progress instead of a typed partial verdict"
+      });
+    }
+    for (const required of [
+      "Progress-timeout protection:",
+      "Second-update JSON packet:",
+      "Full partial checkpoint JSON packet:",
+      "The next progress checkpoint after the first update is the exact second content-ledger Write",
+      "do not write a plan or checklist"
+    ]) {
+      if (!input.promptText.includes(required)) {
+        issues.push({
+          edgeRef: input.edgeRef,
+          code: "prompt_missing_design_depth_incremental_progress_protocol",
+          detail:
+            `design-depth evaluator prompt does not carry required incremental progress protocol marker: ${required}`
+        });
+      }
+    }
+  }
+  if (promptFamily === "evaluate_review_grade") {
+    for (const required of [
+      "The evaluator is read-only over workspace and product files",
+      "Do not use Write, Edit",
+      "Any Write/Edit tool path must equal the assessment artifact path",
+      "every other workspace path is read-only"
+    ]) {
+      if (!input.promptText.includes(required)) {
+        issues.push({
+          edgeRef: input.edgeRef,
+          code: "prompt_missing_review_grade_read_only_workspace_boundary",
+          detail:
+            `review-grade evaluator prompt does not carry required read-only workspace boundary marker: ${required}`
+        });
+      }
+    }
+    for (const required of [
+      "Progress-timeout protection:",
+      "First assessment checkpoint:",
+      "First assessment checkpoint JSON must be valid whole-file JSON",
+      "Final assessment write precedes optional schema verification",
+      "Do not write a plan or checklist before the first assessment checkpoint"
+    ]) {
+      if (!input.promptText.includes(required)) {
+        issues.push({
+          edgeRef: input.edgeRef,
+          code: "prompt_missing_review_grade_progress_protocol",
+          detail:
+            `review-grade evaluator prompt does not carry required progress protocol marker: ${required}`
+        });
+      }
+    }
+    if (
+      !input.promptText.includes(
+        "Final decision immediate-write rule:"
+      ) ||
+      !input.promptText.includes(
+        "your next tool call must overwrite the assessment JSON"
+      )
+    ) {
+      issues.push({
+        edgeRef: input.edgeRef,
+        code: "prompt_missing_review_grade_immediate_final_write_protocol",
+        detail:
+          "review-grade evaluator prompt does not bind final semantic decision to the next durable assessment write"
+      });
+    }
+    if (
+      !input.promptText.includes("Final decision output ban:") ||
+      !input.promptText.includes("emit no assistant text") ||
+      !input.promptText.includes(
+        "the next emitted item must be the Write tool call"
+      )
+    ) {
+      issues.push({
+        edgeRef: input.edgeRef,
+        code: "prompt_missing_review_grade_final_output_ban",
+        detail:
+          "review-grade evaluator prompt does not forbid final-decision prose before the durable assessment write"
+      });
+    }
+  }
   return Object.freeze(issues);
 }
 
-function semanticPromptProjectionReviewIssues(): readonly SdlcPromptProjectionReviewIssue[] {
+export function semanticPromptProjectionIssuesForRenderedPrompt(input: {
+  readonly edgeRef: string;
+  readonly promptFamily: string;
+  readonly promptText: string;
+  readonly outputCarrierKind: string;
+  readonly contractRef: string;
+  readonly contractDigest: string;
+}): readonly SdlcPromptProjectionReviewIssue[] {
+  return reviewRenderedPromptProjection({
+    edgeRef: input.edgeRef,
+    promptText: input.promptText,
+    outputCarrierKind: input.outputCarrierKind,
+    contractRef: input.contractRef,
+    contractDigest: input.contractDigest,
+    promptFamily: input.promptFamily,
+    promptProjection: {
+      invocationAsset: {
+        promptFamily: input.promptFamily,
+        workCategory: input.edgeRef,
+        outputCarrierRefs: [input.outputCarrierKind, input.contractRef],
+        promptSections: [{}]
+      }
+    } as unknown as SdlcRenderedPromptProjection
+  });
+}
+
+function semanticPromptProjectionReview(
+  vectorRows: readonly MaterializedGraphVectorRow[]
+): SemanticPromptProjectionReviewSummary {
   const workspaceRoot = makeSemanticPromptReviewWorkspace();
   try {
     const issues: SdlcPromptProjectionReviewIssue[] = [];
-    for (const edgeRef of SEMANTIC_PROMPT_PROJECTION_REVIEW_EDGE_REFS) {
-      const contract = hookContractByEdgeName(edgeRef);
-      const manifest = deriveWorkerHandoffManifest({
-        workspaceRoot,
-        graphFunctionName: edgeRef,
-        edgeName: contract.edgeName,
-        vectorIndex: 0,
-        contract,
-        runId: `semantic-prompt-review-${edgeRef}`
-      });
-      issues.push(
-        ...reviewRenderedPromptProjection({
-          edgeRef,
-          promptText: promptForHandoff(manifest),
-          outputCarrierKind: manifest.targetCarrierProjection.outputCarrierKind,
+    const promptCases: SemanticPromptProjectionReviewCase[] = [];
+    const nonPromptVectorRefs: string[] = [];
+    vectorRows.forEach((row) => {
+      let contract;
+      try {
+        contract = hookContractByEdgeName(row.vector.name);
+      } catch {
+        nonPromptVectorRefs.push(
+          `${row.graphFunction.name}:${row.vector.name}`
+        );
+        return;
+      }
+      try {
+        const manifest = deriveWorkerHandoffManifest({
+          workspaceRoot,
+          graphFunctionName: row.graphFunction.name,
+          edgeName: contract.edgeName,
+          vectorIndex: row.vectorIndex,
+          contract,
+          runId:
+            `semantic-prompt-review` +
+            `-${stringForRef(row.graphFunction.name)}` +
+            `-${row.vectorIndex}` +
+            `-${stringForRef(row.vector.name)}`
+        });
+        const promptProjection = promptForHandoffProjection(manifest);
+        promptCases.push(Object.freeze({
+          graphFunctionName: row.graphFunction.name,
+          edgeRef: row.vector.name,
+          graphFunctionId: row.graphFunction.id,
+          graphId: row.graph.id,
+          graphVectorId: row.vector.id,
+          vectorIndex: row.vectorIndex,
+          targetAssetType: manifest.targetAssetType,
+          outputCarrierKind:
+            manifest.targetCarrierProjection.outputCarrierKind,
           contractRef:
             manifest.targetCarrierProjection.targetCarrierContractRef,
           contractDigest:
-            manifest.targetCarrierProjection.targetCarrierContractDigest
-        })
-      );
-    }
-    return Object.freeze(issues);
+            manifest.targetCarrierProjection.targetCarrierContractDigest,
+          promptProjection
+        }));
+        issues.push(
+          ...reviewRenderedPromptProjection({
+            edgeRef: row.vector.name,
+            promptText: promptProjection.promptText,
+            outputCarrierKind:
+              manifest.targetCarrierProjection.outputCarrierKind,
+            contractRef:
+              manifest.targetCarrierProjection.targetCarrierContractRef,
+            contractDigest:
+              manifest.targetCarrierProjection.targetCarrierContractDigest,
+            promptProjection
+          })
+        );
+      } catch (error) {
+        issues.push({
+          edgeRef: row.vector.name,
+          code: "prompt_materialization_failed",
+          detail:
+            error instanceof Error
+              ? error.message
+              : "unknown prompt materialization failure"
+        });
+      }
+    });
+    return Object.freeze({
+      graphVectorCount: vectorRows.length,
+      promptProjectionCount: promptCases.length,
+      nonPromptVectorCount: nonPromptVectorRefs.length,
+      promptCases: Object.freeze(promptCases),
+      nonPromptVectorRefs: Object.freeze(nonPromptVectorRefs.sort()),
+      issues: Object.freeze(issues)
+    });
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
   }
 }
 
-function assertSemanticPromptProjectionReviewPassed(): void {
-  const issues = semanticPromptProjectionReviewIssues();
-  if (issues.length > 0) {
+function assertSemanticPromptProjectionReviewPassed(
+  review: SemanticPromptProjectionReviewSummary
+): void {
+  if (review.issues.length > 0) {
     throw new TypeError(
       [
         "SDLC semantic prompt projection review failed:",
-        ...issues.map(
+        ...review.issues.map(
           (issue) => `- ${issue.edgeRef}: ${issue.code}: ${issue.detail}`
         )
       ].join("\n")
@@ -592,14 +1555,264 @@ function assertSemanticPromptProjectionReviewPassed(): void {
   }
 }
 
+function semanticPromptReviewPackageFromSummary(input: {
+  readonly subjectRef: string;
+  readonly review: SemanticPromptProjectionReviewSummary;
+}): SdlcSemanticCompilerPromptReviewPackage {
+  const promptProjections = Object.freeze(
+    input.review.promptCases.map((promptCase) => Object.freeze({
+      graphFunctionName: promptCase.graphFunctionName,
+      edgeRef: promptCase.edgeRef,
+      vectorIndex: promptCase.vectorIndex,
+      targetAssetType: promptCase.targetAssetType,
+      outputCarrierKind: promptCase.outputCarrierKind,
+      contractRef: promptCase.contractRef,
+      contractDigest: promptCase.contractDigest,
+      promptFamily:
+        promptCase.promptProjection.invocationAsset.promptFamily,
+      stage: promptCase.promptProjection.invocationAsset.stage,
+      renderedPromptDigest:
+        promptCase.promptProjection.invocationAsset.renderedPromptDigest,
+      promptText: promptCase.promptProjection.promptText
+    }))
+  );
+  const deterministicDigestBasis = JSON.stringify({
+    subjectRef: input.subjectRef,
+    graphVectorCount: input.review.graphVectorCount,
+    promptProjectionCount: input.review.promptProjectionCount,
+    nonPromptVectorCount: input.review.nonPromptVectorCount,
+    deterministicIssues: input.review.issues,
+    promptProjections: promptProjections.map((projection) => ({
+      graphFunctionName: projection.graphFunctionName,
+      edgeRef: projection.edgeRef,
+      vectorIndex: projection.vectorIndex,
+      targetAssetType: projection.targetAssetType,
+      outputCarrierKind: projection.outputCarrierKind,
+      contractRef: projection.contractRef,
+      contractDigest: projection.contractDigest,
+      promptFamily: projection.promptFamily,
+      stage: projection.stage,
+      renderedPromptDigest: projection.renderedPromptDigest
+    }))
+  });
+  return Object.freeze({
+    kind: "sdlc_semantic_compiler_prompt_review_package" as const,
+    packageVersion: "ts-semantic-compiler-prompt-review-v1" as const,
+    subjectRef: input.subjectRef,
+    deterministicReportDigest: sha256Text(deterministicDigestBasis),
+    graphVectorCount: input.review.graphVectorCount,
+    promptProjectionCount: input.review.promptProjectionCount,
+    nonPromptVectorCount: input.review.nonPromptVectorCount,
+    deterministicIssueCount: input.review.issues.length,
+    deterministicIssues: input.review.issues,
+    promptProjections
+  });
+}
+
+function semanticCompilerFpReviewEnabled(): boolean {
+  const value =
+    process.env["ODD_SDLC_SEMANTIC_COMPILER_FP_EVAL"] ??
+    process.env["ODD_SDLC_SEMANTIC_COMPILER_FP_REVIEW"] ??
+    "";
+  return /^(?:1|true|required|release)$/iu.test(value.trim());
+}
+
+function admittedSemanticCompilerFpReviewResult(input: {
+  readonly value: unknown;
+  readonly expectedDigest: string;
+}): {
+  readonly passed: boolean;
+  readonly reason: string;
+} {
+  if (!isRecord(input.value)) {
+    return Object.freeze({
+      passed: false,
+      reason: "review result is not a JSON object"
+    });
+  }
+  if (
+    input.value["kind"] !== "sdlc_semantic_compiler_fp_review_result" ||
+    input.value["reviewVersion"] !==
+      "ts-semantic-compiler-fp-review-result-v1"
+  ) {
+    return Object.freeze({
+      passed: false,
+      reason: "review result kind/version is not admitted"
+    });
+  }
+  if (input.value["deterministicReportDigest"] !== input.expectedDigest) {
+    return Object.freeze({
+      passed: false,
+      reason: "review result digest does not match current deterministic package"
+    });
+  }
+  if (input.value["status"] !== "passed") {
+    return Object.freeze({
+      passed: false,
+      reason: "review result status is not passed"
+    });
+  }
+  if (input.value["findingCount"] !== 0) {
+    return Object.freeze({
+      passed: false,
+      reason: "review result carries open findings"
+    });
+  }
+  for (const field of ["reviewerProfileRef", "reviewedAt"]) {
+    if (
+      typeof input.value[field] !== "string" ||
+      input.value[field].trim().length === 0
+    ) {
+      return Object.freeze({
+        passed: false,
+        reason: `${field} is missing`
+      });
+    }
+  }
+  return Object.freeze({
+    passed: true,
+    reason: "admitted F_P semantic compiler review result passed"
+  });
+}
+
+function semanticCompilerReviewResultPath(): string {
+  return process.env["ODD_SDLC_SEMANTIC_COMPILER_FP_REVIEW_RESULT"] ?? "";
+}
+
+function readSemanticCompilerFpReviewResult(input: {
+  readonly reviewPackage: SdlcSemanticCompilerPromptReviewPackage;
+}): {
+  readonly path: string;
+  readonly parsed: Readonly<Record<string, unknown>>;
+  readonly reason: string;
+} {
+  const reviewResultPath = semanticCompilerReviewResultPath();
+  if (reviewResultPath.trim().length === 0) {
+    throw new TypeError(
+      [
+        "SDLC semantic compiler F_P.eval review gate requires an admitted review result.",
+        `Set ODD_SDLC_SEMANTIC_COMPILER_FP_REVIEW_RESULT to a JSON result for deterministicReportDigest=${input.reviewPackage.deterministicReportDigest}.`,
+        "Expected result kind=sdlc_semantic_compiler_fp_review_result, reviewVersion=ts-semantic-compiler-fp-review-result-v1, status=passed, findingCount=0."
+      ].join("\n")
+    );
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(reviewResultPath, "utf8"));
+  } catch (error) {
+    throw new TypeError(
+      [
+        "SDLC semantic compiler F_P.eval review gate could not read review result.",
+        `path=${reviewResultPath}`,
+        error instanceof Error ? error.message : "unknown read/parse failure"
+      ].join("\n")
+    );
+  }
+  const admission = admittedSemanticCompilerFpReviewResult({
+    value: parsed,
+    expectedDigest: input.reviewPackage.deterministicReportDigest
+  });
+  if (!admission.passed || !isRecord(parsed)) {
+    throw new TypeError(
+      [
+        "SDLC semantic compiler F_P.eval review gate failed:",
+        admission.reason,
+        `path=${reviewResultPath}`,
+        `deterministicReportDigest=${input.reviewPackage.deterministicReportDigest}`
+      ].join("\n")
+    );
+  }
+  return Object.freeze({
+    path: reviewResultPath,
+    parsed,
+    reason: admission.reason
+  });
+}
+
+function semanticReviewGateRowsForPackage(input: {
+  readonly reviewPackage: SdlcSemanticCompilerPromptReviewPackage;
+}): readonly SdlcGtlProgramSemanticReviewGateRow[] {
+  if (!semanticCompilerFpReviewEnabled()) {
+    return Object.freeze([]);
+  }
+  const reviewResult = readSemanticCompilerFpReviewResult(input);
+  return Object.freeze([
+    Object.freeze({
+      gateRef:
+        "semantic-review-gate://odd-sdlc/t204/materialized-prompts/fp-code-review",
+      subjectRef: input.reviewPackage.subjectRef,
+      deterministicReportDigest:
+        input.reviewPackage.deterministicReportDigest,
+      reviewResultKind:
+        "sdlc_semantic_compiler_fp_review_result" as const,
+      reviewVersion: "ts-semantic-compiler-fp-review-result-v1" as const,
+      status: "passed" as const,
+      findingCount: 0 as const,
+      reviewerProfileRef:
+        reviewResult.parsed["reviewerProfileRef"] as string,
+      reviewedAt: reviewResult.parsed["reviewedAt"] as string,
+      evidenceRefs: Object.freeze([`file://${reviewResult.path}`])
+    })
+  ]);
+}
+
+export function constructCurrentSdlcSemanticCompilerPromptReviewPackage(
+  input: Pick<
+    SdlcGtlProgramConformanceInputOptions,
+    "subjectRef" | "packageRoot"
+  > = {}
+): SdlcSemanticCompilerPromptReviewPackage {
+  const module = constructSdlcGtlModule();
+  const vectorRows = materializedGraphVectorRows(module);
+  const review = semanticPromptProjectionReview(vectorRows);
+  assertSemanticPromptProjectionReviewPassed(review);
+  return semanticPromptReviewPackageFromSummary({
+    subjectRef: input.subjectRef ?? SDLC_GTL_PROGRAM_CONFORMANCE_SUBJECT_REF,
+    review
+  });
+}
+
+export function assertCurrentSdlcSemanticCompilerFpReviewGate(
+  input: Pick<
+    SdlcGtlProgramConformanceInputOptions,
+    "subjectRef" | "packageRoot"
+  > = {}
+): SdlcSemanticCompilerFpReviewGateReport {
+  const reviewPackage =
+    constructCurrentSdlcSemanticCompilerPromptReviewPackage(input);
+  if (!semanticCompilerFpReviewEnabled()) {
+    return Object.freeze({
+      kind: "sdlc_semantic_compiler_fp_review_gate_report" as const,
+      gateVersion: "ts-semantic-compiler-fp-review-gate-v1" as const,
+      mode: "skipped" as const,
+      passed: true,
+      reviewResultPath: null,
+      deterministicReportDigest: reviewPackage.deterministicReportDigest,
+      reason:
+        "ODD_SDLC_SEMANTIC_COMPILER_FP_EVAL is not enabled; deterministic semantic compiler review passed"
+    });
+  }
+  const reviewResult = readSemanticCompilerFpReviewResult({ reviewPackage });
+  return Object.freeze({
+    kind: "sdlc_semantic_compiler_fp_review_gate_report" as const,
+    gateVersion: "ts-semantic-compiler-fp-review-gate-v1" as const,
+    mode: "required" as const,
+    passed: true,
+    reviewResultPath: reviewResult.path,
+    deterministicReportDigest: reviewPackage.deterministicReportDigest,
+    reason: reviewResult.reason
+  });
+}
+
 function materializedGraphVectorRows(module: Module): readonly MaterializedGraphVectorRow[] {
   return Object.freeze(
     module.graphFunctions.flatMap((graphFunction) => {
       const graph = materializeGraphFunction(graphFunction);
-      return graph.vectors.map((vector) => Object.freeze({
+      return graph.vectors.map((vector, vectorIndex) => Object.freeze({
         graphFunction,
         graph,
-        vector
+        vector,
+        vectorIndex
       }));
     })
   );
@@ -1594,8 +2807,18 @@ export function constructCurrentSdlcGtlProgramConformanceInput(
       defaultForOverlayRefs: target.defaultForOverlayRefs
     }))
   );
-  const promptAssets = promptProjectionRows();
-  assertSemanticPromptProjectionReviewPassed();
+  const subjectRef =
+    input.subjectRef ?? SDLC_GTL_PROGRAM_CONFORMANCE_SUBJECT_REF;
+  const promptProjectionReview = semanticPromptProjectionReview(vectorRows);
+  assertSemanticPromptProjectionReviewPassed(promptProjectionReview);
+  const semanticPromptReviewPackage = semanticPromptReviewPackageFromSummary({
+    subjectRef,
+    review: promptProjectionReview
+  });
+  const semanticReviewGates = semanticReviewGateRowsForPackage({
+    reviewPackage: semanticPromptReviewPackage
+  });
+  const promptAssets = promptProjectionRows(promptProjectionReview.promptCases);
   const pluginContracts = Object.freeze([
     fpDispatchPluginContract(),
     fpEvaluatorPluginContract(),
@@ -1605,6 +2828,8 @@ export function constructCurrentSdlcGtlProgramConformanceInput(
     consequenceProjectionPluginContract()
   ]);
   const sourceIdentitySurfaces = activeSdlcSourceIdentitySurfaces(input);
+  assertSemanticSourceAuthorityReviewPassed(sourceIdentitySurfaces);
+  const sourceAuthorityPolicies = sourceAuthorityPolicyRows();
   const sameObjectProofs = Object.freeze([]);
   const operatorDeclarations = operatorDeclarationRows(vectorRows);
   const evaluatorDeclarations = evaluatorDeclarationRows(vectorRows);
@@ -1649,8 +2874,8 @@ export function constructCurrentSdlcGtlProgramConformanceInput(
     runtimeBindings
   });
 
-  return Object.freeze({
-    subjectRef: input.subjectRef ?? SDLC_GTL_PROGRAM_CONFORMANCE_SUBJECT_REF,
+  const conformanceInput = Object.freeze({
+    subjectRef,
     abiPackageVersion: ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.packageVersion,
     expectedCoverage: Object.freeze({
       catalogGraphFunctionCount: catalogGraphFunctionRefs.length,
@@ -1681,6 +2906,8 @@ export function constructCurrentSdlcGtlProgramConformanceInput(
     pluginResultInterfaces,
     traversalBindConservation,
     sourceIdentitySurfaces,
+    sourceAuthorityPolicies,
+    semanticReviewGates,
     sameObjectProofs,
     operatorDeclarations,
     evaluatorDeclarations,
@@ -1694,6 +2921,7 @@ export function constructCurrentSdlcGtlProgramConformanceInput(
     externalToolGates,
     runtimeBindings
   });
+  return conformanceInput as GtlProgramConformanceInput;
 }
 
 export function admitCurrentSdlcGtlProgramConformanceInput(
@@ -1738,7 +2966,11 @@ export function assertSdlcGtlProgramConformanceReportPassed(
 export function assertCurrentSdlcGtlProgramConformance(
   input: SdlcGtlProgramConformanceInputOptions = {}
 ): GtlProgramConformanceReport {
-  return assertSdlcGtlProgramConformanceReportPassed(
+  const report = assertSdlcGtlProgramConformanceReportPassed(
     typecheckCurrentSdlcGtlProgram(input)
   );
+  if (semanticCompilerFpReviewEnabled()) {
+    assertCurrentSdlcSemanticCompilerFpReviewGate(input);
+  }
+  return report;
 }

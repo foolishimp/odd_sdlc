@@ -195,7 +195,10 @@ import { sdlcWorkspaceLocalToolEnvironment } from "./tool_environment.js";
 import {
   selectSdlcWorkCategoryGovernance
 } from "./work_category_governance.js";
-import { sdlcOperatorRuntimePolicy } from "./runtime_policy.js";
+import {
+  sdlcOperatorRuntimePolicy,
+  type SdlcOperatorRuntimeEffort
+} from "./runtime_policy.js";
 import {
   createSdlcAbgPluginSet
 } from "./plugins/plugin_set.js";
@@ -837,6 +840,27 @@ function postActionArchiveRefFromSelectedActionRef(ref: string | null): string |
   return decoded.startsWith("file://") ? decoded : null;
 }
 
+function postActionArchiveRefFromClosureDecisionRef(
+  ref: string | null | undefined
+): string | null {
+  if (ref === null || ref === undefined) {
+    return null;
+  }
+  const prefix = "closure-decision://odd-sdlc/";
+  if (!ref.startsWith(prefix)) {
+    return null;
+  }
+  const remainder = ref.slice(prefix.length);
+  const edgeFulfillmentIndex = remainder.indexOf("/edge-fulfillment/");
+  const encodedArchiveRef =
+    edgeFulfillmentIndex < 0 ? remainder : remainder.slice(0, edgeFulfillmentIndex);
+  if (encodedArchiveRef.length === 0) {
+    return null;
+  }
+  const decoded = decodedArchiveRefForScope(encodedArchiveRef);
+  return decoded.startsWith("file://") ? decoded : null;
+}
+
 function gapDossierFromPostActionArchiveRef(
   archiveRef: string
 ): SdlcPostflightGapDossier | null {
@@ -851,6 +875,108 @@ function gapDossierFromPostActionArchiveRef(
   } catch {
     return null;
   }
+}
+
+function graphFunctionNameFromNextActionProjection(
+  projection: NonNullable<
+    SdlcRuntimeBindingContractProjection["executionContract"]
+  >["nextActionProjection"]
+): string {
+  const ref =
+    projection.selectedComposition?.graphFunctionRef ??
+    projection.nextGraphFunctionRef ??
+    projection.compositionRef ??
+    "";
+  const prefix = "graph-function:odd_sdlc:";
+  if (ref.startsWith(prefix)) {
+    return ref.slice(prefix.length);
+  }
+  const segment = ref.split(":").at(-1);
+  return segment !== undefined && segment.length > 0 ? segment : "unknown_graph_function";
+}
+
+function edgeNameFromNextActionProjection(
+  projection: NonNullable<
+    SdlcRuntimeBindingContractProjection["executionContract"]
+  >["nextActionProjection"]
+): string {
+  const segment = projection.compositionRef?.split("/").at(-1);
+  return segment !== undefined && segment.length > 0 ? segment : "unknown_edge";
+}
+
+function targetAssetTypeFromNextActionProjection(
+  projection: NonNullable<
+    SdlcRuntimeBindingContractProjection["executionContract"]
+  >["nextActionProjection"]
+): string {
+  const ref = projection.edgeAssuranceContractRef;
+  const segment = ref?.split("/").at(-1);
+  return segment !== undefined && segment.length > 0
+    ? segment
+    : "unknown_target_asset_type";
+}
+
+function vectorIndexFromNextActionProjection(
+  projection: NonNullable<
+    SdlcRuntimeBindingContractProjection["executionContract"]
+  >["nextActionProjection"]
+): number {
+  const graphVectorRef =
+    projection.selectedComposition?.graphVectorRef ??
+    projection.nextGraphVectorRef ??
+    "";
+  const match = /\/vector-(\d+)(?:\/|$)/u.exec(
+    graphVectorRef
+  );
+  if (match === null) {
+    return 0;
+  }
+  const parsed = Number.parseInt(match[1] ?? "0", 10);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+function syntheticGapDossierFromPostActionProjection(input: {
+  readonly nextActionProjection: NonNullable<
+    SdlcRuntimeBindingContractProjection["executionContract"]
+  >["nextActionProjection"];
+}): SdlcPostflightGapDossier | null {
+  const closureDecisionRef = input.nextActionProjection.closureDecisionRef;
+  if (closureDecisionRef === null) {
+    return null;
+  }
+  const archiveRef = postActionArchiveRefFromClosureDecisionRef(closureDecisionRef);
+  if (archiveRef === null) {
+    return null;
+  }
+  let archiveRoot: string;
+  try {
+    archiveRoot = fileURLToPath(archiveRef);
+  } catch {
+    return null;
+  }
+  const edgeResidualPressureRefs =
+    input.nextActionProjection.edgeResidualPressureRefs ?? Object.freeze([]);
+  const reasonRefs =
+    edgeResidualPressureRefs.length > 0
+      ? edgeResidualPressureRefs
+      : input.nextActionProjection.gapPressureRefs;
+  return syntheticGapDossierFromClosureRefs({
+    manifest: {
+      archiveRoot,
+      graphFunctionName: graphFunctionNameFromNextActionProjection(
+        input.nextActionProjection
+      ),
+      edgeName: edgeNameFromNextActionProjection(input.nextActionProjection),
+      vectorIndex: vectorIndexFromNextActionProjection(input.nextActionProjection),
+      targetAssetType: targetAssetTypeFromNextActionProjection(
+        input.nextActionProjection
+      )
+    },
+    decisionRef: closureDecisionRef,
+    reasonRefs,
+    sourceProjectionRef: input.nextActionProjection.nextActionProjectionRef,
+    scope: "post_action_projection"
+  });
 }
 
 function postActionGapDossiersFromProjection(input: {
@@ -868,6 +994,15 @@ function postActionGapDossiersFromProjection(input: {
       byRef.set(dossier.currentGapDossierRef, dossier);
     }
   }
+  const closureArchiveRef = postActionArchiveRefFromClosureDecisionRef(
+    input.nextActionProjection.closureDecisionRef
+  );
+  if (closureArchiveRef !== null) {
+    const dossier = gapDossierFromPostActionArchiveRef(closureArchiveRef);
+    if (dossier !== null) {
+      byRef.set(dossier.currentGapDossierRef, dossier);
+    }
+  }
   for (const pressureRef of input.nextActionProjection.gapPressureRefs) {
     const archiveRef = postActionArchiveRefFromGapPressureRef(pressureRef);
     if (archiveRef === null) {
@@ -876,6 +1011,14 @@ function postActionGapDossiersFromProjection(input: {
     const dossier = gapDossierFromPostActionArchiveRef(archiveRef);
     if (dossier !== null) {
       byRef.set(dossier.currentGapDossierRef, dossier);
+    }
+  }
+  if (byRef.size === 0) {
+    const syntheticDossier = syntheticGapDossierFromPostActionProjection({
+      nextActionProjection: input.nextActionProjection
+    });
+    if (syntheticDossier !== null) {
+      byRef.set(syntheticDossier.currentGapDossierRef, syntheticDossier);
     }
   }
   return compactSdlcPriorGapDossiersForRetryContext(
@@ -2348,6 +2491,35 @@ function designDepthFpEvaluatorStdoutBudgetBytes(): number {
   return sdlcOperatorRuntimePolicy().designDepthFpEvaluatorStdoutBudgetBytes;
 }
 
+function designDepthFpEvaluatorMaxEffort(): SdlcOperatorRuntimeEffort {
+  return sdlcOperatorRuntimePolicy().designDepthFpEvaluatorMaxEffort;
+}
+
+const WORKER_EFFORT_RANK: Record<SdlcOperatorRuntimeEffort, number> = {
+  low: 0,
+  medium: 1,
+  high: 2,
+  xhigh: 3,
+  max: 4
+};
+
+function capWorkerTransportEffort(input: {
+  readonly transport: SdlcWorkerTransportContract;
+  readonly maxEffort: SdlcOperatorRuntimeEffort;
+}): SdlcWorkerTransportContract {
+  if (
+    input.transport.effort === null ||
+    WORKER_EFFORT_RANK[input.transport.effort] <=
+      WORKER_EFFORT_RANK[input.maxEffort]
+  ) {
+    return input.transport;
+  }
+  return Object.freeze({
+    ...input.transport,
+    effort: input.maxEffort
+  });
+}
+
 function reviewGradeEdgeFulfillmentEvaluatorTimeoutMs(): number {
   return sdlcOperatorRuntimePolicy().reviewGradeEdgeFulfillmentEvaluatorTimeoutMs;
 }
@@ -2355,6 +2527,10 @@ function reviewGradeEdgeFulfillmentEvaluatorTimeoutMs(): number {
 function reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs(): number {
   return sdlcOperatorRuntimePolicy()
     .reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs;
+}
+
+function reviewGradeEdgeFulfillmentEvaluatorMaxEffort(): SdlcOperatorRuntimeEffort {
+  return sdlcOperatorRuntimePolicy().reviewGradeEdgeFulfillmentEvaluatorMaxEffort;
 }
 
 function reviewGradeEdgeFulfillmentEvaluatorStdoutBudgetBytes(): number {
@@ -3676,15 +3852,19 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
     input.manifest.archiveRoot,
     "design_depth_fp_evaluator_process_events.jsonl"
   );
+  const evaluatorTransport = capWorkerTransportEffort({
+    transport: input.transport,
+    maxEffort: designDepthFpEvaluatorMaxEffort()
+  });
   const outputLastMessagePath =
-    input.transport.agentKey === "codex"
+    evaluatorTransport.agentKey === "codex"
       ? join(input.manifest.archiveRoot, "design_depth_fp_evaluator_last_message.txt")
       : "";
   const executorProfile = selectedWorkerExecutorProfile();
   const processLaunch = constrainClaudeProcessLaunchTools({
-    transport: input.transport,
+    transport: evaluatorTransport,
     processLaunch: processLaunchForWorker({
-      transport: input.transport,
+      transport: evaluatorTransport,
       manifestPath,
       manifest: input.manifest,
       promptPath,
@@ -3741,7 +3921,7 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
       invocation: actorInvocationForPluginInput({
         pluginInput: input.pluginInput,
         basis: input.basis,
-        transport: input.transport
+        transport: evaluatorTransport
       }),
       command: processLaunch.command,
       args: processLaunch.args,
@@ -3769,7 +3949,7 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
         input.pluginInput.selectedRegimeBindingRef ??
         input.pluginInput.selectedCompositionRef
     },
-    environmentPolicy: environmentPolicyForTransport(input.transport),
+	    environmentPolicy: environmentPolicyForTransport(evaluatorTransport),
     stdin: processLaunch.stdin,
     stdoutPath,
     stderrPath,
@@ -3777,7 +3957,7 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
     stderrRef: pathToFileURL(stderrPath).href,
     processStartedPath,
     processEventsPath,
-    parser: parserForWorkerTransport(input.transport),
+	    parser: parserForWorkerTransport(evaluatorTransport),
     executorProfile,
     timeoutMs: evaluatorTimeoutMs,
     inactivityTimeoutMs: inactivityPolicy.inactivityTimeoutMs,
@@ -4478,10 +4658,14 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       ? join(input.manifest.archiveRoot, "review_grade_edge_fulfillment_last_message.txt")
       : "";
   const executorProfile = selectedWorkerExecutorProfile();
-  const processLaunch = constrainReviewGradePlanningEvaluatorTools({
+  const evaluatorTransport = capWorkerTransportEffort({
     transport: input.transport,
+    maxEffort: reviewGradeEdgeFulfillmentEvaluatorMaxEffort()
+  });
+  const processLaunch = constrainReviewGradePlanningEvaluatorTools({
+    transport: evaluatorTransport,
     processLaunch: processLaunchForWorker({
-      transport: input.transport,
+      transport: evaluatorTransport,
       manifestPath,
       manifest: input.manifest,
       promptPath,
@@ -4556,7 +4740,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       invocation: actorInvocationForPluginInput({
         pluginInput: input.pluginInput,
         basis: input.basis,
-        transport: input.transport
+        transport: evaluatorTransport
       }),
       command: processLaunch.command,
       args: processLaunch.args,
@@ -4569,7 +4753,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
         ODD_SDLC_EVALUATOR_PROMPT: promptPath,
         ODD_SDLC_EVALUATOR_WORKER_REPORT: workerReportPath
       },
-      environmentPolicy: environmentPolicyForTransport(input.transport),
+      environmentPolicy: environmentPolicyForTransport(evaluatorTransport),
       stdin: processLaunch.stdin,
       stdoutPath,
       stderrPath,
@@ -4577,7 +4761,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       stderrRef: pathToFileURL(stderrPath).href,
       processStartedPath,
       processEventsPath,
-      parser: parserForWorkerTransport(input.transport),
+      parser: parserForWorkerTransport(evaluatorTransport),
       executorProfile,
       timeoutMs: evaluatorTimeoutMs,
       inactivityTimeoutMs: evaluatorInactivityTimeoutMs,
@@ -4699,7 +4883,15 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       reason: "review_grade_evaluator_mutated_input"
     });
   }
-  if (processResult.status !== 0) {
+  const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+    manifest: input.manifest,
+    outputFile: assessmentPath,
+    invocationScope
+  });
+  if (
+    processResult.status !== 0 &&
+    (admission.status !== "admitted" || admission.assessment === null)
+  ) {
     const processFailureReason: SdlcBlockingReasonCode =
       workerProcessTextLooksRetryableProviderFailure(evaluatorProcessText)
         ? "worker_connection_failed"
@@ -4755,11 +4947,6 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       reason: processFailureReason
     });
   }
-  const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
-    manifest: input.manifest,
-    outputFile: assessmentPath,
-    invocationScope
-  });
   if (admission.status !== "admitted" || admission.assessment === null) {
     const postflight = reviewGradePostflight({
       manifest: input.manifest,

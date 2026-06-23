@@ -88,11 +88,258 @@ function edgeAuthorityCompressionPromptLines(): readonly string[] {
 }
 
 const ABG_ITERATION_OUTCOME_FOLD_REF =
-  "package:@abiogenesis/typescript-tenant@4.1.0-rc.6#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows";
+  "package:@abiogenesis/typescript-tenant@4.1.0-rc.7#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows";
 
 interface EvaluatePromptLineGroups {
   readonly preAuthorityLines: readonly string[];
   readonly postAuthorityLines: readonly string[];
+}
+
+const DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF =
+  "prompt://odd-sdlc/design-depth/first-update-partial-verdict" as const;
+const DESIGN_DEPTH_SECOND_UPDATE_PACKET_REF =
+  "prompt://odd-sdlc/design-depth/second-update-stack-profile-checkpoint" as const;
+const DESIGN_DEPTH_FULL_PARTIAL_CHECKPOINT_PACKET_REF =
+  "prompt://odd-sdlc/design-depth/full-partial-checkpoint" as const;
+const DESIGN_DEPTH_FIRST_UPDATE_VERDICT_SEQUENCE =
+  SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.findIndex(
+    (section) => section === "designCompletenessVerdict"
+  ) + 1;
+const DESIGN_DEPTH_STACK_PROFILE_SEQUENCE =
+  SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.findIndex(
+    (section) => section === "stackProfileRows"
+  ) + 1;
+
+function designDepthFirstUpdateAxisVerdict(axis: "entity" | "attribute" | "flow") {
+  return Object.freeze({
+    kind: "sdlc_design_completeness_axis_verdict" as const,
+    axis,
+    status: "partial" as const,
+    reasons: Object.freeze([
+      "First evaluator update has admitted the ledger slot and requires bounded evidence review before final design-depth judgment."
+    ]),
+    evidenceRefs: Object.freeze([DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF])
+  });
+}
+
+function designDepthFirstUpdateVerdict(): unknown {
+  return Object.freeze({
+    kind: "sdlc_design_completeness_verdict" as const,
+    verdictVersion: "ts-design-depth-v1" as const,
+    entity: designDepthFirstUpdateAxisVerdict("entity"),
+    attribute: designDepthFirstUpdateAxisVerdict("attribute"),
+    flow: designDepthFirstUpdateAxisVerdict("flow")
+  });
+}
+
+function designDepthFirstUpdatePacket(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly governanceRef: string;
+  readonly selectedCompositionRef: string;
+  readonly selectedCompositionDigest: string;
+  readonly selectedCompositionSelectionRef: string;
+  readonly selectedRegimeBindingRef: string | null;
+}): string {
+  return `${JSON.stringify(
+    {
+      kind: "sdlc_evaluate_content_ledger",
+      ledgerVersion: "ts-evaluate-content-ledger-v1",
+      stage: "evaluate.C",
+      ruleRef: DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
+      ruleRole: "semantic_judgment",
+      computeMeans: "F_P",
+      authorityFunction: "synthesize_model",
+      selectedCompositionRef: input.selectedCompositionRef,
+      selectedCompositionDigest: input.selectedCompositionDigest,
+      selectedCompositionSelectionRef: input.selectedCompositionSelectionRef,
+      selectedRegimeBindingRef: input.selectedRegimeBindingRef,
+      compositionContributionRef:
+        input.selectedRegimeBindingRef ?? input.selectedCompositionRef,
+      sourceBasisRefs: [
+        DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF,
+        input.governanceRef
+      ],
+      candidateArtifactRefs: [input.manifest.outputFile],
+      evidenceRefs: [DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF],
+      contentRows: [
+        {
+          kind: "sdlc_evaluate_content_ledger_row",
+          rowRef:
+            "content-ledger-row://odd-sdlc/design-depth/designCompletenessVerdict",
+          authorityFunction: "synthesize_model",
+          carrierFamily: "ProductAssetModel",
+          contentKind: SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND,
+          payload: {
+            kind: "sdlc_design_depth_register_fragment",
+            fragmentVersion: "ts-design-depth-fragment-v1",
+            targetAssetType: input.manifest.targetAssetType,
+            section: "designCompletenessVerdict",
+            sequence: DESIGN_DEPTH_FIRST_UPDATE_VERDICT_SEQUENCE,
+            mergeMode: "replace",
+            value: designDepthFirstUpdateVerdict()
+          },
+          sourceBasisRefs: [
+            DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF,
+            input.governanceRef
+          ],
+          evidenceRefs: [DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF]
+        }
+      ]
+    },
+    null,
+    2
+  )}\n`;
+}
+
+function designDepthSecondUpdatePacket(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly governanceRef: string;
+  readonly selectedCompositionRef: string;
+  readonly selectedCompositionDigest: string;
+  readonly selectedCompositionSelectionRef: string;
+  readonly selectedRegimeBindingRef: string | null;
+}): string {
+  const firstPacket = JSON.parse(designDepthFirstUpdatePacket(input)) as {
+    readonly contentRows: readonly unknown[];
+  };
+  return `${JSON.stringify(
+    {
+      ...firstPacket,
+      sourceBasisRefs: [
+        DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF,
+        DESIGN_DEPTH_SECOND_UPDATE_PACKET_REF,
+        input.governanceRef
+      ],
+      evidenceRefs: [
+        DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF,
+        DESIGN_DEPTH_SECOND_UPDATE_PACKET_REF
+      ],
+      contentRows: [
+        {
+          kind: "sdlc_evaluate_content_ledger_row",
+          rowRef: "content-ledger-row://odd-sdlc/design-depth/stackProfileRows",
+          authorityFunction: "synthesize_model",
+          carrierFamily: "ProductAssetModel",
+          contentKind: SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND,
+          payload: {
+            kind: "sdlc_design_depth_register_fragment",
+            fragmentVersion: "ts-design-depth-fragment-v1",
+            targetAssetType: input.manifest.targetAssetType,
+            section: "stackProfileRows",
+            sequence: DESIGN_DEPTH_STACK_PROFILE_SEQUENCE,
+            mergeMode: "replace",
+            value: []
+          },
+          sourceBasisRefs: [
+            DESIGN_DEPTH_SECOND_UPDATE_PACKET_REF,
+            input.governanceRef
+          ],
+          evidenceRefs: [DESIGN_DEPTH_SECOND_UPDATE_PACKET_REF]
+        },
+        ...firstPacket.contentRows
+      ]
+    },
+    null,
+    2
+  )}\n`;
+}
+
+function designDepthFullPartialCheckpointValue(
+  section: (typeof SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS)[number]
+): unknown {
+  switch (section) {
+    case "aggregateDomainModel":
+    case "aggregateSunnyDaySequence":
+      return null;
+    case "designCompletenessVerdict":
+      return Object.freeze({
+        kind: "sdlc_design_completeness_verdict" as const,
+        verdictVersion: "ts-design-depth-v1" as const,
+        entity: Object.freeze({
+          kind: "sdlc_design_completeness_axis_verdict" as const,
+          axis: "entity" as const,
+          status: "partial" as const,
+          reasons: Object.freeze([
+            "Full partial checkpoint is admitted before bounded evidence refinement; entity model still requires section-level review."
+          ]),
+          evidenceRefs: Object.freeze([DESIGN_DEPTH_FULL_PARTIAL_CHECKPOINT_PACKET_REF])
+        }),
+        attribute: Object.freeze({
+          kind: "sdlc_design_completeness_axis_verdict" as const,
+          axis: "attribute" as const,
+          status: "partial" as const,
+          reasons: Object.freeze([
+            "Full partial checkpoint is admitted before bounded evidence refinement; attribute model still requires section-level review."
+          ]),
+          evidenceRefs: Object.freeze([DESIGN_DEPTH_FULL_PARTIAL_CHECKPOINT_PACKET_REF])
+        }),
+        flow: Object.freeze({
+          kind: "sdlc_design_completeness_axis_verdict" as const,
+          axis: "flow" as const,
+          status: "partial" as const,
+          reasons: Object.freeze([
+            "Full partial checkpoint is admitted before bounded evidence refinement; flow model still requires section-level review."
+          ]),
+          evidenceRefs: Object.freeze([DESIGN_DEPTH_FULL_PARTIAL_CHECKPOINT_PACKET_REF])
+        })
+      });
+    default:
+      return [];
+  }
+}
+
+function designDepthFullPartialCheckpointPacket(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly governanceRef: string;
+  readonly selectedCompositionRef: string;
+  readonly selectedCompositionDigest: string;
+  readonly selectedCompositionSelectionRef: string;
+  readonly selectedRegimeBindingRef: string | null;
+}): string {
+  const secondPacket = JSON.parse(designDepthSecondUpdatePacket(input)) as {
+    readonly contentRows: readonly unknown[];
+  };
+  return `${JSON.stringify(
+    {
+      ...secondPacket,
+      sourceBasisRefs: [
+        DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF,
+        DESIGN_DEPTH_SECOND_UPDATE_PACKET_REF,
+        DESIGN_DEPTH_FULL_PARTIAL_CHECKPOINT_PACKET_REF,
+        input.governanceRef
+      ],
+      evidenceRefs: [
+        DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF,
+        DESIGN_DEPTH_SECOND_UPDATE_PACKET_REF,
+        DESIGN_DEPTH_FULL_PARTIAL_CHECKPOINT_PACKET_REF
+      ],
+      contentRows: SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.map(
+        (section, index) => ({
+          kind: "sdlc_evaluate_content_ledger_row",
+          rowRef: `content-ledger-row://odd-sdlc/design-depth/${section}`,
+          authorityFunction: "synthesize_model",
+          carrierFamily: "ProductAssetModel",
+          contentKind: SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND,
+          payload: {
+            kind: "sdlc_design_depth_register_fragment",
+            fragmentVersion: "ts-design-depth-fragment-v1",
+            targetAssetType: input.manifest.targetAssetType,
+            section,
+            sequence: index + 1,
+            mergeMode: "replace",
+            value: designDepthFullPartialCheckpointValue(section)
+          },
+          sourceBasisRefs: [
+            DESIGN_DEPTH_FULL_PARTIAL_CHECKPOINT_PACKET_REF,
+            input.governanceRef
+          ],
+          evidenceRefs: [DESIGN_DEPTH_FULL_PARTIAL_CHECKPOINT_PACKET_REF]
+        })
+      )
+    },
+    null,
+    2
+  )}\n`;
 }
 
 function stableRefSegment(value: string | null | undefined, fallback: string): string {
@@ -728,7 +975,9 @@ function compactReviewGradePromptLineGroups(input: {
       ...reviewGradePreAuthoritySpecializationLines(input.manifest),
       "- Do not reconstruct global coverage, closure, continuation, or trace policy as a second SDLC. Coverage is a structural fold over refs; ABG owns close/block/redispatch.",
       "- This is semantic evaluation work. Do not rewrite source, tests, design artifacts, reports, ledgers, package files, or framework files.",
+      "- The evaluator is read-only over workspace and product files. Do not use Write, Edit, apply_patch, shell redirection, scripts, formatters, build tools, or editor commands except named outputs.",
       `- The only durable JSON output you may create or modify is the assessment artifact at ${input.assessmentPath}.`,
+      `- Any Write/Edit tool path must equal ${input.assessmentPath} or optional observation manifest ${input.subworkstreamManifestPath}; every other workspace path is read-only.`,
       "- For that assessment artifact only, filesystem writes or a single shell redirection are permitted; do not print the assessment JSON to stdout.",
       `- Optional observation-only subworkstream manifest: ${input.subworkstreamManifestPath}.`,
       "- You may use agent-internal subagents or parallel workstreams as read-only compute strategy for independent modules, obligation slices, or evidence packets.",
@@ -750,6 +999,12 @@ function compactReviewGradePromptLineGroups(input: {
     postAuthorityLines: Object.freeze([
       "",
       ...reviewGradeCurrentPostflightPromptLines(input.currentPostflight),
+      "",
+      ...reviewGradeProgressCheckpointLines({
+        manifest: input.manifest,
+        invocationScope: input.invocationScope,
+        assessmentPath: input.assessmentPath
+      }),
       "",
       "Read in order:",
       `1. compressed work-category governance (${input.governanceRef}): ${input.governancePath}`,
@@ -923,6 +1178,36 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
       "- The content ledger path is the durable evaluation artifact; the task is not a single-shot JSON response.",
       `- The system pre-creates that path as a non-admitted draft with selected composition identity and one "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND}" row per register section. Your job is to convert draft rows into semantic "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND}" rows incrementally.`,
       "",
+      "Immediate first-update protocol:",
+      `- Durable evaluation artifact: ${input.contentRegisterPath}`,
+      `- First-update carrier helper contract: ${DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_REF} (${DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_PATH}).`,
+	      "- First tool action: Read only the existing draft content ledger path above with limit <=80. This satisfies the worker tool's read-before-write policy and is not authority inspection.",
+	      "- Second tool action: write the exact first-update JSON packet below to the durable evaluation artifact path.",
+	      "- The packet contains one non-draft designCompletenessVerdict fragment with partial axes. It is a typed first progress carrier, not final design truth.",
+	      "- Third tool action: write the exact second-update JSON packet below to the durable evaluation artifact path. If the Write tool requires a fresh read-after-write check, Read only the content ledger with limit <=80, then immediately Write the second-update packet.",
+	      "- The second-update packet preserves the first row and adds the stackProfileRows section row as an explicit empty placeholder. It is a progress checkpoint before authority inspection, not final stack truth.",
+	      "- Fourth tool action: write the exact full partial checkpoint JSON packet below to the durable evaluation artifact path. If the Write tool requires a fresh read-after-write check, Read only the content ledger with limit <=80, then immediately Write the full partial checkpoint packet.",
+	      "- The full partial checkpoint publishes every required section with explicit empty/null placeholders and partial designCompletenessVerdict axes. It is admitted pressure, not final design truth.",
+	      "- After the full partial checkpoint Write succeeds, either refine one section from bounded evidence and write immediately, or return with a brief final response so F_D can admit the partial pressure map.",
+	      "- Progress-timeout protection: after the first-update Write, the next evaluator progress checkpoint is the exact second-update Write to the same content ledger. Do not read governance, construction briefs, ADRs, worker reports, manifests, source refs, or broad requirements before that second Write.",
+	      "- Do not read governance, construction briefs, ADRs, worker reports, manifests, source refs, or broad requirements before the full partial checkpoint Write.",
+	      "- Do not produce a post-first-update plan, checklist, summary, or hidden full-register synthesis before the full partial checkpoint Write.",
+	      "- Do not inspect the construction brief, ADR/output artifact, worker result report, worker invocation package, handoff manifest, source authority corpus, or broad requirement tables before the first content-ledger write.",
+	      "- Do not write terminal narration, plans, summaries, or stdout analysis before the first content-ledger write; the first durable progress signal is the ledger file.",
+	      "- A compact partial ledger is better than timeout. Timeout before a non-draft fragment row is an evaluator failure.",
+      "First-update JSON packet:",
+	      "```json",
+	      designDepthFirstUpdatePacket(input).trimEnd(),
+	      "```",
+	      "Second-update JSON packet:",
+	      "```json",
+	      designDepthSecondUpdatePacket(input).trimEnd(),
+	      "```",
+	      "Full partial checkpoint JSON packet:",
+	      "```json",
+	      designDepthFullPartialCheckpointPacket(input).trimEnd(),
+	      "```",
+	      "",
       "Tenant tool boundary:",
       ...tenantToolBoundaryPromptLines(input.tenantToolEnvironment),
       "- Read boundary: use only workspace-relative paths or explicit workspace/run-archive paths named in this prompt; do not read/cite/copy sibling sandboxes, historical test_runs, home memory, /tmp, or outside-workspace absolute paths.",
@@ -931,12 +1216,15 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
     ]),
     postAuthorityLines: Object.freeze([
       "",
-      "Read in order:",
-    `1. compressed work-category governance (${input.governanceRef}): ${input.governancePath}`,
-    `2. bounded inspection of construction brief: ${input.constructionBriefPath}`,
-    `3. bounded inspection of the pre-created draft content ledger at ${input.contentRegisterPath}; preserve its top-level selected composition identity from the embedded selected identity values in this prompt if the file is large.`,
-    `4. bounded inspection of the ADR/output artifact: ${input.manifest.outputFile}; the framework has already written the draft ledger, so this read is allowed before the first semantic update.`,
-    "5. convert each draft row into a semantic design-depth fragment row from the construction brief, admitted transform evidence, the ADR/output artifact, and selected authority refs.",
+	      "Tool order:",
+	    `1. first Read only the existing draft content ledger with limit <=80: ${input.contentRegisterPath}.`,
+	    `2. then Write the exact first-update JSON packet above to ${input.contentRegisterPath}.`,
+	    `3. then Write the exact second-update JSON packet above to ${input.contentRegisterPath}; if the Write tool requires a fresh read-after-write check, Read only ${input.contentRegisterPath} with limit <=80 before this Write.`,
+	    `4. then Write the exact full partial checkpoint JSON packet above to ${input.contentRegisterPath}; if the Write tool requires a fresh read-after-write check, Read only ${input.contentRegisterPath} with limit <=80 before this Write.`,
+	    `5. after the full partial checkpoint Write succeeds, read compressed work-category governance (${input.governanceRef}): ${input.governancePath}`,
+	    "6. re-open the content ledger only after the full partial checkpoint Write when you need to refine it.",
+	    `7. after the full partial checkpoint Write succeeds, inspect the construction brief as needed: ${input.constructionBriefPath}`,
+	    `8. after the full partial checkpoint Write succeeds, inspect the ADR/output artifact as needed: ${input.manifest.outputFile}`,
     "",
     "Precomputed worker result report summary:",
     ...input.workerReportSummaryLines.map((line) => `- ${line}`),
@@ -945,24 +1233,25 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
     `- Do not use the Read tool on the handoff manifest (${input.manifestPath}). It is too large; selected manifest facts needed for this evaluation are projected into the prompt, construction brief, and worker summary.`,
     `- Do not inspect the worker result report (${input.workerReportPath}) before the first evaluator update. Its compact summary is already in this prompt.`,
     `- Do not use the Read tool on the worker invocation package (${input.invocationPackagePath}) before the first evaluator update. Selected invocation pressure is already in the construction brief and worker summary.`,
-    "- Before the first evaluator update, do not inspect extra authority files beyond the governance doc, construction brief, draft content ledger, and ADR/output artifact named above.",
-    "- The first evaluator content-ledger update must be your selected evaluate.C/F_P judgment from the draft ledger plus ADR/output artifact. Do not spend the first pass gathering exhaustive context.",
+    "- Before the first evaluator update, do not inspect any authority files other than the draft content ledger slot required by the worker tool's read-before-write policy. The first evaluator content-ledger update is the exact JSON packet embedded above.",
+    "- The first evaluator content-ledger update is your selected evaluate.C/F_P partial verdict that the edge needs bounded evidence review before final design-depth judgment. Do not spend the first pass gathering exhaustive context.",
     "- Do not run a worker-result-report discovery script before the first evaluator update.",
-    "- Do not run any bounded-summary action before the first evaluator update. After reading the governance doc, construction brief, and draft content ledger, the next tool action must publish the content ledger update.",
+    "- Do not run any bounded-summary action before the first evaluator update. The first non-read tool action must publish the content ledger update.",
     "- Do not say you are writing the register until that file write has succeeded.",
     `- First-update carrier helper contract: ${DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_REF} (${DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_PATH}).`,
     "- The helper contract is authority-neutral carrier mechanics: same-path temp-then-rename publication, selected composition preservation, non-draft fragment envelope construction, and compact row counts only. It emits no semantic section values.",
     "- Bounded local automation may support summarization, JSON validation, and that named carrier-helper contract only. Do not deterministically construct later semantic register rows from framework rules.",
     "",
     "First register materialization rule:",
-    "- After reading the governance doc and construction brief, update the pre-created content ledger file directly as the selected evaluate.C/F_P semantic pressure map.",
-    "- Use admitted upstream design surfaces, dependency pressure, product file targets, tenant stack authority, worker report summary, and specific authority refs as the basis.",
+    "- The first Write publishes the selected evaluate.C/F_P partial designCompletenessVerdict carrier.",
+    "- Use prompt-embedded selected composition identity, target carrier refs, section name, and explicit partial axis reasons as the first basis.",
+    "- After the first write, refine using admitted upstream design surfaces, dependency pressure, product file targets, tenant stack authority, worker report details, and specific authority refs.",
     "- Do not copy a framework-generated register skeleton as semantic truth. If a section is uncertain, emit a partial or blocked axis with explicit reasons and evidence refs instead of inventing rows.",
     `- The content ledger carries ProductAssetModel rows. Use contentKind "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND}" rows for incremental section writes while you build the register.`,
     "- F_D assembles admitted fragment rows, sorted by payload.sequence, into the legacy register projection. A final full contentKind \"sdlc_design_depth_register\" row is also valid when the complete register is already available.",
     `- Do not write the legacy projection path directly: ${input.registerProjectionPath}`,
-    "- The first register can be compact; after it exists, iterate only if validation fails or a specific axis is partial/blocked.",
-    "- After the first register exists, perform a mandatory bounded target-path reconciliation pass against the transform artifact and any source authority refs that explicitly name product files.",
+	    "- The first register can be compact; after it exists, iterate only if validation fails or a specific axis is partial/blocked.",
+	    "- After the first register exists, perform a mandatory bounded target-path reconciliation pass against the transform artifact and any source authority refs that explicitly name product files.",
     "- In that reconciliation pass, compare fileTargetRows[].relativePath, componentTopologyRows[].relativePath, componentRealizationRows[].relativePath, and firstProductFileToChange against the transform artifact Product File Targets / Component rows and explicit source-authority file paths.",
     "- During target-path reconciliation, read only the Product File Targets table's file/path cells or explicit declared product-target rows for fileTargetRows. Do not scrape source refs, authority refs, tech-stack/spec docs, ADR/design refs, or scenario refs into fileTargetRows merely because their paths appear near the table.",
     "- If those sources name exact product paths, the final register must preserve those exact paths unless an admitted later authority supersedes them; do not shorten, normalize away source directories, or invent sibling paths.",
@@ -975,17 +1264,19 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
     "- If JSON or Markdown inspection is needed when command execution is unavailable, use Read offset/limit and inspect only bounded line ranges.",
     "- Keep terminal output bounded and purposeful. Stdout is an agent work trace, not evaluation truth.",
     "- The content ledger file is the evaluation surface. Prefer file writes and bounded self-check reads over terminal narration.",
-    "",
-    "Agentic F_P work loop:",
-    "- After the first evaluator update exists, write a short plan and checklist for the required register sections.",
-    "- Execute the plan incrementally: each iteration should complete one register section or one small cluster of related sections, then overwrite the same content ledger with accumulated rows.",
-    "- Do not announce, plan, or attempt a full semantic register write in one action after the first update. A hidden full-register synthesis pass violates the content-ledger visibility contract.",
-    "- After the first update, every exploratory read must be paired with the next tool action that writes at least one named non-empty or explicitly blocked register section back to the same content ledger file.",
+	    "",
+	    "Agentic F_P work loop:",
+	    "- After the first evaluator update exists, do not write a plan or checklist. The fixed second-update packet, full partial checkpoint packet, and section order below are the plan.",
+	    "- The next progress checkpoint after the first update is the exact second content-ledger Write. Preserve the designCompletenessVerdict row and add stackProfileRows as []. Repair stackProfileRows after reading admitted stack authority.",
+	    "- The next checkpoint after that is the exact full partial checkpoint Write. It gives F_D a complete partial pressure map before any deep evidence review.",
+	    "- Execute the fixed section order incrementally: each iteration completes one register section or one small cluster of related sections, then overwrites the same content ledger with accumulated rows.",
+	    "- Do not announce, plan, or attempt a full semantic register write in one action after the first update. A hidden full-register synthesis pass violates the content-ledger visibility contract.",
+	    "- After the first update, every exploratory read must be paired with the next tool action that writes at least one named non-empty or explicitly blocked register section back to the same content ledger file.",
     "- The preferred order is stackProfileRows, implementationModuleRows, componentTopologyRows, fileTargetRows, componentRealizationRows, moduleSchemaFragments, moduleStateDiagramFragments, aggregateDomainModelRows, aggregateDomainModel, sunnyDaySequenceRows, aggregateSunnyDaySequence, designCompletenessVerdict.",
     "- When reading the transform ADR after the first update, read only the authority a given section needs and do not print it; then write that section to the register file. How you inspect the authority is your choice; the framework prescribes the carrier schema and the visibility contract, not the extraction method.",
     "- Time budget is part of correctness: update the draft content ledger before doing deep exploratory review.",
-    "- After the governance doc, construction brief, and draft content ledger are read, write the first evaluator update before any ADR summary, worker-report inspection, source-authority lookup, or deep exploratory action.",
-    `- First evaluator update: publish one semantic "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND}" row for each pre-seeded draft section. The named carrier helper may build the envelope, but the row values are your evaluation and must be your selected evaluate.C/F_P judgment. Emit null or [] only for whole intentionally empty sections and partial/blocked verdict axes where authority is not yet sufficient; do not emit null inside required scalar fields.`,
+    "- Write the first evaluator update before any construction-brief inspection, ADR reading, worker-report inspection, source-authority lookup, or deep exploratory action. The only allowed prior Read is the existing draft content ledger slot.",
+    `- First evaluator update: publish one semantic "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND}" designCompletenessVerdict row with partial axes. The row value is your selected evaluate.C/F_P judgment that evidence review is still required; do not emit null inside required scalar fields.`,
     "- There is no framework-authored recipe for deriving register rows from authority: do not parse ADR tables by a fixed procedure, read the authority a section needs and decide that section content yourself.",
     "- The first update must satisfy the named helper contract or an equivalent implementation. F_D seeds the draft scaffolding and admits/projects fragment rows; F_D does not construct semantic register rows for you.",
     "- Then iterate by editing the content ledger file in place: inspect only the authority needed for a specific missing/partial section, add or replace the corresponding section row, then validate the file.",
@@ -1300,6 +1591,29 @@ export function designDepthFpEvaluatorPrompt(input: {
   return designDepthFpEvaluatorPromptProjection(input).promptText;
 }
 
+function reviewGradeProgressCheckpointLines(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly invocationScope?: SdlcReviewGradeInvocationScope | null | undefined;
+  readonly assessmentPath: string;
+}): readonly string[] {
+  const obligationCount = reviewGradePromptObligationRefs(
+    input.manifest,
+    input.invocationScope
+  ).length;
+  return Object.freeze([
+    "Progress-timeout protection:",
+    `- First assessment checkpoint: before generated-artifact reads or broad semantic review, create ${input.assessmentPath} with schema-valid blocked checkpoint JSON.`,
+    `- Checkpoint reviewedObligationIds: exactly the active review-scope ids from the admitted edge packet (${obligationCount} ids).`,
+    "- Checkpoint findings[]: one unassessed execution_environment finding per reviewed id, with handoff evidence refs and external_blocked triage.",
+    "- After the checkpoint Write, inspect bounded evidence and overwrite the same assessment file with final semantic findings.",
+    "- Final assessment write precedes optional schema verification: once findings are decided, overwrite the assessment JSON; only then re-open it for bounded key/schema verification.",
+    "- Final decision immediate-write rule: once you know the final status and finding set, your next tool call must overwrite the assessment JSON before more reasoning, source inspection, schema verification, or stdout summary.",
+    "- Final decision output ban: after the final status and finding set are known, emit no assistant text, plans, summaries, or announcements; the next emitted item must be the Write tool call that overwrites the assessment JSON.",
+    "- Do not write a plan or checklist before the first assessment checkpoint; terminal prose is not progress.",
+    "- First assessment checkpoint JSON must be valid whole-file JSON for sdlc_review_grade_edge_fulfillment_assessment before any generated artifact inspection."
+  ]);
+}
+
 function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly invocationScope?: SdlcReviewGradeInvocationScope | null | undefined;
@@ -1332,8 +1646,9 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
       "- Review the generated asset against incoming requirements, accepted upstream authority, stage boundary, evidence, and likely failure modes.",
       ...reviewGradePreAuthoritySpecializationLines(input.manifest),
       "- This is semantic evaluation work. Do not rewrite source, tests, design artifacts, reports, ledgers, or framework files.",
-      "- The evaluator is read-only over workspace and product files. Do not use apply_patch, shell redirection, scripts, formatters, build tools, or editor commands to modify any generated asset, source file, test file, design surface, report, ledger, package file, or framework file.",
+      "- The evaluator is read-only over workspace and product files. Do not use Write, Edit, or apply_patch. Do not use apply_patch, shell redirection, scripts, formatters, build tools, or editor commands to modify any generated asset, source file, test file, design surface, report, ledger, package file, or framework file.",
       `- The only durable JSON output you may create or modify is the assessment artifact at ${input.assessmentPath}.`,
+      `- Any Write/Edit tool path must equal the assessment artifact path ${input.assessmentPath} or the optional observation-only subworkstream manifest path ${input.subworkstreamManifestPath}; every other workspace path is read-only.`,
       "- For that assessment artifact only, filesystem writes or a single shell redirection are permitted; do not print the assessment JSON to stdout.",
       `- The only optional sidecar you may create or modify is the observation-only subworkstream manifest at ${input.subworkstreamManifestPath}.`,
       "- You may use agent-internal subagents or parallel workstreams as read-only compute strategy for independent modules, obligation slices, or evidence packets.",
@@ -1349,6 +1664,12 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
     postAuthorityLines: Object.freeze([
       "",
       ...reviewGradeCurrentPostflightPromptLines(input.currentPostflight),
+      "",
+      ...reviewGradeProgressCheckpointLines({
+        manifest: input.manifest,
+        invocationScope: input.invocationScope,
+        assessmentPath: input.assessmentPath
+      }),
       "",
       "Read in order:",
     `1. compressed work-category governance (${input.governanceRef}): ${input.governancePath}`,

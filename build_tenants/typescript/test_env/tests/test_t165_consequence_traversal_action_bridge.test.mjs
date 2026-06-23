@@ -567,9 +567,11 @@ test("T-165 SDLC consequence bridge rejects relative cursor movement", () => {
 });
 
 test("T-165 SDLC consequence bridge emits canonical ABG graph reentry target refs", () => {
+  const basis = buildThreeStageBasis();
+
   assert.equal(
     constructSdlcGraphReentryTargetRef({ targetVectorIndex: 6 }),
-    "graph-reentry-point://odd-sdlc/6"
+    "graph-reentry-point://realization/6"
   );
   assert.equal(
     constructSdlcGraphReentryTargetRef({
@@ -584,6 +586,10 @@ test("T-165 SDLC consequence bridge emits canonical ABG graph reentry target ref
         authorityNamespaceRef: "graph-function:odd_sdlc:lite_design_module_implementation",
         targetVectorIndex: 6
       }),
-    /single graph-reentry-point authority segment/u
+    /ABG GraphReentryPoint/u
+  );
+  assert.throws(
+    () => buildSdlcTraversalActionBinding(basis, "graph-reentry-point://odd-sdlc/1"),
+    /ABG GraphReentryPoint/u
   );
 });

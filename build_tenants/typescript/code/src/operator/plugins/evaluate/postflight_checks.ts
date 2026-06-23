@@ -66,6 +66,7 @@ import {
   SdlcTestDesignRegister,
   SdlcTestExecutionSurfaceRegister,
   SdlcProductMaterializationContract,
+  SdlcProductMaterializationAuthorityReconciliation,
   SdlcTraversalObligation,
   SdlcProductMaterializationAuthorityTarget,
   SdlcWorkerHandoffManifest,
@@ -75,7 +76,6 @@ import {
   SdlcDecompositionSummary
 } from "../../carriers.js";import {
   declaredBuildConfigRoleForObservedFile,
-  effectiveProductMaterializationRequiredRoles,
   productAuthorityTargetCoversRelativePath,
   reconcileSdlcProductMaterializationAuthority,
   tenantRelativeOutputArtifactPath
@@ -2244,12 +2244,15 @@ export function evaluateStagedConstructionAuthority(input: {
 
 function targetContractForMaterializedFile(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
+  readonly authority: Pick<
+    SdlcProductMaterializationAuthorityReconciliation,
+    "declaredProductTargetContracts"
+  >;
   readonly relativePath: string;
 }): SdlcProductMaterializationAuthorityTarget | null {
   const normalized = input.relativePath.split(path.sep).join("/");
-  const authority = reconcileSdlcProductMaterializationAuthority(input.manifest);
   return (
-    authority.declaredProductTargetContracts.find((candidate) =>
+    input.authority.declaredProductTargetContracts.find((candidate) =>
       productAuthorityTargetCoversRelativePath({
         manifest: input.manifest,
         target: candidate,
@@ -2663,8 +2666,17 @@ function requirementDisplayIdByObligationId(
 
 
 
-function contentCarriesRequirementObligation(input: {
+function normalizedRequirementMarkersForContent(content: string): ReadonlySet<string> {
+  return new Set(
+    (content.match(REQUIREMENT_MARKER_EXPRESSION) ?? [])
+      .filter((marker) => !isPlaceholderRequirementMarker(marker))
+      .map((marker) => normalizeRequirementId(marker))
+  );
+}
+
+function contentCarriesRequirementObligationWithMarkers(input: {
   readonly content: string;
+  readonly normalizedMarkers: ReadonlySet<string>;
   readonly obligationId: string;
   readonly displayId: string | null;
 }): boolean {
@@ -2680,13 +2692,7 @@ function contentCarriesRequirementObligation(input: {
   if (input.displayId === null) {
     return false;
   }
-  const normalizedDisplayId = normalizeRequirementId(input.displayId);
-  return (input.content.match(REQUIREMENT_MARKER_EXPRESSION) ?? []).some((marker) => {
-    if (isPlaceholderRequirementMarker(marker)) {
-      return false;
-    }
-    return normalizeRequirementId(marker) === normalizedDisplayId;
-  });
+  return input.normalizedMarkers.has(normalizeRequirementId(input.displayId));
 }
 
 
@@ -2732,6 +2738,10 @@ function materializedFileRequiresRequirementLineage(input: {
 
 function materializedFileLineageCanBeCarrierOnly(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
+  readonly authority: Pick<
+    SdlcProductMaterializationAuthorityReconciliation,
+    "declaredProductTargetContracts"
+  >;
   readonly file: SdlcMaterializedProductFile;
 }): boolean {
   if (input.file.role !== "build_config") {
@@ -2740,6 +2750,7 @@ function materializedFileLineageCanBeCarrierOnly(input: {
   return (
     targetContractForMaterializedFile({
       manifest: input.manifest,
+      authority: input.authority,
       relativePath: input.file.relativePath
     }) !== null
   );
@@ -2759,6 +2770,33 @@ function materializedProductFileSatisfiesDeclaredTarget(input: {
       target: input.target,
       normalizedRelativePath: input.file.relativePath.split(path.sep).join("/")
     })
+  );
+}
+
+
+
+function effectiveProductMaterializationRequiredRolesForAuthority(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly authority: Pick<
+    SdlcProductMaterializationAuthorityReconciliation,
+    "declaredProductTargetContracts"
+  >;
+}): readonly SdlcMaterializedProductFileRole[] {
+  const roles = new Set<SdlcMaterializedProductFileRole>(
+    input.manifest.productMaterialization.requiredRoles
+  );
+  for (const target of input.authority.declaredProductTargetContracts) {
+    roles.add(target.requiredRole);
+  }
+  return Object.freeze(
+    ([
+      "source",
+      "test",
+      "build_config",
+      "design",
+      "documentation",
+      "other"
+    ] as const).filter((role) => roles.has(role))
   );
 }
 
@@ -2957,7 +2995,12 @@ export function evaluateMaterializedProductFiles(input: {
       })
     );
   }
-  for (const requiredRole of effectiveProductMaterializationRequiredRoles(input.manifest)) {
+  const effectiveRequiredRoles =
+    effectiveProductMaterializationRequiredRolesForAuthority({
+      manifest: input.manifest,
+      authority: materializationAuthority
+    });
+  for (const requiredRole of effectiveRequiredRoles) {
     if (!reportedProductFiles.some((file) => file.role === requiredRole)) {
       input.blockingReasonCarriers.push(
         makeSdlcBlockingReason({
@@ -2993,9 +3036,7 @@ export function evaluateMaterializedProductFiles(input: {
     equivalentRequirementLineageIdsByCanonical(input.manifest);
   const requirementLineageRequired =
     productMaterializationRequirementLineageRequired(input.manifest);
-  const requiredProductRoles = new Set(
-    effectiveProductMaterializationRequiredRoles(input.manifest)
-  );
+  const requiredProductRoles = new Set(effectiveRequiredRoles);
   const moduleSystemAuthority =
     declaredTenantModuleSystemAuthorityForManifest(input.manifest);
   const validRequirementLineageIds = new Set(
@@ -3009,6 +3050,7 @@ export function evaluateMaterializedProductFiles(input: {
     }
     const targetContract = targetContractForMaterializedFile({
       manifest: input.manifest,
+      authority: materializationAuthority,
       relativePath: file.relativePath
     });
     if (
@@ -3116,6 +3158,7 @@ export function evaluateMaterializedProductFiles(input: {
     if (moduleSystemMismatch !== null) {
       input.blockingReasonCarriers.push(moduleSystemMismatch);
     }
+    const normalizedMarkers = normalizedRequirementMarkersForContent(content);
     const requirementTraceObligationIds = canonicalizeRequirementLineageIds({
       manifest: input.manifest,
       obligationIds: file.requirementTraceObligationIds ?? []
@@ -3138,6 +3181,7 @@ export function evaluateMaterializedProductFiles(input: {
           : requirementLineageRequiredForFile &&
               !materializedFileLineageCanBeCarrierOnly({
                 manifest: input.manifest,
+                authority: materializationAuthority,
                 file
               })
 	          ? requirementTraceObligationIds.filter(
@@ -3145,21 +3189,23 @@ export function evaluateMaterializedProductFiles(input: {
 	                !(
 	                  equivalentRequirementIdsByCanonical
 	                    .get(obligationId)
-	                    ?.some((equivalentId) =>
-	                      contentCarriesRequirementObligation({
-	                        content,
-	                        obligationId: equivalentId,
-	                        displayId:
-	                          requirementDisplayIds.get(equivalentId) ??
+                    ?.some((equivalentId) =>
+                      contentCarriesRequirementObligationWithMarkers({
+                        content,
+                        normalizedMarkers,
+                        obligationId: equivalentId,
+                        displayId:
+                          requirementDisplayIds.get(equivalentId) ??
 	                          requirementDisplayIds.get(obligationId) ??
 	                          null
-	                      })
-	                    ) ??
-	                  contentCarriesRequirementObligation({
-	                    content,
-	                    obligationId,
-	                    displayId: requirementDisplayIds.get(obligationId) ?? null
-	                  })
+                      })
+                    ) ??
+                  contentCarriesRequirementObligationWithMarkers({
+                    content,
+                    normalizedMarkers,
+                    obligationId,
+                    displayId: requirementDisplayIds.get(obligationId) ?? null
+                  })
 	                )
 	            )
 	          : [];
@@ -3199,7 +3245,8 @@ export function evaluateComponentDepthTargetCarrier(input: {
 }): void {
   const admission = admitComponentDepthRegisterFromArtifact({
     targetAssetType: input.manifest.targetAssetType,
-    outputFile: input.manifest.outputFile
+    outputFile: input.manifest.outputFile,
+    requireWholeFileJson: true
   });
   if (admission.status === "not_required" || admission.status === "admitted") {
     return;

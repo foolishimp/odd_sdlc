@@ -376,6 +376,7 @@ function compactComponentDepthDirective(
     `\`payload.kind:"sdlc_component_depth_register"\`, ` +
     `\`payload.registerVersion:"ts-component-depth-v1"\`, ` +
     `\`payload.targetAssetType:"${manifest.targetAssetType}"\`. ` +
+    "The output file content must be exactly that selected-carrier JSON object: first non-whitespace character `{`, final non-whitespace character `}`, no Markdown headings, tables, prose preamble, fenced code blocks, or trailing text outside the JSON object. " +
     "The payload field set is closed: use only kind, registerVersion, targetAssetType, componentTopologyRows, componentRealizationRows, testComponentTopologyRows, componentTestRows, componentTestQualificationRows, componentExecutionFailureRegister, componentRepairSchedule, and releaseDepthParity. " +
     "Do not wrap the component_depth_register carrier in Markdown fences. " +
     "Do not place materializedFiles, summaries, execution evidence, worker reports, product-file observations, or tenant-stack authority inside payload; cite evidence only on the selected carrier envelope or in prose.";
@@ -410,7 +411,8 @@ function compactComponentDepthDirective(
         envelopeDirective,
         "Emit payload.componentTestRows with row kind `sdlc_component_test_realization_row` and fields testClassId, relativePath, testcaseIds, componentIds, requirementIds, and shardId.",
         "componentTestRows[].requirementIds is the carrier field and must be a string array; product-file materialization records may use requirementTraceObligationIds, but componentTestRows must not.",
-        "Every admitted requirement obligation in workerInvocationPackage.traversalObligationContext.obligations must be traceable from at least one generated test file comment, one payload.componentTestRows[].requirementIds entry, or one worker_result_report/materialization-manifest evidence row; do not rely on test success or file existence as lineage.",
+        "Component-test requirement lineage is scoped to the active component-test rows, declared test product targets, and Current evaluated gaps for this edge. Do not expand from full traversalObligationContext or broad manifest obligation lists.",
+        "For each scoped component-test requirement, keep lineage traceable from at least one generated test file comment, one payload.componentTestRows[].requirementIds entry, or admitted materialization evidence; do not rely on test success or file existence as lineage.",
         "For component_test_surface, do not copy source componentTopologyRows or componentRealizationRows from component_code_surface; bind tests to source ownership only through componentTestRows[].componentIds.",
         "Generated component tests may define fixtures and non-domain helpers, but they must not satisfy a source/domain capability by declaring a local product-domain type, algebra, validator, parser, compiler, executor, or guard that the accepted product source does not expose.",
         "When testing domain validation, call the admitted product source boundary such as the compiler, parser, executor, engine, or public validator. Do not create test-local validators such as CandidateAggregate or validateAssociativeAggregate to stand in for product behavior.",

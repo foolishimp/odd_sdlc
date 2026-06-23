@@ -6,11 +6,13 @@ import type {
   AllowedConsequenceTraversalFamily,
   ConsequenceTraversalAction,
   GtlAdmittedStateRef,
-  GtlConsequenceProjectionRef
+  GtlConsequenceProjectionRef,
+  GraphReentryPoint
 } from "@abiogenesis/typescript-tenant";
 import {
   admitConsequenceTraversalActionForAllowedCatalog,
-  constructConsequenceTraversalAction
+  constructConsequenceTraversalAction,
+  GRAPH_REENTRY_POINT_VALUES
 } from "@abiogenesis/typescript-tenant";
 import type {
   SdlcEdgeAssuranceCloseDecision,
@@ -427,25 +429,36 @@ function firstNonEmpty(
 
 function requireAbsoluteGraphReentryTarget(ref: string): string {
   const normalized = requireNonEmptyString(ref, "reentryTargetRef");
-  if (!/^graph-reentry-point:\/\/[^/]+\/\d+$/u.test(normalized)) {
+  const match = /^graph-reentry-point:\/\/([^/]+)\/\d+$/u.exec(normalized);
+  if (match === null) {
     throw new TypeError(
       "reentryTargetRef must be an absolute graph-reentry-point URI with a numeric vector index"
+    );
+  }
+  const reentryPoint = match[1] ?? "";
+  if (!isAbgGraphReentryPoint(reentryPoint)) {
+    throw new TypeError(
+      `reentryTargetRef must name an ABG GraphReentryPoint, got ${JSON.stringify(reentryPoint)}`
     );
   }
   return normalized;
 }
 
+function isAbgGraphReentryPoint(value: string): value is GraphReentryPoint {
+  return (GRAPH_REENTRY_POINT_VALUES as readonly string[]).includes(value);
+}
+
 export function constructSdlcGraphReentryTargetRef(input: {
-  readonly authorityNamespaceRef?: string | undefined;
+  readonly authorityNamespaceRef?: GraphReentryPoint | undefined;
   readonly targetVectorIndex: number;
 }): string {
   const authorityNamespaceRef =
     input.authorityNamespaceRef === undefined
-      ? "odd-sdlc"
+      ? "realization"
       : requireNonEmptyString(input.authorityNamespaceRef, "authorityNamespaceRef");
-  if (!/^[a-z][a-z0-9-]*$/u.test(authorityNamespaceRef)) {
+  if (!isAbgGraphReentryPoint(authorityNamespaceRef)) {
     throw new TypeError(
-      "authorityNamespaceRef must be a single graph-reentry-point authority segment"
+      "authorityNamespaceRef must name an ABG GraphReentryPoint"
     );
   }
   if (

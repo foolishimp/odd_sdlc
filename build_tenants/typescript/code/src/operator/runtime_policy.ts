@@ -13,9 +13,11 @@ export interface SdlcOperatorRuntimePolicy {
   readonly workerHeartbeatMs: number;
   readonly workerTerminationGraceMs: number;
   readonly designDepthFpEvaluatorTimeoutMs: number;
+  readonly designDepthFpEvaluatorMaxEffort: SdlcOperatorRuntimeEffort;
   readonly designDepthFpEvaluatorStdoutBudgetBytes: number;
   readonly reviewGradeEdgeFulfillmentEvaluatorTimeoutMs: number;
   readonly reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs: number;
+  readonly reviewGradeEdgeFulfillmentEvaluatorMaxEffort: SdlcOperatorRuntimeEffort;
   readonly reviewGradeEdgeFulfillmentEvaluatorStdoutBudgetBytes: number;
   readonly executionShardTimeoutMs: number;
   readonly executionShardInactivityTimeoutMs: number;
@@ -24,6 +26,13 @@ export interface SdlcOperatorRuntimePolicy {
   readonly liveHarnessFullCapabilityCommandTimeoutMs: number;
   readonly liveHarnessLifecycleCommandTimeoutMs: number;
 }
+
+export type SdlcOperatorRuntimeEffort =
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh"
+  | "max";
 
 interface SdlcOperatorRuntimePolicyConfig {
   readonly kind: "odd_sdlc_operator_runtime_policy";
@@ -38,11 +47,13 @@ interface SdlcOperatorRuntimePolicyConfig {
   };
   readonly designDepthFpEvaluator: {
     readonly timeoutMs: number;
+    readonly maxEffort: SdlcOperatorRuntimeEffort;
     readonly stdoutBudgetBytes: number;
   };
   readonly reviewGradeEdgeFulfillmentEvaluator: {
     readonly timeoutMs: number;
     readonly inactivityTimeoutMs: number;
+    readonly maxEffort: SdlcOperatorRuntimeEffort;
     readonly stdoutBudgetBytes: number;
   };
   readonly executionShard: {
@@ -82,6 +93,24 @@ function positiveIntegerField(
   return value;
 }
 
+function effortField(
+  record: Record<string, unknown>,
+  key: string,
+  label: string
+): SdlcOperatorRuntimeEffort {
+  const value = record[key];
+  if (
+    value === "low" ||
+    value === "medium" ||
+    value === "high" ||
+    value === "xhigh" ||
+    value === "max"
+  ) {
+    return value;
+  }
+  throw new TypeError(`${label}.${key}: expected low, medium, high, xhigh, or max`);
+}
+
 function parsePositiveIntegerFromEnv(name: string): number | null {
   const raw = process.env[name];
   if (raw === undefined) {
@@ -91,11 +120,35 @@ function parsePositiveIntegerFromEnv(name: string): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+function parseEffortFromEnv(name: string): SdlcOperatorRuntimeEffort | null {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim().length === 0) {
+    return null;
+  }
+  if (
+    raw === "low" ||
+    raw === "medium" ||
+    raw === "high" ||
+    raw === "xhigh" ||
+    raw === "max"
+  ) {
+    return raw;
+  }
+  return null;
+}
+
 function configuredPositiveInteger(
   envName: string,
   configuredValue: number
 ): number {
   return parsePositiveIntegerFromEnv(envName) ?? configuredValue;
+}
+
+function configuredEffort(
+  envName: string,
+  configuredValue: SdlcOperatorRuntimeEffort
+): SdlcOperatorRuntimeEffort {
+  return parseEffortFromEnv(envName) ?? configuredValue;
 }
 
 function configuredTimeoutMs(
@@ -191,6 +244,11 @@ function readSdlcOperatorRuntimePolicyConfig(): SdlcOperatorRuntimePolicyConfig 
         "timeoutMs",
         "operator-runtime-policy.json.designDepthFpEvaluator"
       ),
+      maxEffort: effortField(
+        designDepthFpEvaluator,
+        "maxEffort",
+        "operator-runtime-policy.json.designDepthFpEvaluator"
+      ),
       stdoutBudgetBytes: positiveIntegerField(
         designDepthFpEvaluator,
         "stdoutBudgetBytes",
@@ -206,6 +264,11 @@ function readSdlcOperatorRuntimePolicyConfig(): SdlcOperatorRuntimePolicyConfig 
       inactivityTimeoutMs: positiveIntegerField(
         reviewGradeEdgeFulfillmentEvaluator,
         "inactivityTimeoutMs",
+        "operator-runtime-policy.json.reviewGradeEdgeFulfillmentEvaluator"
+      ),
+      maxEffort: effortField(
+        reviewGradeEdgeFulfillmentEvaluator,
+        "maxEffort",
         "operator-runtime-policy.json.reviewGradeEdgeFulfillmentEvaluator"
       ),
       stdoutBudgetBytes: positiveIntegerField(
@@ -283,6 +346,10 @@ export function sdlcOperatorRuntimePolicy(): SdlcOperatorRuntimePolicy {
       "ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_TIMEOUT_MS",
       config.designDepthFpEvaluator.timeoutMs
     ),
+    designDepthFpEvaluatorMaxEffort: configuredEffort(
+      "ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_MAX_EFFORT",
+      config.designDepthFpEvaluator.maxEffort
+    ),
     designDepthFpEvaluatorStdoutBudgetBytes: configuredPositiveInteger(
       "ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_STDOUT_BUDGET_BYTES",
       config.designDepthFpEvaluator.stdoutBudgetBytes
@@ -294,6 +361,10 @@ export function sdlcOperatorRuntimePolicy(): SdlcOperatorRuntimePolicy {
     reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs: configuredPositiveInteger(
       "ODD_SDLC_REVIEW_GRADE_EDGE_FULFILLMENT_EVALUATOR_INACTIVITY_TIMEOUT_MS",
       config.reviewGradeEdgeFulfillmentEvaluator.inactivityTimeoutMs
+    ),
+    reviewGradeEdgeFulfillmentEvaluatorMaxEffort: configuredEffort(
+      "ODD_SDLC_REVIEW_GRADE_EDGE_FULFILLMENT_EVALUATOR_MAX_EFFORT",
+      config.reviewGradeEdgeFulfillmentEvaluator.maxEffort
     ),
     reviewGradeEdgeFulfillmentEvaluatorStdoutBudgetBytes: configuredPositiveInteger(
       "ODD_SDLC_REVIEW_GRADE_EDGE_FULFILLMENT_EVALUATOR_STDOUT_BUDGET_BYTES",

@@ -2764,11 +2764,11 @@ Applied fix:
 
 Important boundary note:
 
-- the full syntactic/materialized prompt compiler evaluation is not built in
-  this checkpoint;
-- the current implemented compiler gate is a narrow semantic prompt-projection
-  review inside `build:semantic`, materializing representative prompt
-  projections and rejecting observed contradiction classes.
+- this 2026-06-22 checkpoint originally carried only a narrow semantic
+  prompt-projection review inside `build:semantic`;
+- that limitation was superseded by the 2026-06-23 semantic compiler expansion
+  below, which materializes every graph-derived prompt-bearing projection and
+  adds a switched final `F_P.eval` review gate.
 
 Validation:
 
@@ -2790,6 +2790,189 @@ build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20
 
 The run was continued in place and completed without starting a replacement
 session.
+
+## 2026-06-23 Semantic Compiler Prompt Construction And F_P Review Gate
+
+This is a T-204 boundary reassertion checkpoint after drift was identified in
+local operator-side symptom fixes. The lawful shape is compiler/release gating,
+not installed-operator liveness behavior:
+
+1. ABG `typecheckGtlProgram(...)` still owns static graph, overlay,
+   traversal-unit, carrier, plugin, and bind conformance.
+2. `odd_sdlc` now materializes graph-derived prompt-bearing projections during
+   semantic conformance instead of reviewing one representative prompt.
+3. Deterministic compiler checks run over every materialized prompt projection.
+4. The final `F_P.eval` code-review gate is switch-controlled. Normal
+   `build:semantic` remains deterministic; release can set
+   `ODD_SDLC_SEMANTIC_COMPILER_FP_EVAL=required`, which fails closed unless
+   `ODD_SDLC_SEMANTIC_COMPILER_FP_REVIEW_RESULT` points at an admitted review
+   result for the current deterministic package digest.
+5. Source-authority regressions that previously appeared during live execution
+   are now compiler checks over the active source-identity surfaces. This began
+   as an `odd_sdlc` deterministic guard and has been promoted into the ABG GTL
+   conformance interface through declared `sourceAuthorityPolicies` rows:
+   - design-depth predecessor selection may not scrape `postflight.json` or
+     `sdlc_edge_closure_decision.json` as acceptance authority;
+   - review-grade current-postflight short-circuiting must exclude retryable
+     reentry points before constructing a triage gap;
+   - workspace gaps archive reads may survive only as diagnostic/read-model
+     input and must not author artifacts, closure/next-action truth, or invoke
+     local traversal/start/control;
+   - product-materialization lineage and postflight checks must cache
+     requirement markers per materialized file instead of repeatedly scanning
+     file contents for every obligation/file pairing.
+
+Current compiler materialization counts:
+
+| Surface | Count |
+| --- | ---: |
+| materialized graph vectors | 125 |
+| hook-backed prompt projections | 99 |
+| non-prompt graph vectors | 26 |
+| prompt asset rows in GTL conformance input | 102 |
+| deterministic prompt-review issues | 0 |
+
+The `F_P.eval` result is admitted as
+`sdlc_semantic_compiler_fp_review_result` with
+`reviewVersion=ts-semantic-compiler-fp-review-result-v1`, matching
+`deterministicReportDigest`, `status=passed`, and `findingCount=0`. This gate
+does not spawn workers during ordinary semantic builds and does not write
+runtime truth. It is a release proof switch over the materialized compiler
+package.
+
+Validation:
+
+| Check | Result |
+| --- | --- |
+| `npm run build:semantic` | passed |
+| ABI `npm run build:semantic` | passed |
+| ABI T-150 GTL conformance compiler gate | passed, 89/89 |
+| T-184/T-192/T-194 compiler/product/prompt gate | passed, 38/38 |
+| T-181 design-depth prompt source contract slice | passed, 1/1 |
+| `npm run guard:pack-no-command-artifacts` | passed |
+| `ODD_SDLC_SEMANTIC_COMPILER_FP_EVAL=required` without review result | failed closed with digest |
+| admitted review-result fixture against current digest | passed |
+
+T-204 implication: prompt correctness is now evaluated before runtime at the
+compiler boundary across the graph-derived prompt set. This is not a
+data-mapper-specific repair and it does not move semantic judgment into `F_D`;
+`F_D` constructs and validates the prompt package, while the switched final
+`F_P.eval` gate supplies release-time code-review judgment over that materialized
+package. The newly added source-authority checks make the same boundary
+fail-fast for known T-204 regressions instead of rediscovering them through
+hello-world/data-mapper runtime behavior.
+
+ABG compiler implication: `typecheckGtlProgram(...)` now admits and evaluates
+`sourceAuthorityPolicies` against `sourceIdentitySurfaces`. The policy rows are
+generic compiler inventory, not odd_sdlc-specific ABG code. `odd_sdlc` publishes
+five T-204 policy rows in its conformance input so the no-archive-authority,
+no-local-control, retryability, read-model, and requirement-marker caching rules
+travel with the graph inventory once the refreshed ABG package is consumed.
+
+2026-06-23 update: the switched final `F_P.eval` code-review gate has also been
+promoted into ABG compiler inventory. `typecheckGtlProgram(...)` now admits
+`semanticReviewGates` and rejects stale or failed semantic compiler reviews:
+
+- the gate subject must match the conformance input subject;
+- `deterministicReportDigest` must be a `sha256:` digest;
+- the result kind/version must be
+  `sdlc_semantic_compiler_fp_review_result` /
+  `ts-semantic-compiler-fp-review-result-v1`;
+- `status` must be `passed`;
+- `findingCount` must be `0`;
+- duplicate gate refs fail.
+
+`odd_sdlc` remains the product client that materializes its graph-derived prompt
+package and, in release mode, supplies the admitted review row. ABG owns the
+admission/check of the semantic review gate.
+
+The data-mapper resume exposed a separate evaluator liveness defect:
+`design_depth_fp_evaluator_first_update_timeout`, followed by
+`design_depth_fp_evaluator_progress_timeout` after the first attempted repair.
+The root cause was prompt projection, not traversal continuation: ABG selected
+same-edge retry correctly, but the rendered design-depth evaluator prompt was
+not mechanically lawful for the active worker. It first allowed evidence reads
+before the first non-draft content-ledger write, then overcorrected into
+`Do not Read anything before this Write` even though the pre-created draft
+ledger file must be read before the worker tool will overwrite it. The same
+prompt also treated an empty/null 12-section liveness packet as semantic
+progress, which encouraged hidden full-register synthesis after the first
+write.
+
+The fix tightens the prompt contract and compiler gate:
+
+- the only pre-write read is the existing draft content ledger slot, with
+  `limit <=80`, solely to satisfy the worker tool read-before-write policy;
+- the next tool action writes one non-draft
+  `designCompletenessVerdict` fragment with partial axes and explicit reasons;
+- construction brief, ADR/output artifact, worker result report, invocation
+  package, handoff manifest, and broad authority tables are explicitly
+  post-first-write inputs;
+- subsequent exploratory reads must be paired with the next write for a named
+  register section;
+- the semantic compiler now rejects rendered design-depth prompts that forbid
+  the required pre-write ledger read or claim empty/null liveness packets are
+  semantic progress.
+
+The resumed data-mapper component-test review exposed the same class at the
+review-grade boundary: the old loaded prompt allowed final-decision prose such
+as "writing the final assessment now" before the durable assessment overwrite.
+The source prompt now carries a final-decision output ban, and the semantic
+compiler rejects review-grade prompt projections that do not require the next
+emitted item to be the `Write` tool call after final status/findings are known.
+
+The continued data-mapper UAT-test source edge exposed another prompt
+projection defect. The transform prompt rendered `obligations in scope: 170`
+while the same prompt required `worker_result_report.obligationAssessments` to
+cover exactly `obligations.inlineObligationIds`, which was 22 for the active
+edge. That was not a product-domain conflict: the UAT target carrier lawfully
+wraps the component-depth payload. The defect was ambiguous prompt scope
+language that blurred broad authority visibility with the active report scope.
+The source prompt now renders `authority obligations visible` separately from
+`active report scope from inlineObligationIds`, and the semantic compiler
+rejects transform prompts that keep the old ambiguous `obligations in scope`
+wording without the active report-scope label.
+
+The same edge exposed the corresponding carrier/projection defect after the
+retry: the framework-generated `worker_result_report.json` still emitted broad
+assessment rows from `manifest.traversalObligationContext.obligations`,
+including generated requirement aliases, while the admitted active report scope
+was the 22 inline obligations. That made the prompt contract and report carrier
+disagree. The handoff manifest now carries `activeReportObligationIds` as
+admitted scope truth, and post-transform report projection folds over that
+carrier instead of broad traversal authority. The semantic source-authority
+gate now rejects report projection code that maps broad
+`traversalObligationContext.obligations` without the active report-scope
+carrier.
+
+This is intentionally a prompt/projection contract fix, not an
+`installed_operator.ts` seed or runtime liveness scaffold.
+
+Validation after the UAT prompt-scope compiler check:
+
+| Check | Result |
+| --- | --- |
+| odd_sdlc `npm run build:semantic` | passed |
+| T-184/T-192/T-194 compiler/product/prompt gate | passed, 39/39 |
+| T-141/T-194 report-scope/compiler gate | passed, 18/18 |
+| odd_sdlc `git diff --check` | passed |
+| ABI `npm run build:semantic` | passed |
+| ABI T-150 GTL conformance compiler gate | passed, 89/89 |
+| ABI `git diff --check` | passed |
+
+Crash-resume validation after compacting review-grade progress wording:
+
+| Check | Result |
+| --- | --- |
+| odd_sdlc `npm run build:semantic` | passed |
+| T-192 compact prompt contract | passed, 8/8; compact review-grade fixture is 23,993 chars under the 24,000-char bound |
+| T-141/T-184/T-192/T-194 focused compiler/prompt/report-scope gate | passed; the combined T-181 file member was canceled after hanging outside the focused slice |
+| T-181 design-depth prompt source contract slice | passed, 1/1 |
+| odd_sdlc `npm run guard:pack-no-command-artifacts` | passed |
+| odd_sdlc `git diff --check` | passed |
+| ABI `npm run build:semantic` | passed |
+| ABI T-150 GTL conformance compiler gate | passed, 89/89 |
+| ABI `git diff --check` | passed |
 
 Stage timing from the live run:
 
