@@ -25,7 +25,7 @@ source_documents:
   - /Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.1.0-rc.2/release-snapshot-manifest.json
   - /Users/jim/src/apps/abiogenesis/docs/ABIOGENESIS_RC_RELEASE_NOTE.md
   - .ai-workspace/tickets/completed/T-203-factor-code-builder-graph-function-for-uat-test-generation-and-ticket-reentry.md
-  - .ai-workspace/tickets/active/T-204-decommission-odd-sdlc-cli-orchestration-surface.md
+  - .ai-workspace/tickets/completed/T-204-decommission-odd-sdlc-cli-orchestration-surface.md
 related_tickets:
   - .ai-workspace/tickets/completed/T-138-preserve-causal-chain-and-replayability-for-traversal-consequence.md
   - .ai-workspace/tickets/completed/T-140-retire-local-forced-iteration-tech-debt.md
@@ -33,7 +33,7 @@ related_tickets:
   - .ai-workspace/tickets/completed/T-160-first-class-traversal-overlays-for-guided-graph-passes.md
   - .ai-workspace/tickets/completed/T-197-reconcile-product-boundary-and-remove-authority-leakage.md
   - .ai-workspace/tickets/completed/T-203-factor-code-builder-graph-function-for-uat-test-generation-and-ticket-reentry.md
-  - .ai-workspace/tickets/active/T-204-decommission-odd-sdlc-cli-orchestration-surface.md
+  - .ai-workspace/tickets/completed/T-204-decommission-odd-sdlc-cli-orchestration-surface.md
   - /Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/T-159-formalize-traversal-unit-and-consequence-bind-boundary.md
 affected_boundary:
   - /Users/jim/src/apps/abiogenesis GTL compiler/validator traversalUnitProjection

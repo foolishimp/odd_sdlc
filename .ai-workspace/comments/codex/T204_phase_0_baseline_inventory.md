@@ -16,6 +16,67 @@ delete code. It establishes the measured source inventory, surviving public
 surface, current command/control residue, and first blockers for the next
 phases.
 
+## 2026-06-24 Closure Refresh
+
+This refresh supersedes the historical 2026-06-22 counts below for closure
+purposes.
+
+Entry commit:
+
+- `odd_sdlc`: `5a53f82`
+- `odd_sdlc` status at refresh: clean tracked tree, with only untracked local
+  V8 isolate log `build_tenants/typescript/isolate-0xa8140c000-50518-v8.log`
+  excluded from source inventory.
+
+Current source inventory:
+
+| Metric | Current |
+| --- | ---: |
+| TypeScript source files under `build_tenants/typescript/code/src` | 175 |
+| TypeScript source lines under `build_tenants/typescript/code/src` | 98,048 |
+| Package bins | 0 |
+| Package exports | `.`, `./install`, `./release` |
+| `code/src/cli` source files | 0 |
+| `spec_method` source files | 0 |
+| `effects` source files | 0 |
+| `operator/event_store.ts` | 0 |
+| `start` source files | 3 |
+| `analysis` source files | 15 |
+| `operator` source files | 53 |
+
+Current survival classification:
+
+| Classification | Current files |
+| --- | ---: |
+| `gtl_program` | 10 |
+| `plugin` | 25 |
+| `product_carrier` | 43 |
+| `product_projection` | 72 |
+| `test_or_release_plumbing` | 25 |
+| `move_to_abg` | 0 |
+| `delete` current rows | 0 |
+
+The authoritative per-file classification is
+`.ai-workspace/comments/codex/20260620T000000Z_T204_source_survival_inventory.md`.
+It now classifies every current `code/src` file and records six non-current
+deleted rows as closed deletion history.
+
+Current residue disposition:
+
+| Surface | Closure fact |
+| --- | --- |
+| `start/*` | Survives as product start-intent, target-policy, and runtime-binding contract projection consumed by ABG runtime binding; it is not a package command, local executor, retry loop, or replay controller. |
+| `operator/installed_operator.ts` | Survives as ABG-consumed plugin/session adapter; public start/control exports and installed start executors are removed, worker invocation goes through ABG supervised process actor, and source gates reject local start/control/reentry/runtime-event authorship. |
+| `operator/traversal_consequence.ts` | Survives as SDLC consequence candidate/read-model surface over admitted evidence; ABG owns final bind, terminal status, runtime transition, replay, and continuation truth. |
+| `workspace_api/entry.ts` | Survives as commandless query/gaps/ticket read-model API; source-authority gate rejects runtime truth authorship and local traversal/start/control calls. |
+| `analysis/*` | Survives as product closure-proof/analyzer read model bound by REQ-F-ODDSDLC-081 and staged-compute design; not a runtime authority path. |
+
+Refresh validation:
+
+| Check | Result |
+| --- | --- |
+| `npm run test:t197` | passed, 33/33; includes source survival inventory closure gate |
+
 ## Current Source Inventory
 
 | Metric | Current |

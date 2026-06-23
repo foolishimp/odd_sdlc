@@ -61,6 +61,7 @@ import {
   constructSdlcEvaluationGridContract,
   constructSdlcPromptInvocationProjection,
   sdlcPromptSectionFromLines,
+  type SdlcPromptFamily,
   type SdlcRenderedPromptProjection
 } from "../operator/prompt_assets.js";
 import {
@@ -1431,12 +1432,44 @@ function reviewRenderedPromptProjection(input: {
 
 export function semanticPromptProjectionIssuesForRenderedPrompt(input: {
   readonly edgeRef: string;
-  readonly promptFamily: string;
+  readonly promptFamily: SdlcPromptFamily;
   readonly promptText: string;
   readonly outputCarrierKind: string;
   readonly contractRef: string;
   readonly contractDigest: string;
 }): readonly SdlcPromptProjectionReviewIssue[] {
+  const promptProjection: SdlcRenderedPromptProjection =
+    constructSdlcPromptInvocationProjection({
+      promptFamily: input.promptFamily,
+      stage: input.promptFamily === "transform" ? "transform.C" : "evaluate.C",
+      recipient: input.promptFamily === "transform" ? "transformer" : "evaluator",
+      targetAssetType: input.outputCarrierKind,
+      workCategory: input.edgeRef,
+      edgePolicyRef: null,
+      constructorRef:
+        "constructor://odd-sdlc/semantic-prompt-projection-review",
+      authorityPacketRefs: Object.freeze([]),
+      obligationRefs: Object.freeze([]),
+      toolEffectPolicyRefs: Object.freeze([]),
+      outputCarrierRefs: Object.freeze([
+        input.outputCarrierKind,
+        input.contractRef
+      ]),
+      proofObligationRefs: Object.freeze([input.contractDigest]),
+      promptSections: Object.freeze([
+        sdlcPromptSectionFromLines({
+          role: "prompt_body",
+          title: "Rendered Prompt Under Review",
+          textLines: Object.freeze([input.promptText]),
+          intent: "Review a rendered prompt projection for semantic regressions.",
+          authorityKindRefs: Object.freeze(["tool_effect_policy"]),
+          expectedOutcome: "The prompt review emits deterministic issues.",
+          failureModeAddressed:
+            "Prompt projection review must use a typed prompt asset carrier.",
+          appliesWhen: "semantic prompt projection tests provide rendered text"
+        })
+      ])
+    });
   return reviewRenderedPromptProjection({
     edgeRef: input.edgeRef,
     promptText: input.promptText,
@@ -1444,14 +1477,7 @@ export function semanticPromptProjectionIssuesForRenderedPrompt(input: {
     contractRef: input.contractRef,
     contractDigest: input.contractDigest,
     promptFamily: input.promptFamily,
-    promptProjection: {
-      invocationAsset: {
-        promptFamily: input.promptFamily,
-        workCategory: input.edgeRef,
-        outputCarrierRefs: [input.outputCarrierKind, input.contractRef],
-        promptSections: [{}]
-      }
-    } as unknown as SdlcRenderedPromptProjection
+    promptProjection
   });
 }
 
@@ -1736,24 +1762,42 @@ function semanticReviewGateRowsForPackage(input: {
     return Object.freeze([]);
   }
   const reviewResult = readSemanticCompilerFpReviewResult(input);
-  return Object.freeze([
-    Object.freeze({
+  const row: SdlcGtlProgramSemanticReviewGateRow = Object.freeze({
       gateRef:
         "semantic-review-gate://odd-sdlc/t204/materialized-prompts/fp-code-review",
       subjectRef: input.reviewPackage.subjectRef,
       deterministicReportDigest:
         input.reviewPackage.deterministicReportDigest,
       reviewResultKind:
-        "sdlc_semantic_compiler_fp_review_result" as const,
-      reviewVersion: "ts-semantic-compiler-fp-review-result-v1" as const,
-      status: "passed" as const,
-      findingCount: 0 as const,
+        "sdlc_semantic_compiler_fp_review_result",
+      reviewVersion: "ts-semantic-compiler-fp-review-result-v1",
+      status: "passed",
+      findingCount: 0,
       reviewerProfileRef:
-        reviewResult.parsed["reviewerProfileRef"] as string,
-      reviewedAt: reviewResult.parsed["reviewedAt"] as string,
+        semanticCompilerReviewResultStringField({
+          reviewResult,
+          fieldName: "reviewerProfileRef"
+        }),
+      reviewedAt: semanticCompilerReviewResultStringField({
+        reviewResult,
+        fieldName: "reviewedAt"
+      }),
       evidenceRefs: Object.freeze([`file://${reviewResult.path}`])
-    })
-  ]);
+  });
+  return Object.freeze([row]);
+}
+
+function semanticCompilerReviewResultStringField(input: {
+  readonly reviewResult: ReturnType<typeof readSemanticCompilerFpReviewResult>;
+  readonly fieldName: "reviewerProfileRef" | "reviewedAt";
+}): string {
+  const value = input.reviewResult.parsed[input.fieldName];
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new TypeError(
+      `semantic compiler review result ${input.fieldName} is missing`
+    );
+  }
+  return value;
 }
 
 export function constructCurrentSdlcSemanticCompilerPromptReviewPackage(
@@ -2874,7 +2918,7 @@ export function constructCurrentSdlcGtlProgramConformanceInput(
     runtimeBindings
   });
 
-  const conformanceInput = Object.freeze({
+  const conformanceInput: GtlProgramConformanceInput = Object.freeze({
     subjectRef,
     abiPackageVersion: ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.packageVersion,
     expectedCoverage: Object.freeze({
@@ -2921,7 +2965,7 @@ export function constructCurrentSdlcGtlProgramConformanceInput(
     externalToolGates,
     runtimeBindings
   });
-  return conformanceInput as GtlProgramConformanceInput;
+  return conformanceInput;
 }
 
 export function admitCurrentSdlcGtlProgramConformanceInput(

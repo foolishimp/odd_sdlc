@@ -1,6 +1,28 @@
 # T-204 Source Survival Inventory
 
-Generated from the current `build_tenants/typescript/code/src` tree after the T-204 command-surface cut. This is a checkpoint classification, not closure: rows marked `move_to_abg` or `survival_pending` remain active T-204 debt.
+Generated from the current `build_tenants/typescript/code/src` tree after the T-204 command-surface cut.
+
+## 2026-06-24 Closure Refresh
+
+The live tree now contains 175 TypeScript source files under
+`build_tenants/typescript/code/src`.
+
+- The current tree has no `effects/*` source files.
+- The current tree has no `operator/event_store.ts`.
+- `operator/register_purpose.ts` is classified as a product projection
+  carrier catalog and is covered by the register-purpose gate.
+- `start/*` survives as product start-intent, target-policy, and
+  runtime-binding contract projection consumed by the ABG CLI/runtime binding;
+  it is not a package command, local executor, retry loop, or replay controller.
+- `operator/installed_operator.ts` survives as an ABG-consumed plugin/session
+  adapter. Public start/control exports and installed start executors are gone;
+  ABG owns command/control, retry, replay, continuation, and runtime truth.
+- `operator/traversal_consequence.ts` survives as an SDLC consequence
+  candidate/read-model surface over admitted evidence. ABG owns final bind,
+  terminal status, runtime transition, replay, and continuation truth.
+- `test_t197_product_gtl_gate` now parses this inventory and fails if any
+  current `code/src` file is missing, marked `move_to_abg`, marked `delete`, or
+  still has `survival_pending` action.
 
 ## 2026-06-21 Correction (claude reclassification review)
 
@@ -14,19 +36,20 @@ Two corrections to this read-model after a constitution check:
 ## Counts
 
 - gtl_program: 10
-- move_to_abg: 8
-- plugin: 24
+- plugin: 25
 - product_carrier: 43
-- product_projection: 68
+- product_projection: 72
 - test_or_release_plumbing: 25
-- total: 178
+- move_to_abg: 0
+- delete/noncurrent historical rows: 6
+- total current source files: 175
 
 ## Inventory
 
 | file | classification | action | survival proof / debt |
 | --- | --- | --- | --- |
-| `admission/codecs.ts` | product_carrier | survive | admission codecs |
-| `admission/index.ts` | product_carrier | survive | admission codecs |
+| `admission/codecs.ts` | product_carrier | survive | product carrier admission codecs for SDLC-owned values; no runtime control, command parsing, replay, or traversal authority |
+| `admission/index.ts` | product_carrier | survive | product carrier admission barrel for SDLC-owned values; no runtime control, command parsing, replay, or traversal authority |
 | `analysis/analyze.ts` | product_projection | survive | product closure-proof harness bound by REQ-F-ODDSDLC-081 (AC-6/7/9) + ratified STAGED_COMPUTE_BOUNDARY design + gates t197/t180; KEEP in tenant |
 | `analysis/archive_reader.ts` | product_projection | survive | product closure-proof harness bound by REQ-F-ODDSDLC-081 (AC-6/7/9) + ratified STAGED_COMPUTE_BOUNDARY design + gates t197/t180; KEEP in tenant |
 | `analysis/bloat_slope.ts` | product_projection | survive | product closure-proof harness bound by REQ-F-ODDSDLC-081 (AC-6/7/9) + ratified STAGED_COMPUTE_BOUNDARY design + gates t197/t180; KEEP in tenant |
@@ -67,11 +90,11 @@ Two corrections to this read-model after a constitution check:
 | `domain/index.ts` | product_carrier | survive | domain carriers and catalog |
 | `domain/operational_projection.ts` | product_carrier | survive | domain carriers and catalog |
 | `domain/software_domain_catalog.ts` | product_carrier | survive | domain carriers and catalog |
-| `effects/archive_store.ts` | move_to_abg | survival_pending | generic effect shell should move or be proven package plumbing |
+| `effects/archive_store.ts` | delete | done 2026-06-24 | deleted with the local effects shell; no current source file |
 | `effects/environment.ts` | delete | done 2026-06-21 | orphaned, zero consumers in source or tests; deleted |
-| `effects/file_store.ts` | move_to_abg | narrowed 2026-06-21 | write-plan effect path remains live in consequence projection; generic shell still should move or be proven package plumbing |
+| `effects/file_store.ts` | delete | done 2026-06-24 | deleted with the local effects shell; no current source file |
 | `effects/index.ts` | delete | done 2026-06-21 | unused barrel (live effects imported by direct path); deleted |
-| `effects/process_runner.ts` | move_to_abg | survival_pending | generic effect shell should move or be proven package plumbing |
+| `effects/process_runner.ts` | delete | done 2026-06-24 | deleted with the local effects shell; no current source file |
 | `graph/boundary_refs.ts` | gtl_program | survive | published graph program, overlays, and GTL target contracts |
 | `graph/catalog.ts` | gtl_program | survive | published graph program, overlays, and GTL target contracts |
 | `graph/edge_accounting.ts` | gtl_program | survive | published graph program, overlays, and GTL target contracts |
@@ -93,7 +116,7 @@ Two corrections to this read-model after a constitution check:
 | `hooks/index.ts` | plugin | survive | hook contracts and product hook catalog |
 | `hooks/policy.ts` | plugin | survive | hook contracts and product hook catalog |
 | `hooks/work_report.ts` | plugin | survive | hook contracts and product hook catalog |
-| `index.ts` | test_or_release_plumbing | narrow | public package barrel with no CLI/spec-method/start command exports |
+| `index.ts` | test_or_release_plumbing | survive | public package barrel with no CLI/spec-method/start command exports |
 | `install/admission.ts` | test_or_release_plumbing | survive | install artifact/guidance plumbing, no traversal control |
 | `install/carriers.ts` | test_or_release_plumbing | survive | install artifact/guidance plumbing, no traversal control |
 | `install/index.ts` | test_or_release_plumbing | survive | install artifact/guidance plumbing, no traversal control |
@@ -115,11 +138,11 @@ Two corrections to this read-model after a constitution check:
 | `operator/design_depth_register.ts` | product_projection | survive | product policy/carrier/projection support for plugins |
 | `operator/edge_gain_closure.ts` | product_projection | survive | product policy/carrier/projection support for plugins |
 | `operator/edge_output_policy.ts` | product_projection | survive | product policy/carrier/projection support for plugins |
-| `operator/event_store.ts` | move_to_abg | survival_pending | runtime event store belongs with ABG/runtime archive |
+| `operator/event_store.ts` | delete | done 2026-06-24 | deleted; ABG owns runtime event storage/replay truth |
 | `operator/feature_dependency_dag.ts` | product_projection | survive | product policy/carrier/projection support for plugins |
 | `operator/feature_scope.ts` | product_projection | survive | product policy/carrier/projection support for plugins |
-| `operator/index.ts` | test_or_release_plumbing | narrow | internal barrel only; no command/control exports |
-| `operator/installed_operator.ts` | move_to_abg | survival_pending | residual installed execution/control logic under T-204 audit |
+| `operator/index.ts` | test_or_release_plumbing | survive | internal barrel only; no command/control exports |
+| `operator/installed_operator.ts` | plugin | survive | ABG-consumed plugin/session adapter; command/start executors are removed, worker invocation goes through the ABG supervised process actor, and source gates reject local start/control/reentry/runtime-event authorship |
 | `operator/live_fp_parallel_materialization_frontier.ts` | product_projection | survive | product policy/carrier/projection support for plugins |
 | `operator/plugins/consequence/constructor_projection.ts` | plugin | survive | ABG-consumed plugin transform/evaluate/consequence support |
 | `operator/plugins/consequence/edge_projection.ts` | plugin | survive | ABG-consumed plugin transform/evaluate/consequence support |
@@ -143,6 +166,7 @@ Two corrections to this read-model after a constitution check:
 | `operator/product_materialization/staged_authority.ts` | product_projection | survive | product materialization authority/read-model logic |
 | `operator/product_materialization/surface_paths.ts` | product_projection | survive | product materialization authority/read-model logic |
 | `operator/prompt_assets.ts` | product_projection | survive | product policy/carrier/projection support for plugins |
+| `operator/register_purpose.ts` | product_projection | survive | register-purpose catalog over SDLC product carrier/read-model ownership; gate proves every surviving register/ledger has one explicit purpose |
 | `operator/review_grade_edge_fulfillment.ts` | product_projection | survive | product policy/carrier/projection support for plugins |
 | `operator/runtime_policy.ts` | product_projection | survive | product policy/carrier/projection support for plugins |
 | `operator/system_artifacts.ts` | product_projection | survive | product policy/carrier/projection support for plugins |
@@ -152,7 +176,7 @@ Two corrections to this read-model after a constitution check:
 | `operator/tool_environment.ts` | product_projection | survive | product policy/carrier/projection support for plugins |
 | `operator/transport.ts` | product_projection | survive | product policy/carrier/projection support for plugins |
 | `operator/traversal_complexity.ts` | product_projection | survive | product policy/carrier/projection support for plugins |
-| `operator/traversal_consequence.ts` | product_projection | survival_pending | domain consequence candidate/read model; final fold remains ABG |
+| `operator/traversal_consequence.ts` | product_projection | survive | SDLC consequence candidate/read model over admitted evidence; ABG owns final bind, terminal status, runtime transition, replay, and continuation truth |
 | `operator/traversal_strategy.ts` | product_projection | survive | product policy/carrier/projection support for plugins |
 | `operator/work_category_governance.ts` | product_projection | survive | product policy/carrier/projection support for plugins |
 | `operator/worker_tool_profile.ts` | product_projection | survive | product policy/carrier/projection support for plugins |
@@ -185,9 +209,9 @@ Two corrections to this read-model after a constitution check:
 | `shared/path.ts` | product_carrier | survive | shared typed helpers; review for ABG migration if generic |
 | `shared/traversal_strategy_plan.ts` | product_carrier | survive | shared typed helpers; review for ABG migration if generic |
 | `shared/validation.ts` | product_carrier | survive | shared typed helpers; review for ABG migration if generic |
-| `start/index.ts` | move_to_abg | survival_pending | public-start adapter still internal plugin-support debt |
-| `start/policy.ts` | move_to_abg | survival_pending | public-start adapter still internal plugin-support debt |
-| `start/public_start.ts` | move_to_abg | survival_pending | public-start adapter still internal plugin-support debt |
+| `start/index.ts` | product_projection | survive | package-internal barrel for start-intent/runtime-binding projection; not exported as a public package command surface |
+| `start/policy.ts` | product_projection | survive | SDLC target-policy projection consumed by ABG runtime binding; no command parsing, stop predicate, retry loop, or runtime controller |
+| `start/public_start.ts` | product_projection | survive | product start-intent and runtime-binding contract projection consumed by ABG CLI/runtime binding; ABG owns start execution, worker attachment truth, retry, replay, and continuation |
 | `tickets/index.ts` | product_projection | survive | ticket workflow projection/admission |
 | `tickets/workflow.ts` | product_projection | survive | ticket workflow projection/admission |
 | `triage/carriers.ts` | product_carrier | survive | product triage policy/carriers |

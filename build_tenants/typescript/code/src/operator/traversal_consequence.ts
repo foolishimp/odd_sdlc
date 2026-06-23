@@ -445,7 +445,8 @@ function requireAbsoluteGraphReentryTarget(ref: string): string {
 }
 
 function isAbgGraphReentryPoint(value: string): value is GraphReentryPoint {
-  return (GRAPH_REENTRY_POINT_VALUES as readonly string[]).includes(value);
+  const graphReentryPointValues: readonly string[] = GRAPH_REENTRY_POINT_VALUES;
+  return graphReentryPointValues.includes(value);
 }
 
 export function constructSdlcGraphReentryTargetRef(input: {

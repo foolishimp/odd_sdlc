@@ -90,6 +90,27 @@ function repoFilesUnder(relativePath) {
   return files.sort();
 }
 
+function parseT204SourceSurvivalInventory() {
+  const inventory = repoFile(
+    ".ai-workspace/comments/codex/20260620T000000Z_T204_source_survival_inventory.md"
+  );
+  const rows = new Map();
+  for (const line of inventory.split("\n")) {
+    const match = /^\| `([^`]+)` \| ([^|]+) \| ([^|]+) \| (.*) \|$/u.exec(line);
+    if (match === null) {
+      continue;
+    }
+    const [, file, classification, action, proof] = match;
+    assert.equal(rows.has(file), false, `duplicate T-204 inventory row: ${file}`);
+    rows.set(file, {
+      classification: classification.trim(),
+      action: action.trim(),
+      proof: proof.trim()
+    });
+  }
+  return rows;
+}
+
 function assertConformancePassed(report) {
   assert.equal(
     report.passed,
@@ -143,6 +164,73 @@ test("T-197 product gate typechecks the live SDLC graph inventory", () => {
   assert.ok(input.expectedCoverage.publicStartTargetCount > 0);
   assert.ok(input.expectedCoverage.sourceIdentitySurfaceCount > 0);
   assert.ok(input.featureCoverageManifest.rows.length >= 26);
+});
+
+test("T-204 source survival inventory closes the current code/src tree", () => {
+  const inventory = parseT204SourceSurvivalInventory();
+  const sourceRoot = path.join(REPO_ROOT, "build_tenants/typescript/code/src");
+  const currentSourceFiles = repoFilesUnder("build_tenants/typescript/code/src")
+    .filter((filePath) => path.extname(filePath) === ".ts")
+    .map((filePath) => path.relative(sourceRoot, filePath).split(path.sep).join("/"))
+    .sort();
+  const currentSourceFileSet = new Set(currentSourceFiles);
+  const allowedClassifications = new Set([
+    "gtl_program",
+    "plugin",
+    "product_carrier",
+    "product_projection",
+    "test_or_release_plumbing"
+  ]);
+  const classificationCounts = new Map();
+
+  assert.deepEqual(
+    currentSourceFiles.filter((file) => !inventory.has(file)),
+    [],
+    "every current code/src file must have a T-204 survival classification"
+  );
+
+  const unclosedRows = [];
+  for (const file of currentSourceFiles) {
+    const row = inventory.get(file);
+    assert.notEqual(row, undefined);
+    if (
+      !allowedClassifications.has(row.classification) ||
+      row.action !== "survive" ||
+      row.proof.length < 20
+    ) {
+      unclosedRows.push(
+        `${file}: ${row.classification} / ${row.action} / ${row.proof}`
+      );
+    }
+    classificationCounts.set(
+      row.classification,
+      (classificationCounts.get(row.classification) ?? 0) + 1
+    );
+  }
+  assert.deepEqual(unclosedRows, [], "current source rows must be closed survivors");
+  assert.deepEqual(
+    Object.fromEntries([...classificationCounts.entries()].sort()),
+    {
+      gtl_program: 10,
+      plugin: 25,
+      product_carrier: 43,
+      product_projection: 72,
+      test_or_release_plumbing: 25
+    }
+  );
+
+  const staleOpenRows = [...inventory.entries()]
+    .filter(([file]) => !currentSourceFileSet.has(file))
+    .filter(
+      ([, row]) =>
+        row.classification !== "delete" || !/^done\b/u.test(row.action)
+    )
+    .map(([file, row]) => `${file}: ${row.classification} / ${row.action}`);
+  assert.deepEqual(
+    staleOpenRows,
+    [],
+    "non-current inventory rows must be closed deletion history"
+  );
 });
 
 test("T-204 register carriers declare one explicit purpose", () => {
@@ -688,8 +776,14 @@ test("T-197 A2 keeps SDLC start as shell over one admitted ABG boundary", () => 
     design,
     /A2 \| `executeInstalledOperatorStartWithReentry` and `executeInstalledOperatorStart\(\.\.\.\)` formerly owned local installed start\/control/u
   );
-  assert.match(design, /residual installed-operator control code remains under T-204 audit/u);
-  assert.match(design, /product plugin\/session adapters with explicit survival proof/u);
+  assert.match(
+    design,
+    /T-204 source survival inventory closes the current code\/src tree/u
+  );
+  assert.match(
+    design,
+    /product projection\/plugin-session adapters with explicit survival proof/u
+  );
   assert.doesNotMatch(design, /loop may only call the installed-start boundary/u);
   assert.doesNotMatch(design, /operator-facing retry\/reentry shell/u);
   assert.match(

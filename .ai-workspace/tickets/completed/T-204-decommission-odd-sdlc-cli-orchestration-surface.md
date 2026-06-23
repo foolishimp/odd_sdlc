@@ -3,7 +3,7 @@ id: T-204
 title: Decommission odd_sdlc orchestration code and shrink to GTL program plus plugins
 type: chore
 ticket_category: implementation_migration
-status: active
+status: completed
 goal: question every odd_sdlc source file and remove product-local orchestration so the package collapses toward a GTL program plus plugins, with only irreducible product carriers/proof surfaces retained
 build_tenant: typescript
 owner: odd_sdlc
@@ -26,7 +26,8 @@ re_entry_point: product
 priority: critical
 triaged_at: 2026-06-17
 created_at: 2026-06-17
-updated_at: 2026-06-20
+updated_at: 2026-06-24
+completed_at: 2026-06-24
 activated_at: 2026-06-17
 governance_scope: STDO Method, ODD_METHOD, ABG/GTL substrate boundary
 source_documents:
@@ -2997,3 +2998,116 @@ Prompt consistency notes from the run:
   execution passed downstream;
 - review-grade assessments for component-test and UAT-test source passed with
   exact scoped obligation coverage and no closure/status divergence.
+
+## 2026-06-24 Closure Review
+
+Verdict: completed for T-204.
+
+The closeout is a source-inventory and command/control boundary close, not a
+claim that every broader product-materialization fixture in the TypeScript
+tenant is green.
+
+Current source inventory:
+
+| Surface | Count / status |
+| --- | ---: |
+| current `build_tenants/typescript/code/src/**/*.ts` files | 175 |
+| `gtl_program` | 10 |
+| `plugin` | 25 |
+| `product_carrier` | 43 |
+| `product_projection` | 72 |
+| `test_or_release_plumbing` | 25 |
+| current `move_to_abg` rows | 0 |
+| current `delete` rows | 0 |
+| `code/src/cli` files | 0 |
+| `code/src/spec_method` files | 0 |
+| `code/src/effects` files | 0 |
+| `operator/event_store.ts` | absent |
+
+Durable proof surfaces:
+
+- `.ai-workspace/comments/codex/20260620T000000Z_T204_source_survival_inventory.md`
+  now classifies every current `code/src` file and records deleted non-current
+  rows as closed deletion history.
+- `test_t197_product_gtl_gate` parses that inventory and fails if any current
+  source file is missing, marked `move_to_abg`, marked `delete`, or carries
+  `survival_pending`.
+- `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_STAGED_COMPUTE_BOUNDARY.md`
+  now marks A2 done: public command/start surfaces and installed start
+  executors are deleted; surviving `start/*` and
+  `operator/installed_operator.ts` rows are product projection/plugin-session
+  adapters with explicit survival proof.
+- `specification/PRODUCT.md` names ABG 4.1.0-rc.7 as the substrate for runtime
+  start traversal selection, retry/reentry, continuation projection, GTL
+  conformance, source-authority policy rows, and semantic review gates.
+
+Surviving former residue classification:
+
+- `start/*` survives as product start-intent, target-policy, and
+  runtime-binding contract projection consumed by ABG runtime binding. It is
+  not a package command, local executor, retry loop, or replay controller.
+- `operator/installed_operator.ts` survives as an ABG-consumed plugin/session
+  adapter. Public start/control exports and installed start executors are gone;
+  worker invocation goes through the ABG supervised process actor; source gates
+  reject local start/control/reentry/runtime-event authorship.
+- `operator/traversal_consequence.ts` survives as SDLC consequence
+  candidate/read-model projection over admitted evidence. ABG owns final bind,
+  terminal status, runtime transition, replay, and continuation truth.
+- `workspace_api/entry.ts` survives as a commandless read-model API. The
+  semantic source-authority gate rejects runtime truth authorship and local
+  traversal/start/control calls from that surface.
+- `analysis/*` survives as product closure-proof/analyzer projection bound by
+  REQ-F-ODDSDLC-081 and staged-compute design, not as runtime authority.
+
+Validation:
+
+| Check | Result |
+| --- | --- |
+| `npm run build:semantic` | passed |
+| `npm run lint:semantic` | passed |
+| `npm run guard:pack-no-command-artifacts` | passed |
+| Focused T-204 boundary gate: `test_t058`, `test_t140`, `test_t180`, `test_t194`, `test_t197`, `test_t203` | passed, 93/93 |
+| `git diff --check` | passed |
+| `npm run test:semantic` | red before completion; stopped after `test_t066_product_materialization_contract.test.mjs` produced 5 product-materialization fixture failures and the next file was cancelled by interruption |
+
+Broad-suite residual classification:
+
+The five observed broad-suite failures are in
+`test_t066_product_materialization_contract.test.mjs`:
+
+- `T-171 current component-test materialization supersedes empty predecessor
+  replay` blocked on `staged_authority_missing`;
+- `T-102 post-transform observation ignores tenant-declared component-test
+  build byproducts` blocked rather than passed;
+- `T-184 component-test observation classifies module src/test files as test
+  materialization` blocked rather than passed;
+- `B-081 test execution preparation carries admitted schedule commands`
+  projected `sbt test` where the fixture expected `sbt "coreModel/test"`;
+- `T-100 component-test postflight admits materialized tests before execution
+  discoverability proof` blocked rather than passed.
+
+These are product-materialization/staged-authority fixture expectations. They
+are not evidence of a remaining odd_sdlc public/private command, local
+start/control loop, local runtime event author, local replay controller, or
+raw-archive command authority. They should be handled under the product
+materialization/staged-authority lane, not by reopening T-204.
+
+Data-mapper validation status:
+
+The last T-204 data-mapper evidence remains the recorded resumed run in
+`T204_phase_6a_semantic_compiler_prompt_eval.md`: run
+`20260622T230124580Z_pid4921` emitted 22 report assessments, review-grade
+passed all 22 findings, and the UAT-test source edge closed. The later terminal
+block was product execution pressure around Spark/Hadoop
+`javax.security.auth.Subject.getSubject`, not a T-204 traversal-control crash.
+
+Closure law check:
+
+- every current `code/src` file is explicitly classified;
+- no current source file is classified `move_to_abg`, `delete`, or
+  `survival_pending`;
+- no public, private, transitional, or test-harness odd_sdlc orchestration CLI
+  remains in source, build output, package exports, or package bin metadata;
+- product/design text names ABG as command/control/runtime owner;
+- product gates prove no remaining SDLC source owns traversal authority outside
+  GTL declarations and ABG-consumed plugins.

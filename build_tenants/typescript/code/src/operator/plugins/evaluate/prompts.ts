@@ -43,6 +43,29 @@ function listForPrompt(values: readonly string[]): string {
   return values.length === 0 ? "none" : values.join(", ");
 }
 
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseDesignDepthUpdatePacketContentRows(input: {
+  readonly text: string;
+  readonly label: string;
+}): {
+  readonly contentRows: readonly unknown[];
+} {
+  const parsed: unknown = JSON.parse(input.text);
+  if (!isRecord(parsed) || !Array.isArray(parsed["contentRows"])) {
+    throw new TypeError(`${input.label}.contentRows: array required`);
+  }
+  const contentRows: unknown[] = [];
+  for (const row of parsed["contentRows"]) {
+    contentRows.push(row);
+  }
+  return Object.freeze({
+    contentRows: Object.freeze(contentRows)
+  });
+}
+
 function tenantToolBoundaryPromptLines(
   tenantToolEnvironment: SdlcTenantToolEnvironmentProjection | null | undefined
 ): readonly string[] {
@@ -199,9 +222,10 @@ function designDepthSecondUpdatePacket(input: {
   readonly selectedCompositionSelectionRef: string;
   readonly selectedRegimeBindingRef: string | null;
 }): string {
-  const firstPacket = JSON.parse(designDepthFirstUpdatePacket(input)) as {
-    readonly contentRows: readonly unknown[];
-  };
+  const firstPacket = parseDesignDepthUpdatePacketContentRows({
+    text: designDepthFirstUpdatePacket(input),
+    label: "DesignDepthFirstUpdatePacket"
+  });
   return `${JSON.stringify(
     {
       ...firstPacket,
@@ -248,6 +272,16 @@ function designDepthFullPartialCheckpointValue(
   section: (typeof SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS)[number]
 ): unknown {
   switch (section) {
+    case "stackProfileRows":
+    case "implementationModuleRows":
+    case "aggregateDomainModelRows":
+    case "moduleSchemaFragments":
+    case "moduleStateDiagramFragments":
+    case "sunnyDaySequenceRows":
+    case "componentTopologyRows":
+    case "componentRealizationRows":
+    case "fileTargetRows":
+      return [];
     case "aggregateDomainModel":
     case "aggregateSunnyDaySequence":
       return null;
@@ -283,8 +317,6 @@ function designDepthFullPartialCheckpointValue(
           evidenceRefs: Object.freeze([DESIGN_DEPTH_FULL_PARTIAL_CHECKPOINT_PACKET_REF])
         })
       });
-    default:
-      return [];
   }
 }
 
@@ -296,9 +328,10 @@ function designDepthFullPartialCheckpointPacket(input: {
   readonly selectedCompositionSelectionRef: string;
   readonly selectedRegimeBindingRef: string | null;
 }): string {
-  const secondPacket = JSON.parse(designDepthSecondUpdatePacket(input)) as {
-    readonly contentRows: readonly unknown[];
-  };
+  const secondPacket = parseDesignDepthUpdatePacketContentRows({
+    text: designDepthSecondUpdatePacket(input),
+    label: "DesignDepthSecondUpdatePacket"
+  });
   return `${JSON.stringify(
     {
       ...secondPacket,

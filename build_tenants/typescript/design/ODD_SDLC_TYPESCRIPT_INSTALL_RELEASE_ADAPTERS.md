@@ -1,7 +1,7 @@
 # odd_sdlc TypeScript Install And Release Adapters
 
 **Status**: Active
-**Owner Ticket**: `.ai-workspace/tickets/completed/T-059-realize-typescript-install-normalize-and-release-cut-adapters.md`, `.ai-workspace/tickets/active/T-204-decommission-odd-sdlc-cli-orchestration-surface.md`
+**Owner Ticket**: `.ai-workspace/tickets/completed/T-059-realize-typescript-install-normalize-and-release-cut-adapters.md`, `.ai-workspace/tickets/completed/T-204-decommission-odd-sdlc-cli-orchestration-surface.md`
 **Implements**: `REQ-F-ODDSDLC-040`, `REQ-F-ODDSDLC-043`
 
 ## Position
