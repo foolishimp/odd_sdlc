@@ -30,9 +30,9 @@ for the TypeScript line.
 
 The ABIogenesis TypeScript tenant is substrate evidence consumed through
 explicit release snapshots. The TypeScript line currently consumes the
-immutable `@abiogenesis/typescript-tenant@4.1.0-rc.9` release snapshot at
-`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.1.0-rc.9/abiogenesis-typescript-tenant-4.1.0-rc.9.tgz`.
-The `4.1.0-rc.9` cut proves GTL/ABG carriers, graph-function
+immutable `@abiogenesis/typescript-tenant@4.1.0-rc.10` release snapshot at
+`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.1.0-rc.10/abiogenesis-typescript-tenant-4.1.0-rc.10.tgz`.
+The `4.1.0-rc.10` cut proves GTL/ABG carriers, graph-function
 iteration, traversal probes,
 evented saga-frontier execution, no-compute-basis failure taxonomy,
 bootstrap-lineage slices, selected `abg.fn_composition` identity, canonical
@@ -56,7 +56,7 @@ SDLC prompt authority policy remains product overlay data. It also proves
 segment-scoped evaluation redispatch metadata, so downstream SDLC evaluation
 can preserve segment, dimension-cell, fold, and relation scope across ABG-owned
 redispatch instead of collapsing deep evaluation coverage back to edge-granular
-fallbacks. It also carries the clean ABG 4.1.0-rc.9 consolidation of the
+fallbacks. It also carries the clean ABG 4.1.0-rc.10 consolidation of the
 defaults/lever registry, temporal runtime-scope consolidation, iteration
 state-action algebra, prompt asset interface, and contract-fulfillment binding
 API that `odd_sdlc.TS` consumes. It also carries the ABG-owned
@@ -123,7 +123,8 @@ outcomes that publish continuation refs, so retryable evaluator/provider
 failures remain traversal-runtime facts and do not become SDLC-local loops or
 terminal gap stops before ABG consumes the admitted continuation.
 It also carries ABG-owned source-authority policy rows, semantic review gates,
-and async construction re-entry handling for consequence traversal actions, so
+the deterministic semantic compiler F_P review graph-function self-run, and
+async construction re-entry handling for consequence traversal actions, so
 SDLC can declare T-204 compiler/runtime boundary constraints as ABG-checked
 program data instead of local evaluator prose or product-local retry routing.
 It is not

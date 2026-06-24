@@ -168,9 +168,9 @@ The relevant release proof used the current staged release packages:
 - odd_sdlc package: `@odd-sdlc/typescript-tenant@3.0.16`
 - ABIogenesis substrate: `@abiogenesis/typescript-tenant@4.1.0-rc.8`
 
-Current substrate after the 2026-06-25 compiler-gate repair:
+Current substrate after the 2026-06-25 compiler-gate self-run repair:
 
-- ABIogenesis substrate: `@abiogenesis/typescript-tenant@4.1.0-rc.9`
+- ABIogenesis substrate: `@abiogenesis/typescript-tenant@4.1.0-rc.10`
 
 Observed non-closure evidence:
 
@@ -253,15 +253,23 @@ compiler truth. The current lanes do not yet fail closed when:
 Implemented the ABG-owned semantic compiler F_P review gate repair without
 moving compiler authority into `odd_sdlc`:
 
-- ABIogenesis `@abiogenesis/typescript-tenant@4.1.0-rc.9` now publishes
+- ABIogenesis `@abiogenesis/typescript-tenant@4.1.0-rc.10` now publishes
   `constructAbgSemanticCompilerFpReviewGraphFunction()` and
+  `runAbgSemanticCompilerFpReviewGraphFunction(...)`, plus
   `admitAbgSemanticCompilerFpReviewResult(...)`.
+- `runAbgSemanticCompilerFpReviewGraphFunction(...)` materializes the
+  self-contained ABI semantic compiler F_P review graph function, requires the
+  single graph vector to bind one F_P operator and one F_P evaluator, executes
+  the deterministic review package over that edge, and returns the ABG-admitted
+  result with graph-function, vector, edge, regime, admission, and evidence
+  provenance.
 - ABI GTL program conformance rejects semantic review gate rows that lack the
   ABG producer graph-function ref, graph-function digest, runtime ref,
   admission ref, and source package digest.
-- `odd_sdlc` now consumes rc.9, emits the deterministic prompt-review package,
-  and fails closed when `ODD_SDLC_SEMANTIC_COMPILER_FP_EVAL=required` points to
-  the old hand-authored JSON stamp shape.
+- `odd_sdlc` now consumes rc.10, emits the deterministic prompt-review package,
+  dogfoods the ABI self-runner for the accepted review result, and fails closed
+  when `ODD_SDLC_SEMANTIC_COMPILER_FP_EVAL=required` points to the old
+  hand-authored JSON stamp shape.
 
 This repairs the first compiler-gate false-positive pattern only. T-204 remains
 active until the installed traversal-unit, scenario descriptor, continuation,

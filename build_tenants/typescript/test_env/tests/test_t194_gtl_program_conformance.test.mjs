@@ -12,8 +12,8 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
-  constructAbgSemanticCompilerFpReviewResult,
-  formatGtlProgramConformanceIssues
+  formatGtlProgramConformanceIssues,
+  runAbgSemanticCompilerFpReviewGraphFunction
 } from "@abiogenesis/typescript-tenant";
 import {
   STALE_ABG_IDENTITY_PATTERN,
@@ -400,15 +400,23 @@ test("T-204 F_P semantic compiler review gate is switched and fail-closed", () =
     );
 
     const resultPath = path.join(tempRoot, "review-result.json");
+    const reviewRun = runAbgSemanticCompilerFpReviewGraphFunction({
+      ...reviewPackage,
+      reviewerProfileRef: "reviewer-profile://odd-sdlc/codex",
+      reviewedAt: "2026-06-23T00:00:00.000Z",
+      evidenceRefs: ["test://odd-sdlc/t204/semantic-compiler-fp-review"]
+    });
+    assert.equal(reviewRun.kind, "abg_semantic_compiler_fp_review_run_result");
+    assert.equal(reviewRun.vectorIndex, 0);
+    assert.equal(reviewRun.edgeRef, "abg.semanticCompiler.fpReview");
+    assert.equal(reviewRun.regime, "F_P");
+    assert.equal(reviewRun.admission.passed, true);
+    assert.equal(reviewRun.result.status, "passed");
+    assert.equal(reviewRun.result.findingCount, 0);
     writeFileSync(
       resultPath,
       `${JSON.stringify(
-        constructAbgSemanticCompilerFpReviewResult({
-          ...reviewPackage,
-          reviewerProfileRef: "reviewer-profile://odd-sdlc/codex",
-          reviewedAt: "2026-06-23T00:00:00.000Z",
-          evidenceRefs: ["test://odd-sdlc/t204/semantic-compiler-fp-review"]
-        }),
+        reviewRun.result,
         null,
         2
       )}\n`,
