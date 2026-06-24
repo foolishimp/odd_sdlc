@@ -591,11 +591,11 @@ test("T-184 F_P evaluator prompt uses incremental content ledger writes", () => 
   );
   assert.match(
     installedOperatorSource,
-    /const canAdmitDesignDepthContentRegisterAfterEvaluatorTimeout =[\s\S]*processResult\.timedOut === true[\s\S]*firstUpdateObservation\.status === "observable"[\s\S]*!evaluatorProcessTextLooksRetryableProviderFailure/u
+    /const canAdmitDesignDepthContentRegisterAfterEvaluatorStop =[\s\S]*firstUpdateObservation\.status === "observable"/u
   );
   assert.match(
     installedOperatorSource,
-    /processResult\.status !== 0 &&[\s\S]*!canAdmitDesignDepthContentRegisterAfterEvaluatorTimeout/u
+    /processResult\.status !== 0 &&[\s\S]*!canAdmitDesignDepthContentRegisterAfterEvaluatorStop/u
   );
   assert.match(
     installedOperatorSource,

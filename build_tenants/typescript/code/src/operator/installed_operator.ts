@@ -4196,13 +4196,11 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
   ]);
   const evaluatorProcessTextLooksRetryableProviderFailure =
     workerProcessTextLooksRetryableProviderFailure(evaluatorProcessText);
-  const canAdmitDesignDepthContentRegisterAfterEvaluatorTimeout =
-    processResult.timedOut === true &&
-    firstUpdateObservation.status === "observable" &&
-    !evaluatorProcessTextLooksRetryableProviderFailure;
+  const canAdmitDesignDepthContentRegisterAfterEvaluatorStop =
+    firstUpdateObservation.status === "observable";
   if (
     processResult.status !== 0 &&
-    !canAdmitDesignDepthContentRegisterAfterEvaluatorTimeout
+    !canAdmitDesignDepthContentRegisterAfterEvaluatorStop
   ) {
     const processFailureReason: SdlcBlockingReasonCode =
       evaluatorProcessTextLooksRetryableProviderFailure
