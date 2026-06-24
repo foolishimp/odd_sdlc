@@ -165,6 +165,9 @@ test("T-204 semantic compiler rejects impossible design-depth first-update promp
       "prompt_missing_design_depth_incremental_progress_protocol",
       "prompt_missing_design_depth_incremental_progress_protocol",
       "prompt_missing_design_depth_incremental_progress_protocol",
+      "prompt_missing_design_depth_incremental_progress_protocol",
+      "prompt_missing_design_depth_incremental_progress_protocol",
+      "prompt_missing_design_depth_incremental_progress_protocol",
       "prompt_missing_design_depth_incremental_progress_protocol"
     ].sort()
   );

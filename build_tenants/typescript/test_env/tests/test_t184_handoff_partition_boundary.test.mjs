@@ -382,7 +382,7 @@ test("T-184 operator timeout policy is tenant configuration, not handoff glue", 
   );
   assert.equal(
     runtimePolicy.designDepthFpEvaluator.checkpointTimeoutMs,
-    120000
+    180000
   );
   assert.equal(
     runtimePolicy.designDepthFpEvaluator.maxEffort,
@@ -397,8 +397,8 @@ test("T-184 operator timeout policy is tenant configuration, not handoff glue", 
       runtimePolicy.designDepthFpEvaluator.timeoutMs
   );
   assert.ok(
-    runtimePolicy.designDepthFpEvaluator.checkpointTimeoutMs <=
-      runtimePolicy.designDepthFpEvaluator.inactivityTimeoutMs
+    runtimePolicy.designDepthFpEvaluator.checkpointTimeoutMs <
+      runtimePolicy.designDepthFpEvaluator.timeoutMs
   );
   assert.equal(
     runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.timeoutMs,

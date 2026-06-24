@@ -301,6 +301,18 @@ test("T-192 broad design-depth prompt front-loads first update and summarizes gr
 	  );
 	  assert.match(
 	    projection.promptText,
+	    /Minimum semantic checkpoint:/u
+	  );
+	  assert.match(
+	    projection.promptText,
+	    /one source file target plus one matching componentTopologyRows row/u
+	  );
+	  assert.match(
+	    projection.promptText,
+	    /Do not wait to enumerate every component\/module before this checkpoint/u
+	  );
+	  assert.match(
+	    projection.promptText,
 	    /precomputed ADR implementation-design evidence summary/u
 	  );
 	  assert.doesNotMatch(

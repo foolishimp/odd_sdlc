@@ -1351,6 +1351,9 @@ function reviewRenderedPromptProjection(input: {
     for (const required of [
       "Progress-timeout protection:",
       "component/file-target semantic checkpoint",
+      "Minimum semantic checkpoint:",
+      "one source file target plus one matching componentTopologyRows row",
+      "Do not wait to enumerate every component/module before this checkpoint",
       "Precomputed ADR implementation-design evidence summary:",
       "The next progress checkpoint after the first update is the component/file-target semantic checkpoint",
       "do not write a plan or checklist"
