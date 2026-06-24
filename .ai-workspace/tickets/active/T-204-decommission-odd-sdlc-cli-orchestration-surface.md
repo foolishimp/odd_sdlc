@@ -3,7 +3,7 @@ id: T-204
 title: Decommission odd_sdlc orchestration code and shrink to GTL program plus plugins
 type: chore
 ticket_category: implementation_migration
-status: completed
+status: active
 goal: question every odd_sdlc source file and remove product-local orchestration so the package collapses toward a GTL program plus plugins, with only irreducible product carriers/proof surfaces retained
 build_tenant: typescript
 owner: odd_sdlc
@@ -26,8 +26,9 @@ re_entry_point: product
 priority: critical
 triaged_at: 2026-06-17
 created_at: 2026-06-17
-updated_at: 2026-06-24
-completed_at: 2026-06-24
+updated_at: 2026-06-25
+reopened_at: 2026-06-25
+prior_completed_at: 2026-06-24
 activated_at: 2026-06-17
 governance_scope: STDO Method, ODD_METHOD, ABG/GTL substrate boundary
 source_documents:
@@ -145,6 +146,127 @@ non_closure_conditions:
 ---
 
 # T-204: Decommission odd_sdlc Orchestration Code
+
+## 2026-06-25 Restoration And Non-Closure Finding
+
+T-204 is restored to active. The 2026-06-24 completed status was invalid
+because the latest release-candidate proof showed framework/compiler gaps that
+violate the ticket closure law and the current `specification/PRODUCT.md`
+runtime-boundary contract.
+
+This is not classified as a Data Mapper source bug, JavaScript hello-world app
+bug, or Rust application bug. The active defect is that the current
+ABG-based compiler/release gate proves static GTL, prompt, and source-surface
+declarations without proving the installed traversal unit can lawfully execute,
+materialize required product files, close, or re-enter through ABG-owned runtime
+truth.
+
+### Reopening Evidence
+
+The relevant release proof used the current staged release packages:
+
+- odd_sdlc package: `@odd-sdlc/typescript-tenant@3.0.16`
+- ABIogenesis substrate: `@abiogenesis/typescript-tenant@4.1.0-rc.8`
+
+Current substrate after the 2026-06-25 compiler-gate repair:
+
+- ABIogenesis substrate: `@abiogenesis/typescript-tenant@4.1.0-rc.9`
+
+Observed non-closure evidence:
+
+| Evidence | Archive | Finding |
+| --- | --- | --- |
+| JS default live run | `build_tenants/typescript/test_env/test_runs/release_3_0_16_t132_hello_world_js_live/20260624T131619465Z_pid97004` | `Fg_conform_project` converged, then `derive_lite_design_adr_surface` returned `blocked`; the workspace materialized `TECH_STACK.json` and an ADR but not `src/hello.js` or `test/hello.test.js`. |
+| JS continuation diagnostic | `build_tenants/typescript/test_env/test_runs/release_3_0_16_t132_hello_world_js_live_continue_blocked/20260624T132413500Z_pid3016` | The harness continued through `blocked` design and component-code outcomes and later generated a passing `hello.js` and test. This is useful diagnostic evidence, but it is not a clean T-204 closure proof because route progress depended on harness continuation through blocked runtime facts. |
+| Rust default live run | `build_tenants/typescript/test_env/test_runs/release_3_0_16_t164_rust_hello_service_live/20260624T132219020Z_pid1442` | First `start` attempted `graph_function:bind_gap_route` and failed before a valid execution contract with `project_conformance_blocked`. |
+| Rust continuation diagnostic | `build_tenants/typescript/test_env/test_runs/release_3_0_16_t164_rust_hello_service_live_continue_blocked/20260624T134628143Z_pid17610` | An explicit sequence reached `derive_lite_component_code_surface`, but intent, design, and component-code all returned `blocked`; no `Cargo.toml` or `src/main.rs` was materialized. |
+
+### Compiler Gap
+
+The current compiler lanes are incomplete for T-204 closure. They check static
+program conformance, prompt projection materialization, selected source-authority
+regressions, and a small set of carrier-closure source patterns. The compiler
+is ABG-based: any dogfooded F_P review lane must be an ABG-owned graph function
+or ABG-owned compiler/runtime primitive. `odd_sdlc` may publish the product
+review package and consume the admitted result, but it must not create an
+odd_sdlc-owned compiler graph function or product-local dependency to produce
+compiler truth. The current lanes do not yet fail closed when:
+
+- a release proof requires a scenario harness to continue through `blocked`
+  edge outcomes;
+- a scenario descriptor is not executable as an ABG-owned installed start path;
+- a prompt-bearing edge returns `blocked/gap_stop` without an ABG-admitted
+  continuation, retry, yield, or re-entry fact;
+- a target-carrier contract declares product files but the edge advances or the
+  proof continues without admitted materialization evidence for those files;
+- a live run demonstrates product output only after local harness sequencing,
+  `stopOnLawful` adjustment, or per-step start-target selection supplies
+  traversal authority that ABG should own;
+- release qualification treats app execution success as closure while earlier
+  design/code traversal atoms remain blocked.
+
+### Active Checklist
+
+- [x] Reprice the T-204 compiler as an ABG-based release-gate compiler, not
+      only a static GTL/prompt/source compiler.
+- [x] Dogfood the switched F_P review gate through a self-contained ABG-owned
+      graph function or ABG-owned compiler/runtime primitive. The switch may
+      remain, but when required it must consume an ABG-admitted review result
+      with graph-function/runtime provenance rather than a hand-authored local
+      JSON stamp.
+- [x] Keep `odd_sdlc` on the downstream side of that compiler boundary:
+      `odd_sdlc` emits the semantic compiler prompt-review package and consumes
+      the ABG-admitted result; it does not own the compiler graph function.
+- [ ] Add an installed traversal-unit lane that proves the declared release
+      proof can execute through ABG-owned `start` / `gaps` / continuation truth
+      without a product-local per-step route loop acting as closure authority.
+- [ ] Add a scenario descriptor compiler that rejects closure proofs whose
+      first executable start cannot construct a valid execution contract, as in
+      the Rust `bind_gap_route` failure.
+- [ ] Add a blocked-outcome compiler rule: any prompt-bearing edge that returns
+      `blocked/gap_stop` must either remain a non-close result or carry an
+      ABG-admitted retry, yield, or re-entry continuation fact before any later
+      edge can be used as closure proof.
+- [ ] Add target materialization closure checks: when target-carrier rows or
+      scenario expectations declare files such as `src/hello.js`, `test/*.js`,
+      `Cargo.toml`, or `src/main.rs`, release proof must fail until admitted
+      materialization evidence for those paths exists.
+- [ ] Add a closure-proof guard that distinguishes diagnostic scenario harnesses
+      from release gates; explicit `startTargetSequence`, `stopOnLawful`
+      relaxation, and forced continuation through `blocked` outcomes may be
+      diagnostic tools but must not satisfy T-204 closure.
+- [ ] Re-run the JS hello-world live release proof and record a clean result
+      only if design, component-code, test construction, and execution evidence
+      close without blocked-edge bypass.
+- [ ] Re-run the Rust hello-service live release proof and record either a clean
+      materialized service proof or a ratified ABG-side non-closure blocker.
+- [ ] Reconcile the Data Mapper proof requirement: either run the live lane
+      against the repaired compiler/runtime boundary or ratify why Data Mapper is
+      not required for this ticket's closure.
+- [ ] Update the Phase 7 closure audit with exact commands, archive roots,
+      installed package versions, and pass/fail verdicts.
+- [ ] Do not move this ticket back to completed until the closure law and Phase
+      7 gate are satisfied by current release artifacts.
+
+### 2026-06-25 Compiler Gate Repair
+
+Implemented the ABG-owned semantic compiler F_P review gate repair without
+moving compiler authority into `odd_sdlc`:
+
+- ABIogenesis `@abiogenesis/typescript-tenant@4.1.0-rc.9` now publishes
+  `constructAbgSemanticCompilerFpReviewGraphFunction()` and
+  `admitAbgSemanticCompilerFpReviewResult(...)`.
+- ABI GTL program conformance rejects semantic review gate rows that lack the
+  ABG producer graph-function ref, graph-function digest, runtime ref,
+  admission ref, and source package digest.
+- `odd_sdlc` now consumes rc.9, emits the deterministic prompt-review package,
+  and fails closed when `ODD_SDLC_SEMANTIC_COMPILER_FP_EVAL=required` points to
+  the old hand-authored JSON stamp shape.
+
+This repairs the first compiler-gate false-positive pattern only. T-204 remains
+active until the installed traversal-unit, scenario descriptor, continuation,
+materialization, and release-proof lanes are implemented and used to reject the
+current JS/Rust false-positive release proof shapes.
 
 ## STDO Triage
 

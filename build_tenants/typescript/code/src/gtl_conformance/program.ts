@@ -20,6 +20,7 @@ import {
   GTL_PROGRAM_OBLIGATION_DELTA_FAMILY_VALUES,
   GTL_PROGRAM_T153_FEATURE_KINDS,
   GTL_PROGRAM_T153_FEATURE_OWNER_CLASSIFICATIONS,
+  admitAbgSemanticCompilerFpReviewResult,
   admitGtlProgramConformanceInput,
   formatGtlProgramConformanceIssues,
   materializeGraphFunction,
@@ -44,7 +45,8 @@ import type {
   GtlProgramTraversalBindConservationRow,
   EnginePluginContract,
   Module,
-  Regime
+  Regime,
+  AbgSemanticCompilerFpReviewResult
 } from "@abiogenesis/typescript-tenant";
 import {
   constructSdlcGraphFunctionCatalog,
@@ -296,10 +298,16 @@ interface SdlcGtlProgramSemanticReviewGateRow {
   readonly deterministicReportDigest: string;
   readonly reviewResultKind: "sdlc_semantic_compiler_fp_review_result";
   readonly reviewVersion: "ts-semantic-compiler-fp-review-result-v1";
+  readonly sourcePackageDigest: string;
   readonly status: "passed";
   readonly findingCount: 0;
   readonly reviewerProfileRef: string;
   readonly reviewedAt: string;
+  readonly producerGraphFunctionRef: string;
+  readonly producerGraphFunctionDigest: string;
+  readonly producerRuntimeKind: string;
+  readonly producerRuntimeRef: string;
+  readonly admissionRef: string;
   readonly evidenceRefs: readonly string[];
 }
 
@@ -2062,59 +2070,41 @@ function semanticCompilerFpReviewEnabled(): boolean {
 
 function admittedSemanticCompilerFpReviewResult(input: {
   readonly value: unknown;
-  readonly expectedDigest: string;
+  readonly reviewPackage: SdlcSemanticCompilerPromptReviewPackage;
 }): {
   readonly passed: boolean;
   readonly reason: string;
+  readonly result: AbgSemanticCompilerFpReviewResult | null;
 } {
-  if (!isRecord(input.value)) {
+  const admission = admitAbgSemanticCompilerFpReviewResult({
+    value: input.value,
+    expectedPackage: input.reviewPackage
+  });
+  if (!admission.admitted) {
     return Object.freeze({
       passed: false,
-      reason: "review result is not a JSON object"
+      reason: `ABG review result admission failed: ${admission.reason}`,
+      result: null
     });
   }
-  if (
-    input.value["kind"] !== "sdlc_semantic_compiler_fp_review_result" ||
-    input.value["reviewVersion"] !==
-      "ts-semantic-compiler-fp-review-result-v1"
-  ) {
+  if (!admission.passed) {
     return Object.freeze({
       passed: false,
-      reason: "review result kind/version is not admitted"
+      reason: admission.reason,
+      result: admission.result
     });
   }
-  if (input.value["deterministicReportDigest"] !== input.expectedDigest) {
+  if (admission.result === null) {
     return Object.freeze({
       passed: false,
-      reason: "review result digest does not match current deterministic package"
+      reason: "ABG review result admission did not return an admitted result",
+      result: null
     });
-  }
-  if (input.value["status"] !== "passed") {
-    return Object.freeze({
-      passed: false,
-      reason: "review result status is not passed"
-    });
-  }
-  if (input.value["findingCount"] !== 0) {
-    return Object.freeze({
-      passed: false,
-      reason: "review result carries open findings"
-    });
-  }
-  for (const field of ["reviewerProfileRef", "reviewedAt"]) {
-    if (
-      typeof input.value[field] !== "string" ||
-      input.value[field].trim().length === 0
-    ) {
-      return Object.freeze({
-        passed: false,
-        reason: `${field} is missing`
-      });
-    }
   }
   return Object.freeze({
     passed: true,
-    reason: "admitted F_P semantic compiler review result passed"
+    reason: admission.reason,
+    result: admission.result
   });
 }
 
@@ -2127,6 +2117,7 @@ function readSemanticCompilerFpReviewResult(input: {
 }): {
   readonly path: string;
   readonly parsed: Readonly<Record<string, unknown>>;
+  readonly admittedResult: AbgSemanticCompilerFpReviewResult;
   readonly reason: string;
 } {
   const reviewResultPath = semanticCompilerReviewResultPath();
@@ -2135,7 +2126,7 @@ function readSemanticCompilerFpReviewResult(input: {
       [
         "SDLC semantic compiler F_P.eval review gate requires an admitted review result.",
         `Set ODD_SDLC_SEMANTIC_COMPILER_FP_REVIEW_RESULT to a JSON result for deterministicReportDigest=${input.reviewPackage.deterministicReportDigest}.`,
-        "Expected result kind=sdlc_semantic_compiler_fp_review_result, reviewVersion=ts-semantic-compiler-fp-review-result-v1, status=passed, findingCount=0."
+        "Expected an ABG-admitted result produced by graph-function://abiogenesis/semantic-compiler-fp-review/v1 with status=passed and findingCount=0."
       ].join("\n")
     );
   }
@@ -2153,9 +2144,9 @@ function readSemanticCompilerFpReviewResult(input: {
   }
   const admission = admittedSemanticCompilerFpReviewResult({
     value: parsed,
-    expectedDigest: input.reviewPackage.deterministicReportDigest
+    reviewPackage: input.reviewPackage
   });
-  if (!admission.passed || !isRecord(parsed)) {
+  if (!admission.passed || admission.result === null || !isRecord(parsed)) {
     throw new TypeError(
       [
         "SDLC semantic compiler F_P.eval review gate failed:",
@@ -2168,6 +2159,7 @@ function readSemanticCompilerFpReviewResult(input: {
   return Object.freeze({
     path: reviewResultPath,
     parsed,
+    admittedResult: admission.result,
     reason: admission.reason
   });
 }
@@ -2179,42 +2171,36 @@ function semanticReviewGateRowsForPackage(input: {
     return Object.freeze([]);
   }
   const reviewResult = readSemanticCompilerFpReviewResult(input);
+  const admittedResult = reviewResult.admittedResult;
   const row: SdlcGtlProgramSemanticReviewGateRow = Object.freeze({
       gateRef:
         "semantic-review-gate://odd-sdlc/t204/materialized-prompts/fp-code-review",
       subjectRef: input.reviewPackage.subjectRef,
       deterministicReportDigest:
-        input.reviewPackage.deterministicReportDigest,
+        admittedResult.deterministicReportDigest,
       reviewResultKind:
-        "sdlc_semantic_compiler_fp_review_result",
-      reviewVersion: "ts-semantic-compiler-fp-review-result-v1",
+        admittedResult.kind,
+      reviewVersion: admittedResult.reviewVersion,
+      sourcePackageDigest: admittedResult.sourcePackageDigest,
       status: "passed",
       findingCount: 0,
-      reviewerProfileRef:
-        semanticCompilerReviewResultStringField({
-          reviewResult,
-          fieldName: "reviewerProfileRef"
-        }),
-      reviewedAt: semanticCompilerReviewResultStringField({
-        reviewResult,
-        fieldName: "reviewedAt"
-      }),
-      evidenceRefs: Object.freeze([`file://${reviewResult.path}`])
+      reviewerProfileRef: admittedResult.reviewerProfileRef,
+      reviewedAt: admittedResult.reviewedAt,
+      producerGraphFunctionRef: admittedResult.producerGraphFunctionRef,
+      producerGraphFunctionDigest:
+        admittedResult.producerGraphFunctionDigest,
+      producerRuntimeKind: admittedResult.producerRuntimeKind,
+      producerRuntimeRef: admittedResult.producerRuntimeRef,
+      admissionRef: admittedResult.admissionRef,
+      evidenceRefs: Object.freeze([
+        `file://${reviewResult.path}`,
+        admittedResult.producerGraphFunctionRef,
+        admittedResult.producerRuntimeRef,
+        admittedResult.admissionRef,
+        ...admittedResult.evidenceRefs
+      ])
   });
   return Object.freeze([row]);
-}
-
-function semanticCompilerReviewResultStringField(input: {
-  readonly reviewResult: ReturnType<typeof readSemanticCompilerFpReviewResult>;
-  readonly fieldName: "reviewerProfileRef" | "reviewedAt";
-}): string {
-  const value = input.reviewResult.parsed[input.fieldName];
-  if (typeof value !== "string" || value.trim().length === 0) {
-    throw new TypeError(
-      `semantic compiler review result ${input.fieldName} is missing`
-    );
-  }
-  return value;
 }
 
 export function constructCurrentSdlcSemanticCompilerPromptReviewPackage(

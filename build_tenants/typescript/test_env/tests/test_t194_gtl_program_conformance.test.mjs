@@ -12,6 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
+  constructAbgSemanticCompilerFpReviewResult,
   formatGtlProgramConformanceIssues
 } from "@abiogenesis/typescript-tenant";
 import {
@@ -372,9 +373,9 @@ test("T-204 F_P semantic compiler review gate is switched and fail-closed", () =
     );
 
     const reviewPackage = constructCurrentSdlcSemanticCompilerPromptReviewPackage();
-    const resultPath = path.join(tempRoot, "review-result.json");
+    const legacyResultPath = path.join(tempRoot, "legacy-review-result.json");
     writeFileSync(
-      resultPath,
+      legacyResultPath,
       `${JSON.stringify(
         {
           kind: "sdlc_semantic_compiler_fp_review_result",
@@ -386,6 +387,28 @@ test("T-204 F_P semantic compiler review gate is switched and fail-closed", () =
           reviewerProfileRef: "reviewer-profile://odd-sdlc/codex",
           reviewedAt: "2026-06-23T00:00:00.000Z"
         },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+    process.env["ODD_SDLC_SEMANTIC_COMPILER_FP_REVIEW_RESULT"] =
+      legacyResultPath;
+    assert.throws(
+      () => assertCurrentSdlcSemanticCompilerFpReviewGate(),
+      /ABG review result admission failed/u
+    );
+
+    const resultPath = path.join(tempRoot, "review-result.json");
+    writeFileSync(
+      resultPath,
+      `${JSON.stringify(
+        constructAbgSemanticCompilerFpReviewResult({
+          ...reviewPackage,
+          reviewerProfileRef: "reviewer-profile://odd-sdlc/codex",
+          reviewedAt: "2026-06-23T00:00:00.000Z",
+          evidenceRefs: ["test://odd-sdlc/t204/semantic-compiler-fp-review"]
+        }),
         null,
         2
       )}\n`,
@@ -408,6 +431,10 @@ test("T-204 F_P semantic compiler review gate is switched and fail-closed", () =
     assert.equal(
       conformanceInput.semanticReviewGates[0].reviewResultKind,
       "sdlc_semantic_compiler_fp_review_result"
+    );
+    assert.match(
+      conformanceInput.semanticReviewGates[0].producerGraphFunctionRef,
+      /^graph-function:\/\/abiogenesis\/semantic-compiler-fp-review\/v1$/u
     );
   } finally {
     if (originalSwitch === undefined) {
