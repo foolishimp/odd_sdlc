@@ -47,9 +47,10 @@ For a release proof, run the full data_mapper lane against the release snapshot
 package instead of the mutable source package:
 
 ```bash
-ODD_SDLC_TS_DATA_MAPPER_RELEASE_SNAPSHOT_ROOT=release_snapshots/odd-sdlc-typescript-tenant/2.0.0 \
-ODD_SDLC_TS_DATA_MAPPER_LANE_NAME=data_mapper_v2_0_0_release_proof \
-ODD_SDLC_TS_DATA_MAPPER_START_TARGET=overlay:deep-sdlc-traversal \
+RELEASE_VERSION=3.0.1
+ODD_SDLC_TS_DATA_MAPPER_RELEASE_SNAPSHOT_ROOT=release_snapshots/odd-sdlc-typescript-tenant/${RELEASE_VERSION} \
+ODD_SDLC_TS_DATA_MAPPER_LANE_NAME=data_mapper_v${RELEASE_VERSION//./_}_release_proof \
+ODD_SDLC_TS_DATA_MAPPER_START_TARGET=graph_function:lite_design_module_implementation \
 npm run live:data-mapper-sandbox
 ```
 

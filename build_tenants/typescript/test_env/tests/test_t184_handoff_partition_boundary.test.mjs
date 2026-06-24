@@ -555,7 +555,19 @@ test("T-184 F_P evaluator prompt uses incremental content ledger writes", () => 
   );
   assert.match(
     installedOperatorSource,
-    /const processFailureReason: SdlcBlockingReasonCode =[\s\S]*workerProcessTextLooksRetryableProviderFailure\(evaluatorProcessText\)[\s\S]*\?\s*"worker_connection_failed"[\s\S]*:\s*processResult\.timedOut[\s\S]*\?\s*"design_depth_fp_evaluator_progress_timeout"[\s\S]*:\s*"design_depth_fp_evaluator_process_failed"/u
+    /const evaluatorProcessTextLooksRetryableProviderFailure =[\s\S]*workerProcessTextLooksRetryableProviderFailure\(evaluatorProcessText\)/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /const canAdmitDesignDepthContentRegisterAfterEvaluatorTimeout =[\s\S]*processResult\.timedOut === true[\s\S]*firstUpdateObservation\.status === "observable"[\s\S]*!evaluatorProcessTextLooksRetryableProviderFailure/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /processResult\.status !== 0 &&[\s\S]*!canAdmitDesignDepthContentRegisterAfterEvaluatorTimeout/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /const processFailureReason: SdlcBlockingReasonCode =[\s\S]*evaluatorProcessTextLooksRetryableProviderFailure[\s\S]*\?\s*"worker_connection_failed"[\s\S]*:\s*processResult\.timedOut[\s\S]*\?\s*"design_depth_fp_evaluator_progress_timeout"[\s\S]*:\s*"design_depth_fp_evaluator_process_failed"/u
   );
   assert.match(
     installedOperatorSource,

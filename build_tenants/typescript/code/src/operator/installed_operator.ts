@@ -4036,9 +4036,18 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
     runRef,
     ...evaluatorTraceEvidenceRefs
   ]);
-  if (processResult.status !== 0) {
+  const evaluatorProcessTextLooksRetryableProviderFailure =
+    workerProcessTextLooksRetryableProviderFailure(evaluatorProcessText);
+  const canAdmitDesignDepthContentRegisterAfterEvaluatorTimeout =
+    processResult.timedOut === true &&
+    firstUpdateObservation.status === "observable" &&
+    !evaluatorProcessTextLooksRetryableProviderFailure;
+  if (
+    processResult.status !== 0 &&
+    !canAdmitDesignDepthContentRegisterAfterEvaluatorTimeout
+  ) {
     const processFailureReason: SdlcBlockingReasonCode =
-      workerProcessTextLooksRetryableProviderFailure(evaluatorProcessText)
+      evaluatorProcessTextLooksRetryableProviderFailure
         ? "worker_connection_failed"
         : processResult.timedOut && firstUpdateObservation.status === "pending"
           ? "design_depth_fp_evaluator_first_update_timeout"
