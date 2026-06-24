@@ -2492,6 +2492,10 @@ function designDepthFpEvaluatorInactivityTimeoutMs(): number {
   return sdlcOperatorRuntimePolicy().designDepthFpEvaluatorInactivityTimeoutMs;
 }
 
+function designDepthFpEvaluatorCheckpointTimeoutMs(): number {
+  return sdlcOperatorRuntimePolicy().designDepthFpEvaluatorCheckpointTimeoutMs;
+}
+
 function designDepthFpEvaluatorStdoutBudgetBytes(): number {
   return sdlcOperatorRuntimePolicy().designDepthFpEvaluatorStdoutBudgetBytes;
 }
@@ -3813,9 +3817,33 @@ function writeDesignDepthFirstUpdateObservation(input: {
   });
 }
 
-function designDepthFpEvaluatorTimedOutBlockingReason(
-  observation: SdlcDesignDepthContentRegisterFirstUpdateObservation
-): SdlcBlockingReasonCode {
+function designDepthFpEvaluatorSemanticCheckpointObserved(input: {
+  readonly contentRegisterPath: string;
+}): boolean {
+  const observation = observeDesignDepthContentRegisterFirstUpdate({
+    registerPath: input.contentRegisterPath
+  });
+  if (observation.status !== "partial" && observation.status !== "observable") {
+    return false;
+  }
+  return (
+    !observation.missingSections.includes("fileTargetRows") &&
+    !observation.missingSections.includes("componentTopologyRows") &&
+    !observation.missingSections.includes("componentRealizationRows")
+  );
+}
+
+function designDepthFpEvaluatorTimedOutBlockingReason(input: {
+  readonly observation: SdlcDesignDepthContentRegisterFirstUpdateObservation;
+  readonly outcome?: SupervisedProcessActorResult["outcome"] | undefined;
+}): SdlcBlockingReasonCode {
+  if (
+    input.outcome?.kind === "external_progress_timeout" &&
+    input.outcome.reason === "design_depth_fp_evaluator_semantic_checkpoint_timeout"
+  ) {
+    return "design_depth_fp_evaluator_semantic_checkpoint_timeout";
+  }
+  const observation = input.observation;
   if (observation.status === "pending") {
     return "design_depth_fp_evaluator_first_update_timeout";
   }
@@ -3995,6 +4023,7 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
   const inactivityPolicy = workerInactivityPolicy();
   const evaluatorTimeoutMs = designDepthFpEvaluatorTimeoutMs();
   const evaluatorInactivityTimeoutMs = designDepthFpEvaluatorInactivityTimeoutMs();
+  const evaluatorCheckpointTimeoutMs = designDepthFpEvaluatorCheckpointTimeoutMs();
   const stdoutBudgetBytes = designDepthFpEvaluatorStdoutBudgetBytes();
   const traceRoot = `${processEventsPath}.trace`;
   const designDepthRunStartedPayload = Object.freeze({
@@ -4011,6 +4040,7 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
     timeoutMs: evaluatorTimeoutMs,
     workerTimeoutMs: inactivityPolicy.timeoutMs,
     inactivityTimeoutMs: evaluatorInactivityTimeoutMs,
+    checkpointTimeoutMs: evaluatorCheckpointTimeoutMs,
     stdoutBudgetBytes,
     stdoutByteCount: 0,
     stderrByteCount: 0,
@@ -4082,6 +4112,11 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
     executorProfile,
     timeoutMs: evaluatorTimeoutMs,
     inactivityTimeoutMs: evaluatorInactivityTimeoutMs,
+    externalProgressTimeoutMs: evaluatorCheckpointTimeoutMs,
+    externalProgressTimeoutReason:
+      "design_depth_fp_evaluator_semantic_checkpoint_timeout",
+    externalProgressCheck: () =>
+      designDepthFpEvaluatorSemanticCheckpointObserved({ contentRegisterPath }),
     terminationGraceMs: inactivityPolicy.terminationGraceMs,
     heartbeatMs: inactivityPolicy.heartbeatMs,
     eventSink: input.eventSink
@@ -4118,6 +4153,7 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
       timeoutMs: evaluatorTimeoutMs,
       workerTimeoutMs: inactivityPolicy.timeoutMs,
       inactivityTimeoutMs: evaluatorInactivityTimeoutMs,
+      checkpointTimeoutMs: evaluatorCheckpointTimeoutMs,
       stdoutBudgetBytes,
       stdoutByteCount,
       stderrByteCount,
@@ -4172,7 +4208,10 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
       evaluatorProcessTextLooksRetryableProviderFailure
         ? "worker_connection_failed"
         : processResult.timedOut
-          ? designDepthFpEvaluatorTimedOutBlockingReason(firstUpdateObservation)
+          ? designDepthFpEvaluatorTimedOutBlockingReason({
+              observation: firstUpdateObservation,
+              outcome: processResult.outcome
+            })
           : "design_depth_fp_evaluator_process_failed";
     return constructEvaluationRuleOutcome({
       status: "blocked",

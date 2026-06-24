@@ -12,6 +12,7 @@
   "designDepthFpEvaluator": {
     "timeoutMs": 600000,
     "inactivityTimeoutMs": 120000,
+    "checkpointTimeoutMs": 120000,
     "maxEffort": "medium",
     "stdoutBudgetBytes": 1048576
   },

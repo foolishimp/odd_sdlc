@@ -381,6 +381,10 @@ test("T-184 operator timeout policy is tenant configuration, not handoff glue", 
     120000
   );
   assert.equal(
+    runtimePolicy.designDepthFpEvaluator.checkpointTimeoutMs,
+    120000
+  );
+  assert.equal(
     runtimePolicy.designDepthFpEvaluator.maxEffort,
     "medium"
   );
@@ -391,6 +395,10 @@ test("T-184 operator timeout policy is tenant configuration, not handoff glue", 
   assert.ok(
     runtimePolicy.designDepthFpEvaluator.inactivityTimeoutMs <
       runtimePolicy.designDepthFpEvaluator.timeoutMs
+  );
+  assert.ok(
+    runtimePolicy.designDepthFpEvaluator.checkpointTimeoutMs <=
+      runtimePolicy.designDepthFpEvaluator.inactivityTimeoutMs
   );
   assert.equal(
     runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.timeoutMs,
@@ -589,7 +597,7 @@ test("T-184 F_P evaluator prompt uses incremental content ledger writes", () => 
   );
   assert.match(
     installedOperatorSource,
-    /const processFailureReason: SdlcBlockingReasonCode =[\s\S]*evaluatorProcessTextLooksRetryableProviderFailure[\s\S]*\?\s*"worker_connection_failed"[\s\S]*:\s*processResult\.timedOut[\s\S]*\?\s*designDepthFpEvaluatorTimedOutBlockingReason\(firstUpdateObservation\)[\s\S]*:\s*"design_depth_fp_evaluator_process_failed"/u
+    /const processFailureReason: SdlcBlockingReasonCode =[\s\S]*evaluatorProcessTextLooksRetryableProviderFailure[\s\S]*\?\s*"worker_connection_failed"[\s\S]*:\s*processResult\.timedOut[\s\S]*\?\s*designDepthFpEvaluatorTimedOutBlockingReason\(\{[\s\S]*observation: firstUpdateObservation,[\s\S]*outcome: processResult\.outcome[\s\S]*\}\)[\s\S]*:\s*"design_depth_fp_evaluator_process_failed"/u
   );
   assert.match(
     installedOperatorSource,
@@ -610,6 +618,22 @@ test("T-184 F_P evaluator prompt uses incremental content ledger writes", () => 
   assert.match(
     installedOperatorSource,
     /inactivityTimeoutMs: evaluatorInactivityTimeoutMs/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /checkpointTimeoutMs: evaluatorCheckpointTimeoutMs/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /externalProgressTimeoutMs: evaluatorCheckpointTimeoutMs/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /externalProgressTimeoutReason:[\s\S]*"design_depth_fp_evaluator_semantic_checkpoint_timeout"/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /externalProgressCheck: \(\) =>[\s\S]*designDepthFpEvaluatorSemanticCheckpointObserved\(\{ contentRegisterPath \}\)/u
   );
   assert.match(
     installedOperatorSource,
