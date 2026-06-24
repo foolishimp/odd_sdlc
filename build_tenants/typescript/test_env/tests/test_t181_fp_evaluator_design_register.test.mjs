@@ -942,6 +942,118 @@ test("T-181 design-depth content ledger supports incremental fragment projection
   }
 });
 
+test("T-181 design-depth content ledger rejects empty full-section implementation pressure", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForImplementationDesign(
+      workspaceRoot,
+      "t181-empty-full-section-content-ledger"
+    );
+    mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+    writeFileSync(
+      manifest.outputFile,
+      implementationDesignAdr("empty-full-section-component"),
+      "utf8"
+    );
+    const registerPath = designDepthFpEvaluatorRegisterPath(manifest);
+    const contentRegisterPath = designDepthFpEvaluatorContentRegisterPath({
+      archiveRoot: manifest.archiveRoot
+    });
+    const composition = designDepthGtlSelectedComposition();
+    const evidenceRef = pathToFileURL(manifest.outputFile).href;
+    const register = {
+      ...implementationDesignRegister("empty-full-section-component", evidenceRef),
+      stackProfileRows: [],
+      implementationModuleRows: [],
+      componentTopologyRows: [],
+      componentRealizationRows: [],
+      fileTargetRows: []
+    };
+    const sections = [
+      "stackProfileRows",
+      "implementationModuleRows",
+      "aggregateDomainModelRows",
+      "moduleSchemaFragments",
+      "moduleStateDiagramFragments",
+      "aggregateDomainModel",
+      "sunnyDaySequenceRows",
+      "aggregateSunnyDaySequence",
+      "componentTopologyRows",
+      "componentRealizationRows",
+      "fileTargetRows",
+      "designCompletenessVerdict"
+    ];
+    mkdirSync(path.dirname(contentRegisterPath), { recursive: true });
+    writeFileSync(
+      contentRegisterPath,
+      `${JSON.stringify(
+        {
+          kind: "sdlc_evaluate_content_ledger",
+          ledgerVersion: "ts-evaluate-content-ledger-v1",
+          stage: "evaluate.C",
+          ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+          ruleRole: "semantic_judgment",
+          computeMeans: "F_P",
+          authorityFunction: "synthesize_model",
+          selectedCompositionRef: composition.compositionRef,
+          selectedCompositionDigest: composition.compositionDigest,
+          selectedCompositionSelectionRef: composition.compositionSelectionRef,
+          selectedRegimeBindingRef: composition.selectedRegimeBindingRef,
+          compositionContributionRef: composition.selectedRegimeBindingRef,
+          sourceBasisRefs: [evidenceRef],
+          candidateArtifactRefs: [evidenceRef],
+          evidenceRefs: [evidenceRef],
+          contentRows: sections.map((section, index) => ({
+            kind: "sdlc_evaluate_content_ledger_row",
+            rowRef: `content-ledger-row://t181/empty-full-section/${section}`,
+            authorityFunction: "synthesize_model",
+            carrierFamily: "ProductAssetModel",
+            contentKind: "sdlc_design_depth_register_fragment",
+            payload: {
+              kind: "sdlc_design_depth_register_fragment",
+              fragmentVersion: "ts-design-depth-fragment-v1",
+              targetAssetType: "implementation_design_surface",
+              section,
+              sequence: index + 1,
+              mergeMode: "replace",
+              value: register[section]
+            },
+            sourceBasisRefs: [evidenceRef],
+            evidenceRefs: [evidenceRef]
+          }))
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+
+    const admission = admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity({
+      registerPath: contentRegisterPath,
+      selectedIdentity: {
+        selectedCompositionRef: composition.compositionRef,
+        selectedCompositionDigest: composition.compositionDigest,
+        selectedCompositionSelectionRef: composition.compositionSelectionRef,
+        selectedRegimeBindingRef: composition.selectedRegimeBindingRef
+      },
+      ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+      authorityFunction: "synthesize_model"
+    });
+    assert.equal(admission.status, "admitted");
+    assert.throws(
+      () =>
+        writeDesignDepthRegisterProjectionFromEvaluateContentRegister({
+          register: admission.register,
+          archiveRoot: manifest.archiveRoot,
+          registerPath
+        }),
+      /implementation_design_surface semantic floor missing: stackProfileRows,implementationModuleRows,componentTopologyRows,componentRealizationRows,fileTargetRows/u
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
 test("T-181 design-depth fragment projection canonicalizes legacy verdict axis aliases", () => {
   const workspaceRoot = makeWorkspace();
   try {
@@ -2508,6 +2620,9 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   const evaluatorPromptSource = readRepoFile(
     "build_tenants/typescript/code/src/operator/plugins/evaluate/prompts.ts"
   );
+  const contentRegisterSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/plugins/evaluate/content_register.ts"
+  );
   const pluginContractsSource = readRepoFile(
     "build_tenants/typescript/code/src/operator/plugins/plugin_contracts.ts"
   );
@@ -2628,14 +2743,15 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(evaluatorPromptSource, /Do not inspect the worker result report/u);
   assert.match(evaluatorPromptSource, /Do not use the Read tool on the worker invocation package/u);
   assert.match(evaluatorPromptSource, /Do not run any bounded-summary action before the first evaluator update/u);
-  assert.match(evaluatorPromptSource, /First tool action: Read only the existing draft content ledger/u);
+	  assert.match(evaluatorPromptSource, /First tool action: Read only the existing draft content ledger/u);
 	  assert.match(evaluatorPromptSource, /Second tool action: write the exact first-update JSON packet/u);
 	  assert.match(evaluatorPromptSource, /Third tool action: write the exact second-update JSON packet/u);
-	  assert.match(evaluatorPromptSource, /Fourth tool action: write the exact full partial checkpoint JSON packet/u);
+	  assert.match(evaluatorPromptSource, /Fourth tool action: read bounded authority and write at least one non-empty semantic section/u);
 	  assert.match(evaluatorPromptSource, /read-before-write policy/u);
 	  assert.match(evaluatorPromptSource, /First-update JSON packet/u);
 	  assert.match(evaluatorPromptSource, /Second-update JSON packet/u);
-	  assert.match(evaluatorPromptSource, /Full partial checkpoint JSON packet/u);
+	  assert.match(evaluatorPromptSource, /Never publish all required sections with empty\/null placeholders/u);
+	  assert.doesNotMatch(evaluatorPromptSource, /Full partial checkpoint JSON packet/u);
 	  assert.match(evaluatorPromptSource, /Do not inspect the construction brief, ADR\/output artifact/u);
   assert.match(evaluatorPromptSource, /only allowed prior Read is the existing draft content ledger slot/u);
   assert.doesNotMatch(evaluatorPromptSource, /At most one bounded summary script is allowed/u);
@@ -2710,6 +2826,8 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(evaluatorPromptSource, /sdlc_design_depth_register_fragment/u);
   assert.match(evaluatorPromptSource, /F_D assembles admitted fragment rows/u);
   assert.match(evaluatorPromptSource, /at least one fragment for every listed register section/u);
+  assert.match(contentRegisterSource, /assertDesignDepthProjectionSemanticFloor/u);
+  assert.match(contentRegisterSource, /implementation_design_surface semantic floor missing/u);
   assert.doesNotMatch(
     evaluatorPromptSource,
     /contentRows\[0\]\.payload must be the full design-depth register object/u

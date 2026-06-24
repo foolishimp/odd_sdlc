@@ -47,7 +47,7 @@ For a release proof, run the full data_mapper lane against the release snapshot
 package instead of the mutable source package:
 
 ```bash
-RELEASE_VERSION=3.0.1
+RELEASE_VERSION=3.0.2
 ODD_SDLC_TS_DATA_MAPPER_RELEASE_SNAPSHOT_ROOT=release_snapshots/odd-sdlc-typescript-tenant/${RELEASE_VERSION} \
 ODD_SDLC_TS_DATA_MAPPER_LANE_NAME=data_mapper_v${RELEASE_VERSION//./_}_release_proof \
 ODD_SDLC_TS_DATA_MAPPER_START_TARGET=graph_function:lite_design_module_implementation \

@@ -122,8 +122,6 @@ const DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF =
   "prompt://odd-sdlc/design-depth/first-update-partial-verdict" as const;
 const DESIGN_DEPTH_SECOND_UPDATE_PACKET_REF =
   "prompt://odd-sdlc/design-depth/second-update-stack-profile-checkpoint" as const;
-const DESIGN_DEPTH_FULL_PARTIAL_CHECKPOINT_PACKET_REF =
-  "prompt://odd-sdlc/design-depth/full-partial-checkpoint" as const;
 const DESIGN_DEPTH_FIRST_UPDATE_VERDICT_SEQUENCE =
   SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.findIndex(
     (section) => section === "designCompletenessVerdict"
@@ -262,113 +260,6 @@ function designDepthSecondUpdatePacket(input: {
         },
         ...firstPacket.contentRows
       ]
-    },
-    null,
-    2
-  )}\n`;
-}
-
-function designDepthFullPartialCheckpointValue(
-  section: (typeof SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS)[number]
-): unknown {
-  switch (section) {
-    case "stackProfileRows":
-    case "implementationModuleRows":
-    case "aggregateDomainModelRows":
-    case "moduleSchemaFragments":
-    case "moduleStateDiagramFragments":
-    case "sunnyDaySequenceRows":
-    case "componentTopologyRows":
-    case "componentRealizationRows":
-    case "fileTargetRows":
-      return [];
-    case "aggregateDomainModel":
-    case "aggregateSunnyDaySequence":
-      return null;
-    case "designCompletenessVerdict":
-      return Object.freeze({
-        kind: "sdlc_design_completeness_verdict" as const,
-        verdictVersion: "ts-design-depth-v1" as const,
-        entity: Object.freeze({
-          kind: "sdlc_design_completeness_axis_verdict" as const,
-          axis: "entity" as const,
-          status: "partial" as const,
-          reasons: Object.freeze([
-            "Full partial checkpoint is admitted before bounded evidence refinement; entity model still requires section-level review."
-          ]),
-          evidenceRefs: Object.freeze([DESIGN_DEPTH_FULL_PARTIAL_CHECKPOINT_PACKET_REF])
-        }),
-        attribute: Object.freeze({
-          kind: "sdlc_design_completeness_axis_verdict" as const,
-          axis: "attribute" as const,
-          status: "partial" as const,
-          reasons: Object.freeze([
-            "Full partial checkpoint is admitted before bounded evidence refinement; attribute model still requires section-level review."
-          ]),
-          evidenceRefs: Object.freeze([DESIGN_DEPTH_FULL_PARTIAL_CHECKPOINT_PACKET_REF])
-        }),
-        flow: Object.freeze({
-          kind: "sdlc_design_completeness_axis_verdict" as const,
-          axis: "flow" as const,
-          status: "partial" as const,
-          reasons: Object.freeze([
-            "Full partial checkpoint is admitted before bounded evidence refinement; flow model still requires section-level review."
-          ]),
-          evidenceRefs: Object.freeze([DESIGN_DEPTH_FULL_PARTIAL_CHECKPOINT_PACKET_REF])
-        })
-      });
-  }
-}
-
-function designDepthFullPartialCheckpointPacket(input: {
-  readonly manifest: SdlcWorkerHandoffManifest;
-  readonly governanceRef: string;
-  readonly selectedCompositionRef: string;
-  readonly selectedCompositionDigest: string;
-  readonly selectedCompositionSelectionRef: string;
-  readonly selectedRegimeBindingRef: string | null;
-}): string {
-  const secondPacket = parseDesignDepthUpdatePacketContentRows({
-    text: designDepthSecondUpdatePacket(input),
-    label: "DesignDepthSecondUpdatePacket"
-  });
-  return `${JSON.stringify(
-    {
-      ...secondPacket,
-      sourceBasisRefs: [
-        DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF,
-        DESIGN_DEPTH_SECOND_UPDATE_PACKET_REF,
-        DESIGN_DEPTH_FULL_PARTIAL_CHECKPOINT_PACKET_REF,
-        input.governanceRef
-      ],
-      evidenceRefs: [
-        DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF,
-        DESIGN_DEPTH_SECOND_UPDATE_PACKET_REF,
-        DESIGN_DEPTH_FULL_PARTIAL_CHECKPOINT_PACKET_REF
-      ],
-      contentRows: SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.map(
-        (section, index) => ({
-          kind: "sdlc_evaluate_content_ledger_row",
-          rowRef: `content-ledger-row://odd-sdlc/design-depth/${section}`,
-          authorityFunction: "synthesize_model",
-          carrierFamily: "ProductAssetModel",
-          contentKind: SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND,
-          payload: {
-            kind: "sdlc_design_depth_register_fragment",
-            fragmentVersion: "ts-design-depth-fragment-v1",
-            targetAssetType: input.manifest.targetAssetType,
-            section,
-            sequence: index + 1,
-            mergeMode: "replace",
-            value: designDepthFullPartialCheckpointValue(section)
-          },
-          sourceBasisRefs: [
-            DESIGN_DEPTH_FULL_PARTIAL_CHECKPOINT_PACKET_REF,
-            input.governanceRef
-          ],
-          evidenceRefs: [DESIGN_DEPTH_FULL_PARTIAL_CHECKPOINT_PACKET_REF]
-        })
-      )
     },
     null,
     2
@@ -1219,12 +1110,12 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
 	      "- The packet contains one non-draft designCompletenessVerdict fragment with partial axes. It is a typed first progress carrier, not final design truth.",
 	      "- Third tool action: write the exact second-update JSON packet below to the durable evaluation artifact path. If the Write tool requires a fresh read-after-write check, Read only the content ledger with limit <=80, then immediately Write the second-update packet.",
 	      "- The second-update packet preserves the first row and adds the stackProfileRows section row as an explicit empty placeholder. It is a progress checkpoint before authority inspection, not final stack truth.",
-	      "- Fourth tool action: write the exact full partial checkpoint JSON packet below to the durable evaluation artifact path. If the Write tool requires a fresh read-after-write check, Read only the content ledger with limit <=80, then immediately Write the full partial checkpoint packet.",
-	      "- The full partial checkpoint publishes every required section with explicit empty/null placeholders and partial designCompletenessVerdict axes. It is admitted pressure, not final design truth.",
-	      "- After the full partial checkpoint Write succeeds, either refine one section from bounded evidence and write immediately, or return with a brief final response so F_D can admit the partial pressure map.",
+	      "- Fourth tool action: read bounded authority and write at least one non-empty semantic section back to the same content ledger path.",
+	      "- Never publish all required sections with empty/null placeholders as a full checkpoint. An implementation-design register with empty stackProfileRows, implementationModuleRows, componentTopologyRows, componentRealizationRows, or fileTargetRows is rejected before projection.",
+	      "- After the second-update Write succeeds, every exploratory read must be paired with the next tool action that writes at least one named non-empty or explicitly blocked register section back to the same content ledger file.",
 	      "- Progress-timeout protection: after the first-update Write, the next evaluator progress checkpoint is the exact second-update Write to the same content ledger. Do not read governance, construction briefs, ADRs, worker reports, manifests, source refs, or broad requirements before that second Write.",
-	      "- Do not read governance, construction briefs, ADRs, worker reports, manifests, source refs, or broad requirements before the full partial checkpoint Write.",
-	      "- Do not produce a post-first-update plan, checklist, summary, or hidden full-register synthesis before the full partial checkpoint Write.",
+	      "- Do not read governance, construction briefs, ADRs, worker reports, manifests, source refs, or broad requirements before the second-update Write.",
+	      "- Do not produce a post-first-update plan, checklist, summary, or hidden full-register synthesis before the second-update Write.",
 	      "- Do not inspect the construction brief, ADR/output artifact, worker result report, worker invocation package, handoff manifest, source authority corpus, or broad requirement tables before the first content-ledger write.",
 	      "- Do not write terminal narration, plans, summaries, or stdout analysis before the first content-ledger write; the first durable progress signal is the ledger file.",
 	      "- A compact partial ledger is better than timeout. Timeout before a non-draft fragment row is an evaluator failure.",
@@ -1236,11 +1127,6 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
 	      "```json",
 	      designDepthSecondUpdatePacket(input).trimEnd(),
 	      "```",
-	      "Full partial checkpoint JSON packet:",
-	      "```json",
-	      designDepthFullPartialCheckpointPacket(input).trimEnd(),
-	      "```",
-	      "",
       "Tenant tool boundary:",
       ...tenantToolBoundaryPromptLines(input.tenantToolEnvironment),
       "- Read boundary: use only workspace-relative paths or explicit workspace/run-archive paths named in this prompt; do not read/cite/copy sibling sandboxes, historical test_runs, home memory, /tmp, or outside-workspace absolute paths.",
@@ -1253,11 +1139,10 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
 	    `1. first Read only the existing draft content ledger with limit <=80: ${input.contentRegisterPath}.`,
 	    `2. then Write the exact first-update JSON packet above to ${input.contentRegisterPath}.`,
 	    `3. then Write the exact second-update JSON packet above to ${input.contentRegisterPath}; if the Write tool requires a fresh read-after-write check, Read only ${input.contentRegisterPath} with limit <=80 before this Write.`,
-	    `4. then Write the exact full partial checkpoint JSON packet above to ${input.contentRegisterPath}; if the Write tool requires a fresh read-after-write check, Read only ${input.contentRegisterPath} with limit <=80 before this Write.`,
-	    `5. after the full partial checkpoint Write succeeds, read compressed work-category governance (${input.governanceRef}): ${input.governancePath}`,
-	    "6. re-open the content ledger only after the full partial checkpoint Write when you need to refine it.",
-	    `7. after the full partial checkpoint Write succeeds, inspect the construction brief as needed: ${input.constructionBriefPath}`,
-	    `8. after the full partial checkpoint Write succeeds, inspect the ADR/output artifact as needed: ${input.manifest.outputFile}`,
+	    `4. after the second-update Write succeeds, read compressed work-category governance (${input.governanceRef}): ${input.governancePath}`,
+	    "5. re-open the content ledger only after the second-update Write when you need to refine it.",
+	    `6. after the second-update Write succeeds, inspect the construction brief as needed: ${input.constructionBriefPath}`,
+	    `7. after the second-update Write succeeds, inspect the ADR/output artifact as needed: ${input.manifest.outputFile}`,
     "",
     "Precomputed worker result report summary:",
     ...input.workerReportSummaryLines.map((line) => `- ${line}`),
@@ -1299,9 +1184,9 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
     "- The content ledger file is the evaluation surface. Prefer file writes and bounded self-check reads over terminal narration.",
 	    "",
 	    "Agentic F_P work loop:",
-	    "- After the first evaluator update exists, do not write a plan or checklist. The fixed second-update packet, full partial checkpoint packet, and section order below are the plan.",
+	    "- After the first evaluator update exists, do not write a plan or checklist. The fixed second-update packet, bounded authority reads, and section order below are the plan.",
 	    "- The next progress checkpoint after the first update is the exact second content-ledger Write. Preserve the designCompletenessVerdict row and add stackProfileRows as []. Repair stackProfileRows after reading admitted stack authority.",
-	    "- The next checkpoint after that is the exact full partial checkpoint Write. It gives F_D a complete partial pressure map before any deep evidence review.",
+	    "- The next checkpoint after that must advance a named section from bounded evidence. Do not create an all-empty full-section pressure map.",
 	    "- Execute the fixed section order incrementally: each iteration completes one register section or one small cluster of related sections, then overwrites the same content ledger with accumulated rows.",
 	    "- Do not announce, plan, or attempt a full semantic register write in one action after the first update. A hidden full-register synthesis pass violates the content-ledger visibility contract.",
 	    "- After the first update, every exploratory read must be paired with the next tool action that writes at least one named non-empty or explicitly blocked register section back to the same content ledger file.",
