@@ -377,12 +377,20 @@ test("T-184 operator timeout policy is tenant configuration, not handoff glue", 
     600000
   );
   assert.equal(
+    runtimePolicy.designDepthFpEvaluator.inactivityTimeoutMs,
+    120000
+  );
+  assert.equal(
     runtimePolicy.designDepthFpEvaluator.maxEffort,
     "medium"
   );
   assert.ok(
     runtimePolicy.designDepthFpEvaluator.timeoutMs <
       runtimePolicy.minimumOperatorTimeoutMs
+  );
+  assert.ok(
+    runtimePolicy.designDepthFpEvaluator.inactivityTimeoutMs <
+      runtimePolicy.designDepthFpEvaluator.timeoutMs
   );
   assert.equal(
     runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.timeoutMs,
@@ -577,7 +585,11 @@ test("T-184 F_P evaluator prompt uses incremental content ledger writes", () => 
   );
   assert.match(
     installedOperatorSource,
-    /const processFailureReason: SdlcBlockingReasonCode =[\s\S]*evaluatorProcessTextLooksRetryableProviderFailure[\s\S]*\?\s*"worker_connection_failed"[\s\S]*:\s*processResult\.timedOut[\s\S]*\?\s*"design_depth_fp_evaluator_progress_timeout"[\s\S]*:\s*"design_depth_fp_evaluator_process_failed"/u
+    /function designDepthFpEvaluatorTimedOutBlockingReason[\s\S]*observation\.status === "pending"[\s\S]*"design_depth_fp_evaluator_first_update_timeout"[\s\S]*missingSections\.includes\("fileTargetRows"\)[\s\S]*"design_depth_fp_evaluator_semantic_checkpoint_timeout"[\s\S]*"design_depth_fp_evaluator_progress_timeout"/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /const processFailureReason: SdlcBlockingReasonCode =[\s\S]*evaluatorProcessTextLooksRetryableProviderFailure[\s\S]*\?\s*"worker_connection_failed"[\s\S]*:\s*processResult\.timedOut[\s\S]*\?\s*designDepthFpEvaluatorTimedOutBlockingReason\(firstUpdateObservation\)[\s\S]*:\s*"design_depth_fp_evaluator_process_failed"/u
   );
   assert.match(
     installedOperatorSource,
@@ -597,7 +609,7 @@ test("T-184 F_P evaluator prompt uses incremental content ledger writes", () => 
   );
   assert.match(
     installedOperatorSource,
-    /processResult\.timedOut && firstUpdateObservation\.status === "pending"[\s\S]*\?\s*"design_depth_fp_evaluator_first_update_timeout"/u
+    /inactivityTimeoutMs: evaluatorInactivityTimeoutMs/u
   );
   assert.match(
     installedOperatorSource,
@@ -609,6 +621,10 @@ test("T-184 F_P evaluator prompt uses incremental content ledger writes", () => 
   );
   assert.match(
     installedOperatorSource,
+    /outcome\.reason === "design_depth_fp_evaluator_semantic_checkpoint_timeout"[\s\S]*return "design_depth_fp_evaluator_semantic_checkpoint_timeout"/u
+  );
+  assert.match(
+    installedOperatorSource,
     /outcome\.reason === "design_depth_fp_evaluator_progress_timeout"[\s\S]*return "design_depth_fp_evaluator_progress_timeout"/u
   );
   assert.match(
@@ -617,7 +633,19 @@ test("T-184 F_P evaluator prompt uses incremental content ledger writes", () => 
   );
   assert.match(
     blockingReasonSource,
+    /code === "design_depth_fp_evaluator_semantic_checkpoint_timeout"[\s\S]*lawfulReentryPoint: "triage_gap"/u
+  );
+  assert.match(
+    blockingReasonSource,
     /code === "design_depth_fp_evaluator_progress_timeout"[\s\S]*lawfulReentryPoint: "same_edge_retry"/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /Precomputed ADR implementation-design evidence summary/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /implementationDesignArtifactSummaryForDesignDepthPrompt/u
   );
   assert.match(
     evaluatorPromptSource,

@@ -755,6 +755,7 @@ function compactDesignDepthPromptLineGroups(input: {
   readonly invocationPackagePath: string;
   readonly workerReportPath: string;
   readonly workerReportSummaryLines: readonly string[];
+  readonly implementationDesignArtifactSummaryLines?: readonly string[] | undefined;
   readonly contentRegisterPath: string;
   readonly registerProjectionPath: string;
   readonly subworkstreamManifestPath: string;
@@ -799,6 +800,11 @@ function compactDesignDepthPromptLineGroups(input: {
       "",
       "Precomputed worker result report summary:",
       ...input.workerReportSummaryLines.map((line) => `- ${line}`),
+      "",
+      "Precomputed ADR implementation-design evidence summary:",
+      ...(input.implementationDesignArtifactSummaryLines ?? [
+        "not supplied; use bounded ADR reads"
+      ]).map((line) => `- ${line}`),
       "",
       "Hard bounds:",
       `- Do not use the Read tool on the handoff manifest (${input.manifestPath}); selected edge facts are in this prompt.`,
@@ -1071,6 +1077,7 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
   readonly invocationPackagePath: string;
   readonly workerReportPath: string;
   readonly workerReportSummaryLines: readonly string[];
+  readonly implementationDesignArtifactSummaryLines?: readonly string[] | undefined;
   readonly contentRegisterPath: string;
   readonly registerProjectionPath: string;
   readonly subworkstreamManifestPath: string;
@@ -1149,6 +1156,11 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
     "",
     "Precomputed worker result report summary:",
     ...input.workerReportSummaryLines.map((line) => `- ${line}`),
+    "",
+    "Precomputed ADR implementation-design evidence summary:",
+    ...(input.implementationDesignArtifactSummaryLines ?? [
+      "not supplied; use bounded ADR reads"
+    ]).map((line) => `- ${line}`),
     "",
     "Hard pre-register limits:",
     `- Do not use the Read tool on the handoff manifest (${input.manifestPath}). It is too large; selected manifest facts needed for this evaluation are projected into the prompt, construction brief, and worker summary.`,
@@ -1388,6 +1400,7 @@ export function designDepthFpEvaluatorPromptProjection(input: {
   readonly invocationPackagePath: string;
   readonly workerReportPath: string;
   readonly workerReportSummaryLines: readonly string[];
+  readonly implementationDesignArtifactSummaryLines?: readonly string[] | undefined;
   readonly contentRegisterPath: string;
   readonly registerProjectionPath: string;
   readonly subworkstreamManifestPath: string;
@@ -1501,6 +1514,7 @@ export function designDepthFpEvaluatorPrompt(input: {
   readonly invocationPackagePath: string;
   readonly workerReportPath: string;
   readonly workerReportSummaryLines: readonly string[];
+  readonly implementationDesignArtifactSummaryLines?: readonly string[] | undefined;
   readonly contentRegisterPath: string;
   readonly registerProjectionPath: string;
   readonly subworkstreamManifestPath: string;

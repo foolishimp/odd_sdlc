@@ -303,13 +303,17 @@ test("T-192 broad design-depth prompt front-loads first update and summarizes gr
 	    projection.promptText,
 	    /"section": "stackProfileRows"/u
 	  );
-	  assert.match(
+	  assert.doesNotMatch(
 	    projection.promptText,
 	    /Full partial checkpoint JSON packet:/u
 	  );
 	  assert.match(
 	    projection.promptText,
-	    /"section": "componentTopologyRows"/u
+	    /fileTargetRows plus matching componentTopologyRows and componentRealizationRows/u
+	  );
+	  assert.match(
+	    projection.promptText,
+	    /Precomputed ADR implementation-design evidence summary:/u
 	  );
 	  assert.match(
 	    projection.promptText,

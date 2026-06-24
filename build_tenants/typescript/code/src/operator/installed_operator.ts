@@ -215,7 +215,8 @@ import {
   observeDesignDepthContentRegisterFirstUpdate,
   sdlcFpEvaluateOpenObligationPressureRefs,
   writeDesignDepthRegisterProjectionFromEvaluateContentRegister,
-  writeSdlcFpEvaluateResult
+  writeSdlcFpEvaluateResult,
+  type SdlcDesignDepthContentRegisterFirstUpdateObservation
 } from "./plugins/evaluate/index.js";
 import {
   DESIGN_DEPTH_FP_EVALUATOR_RULE_OUTCOME_FILE,
@@ -2487,6 +2488,10 @@ function designDepthFpEvaluatorTimeoutMs(): number {
   return sdlcOperatorRuntimePolicy().designDepthFpEvaluatorTimeoutMs;
 }
 
+function designDepthFpEvaluatorInactivityTimeoutMs(): number {
+  return sdlcOperatorRuntimePolicy().designDepthFpEvaluatorInactivityTimeoutMs;
+}
+
 function designDepthFpEvaluatorStdoutBudgetBytes(): number {
   return sdlcOperatorRuntimePolicy().designDepthFpEvaluatorStdoutBudgetBytes;
 }
@@ -3640,6 +3645,101 @@ function workerResultReportSummaryForDesignDepthPrompt(
   }
 }
 
+function trimMarkdownCell(value: string): string {
+  return value
+    .trim()
+    .replace(/^`|`$/gu, "")
+    .replace(/\s+/gu, " ");
+}
+
+function markdownTableRowsAfterHeading(input: {
+  readonly filePath: string;
+  readonly heading: string;
+  readonly maxRows: number;
+}): readonly (readonly string[])[] {
+  if (!existsSync(input.filePath) || !statSync(input.filePath).isFile()) {
+    return Object.freeze([]);
+  }
+  const lines = readFileSync(input.filePath, "utf8").split(/\r?\n/u);
+  const headingIndex = lines.findIndex(
+    (line) => line.trim().replace(/^#+\s*/u, "") === input.heading
+  );
+  if (headingIndex < 0) {
+    return Object.freeze([]);
+  }
+  const rows: string[][] = [];
+  for (const line of lines.slice(headingIndex + 1)) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("#")) {
+      break;
+    }
+    if (!trimmed.startsWith("|") || !trimmed.endsWith("|")) {
+      if (rows.length > 0) {
+        break;
+      }
+      continue;
+    }
+    const cells = trimmed
+      .slice(1, -1)
+      .split("|")
+      .map(trimMarkdownCell);
+    if (cells.every((cell) => /^-+$/u.test(cell))) {
+      continue;
+    }
+    rows.push(cells);
+    if (rows.length >= input.maxRows + 1) {
+      break;
+    }
+  }
+  if (rows.length <= 1) {
+    return Object.freeze([]);
+  }
+  return Object.freeze(rows.slice(1, input.maxRows + 1).map((row) => Object.freeze(row)));
+}
+
+function implementationDesignArtifactSummaryForDesignDepthPrompt(
+  sourceArtifactPath: string
+): readonly string[] {
+  try {
+    const stackRows = markdownTableRowsAfterHeading({
+      filePath: sourceArtifactPath,
+      heading: "Stack Profile",
+      maxRows: 8
+    });
+    const moduleRows = markdownTableRowsAfterHeading({
+      filePath: sourceArtifactPath,
+      heading: "Module Boundary",
+      maxRows: 12
+    });
+    const componentRows = markdownTableRowsAfterHeading({
+      filePath: sourceArtifactPath,
+      heading: "Component Topology",
+      maxRows: 32
+    });
+    const fileTargetRows = markdownTableRowsAfterHeading({
+      filePath: sourceArtifactPath,
+      heading: "Product File Targets",
+      maxRows: 40
+    });
+    const sourceTargets = fileTargetRows.filter((row) => row[1] === "source");
+    return Object.freeze([
+      `sourceArtifact=${pathToFileURL(sourceArtifactPath).href}`,
+      `stack=${stackRows.map((row) => `${row[0]}=${row[1]}`).join("; ") || "none"}`,
+      `moduleRows=${moduleRows.length}; modules=${moduleRows.map((row) => row[0]).join(", ") || "none"}`,
+      `sourceFileTargets=${sourceTargets.length}; ${sourceTargets.map((row) => `${row[0]}=>${row[2]}`).join("; ") || "none"}`,
+      `componentTopologyRows=${componentRows.length}`,
+      ...componentRows.map(
+        (row) =>
+          `component=${row[0]}; module=${row[1]}; path=${row[2]}; publicBoundary=${row[3]}; concernRole=${row[4]}`
+      )
+    ]);
+  } catch (error) {
+    return Object.freeze([
+      `implementation-design artifact could not be summarized by the system (${error instanceof Error ? error.message : "unknown error"}); use bounded ADR reads and write an honest partial register.`
+    ]);
+  }
+}
+
 function writeDesignDepthFpEvaluatorDraftContentRegister(input: {
   readonly archiveRoot: string;
   readonly contentRegisterPath: string;
@@ -3711,6 +3811,23 @@ function writeDesignDepthFirstUpdateObservation(input: {
       registerPath: input.contentRegisterPath
     })
   });
+}
+
+function designDepthFpEvaluatorTimedOutBlockingReason(
+  observation: SdlcDesignDepthContentRegisterFirstUpdateObservation
+): SdlcBlockingReasonCode {
+  if (observation.status === "pending") {
+    return "design_depth_fp_evaluator_first_update_timeout";
+  }
+  if (
+    observation.status === "partial" &&
+    (observation.missingSections.includes("fileTargetRows") ||
+      observation.missingSections.includes("componentTopologyRows") ||
+      observation.missingSections.includes("componentRealizationRows"))
+  ) {
+    return "design_depth_fp_evaluator_semantic_checkpoint_timeout";
+  }
+  return "design_depth_fp_evaluator_progress_timeout";
 }
 
 function draftDesignDepthRegisterFragmentValue(input: {
@@ -3816,6 +3933,8 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
     workerReportPath,
     workerReportSummaryLines:
       workerResultReportSummaryForDesignDepthPrompt(workerReportPath),
+    implementationDesignArtifactSummaryLines:
+      implementationDesignArtifactSummaryForDesignDepthPrompt(input.manifest.outputFile),
     contentRegisterPath,
     registerProjectionPath: registerPath,
     subworkstreamManifestPath,
@@ -3875,6 +3994,7 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
   });
   const inactivityPolicy = workerInactivityPolicy();
   const evaluatorTimeoutMs = designDepthFpEvaluatorTimeoutMs();
+  const evaluatorInactivityTimeoutMs = designDepthFpEvaluatorInactivityTimeoutMs();
   const stdoutBudgetBytes = designDepthFpEvaluatorStdoutBudgetBytes();
   const traceRoot = `${processEventsPath}.trace`;
   const designDepthRunStartedPayload = Object.freeze({
@@ -3890,6 +4010,7 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
     error: null,
     timeoutMs: evaluatorTimeoutMs,
     workerTimeoutMs: inactivityPolicy.timeoutMs,
+    inactivityTimeoutMs: evaluatorInactivityTimeoutMs,
     stdoutBudgetBytes,
     stdoutByteCount: 0,
     stderrByteCount: 0,
@@ -3960,7 +4081,7 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
 	    parser: parserForWorkerTransport(evaluatorTransport),
     executorProfile,
     timeoutMs: evaluatorTimeoutMs,
-    inactivityTimeoutMs: inactivityPolicy.inactivityTimeoutMs,
+    inactivityTimeoutMs: evaluatorInactivityTimeoutMs,
     terminationGraceMs: inactivityPolicy.terminationGraceMs,
     heartbeatMs: inactivityPolicy.heartbeatMs,
     eventSink: input.eventSink
@@ -3996,6 +4117,7 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
       error: processResult.error,
       timeoutMs: evaluatorTimeoutMs,
       workerTimeoutMs: inactivityPolicy.timeoutMs,
+      inactivityTimeoutMs: evaluatorInactivityTimeoutMs,
       stdoutBudgetBytes,
       stdoutByteCount,
       stderrByteCount,
@@ -4049,11 +4171,9 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
     const processFailureReason: SdlcBlockingReasonCode =
       evaluatorProcessTextLooksRetryableProviderFailure
         ? "worker_connection_failed"
-        : processResult.timedOut && firstUpdateObservation.status === "pending"
-          ? "design_depth_fp_evaluator_first_update_timeout"
-          : processResult.timedOut
-            ? "design_depth_fp_evaluator_progress_timeout"
-            : "design_depth_fp_evaluator_process_failed";
+        : processResult.timedOut
+          ? designDepthFpEvaluatorTimedOutBlockingReason(firstUpdateObservation)
+          : "design_depth_fp_evaluator_process_failed";
     return constructEvaluationRuleOutcome({
       status: "blocked",
       ruleRef: DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
@@ -4260,6 +4380,9 @@ function designDepthFpEvaluatorBlockingReasonCode(
   }
   if (outcome.reason === "design_depth_fp_evaluator_first_update_timeout") {
     return "design_depth_fp_evaluator_first_update_timeout";
+  }
+  if (outcome.reason === "design_depth_fp_evaluator_semantic_checkpoint_timeout") {
+    return "design_depth_fp_evaluator_semantic_checkpoint_timeout";
   }
   if (outcome.reason === "design_depth_fp_evaluator_progress_timeout") {
     return "design_depth_fp_evaluator_progress_timeout";

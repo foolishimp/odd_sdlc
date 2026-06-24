@@ -13,6 +13,7 @@ export interface SdlcOperatorRuntimePolicy {
   readonly workerHeartbeatMs: number;
   readonly workerTerminationGraceMs: number;
   readonly designDepthFpEvaluatorTimeoutMs: number;
+  readonly designDepthFpEvaluatorInactivityTimeoutMs: number;
   readonly designDepthFpEvaluatorMaxEffort: SdlcOperatorRuntimeEffort;
   readonly designDepthFpEvaluatorStdoutBudgetBytes: number;
   readonly reviewGradeEdgeFulfillmentEvaluatorTimeoutMs: number;
@@ -47,6 +48,7 @@ interface SdlcOperatorRuntimePolicyConfig {
   };
   readonly designDepthFpEvaluator: {
     readonly timeoutMs: number;
+    readonly inactivityTimeoutMs: number;
     readonly maxEffort: SdlcOperatorRuntimeEffort;
     readonly stdoutBudgetBytes: number;
   };
@@ -244,6 +246,11 @@ function readSdlcOperatorRuntimePolicyConfig(): SdlcOperatorRuntimePolicyConfig 
         "timeoutMs",
         "operator-runtime-policy.json.designDepthFpEvaluator"
       ),
+      inactivityTimeoutMs: positiveIntegerField(
+        designDepthFpEvaluator,
+        "inactivityTimeoutMs",
+        "operator-runtime-policy.json.designDepthFpEvaluator"
+      ),
       maxEffort: effortField(
         designDepthFpEvaluator,
         "maxEffort",
@@ -345,6 +352,10 @@ export function sdlcOperatorRuntimePolicy(): SdlcOperatorRuntimePolicy {
     designDepthFpEvaluatorTimeoutMs: configuredPositiveInteger(
       "ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_TIMEOUT_MS",
       config.designDepthFpEvaluator.timeoutMs
+    ),
+    designDepthFpEvaluatorInactivityTimeoutMs: configuredPositiveInteger(
+      "ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_INACTIVITY_TIMEOUT_MS",
+      config.designDepthFpEvaluator.inactivityTimeoutMs
     ),
     designDepthFpEvaluatorMaxEffort: configuredEffort(
       "ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_MAX_EFFORT",
