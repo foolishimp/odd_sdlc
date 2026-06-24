@@ -440,52 +440,6 @@ function designDepthSemanticFloorRows(input: {
   readonly aggregateSunnyDaySequence: unknown;
 } {
   const moduleRef = `module://${input.moduleToken}`;
-  const modelRef = `model://${input.moduleToken}`;
-  const sequenceRef = `sequence://${input.moduleToken}/happy-path`;
-  const entityId = `entity:${input.moduleToken}.${input.componentToken}`;
-  const attributeId = `attr:${input.moduleToken}.${input.componentToken}.boundary`;
-  const operationId = `operation:${input.moduleToken}.${input.componentToken}.realize`;
-  const attribute = Object.freeze({
-    kind: "sdlc_domain_attribute" as const,
-    attributeId,
-    name: "boundary",
-    valueType: "string",
-    cardinality: "one",
-    invariantRefs: Object.freeze([input.publicBoundary])
-  });
-  const entity = Object.freeze({
-    kind: "sdlc_domain_entity" as const,
-    entityId,
-    moduleName: input.sourceTarget.moduleName,
-    ownership: "owned" as const,
-    attributes: Object.freeze([attribute]),
-    invariants: Object.freeze([input.publicBoundary]),
-    sourceAssetRefs: input.sourceAssetRefs
-  });
-  const operation = Object.freeze({
-    kind: "sdlc_domain_operation" as const,
-    operationId,
-    moduleName: input.sourceTarget.moduleName,
-    inputEntityIds: Object.freeze([]),
-    outputEntityIds: Object.freeze([entityId]),
-    requiredAttributeIds: Object.freeze([attributeId])
-  });
-  const aggregateEntity = Object.freeze({
-    kind: "sdlc_aggregate_domain_entity" as const,
-    entityId,
-    ownerModuleName: input.sourceTarget.moduleName,
-    attributes: Object.freeze([attribute]),
-    sourceModuleNames: Object.freeze([input.sourceTarget.moduleName])
-  });
-  const sequenceStep = Object.freeze({
-    kind: "sdlc_sunny_day_sequence_step" as const,
-    stepId: `step:${input.moduleToken}.${input.componentToken}.realize`,
-    moduleName: input.sourceTarget.moduleName,
-    operationId,
-    inputEntityIds: Object.freeze([]),
-    outputEntityIds: Object.freeze([entityId]),
-    stateTransitionIds: Object.freeze([])
-  });
   return Object.freeze({
     stackProfileRows: Object.freeze([
       Object.freeze({
@@ -502,52 +456,22 @@ function designDepthSemanticFloorRows(input: {
         moduleRef
       })
     ]),
-    aggregateDomainModelRows: Object.freeze([
-      Object.freeze({
-        kind: "sdlc_aggregate_domain_model_row" as const,
-        modelRef
-      })
-    ]),
-    moduleSchemaFragments: Object.freeze([
-      Object.freeze({
-        kind: "sdlc_module_schema_fragment" as const,
-        moduleName: input.sourceTarget.moduleName,
-        entities: Object.freeze([entity]),
-        operations: Object.freeze([operation]),
-        requirementIds: input.requirementIds,
-        sourceAssetRefs: input.sourceAssetRefs
-      })
-    ]),
-    moduleStateDiagramFragments: Object.freeze([
-      Object.freeze({
-        kind: "sdlc_module_state_diagram_fragment" as const,
-        moduleName: input.sourceTarget.moduleName,
-        entityId,
-        stateless: true,
-        states: Object.freeze([]),
-        transitions: Object.freeze([]),
-        requirementIds: input.requirementIds,
-        sourceAssetRefs: input.sourceAssetRefs
-      })
-    ]),
+    aggregateDomainModelRows: Object.freeze([]),
+    moduleSchemaFragments: Object.freeze([]),
+    moduleStateDiagramFragments: Object.freeze([]),
     aggregateDomainModel: Object.freeze({
       kind: "sdlc_aggregate_domain_model" as const,
       modelVersion: "ts-design-depth-v1" as const,
-      entities: Object.freeze([aggregateEntity]),
-      operations: Object.freeze([operation]),
+      entities: Object.freeze([]),
+      operations: Object.freeze([]),
       crossModuleReferences: Object.freeze([]),
       evidenceRefs: input.sourceAssetRefs
     }),
-    sunnyDaySequenceRows: Object.freeze([
-      Object.freeze({
-        kind: "sdlc_sunny_day_sequence_row" as const,
-        sequenceRef
-      })
-    ]),
+    sunnyDaySequenceRows: Object.freeze([]),
     aggregateSunnyDaySequence: Object.freeze({
       kind: "sdlc_aggregate_sunny_day_sequence" as const,
       sequenceVersion: "ts-design-depth-v1" as const,
-      steps: Object.freeze([sequenceStep]),
+      steps: Object.freeze([]),
       evidenceRefs: input.sourceAssetRefs
     })
   });
@@ -595,12 +519,10 @@ function designDepthMinimumSemanticCheckpointPacket(
   });
   const checkpointBasisRefs = Object.freeze([
     DESIGN_DEPTH_MINIMUM_SEMANTIC_CHECKPOINT_PACKET_REF,
-    input.governanceRef,
-    sourceArtifactRef
+    input.governanceRef
   ]);
   const checkpointEvidenceRefs = Object.freeze([
-    DESIGN_DEPTH_MINIMUM_SEMANTIC_CHECKPOINT_PACKET_REF,
-    sourceArtifactRef
+    DESIGN_DEPTH_MINIMUM_SEMANTIC_CHECKPOINT_PACKET_REF
   ]);
   return `${JSON.stringify(
     designDepthEvaluateContentLedger({
@@ -1579,7 +1501,7 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
 	      "- The packet contains one non-draft designCompletenessVerdict fragment with partial axes. It is a typed first progress carrier, not final design truth.",
 	      "- Third tool action: write the exact minimum semantic checkpoint JSON packet below to the same durable evaluation artifact path. If the Write tool requires a fresh read-after-write check, Read only the content ledger with limit <=80, then immediately Write this semantic checkpoint packet.",
 	      "- The minimum semantic checkpoint JSON packet is derived from the precomputed ADR implementation-design evidence summary below and preserves only the required liveness row set.",
-	      "- Minimum semantic checkpoint: preserve the first designCompletenessVerdict row and add a compact projectable register floor from the precomputed ADR summary: one stackProfileRows row, one implementationModuleRows row, one source file target, one matching componentTopologyRows row, one matching componentRealizationRows row, and minimal domain/sequence section rows.",
+	      "- Minimum semantic checkpoint: preserve the first designCompletenessVerdict row and add a compact projectable register floor from the precomputed ADR summary: one stackProfileRows row, one implementationModuleRows row, one source file target, one matching componentTopologyRows row, one matching componentRealizationRows row, and explicit empty secondary domain/schema/sequence sections.",
 	      "- Minimum checkpoint row set: every design-depth fragment section must be present. stackProfileRows, implementationModuleRows, componentTopologyRows, componentRealizationRows, and fileTargetRows must be non-empty.",
 	      "- Prefer the first sourceFileTargets entry and the first matching component summary row. Do not wait to enumerate every component/module before this checkpoint; it is progress, not final design truth.",
 	      "- The component/file-target semantic checkpoint must preserve the first designCompletenessVerdict row and add non-empty stackProfileRows, implementationModuleRows, fileTargetRows, componentTopologyRows, and componentRealizationRows from the same precomputed summary.",

@@ -429,6 +429,7 @@ test("T-192 broad design-depth prompt front-loads first update and summarizes gr
 test("T-192 design-depth minimum checkpoint packet is admitted and projectable", () => {
   const projection = designDepthProjection();
   const checkpoint = extractMinimumSemanticCheckpointPacket(projection.promptText);
+  assert(JSON.stringify(checkpoint).length < 12500);
   const workspaceRoot = mkdtempSync(
     path.join(tmpdir(), "odd-sdlc-t192-minimum-checkpoint-")
   );
@@ -475,10 +476,12 @@ test("T-192 design-depth minimum checkpoint packet is admitted and projectable",
     assert.equal(projected.fileTargetRows.length, 1);
     assert.equal(projected.componentTopologyRows.length, 1);
     assert.equal(projected.componentRealizationRows.length, 1);
-    assert.equal(projected.moduleSchemaFragments.length, 1);
-    assert.equal(projected.moduleStateDiagramFragments.length, 1);
-    assert.equal(projected.aggregateDomainModel.entities.length, 1);
-    assert.equal(projected.aggregateSunnyDaySequence.steps.length, 1);
+    assert.equal(projected.aggregateDomainModelRows.length, 0);
+    assert.equal(projected.moduleSchemaFragments.length, 0);
+    assert.equal(projected.moduleStateDiagramFragments.length, 0);
+    assert.equal(projected.aggregateDomainModel.entities.length, 0);
+    assert.equal(projected.sunnyDaySequenceRows.length, 0);
+    assert.equal(projected.aggregateSunnyDaySequence.steps.length, 0);
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
   }
