@@ -30,9 +30,9 @@ for the TypeScript line.
 
 The ABIogenesis TypeScript tenant is substrate evidence consumed through
 explicit release snapshots. The TypeScript line currently consumes the
-immutable `@abiogenesis/typescript-tenant@4.1.0-rc.7` release snapshot at
-`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.1.0-rc.7/abiogenesis-typescript-tenant-4.1.0-rc.7.tgz`.
-The `4.1.0-rc.7` cut proves GTL/ABG carriers, graph-function
+immutable `@abiogenesis/typescript-tenant@4.1.0-rc.8` release snapshot at
+`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.1.0-rc.8/abiogenesis-typescript-tenant-4.1.0-rc.8.tgz`.
+The `4.1.0-rc.8` cut proves GTL/ABG carriers, graph-function
 iteration, traversal probes,
 evented saga-frontier execution, no-compute-basis failure taxonomy,
 bootstrap-lineage slices, selected `abg.fn_composition` identity, canonical
@@ -42,8 +42,10 @@ stage tasks, replay-derived retry context, admitted output-authority
 projection, target-carrier output admission before closure, PTY-local-spawn
 worker supervision, heartbeat/progress lease separation, trace-visible
 inactivity cleanup, supervisor owner-exit cleanup for interrupted PTY workers,
-and retry-frontier replay that treats zero-attempt stops as evidence rather
-than fake attempt coverage. It also proves ABG's replay-derived runtime
+external progress timeout interruption for active-output workers that fail to
+publish required semantic checkpoints, and retry-frontier replay that treats
+zero-attempt stops as evidence rather than fake attempt coverage. It also
+proves ABG's replay-derived runtime
 continuation-transition projection and primitive iteration-outcome projection,
 where typed runtime facts and assurance fold outcomes outrank terminal retry
 fallback evidence. It also proves the ABG public control surface projects
@@ -54,7 +56,7 @@ SDLC prompt authority policy remains product overlay data. It also proves
 segment-scoped evaluation redispatch metadata, so downstream SDLC evaluation
 can preserve segment, dimension-cell, fold, and relation scope across ABG-owned
 redispatch instead of collapsing deep evaluation coverage back to edge-granular
-fallbacks. It also carries the clean ABG 4.1.0-rc.7 consolidation of the
+fallbacks. It also carries the clean ABG 4.1.0-rc.8 consolidation of the
 defaults/lever registry, temporal runtime-scope consolidation, iteration
 state-action algebra, prompt asset interface, and contract-fulfillment binding
 API that `odd_sdlc.TS` consumes. It also carries the ABG-owned

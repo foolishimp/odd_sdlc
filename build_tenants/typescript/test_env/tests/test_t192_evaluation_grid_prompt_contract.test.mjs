@@ -204,7 +204,7 @@ test("T-192 evaluation grid rejects global coverage as a local cell", () => {
         "evaluation-finding://odd-sdlc/t192/global-coverage"
       ],
       abgOutcomeFoldRef:
-        "package:@abiogenesis/typescript-tenant@4.1.0-rc.7#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows",
+        "package:@abiogenesis/typescript-tenant@4.1.0-rc.8#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows",
       provenanceRefs: ["REQ-F-ODDSDLC-088"]
     }),
     /not cell dimensions/u
@@ -297,11 +297,11 @@ test("T-192 broad design-depth prompt front-loads first update and summarizes gr
 	  );
 	  assert.match(
 	    projection.promptText,
-	    /Second-update JSON packet:/u
+	    /component\/file-target semantic checkpoint/u
 	  );
 	  assert.match(
 	    projection.promptText,
-	    /"section": "stackProfileRows"/u
+	    /precomputed ADR implementation-design evidence summary/u
 	  );
 	  assert.doesNotMatch(
 	    projection.promptText,
@@ -317,7 +317,7 @@ test("T-192 broad design-depth prompt front-loads first update and summarizes gr
 	  );
 	  assert.match(
 	    projection.promptText,
-	    /The next progress checkpoint after the first update is the exact second content-ledger Write/u
+	    /The next progress checkpoint after the first update is the component\/file-target semantic checkpoint/u
 	  );
 	  assert.match(
 	    projection.promptText,

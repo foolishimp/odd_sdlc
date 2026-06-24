@@ -43,29 +43,6 @@ function listForPrompt(values: readonly string[]): string {
   return values.length === 0 ? "none" : values.join(", ");
 }
 
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function parseDesignDepthUpdatePacketContentRows(input: {
-  readonly text: string;
-  readonly label: string;
-}): {
-  readonly contentRows: readonly unknown[];
-} {
-  const parsed: unknown = JSON.parse(input.text);
-  if (!isRecord(parsed) || !Array.isArray(parsed["contentRows"])) {
-    throw new TypeError(`${input.label}.contentRows: array required`);
-  }
-  const contentRows: unknown[] = [];
-  for (const row of parsed["contentRows"]) {
-    contentRows.push(row);
-  }
-  return Object.freeze({
-    contentRows: Object.freeze(contentRows)
-  });
-}
-
 function tenantToolBoundaryPromptLines(
   tenantToolEnvironment: SdlcTenantToolEnvironmentProjection | null | undefined
 ): readonly string[] {
@@ -111,7 +88,7 @@ function edgeAuthorityCompressionPromptLines(): readonly string[] {
 }
 
 const ABG_ITERATION_OUTCOME_FOLD_REF =
-  "package:@abiogenesis/typescript-tenant@4.1.0-rc.7#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows";
+  "package:@abiogenesis/typescript-tenant@4.1.0-rc.8#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows";
 
 interface EvaluatePromptLineGroups {
   readonly preAuthorityLines: readonly string[];
@@ -120,15 +97,9 @@ interface EvaluatePromptLineGroups {
 
 const DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF =
   "prompt://odd-sdlc/design-depth/first-update-partial-verdict" as const;
-const DESIGN_DEPTH_SECOND_UPDATE_PACKET_REF =
-  "prompt://odd-sdlc/design-depth/second-update-stack-profile-checkpoint" as const;
 const DESIGN_DEPTH_FIRST_UPDATE_VERDICT_SEQUENCE =
   SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.findIndex(
     (section) => section === "designCompletenessVerdict"
-  ) + 1;
-const DESIGN_DEPTH_STACK_PROFILE_SEQUENCE =
-  SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.findIndex(
-    (section) => section === "stackProfileRows"
   ) + 1;
 
 function designDepthFirstUpdateAxisVerdict(axis: "entity" | "attribute" | "flow") {
@@ -205,60 +176,6 @@ function designDepthFirstUpdatePacket(input: {
           ],
           evidenceRefs: [DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF]
         }
-      ]
-    },
-    null,
-    2
-  )}\n`;
-}
-
-function designDepthSecondUpdatePacket(input: {
-  readonly manifest: SdlcWorkerHandoffManifest;
-  readonly governanceRef: string;
-  readonly selectedCompositionRef: string;
-  readonly selectedCompositionDigest: string;
-  readonly selectedCompositionSelectionRef: string;
-  readonly selectedRegimeBindingRef: string | null;
-}): string {
-  const firstPacket = parseDesignDepthUpdatePacketContentRows({
-    text: designDepthFirstUpdatePacket(input),
-    label: "DesignDepthFirstUpdatePacket"
-  });
-  return `${JSON.stringify(
-    {
-      ...firstPacket,
-      sourceBasisRefs: [
-        DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF,
-        DESIGN_DEPTH_SECOND_UPDATE_PACKET_REF,
-        input.governanceRef
-      ],
-      evidenceRefs: [
-        DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF,
-        DESIGN_DEPTH_SECOND_UPDATE_PACKET_REF
-      ],
-      contentRows: [
-        {
-          kind: "sdlc_evaluate_content_ledger_row",
-          rowRef: "content-ledger-row://odd-sdlc/design-depth/stackProfileRows",
-          authorityFunction: "synthesize_model",
-          carrierFamily: "ProductAssetModel",
-          contentKind: SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND,
-          payload: {
-            kind: "sdlc_design_depth_register_fragment",
-            fragmentVersion: "ts-design-depth-fragment-v1",
-            targetAssetType: input.manifest.targetAssetType,
-            section: "stackProfileRows",
-            sequence: DESIGN_DEPTH_STACK_PROFILE_SEQUENCE,
-            mergeMode: "replace",
-            value: []
-          },
-          sourceBasisRefs: [
-            DESIGN_DEPTH_SECOND_UPDATE_PACKET_REF,
-            input.governanceRef
-          ],
-          evidenceRefs: [DESIGN_DEPTH_SECOND_UPDATE_PACKET_REF]
-        },
-        ...firstPacket.contentRows
       ]
     },
     null,
@@ -1115,26 +1032,21 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
 	      "- First tool action: Read only the existing draft content ledger path above with limit <=80. This satisfies the worker tool's read-before-write policy and is not authority inspection.",
 	      "- Second tool action: write the exact first-update JSON packet below to the durable evaluation artifact path.",
 	      "- The packet contains one non-draft designCompletenessVerdict fragment with partial axes. It is a typed first progress carrier, not final design truth.",
-	      "- Third tool action: write the exact second-update JSON packet below to the durable evaluation artifact path. If the Write tool requires a fresh read-after-write check, Read only the content ledger with limit <=80, then immediately Write the second-update packet.",
-	      "- The second-update packet preserves the first row and adds the stackProfileRows section row as an explicit empty placeholder. It is a progress checkpoint before authority inspection, not final stack truth.",
-	      "- Fourth tool action: read bounded authority and write at least one non-empty semantic section back to the same content ledger path.",
+	      "- Third tool action: write a component/file-target semantic checkpoint to the same durable evaluation artifact path using the precomputed ADR implementation-design evidence summary below. If the Write tool requires a fresh read-after-write check, Read only the content ledger with limit <=80, then immediately Write this semantic checkpoint.",
+	      "- The component/file-target semantic checkpoint must preserve the first designCompletenessVerdict row and add non-empty fileTargetRows plus matching componentTopologyRows and componentRealizationRows. Add stackProfileRows and implementationModuleRows from the same precomputed summary when they are available.",
+	      "- Fourth tool action: only after that semantic checkpoint exists, read bounded governance, construction, ADR, or worker-report authority as needed to complete or refine the remaining sections.",
 	      "- Never publish all required sections with empty/null placeholders as a full checkpoint. An implementation-design register with empty stackProfileRows, implementationModuleRows, componentTopologyRows, componentRealizationRows, or fileTargetRows is rejected before projection.",
-	      "- After the second-update Write succeeds, every exploratory read must be paired with the next tool action that writes at least one named non-empty or explicitly blocked register section back to the same content ledger file.",
-	      "- Do not attempt a complete semantic register as hidden synthesis after bounded reads. The next durable progress after bounded ADR/construction evidence is a component/file-target checkpoint Write.",
-	      "- Component/file-target checkpoint: write fileTargetRows plus matching componentTopologyRows and componentRealizationRows from the ADR Product File Targets table or higher accepted source authority. Preserve existing stackProfileRows and designCompletenessVerdict rows in the same content ledger.",
-	      "- Progress-timeout protection: after the first-update Write, the next evaluator progress checkpoint is the exact second-update Write to the same content ledger. Do not read governance, construction briefs, ADRs, worker reports, manifests, source refs, or broad requirements before that second Write.",
-	      "- Do not read governance, construction briefs, ADRs, worker reports, manifests, source refs, or broad requirements before the second-update Write.",
-	      "- Do not produce a post-first-update plan, checklist, summary, or hidden full-register synthesis before the second-update Write.",
+	      "- After the component/file-target semantic checkpoint succeeds, every exploratory read must be paired with the next tool action that writes at least one named non-empty or explicitly blocked register section back to the same content ledger file.",
+	      "- Do not attempt a complete semantic register as hidden synthesis after bounded reads. The next durable progress after the first-update Write is the component/file-target checkpoint Write.",
+	      "- Component/file-target checkpoint: write fileTargetRows plus matching componentTopologyRows and componentRealizationRows from the precomputed ADR summary, ADR Product File Targets table, or higher accepted source authority. Preserve existing designCompletenessVerdict rows in the same content ledger.",
+	      "- Progress-timeout protection: after the first-update Write, the next evaluator progress checkpoint is the component/file-target semantic checkpoint to the same content ledger. Do not read governance, construction briefs, ADRs, worker reports, manifests, source refs, or broad requirements before that semantic checkpoint unless the precomputed summary is missing or contradictory.",
+	      "- Do not produce a post-first-update plan, checklist, summary, or hidden full-register synthesis before the component/file-target semantic checkpoint Write.",
 	      "- Do not inspect the construction brief, ADR/output artifact, worker result report, worker invocation package, handoff manifest, source authority corpus, or broad requirement tables before the first content-ledger write.",
 	      "- Do not write terminal narration, plans, summaries, or stdout analysis before the first content-ledger write; the first durable progress signal is the ledger file.",
 	      "- A compact partial ledger is better than timeout. Timeout before a non-draft fragment row is an evaluator failure.",
       "First-update JSON packet:",
 	      "```json",
 	      designDepthFirstUpdatePacket(input).trimEnd(),
-	      "```",
-	      "Second-update JSON packet:",
-	      "```json",
-	      designDepthSecondUpdatePacket(input).trimEnd(),
 	      "```",
       "Tenant tool boundary:",
       ...tenantToolBoundaryPromptLines(input.tenantToolEnvironment),
@@ -1147,12 +1059,12 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
 	      "Tool order:",
 	    `1. first Read only the existing draft content ledger with limit <=80: ${input.contentRegisterPath}.`,
 	    `2. then Write the exact first-update JSON packet above to ${input.contentRegisterPath}.`,
-	    `3. then Write the exact second-update JSON packet above to ${input.contentRegisterPath}; if the Write tool requires a fresh read-after-write check, Read only ${input.contentRegisterPath} with limit <=80 before this Write.`,
-	    `4. after the second-update Write succeeds, read compressed work-category governance (${input.governanceRef}): ${input.governancePath}`,
-	    "5. re-open the content ledger only after the second-update Write when you need to refine it.",
-	    `6. after the second-update Write succeeds, inspect the construction brief as needed: ${input.constructionBriefPath}`,
-	    `7. after the second-update Write succeeds, inspect the ADR/output artifact as needed: ${input.manifest.outputFile}`,
-	    `8. immediately after the bounded construction/ADR reads, Write a component/file-target checkpoint to ${input.contentRegisterPath}; do not attempt a complete semantic register before this Write.`,
+	    `3. then Write the component/file-target semantic checkpoint to ${input.contentRegisterPath} from the precomputed ADR implementation-design evidence summary below; if the Write tool requires a fresh read-after-write check, Read only ${input.contentRegisterPath} with limit <=80 before this Write.`,
+	    `4. after the component/file-target semantic checkpoint succeeds, read compressed work-category governance as needed (${input.governanceRef}): ${input.governancePath}`,
+	    "5. re-open the content ledger only after the semantic checkpoint when you need to refine it.",
+	    `6. after the semantic checkpoint succeeds, inspect the construction brief as needed: ${input.constructionBriefPath}`,
+	    `7. after the semantic checkpoint succeeds, inspect the ADR/output artifact as needed: ${input.manifest.outputFile}`,
+	    `8. after bounded refinement reads, extend the existing content ledger one section or small section cluster at a time; do not attempt a complete hidden register before durable writes.`,
     "",
     "Precomputed worker result report summary:",
     ...input.workerReportSummaryLines.map((line) => `- ${line}`),
@@ -1199,14 +1111,15 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
     "- The content ledger file is the evaluation surface. Prefer file writes and bounded self-check reads over terminal narration.",
 	    "",
 	    "Agentic F_P work loop:",
-	    "- After the first evaluator update exists, do not write a plan or checklist. The fixed second-update packet, bounded authority reads, and section order below are the plan.",
-	    "- The next progress checkpoint after the first update is the exact second content-ledger Write. Preserve the designCompletenessVerdict row and add stackProfileRows as []. Repair stackProfileRows after reading admitted stack authority.",
+	    "- After the first evaluator update exists, do not write a plan or checklist. The immediate component/file-target checkpoint, bounded authority reads, and section order below are the plan.",
+	    "- The next progress checkpoint after the first update is the component/file-target semantic checkpoint. Preserve the designCompletenessVerdict row and add non-empty fileTargetRows plus matching componentTopologyRows and componentRealizationRows from the precomputed ADR summary or the narrowest accepted source authority.",
+	    "- That checkpoint may also add stackProfileRows and implementationModuleRows from the precomputed summary. Repair or extend those rows after reading admitted stack/module authority.",
 	    "- The next checkpoint after that must advance a named section from bounded evidence. Do not create an all-empty full-section pressure map.",
-	    "- The first post-evidence checkpoint must write fileTargetRows, componentTopologyRows, and componentRealizationRows before any attempt to synthesize the full register.",
+	    "- The first post-first-update checkpoint must write fileTargetRows, componentTopologyRows, and componentRealizationRows before any attempt to synthesize the full register.",
 	    "- Execute the fixed section order incrementally: each iteration completes one register section or one small cluster of related sections, then overwrites the same content ledger with accumulated rows.",
 	    "- Do not announce, plan, or attempt a full semantic register write in one action after the first update. A hidden full-register synthesis pass violates the content-ledger visibility contract.",
 	    "- After the first update, every exploratory read must be paired with the next tool action that writes at least one named non-empty or explicitly blocked register section back to the same content ledger file.",
-    "- The preferred order is stackProfileRows, implementationModuleRows, componentTopologyRows, fileTargetRows, componentRealizationRows, moduleSchemaFragments, moduleStateDiagramFragments, aggregateDomainModelRows, aggregateDomainModel, sunnyDaySequenceRows, aggregateSunnyDaySequence, designCompletenessVerdict.",
+    "- The preferred order is componentTopologyRows/fileTargetRows/componentRealizationRows first, then stackProfileRows, implementationModuleRows, moduleSchemaFragments, moduleStateDiagramFragments, aggregateDomainModelRows, aggregateDomainModel, sunnyDaySequenceRows, aggregateSunnyDaySequence, designCompletenessVerdict.",
     "- When reading the transform ADR after the first update, read only the authority a given section needs and do not print it; then write that section to the register file. How you inspect the authority is your choice; the framework prescribes the carrier schema and the visibility contract, not the extraction method.",
     "- Time budget is part of correctness: update the draft content ledger before doing deep exploratory review.",
     "- Write the first evaluator update before any construction-brief inspection, ADR reading, worker-report inspection, source-authority lookup, or deep exploratory action. The only allowed prior Read is the existing draft content ledger slot.",

@@ -1350,9 +1350,9 @@ function reviewRenderedPromptProjection(input: {
     }
     for (const required of [
       "Progress-timeout protection:",
-      "Second-update JSON packet:",
-      "Full partial checkpoint JSON packet:",
-      "The next progress checkpoint after the first update is the exact second content-ledger Write",
+      "component/file-target semantic checkpoint",
+      "Precomputed ADR implementation-design evidence summary:",
+      "The next progress checkpoint after the first update is the component/file-target semantic checkpoint",
       "do not write a plan or checklist"
     ]) {
       if (!input.promptText.includes(required)) {

@@ -2739,7 +2739,7 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
 	  assert.match(evaluatorPromptSource, /not a single-shot JSON response/u);
 	  assert.match(evaluatorPromptSource, /Agentic F_P work loop/u);
 	  assert.match(evaluatorPromptSource, /do not write a plan or checklist/u);
-	  assert.match(evaluatorPromptSource, /second content-ledger Write/u);
+	  assert.match(evaluatorPromptSource, /component\/file-target semantic checkpoint/u);
 	  assert.doesNotMatch(evaluatorPromptSource, /write a short plan and checklist/u);
 	  assert.match(evaluatorPromptSource, /update the draft content ledger before doing deep exploratory review/u);
   assert.match(evaluatorPromptSource, /Do not use the Read tool on the handoff manifest/u);
@@ -2749,13 +2749,13 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(evaluatorPromptSource, /Do not run any bounded-summary action before the first evaluator update/u);
 	  assert.match(evaluatorPromptSource, /First tool action: Read only the existing draft content ledger/u);
 	  assert.match(evaluatorPromptSource, /Second tool action: write the exact first-update JSON packet/u);
-	  assert.match(evaluatorPromptSource, /Third tool action: write the exact second-update JSON packet/u);
-	  assert.match(evaluatorPromptSource, /Fourth tool action: read bounded authority and write at least one non-empty semantic section/u);
+	  assert.match(evaluatorPromptSource, /Third tool action: write a component\/file-target semantic checkpoint/u);
+	  assert.match(evaluatorPromptSource, /Fourth tool action: only after that semantic checkpoint exists/u);
 	  assert.match(evaluatorPromptSource, /component\/file-target checkpoint Write/u);
 	  assert.match(evaluatorPromptSource, /fileTargetRows plus matching componentTopologyRows and componentRealizationRows/u);
 	  assert.match(evaluatorPromptSource, /read-before-write policy/u);
 	  assert.match(evaluatorPromptSource, /First-update JSON packet/u);
-	  assert.match(evaluatorPromptSource, /Second-update JSON packet/u);
+	  assert.doesNotMatch(evaluatorPromptSource, /Second-update JSON packet/u);
 	  assert.match(evaluatorPromptSource, /Never publish all required sections with empty\/null placeholders/u);
 	  assert.doesNotMatch(evaluatorPromptSource, /Full partial checkpoint JSON packet/u);
 	  assert.match(evaluatorPromptSource, /Do not inspect the construction brief, ADR\/output artifact/u);
@@ -2807,7 +2807,7 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(evaluatorPromptSource, /First-update carrier helper contract/u);
   assert.match(evaluatorPromptSource, /DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_REF/u);
   assert.match(evaluatorPromptSource, /Bounded first-pass register target/u);
-  assert.match(evaluatorPromptSource, /first post-evidence checkpoint must write fileTargetRows, componentTopologyRows, and componentRealizationRows/u);
+  assert.match(evaluatorPromptSource, /first post-first-update checkpoint must write fileTargetRows, componentTopologyRows, and componentRealizationRows/u);
   assert.match(evaluatorPromptSource, /It is acceptable to rewrite the content ledger multiple times while converging/u);
   assert.match(evaluatorPromptSource, /Stdout is an agent work trace, not evaluation truth/u);
   assert.match(evaluatorPromptSource, /compressed work-category governance/u);
