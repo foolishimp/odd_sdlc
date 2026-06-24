@@ -527,6 +527,10 @@ test("T-184 operator summary separates obligation review from semantic admission
     installedOperatorSource,
     /edgeAssuranceCloseDecision\.disposition/u
   );
+  assert.match(
+    installedOperatorSource,
+    /stateWithBlockedDesignDepthFpEvaluatorOutcome[\s\S]*publishDispatchState\(dispatchState\.current\)/u
+  );
 });
 
 test("T-184 F_P evaluator prompt uses incremental content ledger writes", () => {

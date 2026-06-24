@@ -10122,6 +10122,7 @@ function createSdlcInstalledOperatorAbgPluginSessionInternal(
           outcome,
           ruleOutcomeRef
         });
+        publishDispatchState(dispatchState.current);
       }
       return outcome;
   };
