@@ -2752,11 +2752,12 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
 	  assert.match(evaluatorPromptSource, /Third tool action: write the exact minimum semantic checkpoint JSON packet/u);
 	  assert.match(evaluatorPromptSource, /Fourth tool action: only after that semantic checkpoint exists/u);
 	  assert.match(evaluatorPromptSource, /component\/file-target checkpoint Write/u);
-	  assert.match(evaluatorPromptSource, /fileTargetRows plus matching componentTopologyRows and componentRealizationRows/u);
+	  assert.match(evaluatorPromptSource, /stackProfileRows, implementationModuleRows, fileTargetRows, componentTopologyRows, and componentRealizationRows/u);
 	  assert.match(evaluatorPromptSource, /read-before-write policy/u);
 	  assert.match(evaluatorPromptSource, /First-update JSON packet/u);
 	  assert.match(evaluatorPromptSource, /Minimum semantic checkpoint JSON packet/u);
 	  assert.doesNotMatch(evaluatorPromptSource, /Second-update JSON packet/u);
+	  assert.doesNotMatch(evaluatorPromptSource, /Do not include stackProfileRows or implementationModuleRows in the minimum checkpoint/u);
 	  assert.match(evaluatorPromptSource, /Never publish all required sections with empty\/null placeholders/u);
 	  assert.doesNotMatch(evaluatorPromptSource, /Full partial checkpoint JSON packet/u);
 	  assert.match(evaluatorPromptSource, /Do not inspect the construction brief, ADR\/output artifact/u);

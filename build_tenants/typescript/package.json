@@ -1,6 +1,6 @@
 {
   "name": "@odd-sdlc/typescript-tenant",
-  "version": "3.0.9",
+  "version": "3.0.10",
   "private": true,
   "description": "ODD-native TypeScript tenant for odd_sdlc.",
   "type": "module",

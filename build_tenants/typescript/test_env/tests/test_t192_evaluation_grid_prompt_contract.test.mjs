@@ -13,6 +13,10 @@ import { fileURLToPath } from "node:url";
 import {
   constructSdlcEvaluationGridContract
 } from "../../build/semantic/code/src/operator/index.js";
+import {
+  admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity,
+  writeDesignDepthRegisterProjectionFromEvaluateContentRegister
+} from "../../build/semantic/code/src/operator/plugins/evaluate/content_register.js";
 
 import {
   designDepthFpEvaluatorPromptProjection,
@@ -149,6 +153,19 @@ function designDepthProjection() {
     selectedRegimeBindingRef: null,
     tenantToolEnvironment: null
   });
+}
+
+function extractMinimumSemanticCheckpointPacket(promptText) {
+  const marker = "Minimum semantic checkpoint JSON packet:";
+  const markerOffset = promptText.indexOf(marker);
+  assert.notEqual(markerOffset, -1);
+  const fenceStart = promptText.indexOf("```json", markerOffset);
+  assert.notEqual(fenceStart, -1);
+  const jsonStart = promptText.indexOf("\n", fenceStart) + 1;
+  assert.notEqual(jsonStart, 0);
+  const fenceEnd = promptText.indexOf("```", jsonStart);
+  assert.notEqual(fenceEnd, -1);
+  return JSON.parse(promptText.slice(jsonStart, fenceEnd));
 }
 
 function reviewGradeProjection() {
@@ -309,7 +326,19 @@ test("T-192 broad design-depth prompt front-loads first update and summarizes gr
 	  );
 	  assert.match(
 	    projection.promptText,
-	    /one source file target plus one matching componentTopologyRows row/u
+	    /every design-depth fragment section must be present/u
+	  );
+	  assert.match(
+	    projection.promptText,
+	    /stackProfileRows, implementationModuleRows, componentTopologyRows, componentRealizationRows, and fileTargetRows must be non-empty/u
+	  );
+	  assert.match(
+	    projection.promptText,
+	    /"section": "stackProfileRows"/u
+	  );
+	  assert.match(
+	    projection.promptText,
+	    /"section": "implementationModuleRows"/u
 	  );
 	  assert.match(
 	    projection.promptText,
@@ -329,6 +358,14 @@ test("T-192 broad design-depth prompt front-loads first update and summarizes gr
 	  );
 	  assert.match(
 	    projection.promptText,
+	    /"kind": "sdlc_stack_profile_row"/u
+	  );
+	  assert.match(
+	    projection.promptText,
+	    /"kind": "sdlc_implementation_module_row"/u
+	  );
+	  assert.match(
+	    projection.promptText,
 	    /"kind": "sdlc_component_topology_row"/u
 	  );
 	  assert.match(
@@ -337,7 +374,7 @@ test("T-192 broad design-depth prompt front-loads first update and summarizes gr
 	  );
 	  assert.match(
 	    projection.promptText,
-	    /Do not include stackProfileRows or implementationModuleRows in the minimum checkpoint/u
+	    /Include stackProfileRows and implementationModuleRows in the minimum checkpoint/u
 	  );
 	  assert.match(
 	    projection.promptText,
@@ -383,10 +420,68 @@ test("T-192 broad design-depth prompt front-loads first update and summarizes gr
     projection.promptText,
     /tail=requirement:req_t192_design_broad_038, requirement:req_t192_design_broad_039, requirement:req_t192_design_broad_040/u
   );
-  assert.doesNotMatch(
-    projection.promptText,
-    /requirement:req_t192_design_broad_025/u
+	  assert.doesNotMatch(
+	    projection.promptText,
+	    /requirement:req_t192_design_broad_025/u
+	  );
+	});
+
+test("T-192 design-depth minimum checkpoint packet is admitted and projectable", () => {
+  const projection = designDepthProjection();
+  const checkpoint = extractMinimumSemanticCheckpointPacket(projection.promptText);
+  const workspaceRoot = mkdtempSync(
+    path.join(tmpdir(), "odd-sdlc-t192-minimum-checkpoint-")
   );
+
+  try {
+    const contentRegisterPath = path.join(
+      workspaceRoot,
+      "design_depth_fp_evaluator_content_register.json"
+    );
+    const registerPath = path.join(
+      workspaceRoot,
+      "design_depth_fp_evaluator_register.json"
+    );
+    writeFileSync(contentRegisterPath, `${JSON.stringify(checkpoint, null, 2)}\n`, "utf8");
+
+    const admission = admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity({
+      registerPath: contentRegisterPath,
+      selectedIdentity: {
+        selectedCompositionRef: "composition://t192/selected",
+        selectedCompositionDigest: "sha256:t192",
+        selectedCompositionSelectionRef: "selection://t192",
+        selectedRegimeBindingRef: null
+      },
+      ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+      authorityFunction: "synthesize_model"
+    });
+    assert.equal(
+      admission.status,
+      "admitted",
+      admission.blockingReasons?.join(",") ?? "checkpoint rejected"
+    );
+    assert.notEqual(admission.register, null);
+    assert.equal(admission.register.contentRows.length, 12);
+
+    writeDesignDepthRegisterProjectionFromEvaluateContentRegister({
+      register: admission.register,
+      archiveRoot: workspaceRoot,
+      registerPath
+    });
+    const projected = JSON.parse(readFileSync(registerPath, "utf8"));
+
+    assert.equal(projected.stackProfileRows.length, 1);
+    assert.equal(projected.implementationModuleRows.length, 1);
+    assert.equal(projected.fileTargetRows.length, 1);
+    assert.equal(projected.componentTopologyRows.length, 1);
+    assert.equal(projected.componentRealizationRows.length, 1);
+    assert.equal(projected.moduleSchemaFragments.length, 1);
+    assert.equal(projected.moduleStateDiagramFragments.length, 1);
+    assert.equal(projected.aggregateDomainModel.entities.length, 1);
+    assert.equal(projected.aggregateSunnyDaySequence.steps.length, 1);
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
 });
 
 test("T-192 small admitted handoffs render compact fused-grid prompts", () => {
