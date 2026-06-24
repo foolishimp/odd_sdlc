@@ -3111,3 +3111,41 @@ Closure law check:
 - product/design text names ABG as command/control/runtime owner;
 - product gates prove no remaining SDLC source owns traversal authority outside
   GTL declarations and ABG-consumed plugins.
+
+## 2026-06-24 Carrier-Closure Compiler Lane
+
+The post-closure Data Mapper release proof exposed the recurring pattern behind
+the late T-204 fixes: live runs were discovering undefined cells between
+materialized F_P carrier output, evaluator admission, postflight status, and
+edge closure projection.
+
+The 3.0.15 Data Mapper release proof at
+`build_tenants/typescript/test_env/test_runs/data_mapper_v3_0_15_release_proof/20260624T115332321Z_pid80438`
+did not close Data Mapper. It did prove the 3.0.15 framework fix: the previous
+`closure_decision_missing` failure became a typed blocked closure. The run
+materialized `design_depth_fp_evaluator_rule_outcome.json`,
+`design_depth_fp_evaluator_postflight.json`, `fp_evaluate_result.json`,
+`postflight.json`, `sdlc_edge_closure_decision.json`,
+`sdlc_edge_fulfillment_ledger.json`, and `sdlc_edge_residual_pressure.json`.
+The closure disposition was `block`; the fulfillment ledger counted
+`expected=153`, `fulfilled=13`, `missing=140`; residual pressure remained
+non-clear with 144 required refs. The design-depth F_P content ledger was
+structurally full at 12 rows but semantically shallow: zero
+`moduleSchemaFragments`, zero `moduleStateDiagramFragments`, zero aggregate
+domain entities/operations, zero sunny-day steps, and partial
+`designCompletenessVerdict` axes.
+
+3.0.16 adds a deterministic semantic compiler lane over that class:
+
+- it synthesizes a structurally valid but semantically shallow design-depth F_P
+  evaluate content ledger and requires real materialization/admission to reject
+  it at the semantic floor;
+- it rejects source regressions where blocked design-depth F_P evaluator
+  outcomes fail to publish dispatch state and therefore fail to materialize
+  closure artifacts;
+- it rejects F_P close-proposed evaluations that emit continuation refs.
+
+This keeps the check at the compiler boundary: no Data Mapper worker is spawned
+during `build:semantic`, but release preflight now fails if the
+materialization -> F_P.eval -> postflight -> closure chain admits the known
+shallow-carrier or missing-closure patterns again.

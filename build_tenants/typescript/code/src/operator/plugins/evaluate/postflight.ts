@@ -531,9 +531,10 @@ function constructGtlFpEvaluation(input: {
     `metrics://odd-sdlc/${runRef}/fp-evaluate/obligations`
   ]);
   const closeDisposition = fpEvaluateCloseDisposition(input.status);
+  const emptyContinuationRefs: readonly string[] = Object.freeze([]);
   const continuationRefs =
     closeDisposition === "close_proposed"
-      ? Object.freeze([] as string[])
+      ? emptyContinuationRefs
       : Object.freeze([`continuation://odd-sdlc/${runRef}/evaluate.C/${input.status}`]);
   const finding: GtlEvaluationFindingRef = Object.freeze({
     kind: "gtl_evaluation_finding_ref" as const,

@@ -17,9 +17,12 @@ import {
 import {
   STALE_ABG_IDENTITY_PATTERN,
   assertCurrentSdlcSemanticCompilerFpReviewGate,
+  assertCurrentSdlcSemanticCarrierClosureReview,
   activeSdlcSourceIdentitySurfaces,
   constructCurrentSdlcGtlProgramConformanceInput,
+  constructCurrentSdlcSemanticCarrierClosureReviewReport,
   constructCurrentSdlcSemanticCompilerPromptReviewPackage,
+  semanticCarrierClosureIssuesForSurfaces,
   semanticSourceAuthorityIssuesForSurfaces,
   semanticPromptProjectionIssuesForRenderedPrompt,
   typecheckCurrentSdlcGtlProgram
@@ -419,6 +422,63 @@ test("T-204 F_P semantic compiler review gate is switched and fail-closed", () =
     }
     rmSync(tempRoot, { recursive: true, force: true });
   }
+});
+
+test("T-204 semantic compiler enforces carrier materialization and closure totality", () => {
+  const report = constructCurrentSdlcSemanticCarrierClosureReviewReport();
+
+  assert.equal(report.kind, "sdlc_semantic_carrier_closure_review_report");
+  assert.equal(report.passed, true);
+  assert.equal(report.issueCount, 0);
+  assert.deepEqual(report.issues, []);
+
+  const asserted = assertCurrentSdlcSemanticCarrierClosureReview();
+  assert.equal(asserted.passed, true);
+  assert.equal(asserted.issueCount, 0);
+});
+
+test("T-204 semantic compiler rejects carrier-closure regressions", () => {
+  const issues = semanticCarrierClosureIssuesForSurfaces([
+    {
+      surfaceRef:
+        "build_tenants/typescript/code/src/operator/plugins/evaluate/content_register.ts",
+      text:
+        "export function writeDesignDepthRegisterProjectionFromEvaluateContentRegister() { return 'projected'; }",
+      evidenceRefs: []
+    },
+    {
+      surfaceRef:
+        "build_tenants/typescript/code/src/operator/installed_operator.ts",
+      text: [
+        "async function evaluateDesignDepth() {",
+        "  dispatchState.current = stateWithBlockedDesignDepthFpEvaluatorOutcome({});",
+        "  return outcome;",
+        "}"
+      ].join("\n"),
+      evidenceRefs: []
+    },
+    {
+      surfaceRef:
+        "build_tenants/typescript/code/src/operator/plugins/evaluate/postflight.ts",
+      text: [
+        "function constructGtlFpEvaluation() {",
+        "  const closeDisposition = 'close_proposed';",
+        "  const continuationRefs = Object.freeze(['continuation://odd-sdlc/stale']);",
+        "  return { closeDisposition, continuationRefs };",
+        "}"
+      ].join("\n"),
+      evidenceRefs: []
+    }
+  ]);
+
+  assert.deepEqual(
+    issues.map((issue) => issue.code).sort(),
+    [
+      "blocked_fp_evaluator_outcome_without_dispatch_publication",
+      "close_proposed_emits_continuation_refs",
+      "design_depth_content_register_semantic_floor_missing"
+    ].sort()
+  );
 });
 
 test("T-204 semantic compiler rejects source authority regressions", () => {

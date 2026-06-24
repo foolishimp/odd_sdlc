@@ -76,6 +76,11 @@ import {
   reviewGradeEdgeFulfillmentRuleContract,
   ticketWorkflowFdRuleContract
 } from "../operator/plugins/plugin_contracts.js";
+import {
+  admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity,
+  writeDesignDepthRegisterProjectionFromEvaluateContentRegister,
+  type SdlcDesignDepthRegisterFragmentSection
+} from "../operator/plugins/evaluate/content_register.js";
 import { sha256Text } from "../shared/digest.js";
 const PACKAGE_ROOT_FROM_BUILD = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -248,6 +253,25 @@ export interface SdlcSemanticSourceAuthorityIssue {
     | "consequence_reentry_target_uses_abg_graph_reentry_point";
   readonly surfaceRef: string;
   readonly detail: string;
+}
+
+export interface SdlcSemanticCarrierClosureIssue {
+  readonly code:
+    | "design_depth_content_register_semantic_floor_missing"
+    | "design_depth_materialization_fixture_unadmitted"
+    | "design_depth_materialization_semantic_floor_regression"
+    | "blocked_fp_evaluator_outcome_without_dispatch_publication"
+    | "close_proposed_emits_continuation_refs";
+  readonly surfaceRef: string;
+  readonly detail: string;
+}
+
+export interface SdlcSemanticCarrierClosureReviewReport {
+  readonly kind: "sdlc_semantic_carrier_closure_review_report";
+  readonly reportVersion: "ts-semantic-carrier-closure-review-v1";
+  readonly passed: boolean;
+  readonly issueCount: number;
+  readonly issues: readonly SdlcSemanticCarrierClosureIssue[];
 }
 
 interface SdlcSemanticSourceAuthoritySurface {
@@ -555,6 +579,389 @@ function sourceIncludesAny(
   tokens: readonly string[]
 ): boolean {
   return tokens.some((token) => source.includes(token));
+}
+
+function designDepthFragmentValueForCompilerFixture(
+  section: SdlcDesignDepthRegisterFragmentSection
+): unknown {
+  switch (section) {
+    case "stackProfileRows":
+      return Object.freeze([
+        Object.freeze({
+          kind: "sdlc_stack_profile_row" as const,
+          stackRef: "stack://odd-sdlc/compiler-fixture",
+          language: "typescript",
+          buildTool: "npm"
+        })
+      ]);
+    case "implementationModuleRows":
+      return Object.freeze([
+        Object.freeze({
+          kind: "sdlc_implementation_module_row" as const,
+          moduleName: "semantic-compiler-fixture",
+          moduleRef: "module://odd-sdlc/compiler-fixture"
+        })
+      ]);
+    case "componentTopologyRows":
+      return Object.freeze([
+        Object.freeze({
+          kind: "sdlc_component_topology_row" as const,
+          componentId: "component://odd-sdlc/compiler-fixture",
+          moduleName: "semantic-compiler-fixture",
+          relativePath: "src/compiler-fixture.ts",
+          publicBoundary: "compileFixture",
+          concernRole: "other",
+          requirementIds: Object.freeze(["REQ-T204-CARRIER-CLOSURE"]),
+          sourceAssetRefs: Object.freeze(["fixture://odd-sdlc/t204"])
+        })
+      ]);
+    case "componentRealizationRows":
+      return Object.freeze([
+        Object.freeze({
+          kind: "sdlc_component_realization_row" as const,
+          componentId: "component://odd-sdlc/compiler-fixture",
+          moduleName: "semantic-compiler-fixture",
+          relativePath: "src/compiler-fixture.ts",
+          publicBoundary: "compileFixture",
+          trancheId: "tranche://odd-sdlc/compiler-fixture",
+          firstProductFileToChange: "src/compiler-fixture.ts",
+          upstreamComponentIds: Object.freeze([]),
+          requirementIds: Object.freeze(["REQ-T204-CARRIER-CLOSURE"]),
+          sourceAssetRefs: Object.freeze(["fixture://odd-sdlc/t204"])
+        })
+      ]);
+    case "fileTargetRows":
+      return Object.freeze([
+        Object.freeze({
+          kind: "sdlc_file_target_row" as const,
+          relativePath: "src/compiler-fixture.ts",
+          role: "source"
+        })
+      ]);
+    case "aggregateDomainModel":
+      return Object.freeze({
+        kind: "sdlc_aggregate_domain_model" as const,
+        modelVersion: "ts-design-depth-v1",
+        entities: Object.freeze([]),
+        operations: Object.freeze([]),
+        crossModuleReferences: Object.freeze([]),
+        evidenceRefs: Object.freeze(["fixture://odd-sdlc/t204"])
+      });
+    case "aggregateSunnyDaySequence":
+      return Object.freeze({
+        kind: "sdlc_aggregate_sunny_day_sequence" as const,
+        sequenceVersion: "ts-design-depth-v1",
+        steps: Object.freeze([]),
+        evidenceRefs: Object.freeze(["fixture://odd-sdlc/t204"])
+      });
+    case "designCompletenessVerdict":
+      return Object.freeze({
+        kind: "sdlc_design_completeness_verdict" as const,
+        verdictVersion: "ts-design-depth-v1",
+        entity: Object.freeze({
+          kind: "sdlc_design_completeness_axis_verdict" as const,
+          axis: "entity" as const,
+          status: "partial" as const,
+          reasons: Object.freeze(["fixture intentionally lacks entity depth"]),
+          evidenceRefs: Object.freeze(["fixture://odd-sdlc/t204"])
+        }),
+        attribute: Object.freeze({
+          kind: "sdlc_design_completeness_axis_verdict" as const,
+          axis: "attribute" as const,
+          status: "partial" as const,
+          reasons: Object.freeze(["fixture intentionally lacks attribute depth"]),
+          evidenceRefs: Object.freeze(["fixture://odd-sdlc/t204"])
+        }),
+        flow: Object.freeze({
+          kind: "sdlc_design_completeness_axis_verdict" as const,
+          axis: "flow" as const,
+          status: "partial" as const,
+          reasons: Object.freeze(["fixture intentionally lacks flow depth"]),
+          evidenceRefs: Object.freeze(["fixture://odd-sdlc/t204"])
+        })
+      });
+    case "aggregateDomainModelRows":
+    case "moduleSchemaFragments":
+    case "moduleStateDiagramFragments":
+    case "sunnyDaySequenceRows":
+      return Object.freeze([]);
+    default: {
+      const exhaustive: never = section;
+      throw new TypeError(`unsupported design-depth section ${exhaustive}`);
+    }
+  }
+}
+
+function designDepthCarrierMaterializationIssues():
+  readonly SdlcSemanticCarrierClosureIssue[] {
+  const selectedIdentity = Object.freeze({
+    selectedCompositionRef:
+      "composition://odd-sdlc/compiler/design-depth-materialization",
+    selectedCompositionDigest: "sha256:compiler-design-depth-materialization",
+    selectedCompositionSelectionRef:
+      "selection://odd-sdlc/compiler/design-depth-materialization",
+    selectedRegimeBindingRef: null
+  });
+  const tempRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-carrier-closure-"));
+  try {
+    const contentRegisterPath = path.join(
+      tempRoot,
+      "design_depth_fp_evaluator_content_register.json"
+    );
+    const registerPath = path.join(
+      tempRoot,
+      "design_depth_fp_evaluator_register.json"
+    );
+    const sections: readonly SdlcDesignDepthRegisterFragmentSection[] =
+      Object.freeze([
+        "stackProfileRows",
+        "implementationModuleRows",
+        "aggregateDomainModelRows",
+        "moduleSchemaFragments",
+        "moduleStateDiagramFragments",
+        "aggregateDomainModel",
+        "sunnyDaySequenceRows",
+        "aggregateSunnyDaySequence",
+        "componentTopologyRows",
+        "componentRealizationRows",
+        "fileTargetRows",
+        "designCompletenessVerdict"
+      ]);
+    writeFileSync(
+      contentRegisterPath,
+      `${JSON.stringify(
+        {
+          kind: "sdlc_evaluate_content_ledger",
+          ledgerVersion: "ts-evaluate-content-ledger-v1",
+          stage: "evaluate.C",
+          ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+          ruleRole: "semantic_judgment",
+          computeMeans: "F_P",
+          authorityFunction: "synthesize_model",
+          selectedCompositionRef: selectedIdentity.selectedCompositionRef,
+          selectedCompositionDigest: selectedIdentity.selectedCompositionDigest,
+          selectedCompositionSelectionRef:
+            selectedIdentity.selectedCompositionSelectionRef,
+          selectedRegimeBindingRef: selectedIdentity.selectedRegimeBindingRef,
+          compositionContributionRef: selectedIdentity.selectedCompositionRef,
+          sourceBasisRefs: ["fixture://odd-sdlc/t204"],
+          candidateArtifactRefs: ["fixture://odd-sdlc/t204/design"],
+          evidenceRefs: ["fixture://odd-sdlc/t204"],
+          contentRows: sections.map((section, index) => ({
+            kind: "sdlc_evaluate_content_ledger_row",
+            rowRef: `content-ledger-row://odd-sdlc/compiler-fixture/${section}`,
+            authorityFunction: "synthesize_model",
+            carrierFamily: "ProductAssetModel",
+            contentKind: "sdlc_design_depth_register_fragment",
+            payload: {
+              kind: "sdlc_design_depth_register_fragment",
+              fragmentVersion: "ts-design-depth-fragment-v1",
+              targetAssetType: "implementation_design_surface",
+              section,
+              sequence: index + 1,
+              mergeMode: "replace",
+              value: designDepthFragmentValueForCompilerFixture(section)
+            },
+            sourceBasisRefs: ["fixture://odd-sdlc/t204"],
+            evidenceRefs: ["fixture://odd-sdlc/t204"]
+          }))
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+    const admission = admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity({
+      registerPath: contentRegisterPath,
+      selectedIdentity,
+      ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+      authorityFunction: "synthesize_model",
+      computeMeans: "F_P"
+    });
+    if (admission.status !== "admitted" || admission.register === null) {
+      return Object.freeze([
+        Object.freeze({
+          code: "design_depth_materialization_fixture_unadmitted" as const,
+          surfaceRef: "compiler://odd-sdlc/t204/carrier-closure-fixture",
+          detail:
+            admission.blockingReasons.join("; ") ||
+            "syntactic evaluate content ledger fixture was rejected"
+        })
+      ]);
+    }
+    try {
+      writeDesignDepthRegisterProjectionFromEvaluateContentRegister({
+        register: admission.register,
+        archiveRoot: tempRoot,
+        registerPath
+      });
+      return Object.freeze([
+        Object.freeze({
+          code:
+            "design_depth_materialization_semantic_floor_regression" as const,
+          surfaceRef:
+            "build_tenants/typescript/code/src/operator/plugins/evaluate/content_register.ts",
+          detail:
+            "structurally complete but semantically shallow design-depth F_P content ledger projected as an admitted register"
+        })
+      ]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "unknown";
+      return /semantic floor missing/u.test(message)
+        ? Object.freeze([])
+        : Object.freeze([
+            Object.freeze({
+              code:
+                "design_depth_materialization_semantic_floor_regression" as const,
+              surfaceRef:
+                "build_tenants/typescript/code/src/operator/plugins/evaluate/content_register.ts",
+              detail:
+                `shallow design-depth F_P content ledger failed for the wrong reason: ${message}`
+            })
+          ]);
+    }
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+export function semanticCarrierClosureIssuesForSurfaces(
+  surfaces: readonly SdlcSemanticSourceAuthoritySurface[]
+): readonly SdlcSemanticCarrierClosureIssue[] {
+  const issues: SdlcSemanticCarrierClosureIssue[] = [
+    ...designDepthCarrierMaterializationIssues()
+  ];
+  const contentRegister = sourceAuthoritySurfaceForPath(
+    surfaces,
+    "build_tenants/typescript/code/src/operator/plugins/evaluate/content_register.ts"
+  );
+  if (
+    contentRegister !== null &&
+    (!contentRegister.text.includes("assertDesignDepthRegisterSemanticFloor(payload)") ||
+      !contentRegister.text.includes(
+        "evaluate_content_ledger_design_depth_payload_invalid"
+      ))
+  ) {
+    issues.push({
+      code: "design_depth_content_register_semantic_floor_missing",
+      surfaceRef: contentRegister.surfaceRef,
+      detail:
+        "materialized design-depth F_P content ledgers must pass the semantic floor before register projection or admission"
+    });
+  }
+
+  const installedOperator = sourceAuthoritySurfaceForPath(
+    surfaces,
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+  if (installedOperator !== null) {
+    const blockedOutcomeStart = installedOperator.text.indexOf(
+      "dispatchState.current = stateWithBlockedDesignDepthFpEvaluatorOutcome({"
+    );
+    const blockedOutcomeEnd =
+      blockedOutcomeStart < 0
+        ? -1
+        : installedOperator.text.indexOf("return outcome;", blockedOutcomeStart);
+    const publicationIndex =
+      blockedOutcomeStart < 0
+        ? -1
+        : installedOperator.text.indexOf(
+            "publishDispatchState(dispatchState.current);",
+            blockedOutcomeStart
+          );
+    if (
+      blockedOutcomeStart < 0 ||
+      blockedOutcomeEnd < 0 ||
+      publicationIndex < 0 ||
+      publicationIndex > blockedOutcomeEnd
+    ) {
+      issues.push({
+        code: "blocked_fp_evaluator_outcome_without_dispatch_publication",
+        surfaceRef: installedOperator.surfaceRef,
+        detail:
+          "blocked design-depth F_P evaluator outcomes must publish dispatch state so postflight, closure, and residual-pressure artifacts materialize"
+      });
+    }
+  }
+
+  const postflight = sourceAuthoritySurfaceForPath(
+    surfaces,
+    "build_tenants/typescript/code/src/operator/plugins/evaluate/postflight.ts"
+  );
+  if (postflight !== null) {
+    const continuationAssignment = assignmentWindow({
+      source: postflight.text,
+      startToken: "const continuationRefs =",
+      endToken: "const finding:"
+    });
+    if (
+      continuationAssignment === null ||
+      !postflight.text.includes(
+        "const emptyContinuationRefs: readonly string[] = Object.freeze([]);"
+      ) ||
+      !continuationAssignment.includes('closeDisposition === "close_proposed"') ||
+      !continuationAssignment.includes("? emptyContinuationRefs")
+    ) {
+      issues.push({
+        code: "close_proposed_emits_continuation_refs",
+        surfaceRef: postflight.surfaceRef,
+        detail:
+          "close-proposed F_P evaluations must emit no continuation refs; continuation refs imply non-close pressure"
+      });
+    }
+  }
+
+  return Object.freeze(issues);
+}
+
+function assertSemanticCarrierClosureReviewPassed(
+  surfaces: readonly SdlcSemanticSourceAuthoritySurface[]
+): void {
+  const issues = semanticCarrierClosureIssuesForSurfaces(surfaces);
+  if (issues.length > 0) {
+    throw new TypeError(
+      [
+        "SDLC semantic carrier-closure compiler review failed:",
+        ...issues.map(
+          (issue) =>
+            `- ${issue.code} at ${issue.surfaceRef}: ${issue.detail}`
+        )
+      ].join("\n")
+    );
+  }
+}
+
+export function constructCurrentSdlcSemanticCarrierClosureReviewReport(
+  input: SdlcGtlProgramConformanceInputOptions = {}
+): SdlcSemanticCarrierClosureReviewReport {
+  const issues = semanticCarrierClosureIssuesForSurfaces(
+    activeSdlcSourceIdentitySurfaces(input)
+  );
+  return Object.freeze({
+    kind: "sdlc_semantic_carrier_closure_review_report" as const,
+    reportVersion: "ts-semantic-carrier-closure-review-v1" as const,
+    passed: issues.length === 0,
+    issueCount: issues.length,
+    issues
+  });
+}
+
+export function assertCurrentSdlcSemanticCarrierClosureReview(
+  input: SdlcGtlProgramConformanceInputOptions = {}
+): SdlcSemanticCarrierClosureReviewReport {
+  const report = constructCurrentSdlcSemanticCarrierClosureReviewReport(input);
+  if (!report.passed) {
+    throw new TypeError(
+      [
+        "SDLC semantic carrier-closure compiler review failed:",
+        ...report.issues.map(
+          (issue) =>
+            `- ${issue.code} at ${issue.surfaceRef}: ${issue.detail}`
+        )
+      ].join("\n")
+    );
+  }
+  return report;
 }
 
 export function semanticSourceAuthorityIssuesForSurfaces(
@@ -2883,6 +3290,7 @@ export function constructCurrentSdlcGtlProgramConformanceInput(
   ]);
   const sourceIdentitySurfaces = activeSdlcSourceIdentitySurfaces(input);
   assertSemanticSourceAuthorityReviewPassed(sourceIdentitySurfaces);
+  assertSemanticCarrierClosureReviewPassed(sourceIdentitySurfaces);
   const sourceAuthorityPolicies = sourceAuthorityPolicyRows();
   const sameObjectProofs = Object.freeze([]);
   const operatorDeclarations = operatorDeclarationRows(vectorRows);
