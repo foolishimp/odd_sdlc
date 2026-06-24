@@ -212,8 +212,49 @@ test("T-179 evaluate.C result preserves selected abg.fn_composition identity", (
   assert.equal(finding.compositionRef, result.compositionRef);
   assert.equal(finding.compositionDigest, result.compositionDigest);
   assert.equal(finding.closeDisposition, "close_proposed");
+  assert.deepEqual(finding.continuationRefs, []);
   assert.deepEqual(finding.evidenceRefs, ["evidence://t179/output"]);
   assert.match(finding.compositionContributionRef, /^composition-contribution:/u);
+});
+
+test("T-204 evaluate.C result emits continuations only for non-close findings", () => {
+  const archiveRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t204-eval-continuation-"));
+  const selectedComposition = compositionIdentity();
+  const result = constructSdlcFpEvaluateResult({
+    manifest: {
+      archiveRoot,
+      graphFunctionName: "Fg_t204_runtime_alignment",
+      edgeName: "derive_t204_surface",
+      reportFile: path.join(archiveRoot, "worker_result_report.json"),
+      fpTransformRequest: null,
+      fpTransformResultFile: path.join(archiveRoot, "fp_transform_result.json")
+    },
+    selectedComposition,
+    report: {
+      obligationAssessments: [
+        {
+          fulfillmentStatus: "blocked"
+        }
+      ],
+      executionEvidence: {
+        status: "blocked"
+      }
+    },
+    postflight: {
+      status: "blocked",
+      blockingReasons: ["output_file_missing"],
+      blockingReasonCarriers: [],
+      evidenceRefs: ["evidence://t204/output"]
+    },
+    postflightRef: "postflight://t204"
+  });
+
+  const finding = result.findings[0];
+  assert.equal(finding.closeDisposition, "block_proposed");
+  assert.equal(finding.residualPressureRefs.length, 1);
+  assert.match(finding.residualPressureRefs[0], /output_file_missing/u);
+  assert.equal(finding.continuationRefs.length, 1);
+  assert.match(finding.continuationRefs[0], /\/evaluate\.C\/blocked$/u);
 });
 
 test("T-179 consequence carriers preserve selected composition through ledgers and projection", () => {

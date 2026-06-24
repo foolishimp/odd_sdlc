@@ -530,6 +530,11 @@ function constructGtlFpEvaluation(input: {
     ...residualPressureRefs,
     `metrics://odd-sdlc/${runRef}/fp-evaluate/obligations`
   ]);
+  const closeDisposition = fpEvaluateCloseDisposition(input.status);
+  const continuationRefs =
+    closeDisposition === "close_proposed"
+      ? Object.freeze([] as string[])
+      : Object.freeze([`continuation://odd-sdlc/${runRef}/evaluate.C/${input.status}`]);
   const finding: GtlEvaluationFindingRef = Object.freeze({
     kind: "gtl_evaluation_finding_ref" as const,
     findingRef: `finding://odd-sdlc/${runRef}/fp-evaluate/1`,
@@ -537,11 +542,9 @@ function constructGtlFpEvaluation(input: {
     hookActionRef: null,
     gainReportRef: null,
     metricsRef: `metrics://odd-sdlc/${runRef}/fp-evaluate/obligations/${input.counts.fulfilled}-${input.counts.total}`,
-    closeDisposition: fpEvaluateCloseDisposition(input.status),
+    closeDisposition,
     residualPressureRefs,
-    continuationRefs: Object.freeze([
-      `continuation://odd-sdlc/${runRef}/evaluate.C/${input.status}`
-    ]),
+    continuationRefs,
     evidenceRefs: input.postflight.evidenceRefs,
     authorityRefs: uniqueSorted([
       input.workerReportProjectionRef,
