@@ -540,6 +540,11 @@ test("T-184 F_P evaluator prompt uses incremental content ledger writes", () => 
     evaluatorPromptSource,
     /Never publish all required sections with empty\/null placeholders/u
   );
+  assert.match(evaluatorPromptSource, /component\/file-target checkpoint Write/u);
+  assert.match(
+    evaluatorPromptSource,
+    /fileTargetRows plus matching componentTopologyRows and componentRealizationRows/u
+  );
   assert.match(evaluatorPromptSource, /First-update carrier helper contract/u);
   assert.match(evaluatorPromptSource, /same-path temp-then-rename publication/u);
   assert.match(evaluatorPromptSource, /named carrier-helper contract only/u);

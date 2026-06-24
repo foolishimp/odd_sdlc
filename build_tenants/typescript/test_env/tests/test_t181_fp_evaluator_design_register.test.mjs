@@ -2747,6 +2747,8 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
 	  assert.match(evaluatorPromptSource, /Second tool action: write the exact first-update JSON packet/u);
 	  assert.match(evaluatorPromptSource, /Third tool action: write the exact second-update JSON packet/u);
 	  assert.match(evaluatorPromptSource, /Fourth tool action: read bounded authority and write at least one non-empty semantic section/u);
+	  assert.match(evaluatorPromptSource, /component\/file-target checkpoint Write/u);
+	  assert.match(evaluatorPromptSource, /fileTargetRows plus matching componentTopologyRows and componentRealizationRows/u);
 	  assert.match(evaluatorPromptSource, /read-before-write policy/u);
 	  assert.match(evaluatorPromptSource, /First-update JSON packet/u);
 	  assert.match(evaluatorPromptSource, /Second-update JSON packet/u);
@@ -2801,6 +2803,7 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(evaluatorPromptSource, /First-update carrier helper contract/u);
   assert.match(evaluatorPromptSource, /DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_REF/u);
   assert.match(evaluatorPromptSource, /Bounded first-pass register target/u);
+  assert.match(evaluatorPromptSource, /first post-evidence checkpoint must write fileTargetRows, componentTopologyRows, and componentRealizationRows/u);
   assert.match(evaluatorPromptSource, /It is acceptable to rewrite the content ledger multiple times while converging/u);
   assert.match(evaluatorPromptSource, /Stdout is an agent work trace, not evaluation truth/u);
   assert.match(evaluatorPromptSource, /compressed work-category governance/u);
