@@ -2749,12 +2749,13 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(evaluatorPromptSource, /Do not run any bounded-summary action before the first evaluator update/u);
 	  assert.match(evaluatorPromptSource, /First tool action: Read only the existing draft content ledger/u);
 	  assert.match(evaluatorPromptSource, /Second tool action: write the exact first-update JSON packet/u);
-	  assert.match(evaluatorPromptSource, /Third tool action: write a component\/file-target semantic checkpoint/u);
+	  assert.match(evaluatorPromptSource, /Third tool action: write the exact minimum semantic checkpoint JSON packet/u);
 	  assert.match(evaluatorPromptSource, /Fourth tool action: only after that semantic checkpoint exists/u);
 	  assert.match(evaluatorPromptSource, /component\/file-target checkpoint Write/u);
 	  assert.match(evaluatorPromptSource, /fileTargetRows plus matching componentTopologyRows and componentRealizationRows/u);
 	  assert.match(evaluatorPromptSource, /read-before-write policy/u);
 	  assert.match(evaluatorPromptSource, /First-update JSON packet/u);
+	  assert.match(evaluatorPromptSource, /Minimum semantic checkpoint JSON packet/u);
 	  assert.doesNotMatch(evaluatorPromptSource, /Second-update JSON packet/u);
 	  assert.match(evaluatorPromptSource, /Never publish all required sections with empty\/null placeholders/u);
 	  assert.doesNotMatch(evaluatorPromptSource, /Full partial checkpoint JSON packet/u);
@@ -2779,12 +2780,12 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.doesNotMatch(evaluatorPromptSource, /node --input-type=module/u);
   assert.doesNotMatch(evaluatorPromptSource, /await rename\(tmp, file\)/u);
   assert.doesNotMatch(evaluatorPromptSource, /tableRows|sectionText/u);
-  assert.match(evaluatorPromptSource, /no framework-authored recipe for deriving register rows/u);
+  assert.match(evaluatorPromptSource, /no framework-authored recipe for deriving the full register/u);
   assert.match(evaluatorPromptSource, /The row value is your selected evaluate\.C\/F_P judgment/u);
-  assert.match(evaluatorPromptSource, /F_D does not construct semantic register rows/u);
+  assert.match(evaluatorPromptSource, /F_P owns accepting, correcting, and refining it into final section values/u);
   assert.match(evaluatorPromptSource, /mandatory bounded target-path reconciliation pass/u);
   assert.match(evaluatorPromptSource, /If those sources name exact product paths, the final register must preserve those exact paths/u);
-  assert.match(evaluatorPromptSource, /Do not deterministically construct later semantic register rows/u);
+  assert.match(evaluatorPromptSource, /Do not deterministically construct final semantic register rows/u);
   assert.match(evaluatorPromptSource, /Do not spend the run enumerating every requirement id before writing the register/u);
   assert.match(evaluatorPromptSource, /Draft-row timeout is worse than an admitted pressure map/u);
   assert.match(

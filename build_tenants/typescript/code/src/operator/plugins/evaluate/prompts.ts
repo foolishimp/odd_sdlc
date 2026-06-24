@@ -97,10 +97,8 @@ interface EvaluatePromptLineGroups {
 
 const DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF =
   "prompt://odd-sdlc/design-depth/first-update-partial-verdict" as const;
-const DESIGN_DEPTH_FIRST_UPDATE_VERDICT_SEQUENCE =
-  SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.findIndex(
-    (section) => section === "designCompletenessVerdict"
-  ) + 1;
+const DESIGN_DEPTH_MINIMUM_SEMANTIC_CHECKPOINT_PACKET_REF =
+  "prompt://odd-sdlc/design-depth/minimum-semantic-checkpoint" as const;
 
 function designDepthFirstUpdateAxisVerdict(axis: "entity" | "attribute" | "flow") {
   return Object.freeze({
@@ -124,60 +122,374 @@ function designDepthFirstUpdateVerdict(): unknown {
   });
 }
 
-function designDepthFirstUpdatePacket(input: {
+interface DesignDepthPromptPacketInput {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly governanceRef: string;
   readonly selectedCompositionRef: string;
   readonly selectedCompositionDigest: string;
   readonly selectedCompositionSelectionRef: string;
   readonly selectedRegimeBindingRef: string | null;
-}): string {
+  readonly implementationDesignArtifactSummaryLines?: readonly string[] | undefined;
+}
+
+function designDepthFragmentSequence(
+  section: (typeof SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS)[number]
+): number {
+  return SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.findIndex(
+    (candidate) => candidate === section
+  ) + 1;
+}
+
+function designDepthFragmentContentRow(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly section: (typeof SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS)[number];
+  readonly value: unknown;
+  readonly sourceBasisRefs: readonly string[];
+  readonly evidenceRefs: readonly string[];
+}): unknown {
+  return Object.freeze({
+    kind: "sdlc_evaluate_content_ledger_row" as const,
+    rowRef: `content-ledger-row://odd-sdlc/design-depth/${input.section}`,
+    authorityFunction: "synthesize_model" as const,
+    carrierFamily: "ProductAssetModel" as const,
+    contentKind: SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND,
+    payload: Object.freeze({
+      kind: "sdlc_design_depth_register_fragment" as const,
+      fragmentVersion: "ts-design-depth-fragment-v1" as const,
+      targetAssetType: input.manifest.targetAssetType,
+      section: input.section,
+      sequence: designDepthFragmentSequence(input.section),
+      mergeMode: "replace" as const,
+      value: input.value
+    }),
+    sourceBasisRefs: input.sourceBasisRefs,
+    evidenceRefs: input.evidenceRefs
+  });
+}
+
+function designDepthFirstUpdateContentRow(
+  input: DesignDepthPromptPacketInput
+): unknown {
+  return designDepthFragmentContentRow({
+    manifest: input.manifest,
+    section: "designCompletenessVerdict",
+    value: designDepthFirstUpdateVerdict(),
+    sourceBasisRefs: Object.freeze([
+      DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF,
+      input.governanceRef
+    ]),
+    evidenceRefs: Object.freeze([DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF])
+  });
+}
+
+function designDepthEvaluateContentLedger(input: {
+  readonly packetInput: DesignDepthPromptPacketInput;
+  readonly sourceBasisRefs: readonly string[];
+  readonly evidenceRefs: readonly string[];
+  readonly contentRows: readonly unknown[];
+}): unknown {
+  return Object.freeze({
+    kind: "sdlc_evaluate_content_ledger" as const,
+    ledgerVersion: "ts-evaluate-content-ledger-v1" as const,
+    stage: "evaluate.C" as const,
+    ruleRef: DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
+    ruleRole: "semantic_judgment" as const,
+    computeMeans: "F_P" as const,
+    authorityFunction: "synthesize_model" as const,
+    selectedCompositionRef: input.packetInput.selectedCompositionRef,
+    selectedCompositionDigest: input.packetInput.selectedCompositionDigest,
+    selectedCompositionSelectionRef:
+      input.packetInput.selectedCompositionSelectionRef,
+    selectedRegimeBindingRef: input.packetInput.selectedRegimeBindingRef,
+    compositionContributionRef:
+      input.packetInput.selectedRegimeBindingRef ??
+      input.packetInput.selectedCompositionRef,
+    sourceBasisRefs: input.sourceBasisRefs,
+    candidateArtifactRefs: Object.freeze([input.packetInput.manifest.outputFile]),
+    evidenceRefs: input.evidenceRefs,
+    contentRows: input.contentRows
+  });
+}
+
+function designDepthFirstUpdatePacket(
+  input: DesignDepthPromptPacketInput
+): string {
   return `${JSON.stringify(
-    {
-      kind: "sdlc_evaluate_content_ledger",
-      ledgerVersion: "ts-evaluate-content-ledger-v1",
-      stage: "evaluate.C",
-      ruleRef: DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
-      ruleRole: "semantic_judgment",
-      computeMeans: "F_P",
-      authorityFunction: "synthesize_model",
-      selectedCompositionRef: input.selectedCompositionRef,
-      selectedCompositionDigest: input.selectedCompositionDigest,
-      selectedCompositionSelectionRef: input.selectedCompositionSelectionRef,
-      selectedRegimeBindingRef: input.selectedRegimeBindingRef,
-      compositionContributionRef:
-        input.selectedRegimeBindingRef ?? input.selectedCompositionRef,
-      sourceBasisRefs: [
+    designDepthEvaluateContentLedger({
+      packetInput: input,
+      sourceBasisRefs: Object.freeze([
         DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF,
         input.governanceRef
-      ],
-      candidateArtifactRefs: [input.manifest.outputFile],
-      evidenceRefs: [DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF],
-      contentRows: [
-        {
-          kind: "sdlc_evaluate_content_ledger_row",
-          rowRef:
-            "content-ledger-row://odd-sdlc/design-depth/designCompletenessVerdict",
-          authorityFunction: "synthesize_model",
-          carrierFamily: "ProductAssetModel",
-          contentKind: SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND,
-          payload: {
-            kind: "sdlc_design_depth_register_fragment",
-            fragmentVersion: "ts-design-depth-fragment-v1",
-            targetAssetType: input.manifest.targetAssetType,
-            section: "designCompletenessVerdict",
-            sequence: DESIGN_DEPTH_FIRST_UPDATE_VERDICT_SEQUENCE,
-            mergeMode: "replace",
-            value: designDepthFirstUpdateVerdict()
-          },
-          sourceBasisRefs: [
-            DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF,
-            input.governanceRef
-          ],
-          evidenceRefs: [DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF]
+      ]),
+      evidenceRefs: Object.freeze([DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF]),
+      contentRows: Object.freeze([designDepthFirstUpdateContentRow(input)])
+    }),
+    null,
+    2
+  )}\n`;
+}
+
+interface DesignDepthSourceTargetSummary {
+  readonly relativePath: string;
+  readonly moduleName: string;
+}
+
+interface DesignDepthComponentSummary {
+  readonly componentName: string;
+  readonly moduleName: string;
+  readonly relativePath: string;
+  readonly publicBoundary: string;
+  readonly concernRole: string;
+}
+
+function summaryLineValue(
+  lines: readonly string[] | undefined,
+  prefix: string
+): string | null {
+  const line = lines?.find((candidate) => candidate.startsWith(prefix));
+  return line === undefined ? null : line.slice(prefix.length).trim();
+}
+
+function stripMarkdownTicks(value: string): string {
+  return value.replace(/`/gu, "").trim();
+}
+
+function sourceArtifactRefForDesignDepthCheckpoint(
+  input: DesignDepthPromptPacketInput
+): string {
+  return (
+    summaryLineValue(input.implementationDesignArtifactSummaryLines, "sourceArtifact=") ??
+    input.manifest.outputFile
+  );
+}
+
+function sourceTargetsForDesignDepthCheckpoint(
+  input: DesignDepthPromptPacketInput
+): readonly DesignDepthSourceTargetSummary[] {
+  const value = summaryLineValue(
+    input.implementationDesignArtifactSummaryLines,
+    "sourceFileTargets="
+  );
+  if (value === null) {
+    return Object.freeze([]);
+  }
+  const [, ...targetEntries] = value.split(";");
+  return Object.freeze(
+    targetEntries
+      .map((entry) => entry.trim())
+      .flatMap((entry) => {
+        const match = /^(.*?)=>(.*)$/u.exec(entry);
+        if (match === null) {
+          return [];
         }
-      ]
-    },
+        const relativePath = stripMarkdownTicks(match[1] ?? "");
+        const moduleName = stripMarkdownTicks(match[2] ?? "");
+        return relativePath.length === 0 || moduleName.length === 0
+          ? []
+          : [Object.freeze({ relativePath, moduleName })];
+      })
+  );
+}
+
+function componentSummariesForDesignDepthCheckpoint(
+  input: DesignDepthPromptPacketInput
+): readonly DesignDepthComponentSummary[] {
+  return Object.freeze(
+    (input.implementationDesignArtifactSummaryLines ?? []).flatMap((line) => {
+      if (!line.startsWith("component=")) {
+        return [];
+      }
+      const fields = new Map<string, string>();
+      for (const field of line.split(";")) {
+        const match = /^([^=]+)=(.*)$/u.exec(field);
+        if (match === null) {
+          continue;
+        }
+        fields.set(
+          (match[1] ?? "").trim(),
+          stripMarkdownTicks(match[2] ?? "")
+        );
+      }
+      const componentName = fields.get("component");
+      const moduleName = fields.get("module");
+      const relativePath = fields.get("path");
+      const publicBoundary = fields.get("publicBoundary");
+      const concernRole = fields.get("concernRole");
+      return componentName === undefined ||
+        moduleName === undefined ||
+        relativePath === undefined ||
+        publicBoundary === undefined ||
+        concernRole === undefined
+        ? []
+        : [
+            Object.freeze({
+              componentName,
+              moduleName,
+              relativePath,
+              publicBoundary,
+              concernRole
+            })
+          ];
+    })
+  );
+}
+
+function checkpointRequirementIdsForDesignDepthPrompt(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  const requirementRefs = manifestObligationRefs(manifest)
+    .filter((ref) => ref.startsWith("requirement:"))
+    .slice(0, 4);
+  if (requirementRefs.length > 0) {
+    return Object.freeze(requirementRefs);
+  }
+  const fallbackRefs = manifestObligationRefs(manifest).slice(0, 4);
+  return Object.freeze(
+    fallbackRefs.length > 0
+      ? fallbackRefs
+      : [`target_asset:${manifest.targetAssetType}`]
+  );
+}
+
+function designDepthIdentifierToken(value: string, fallback: string): string {
+  const token = stripMarkdownTicks(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, "_")
+    .replace(/^_+|_+$/gu, "");
+  return token.length === 0 ? fallback : token;
+}
+
+function designDepthConcernRoleFromSummary(
+  summary: DesignDepthComponentSummary | null
+): (typeof SDLC_COMPONENT_CONCERN_ROLES)[number] {
+  const text = `${summary?.componentName ?? ""} ${summary?.publicBoundary ?? ""} ${summary?.concernRole ?? ""}`.toLowerCase();
+  if (/error|exception|failure/u.test(text)) {
+    return "error_model";
+  }
+  if (/report|ledger|account/u.test(text)) {
+    return "reporting";
+  }
+  if (/valid|check|guard|proof|prover|assurance/u.test(text)) {
+    return "validator";
+  }
+  if (/parse|compile|path/u.test(text)) {
+    return "parser";
+  }
+  if (/domain|model|entity|type|graph|schema/u.test(text)) {
+    return "domain_model";
+  }
+  if (/map|mapping|morphism/u.test(text)) {
+    return "mapper";
+  }
+  if (/io|adapter|executor|runtime|read|write/u.test(text)) {
+    return "io_adapter";
+  }
+  return "other";
+}
+
+function designDepthMinimumSemanticCheckpointPacket(
+  input: DesignDepthPromptPacketInput
+): string {
+  const sourceArtifactRef = sourceArtifactRefForDesignDepthCheckpoint(input);
+  const sourceTarget =
+    sourceTargetsForDesignDepthCheckpoint(input)[0] ??
+    Object.freeze({
+      relativePath: input.manifest.outputFile,
+      moduleName: stableRefSegment(input.manifest.graphFunctionName, "module")
+    });
+  const componentSummary =
+    componentSummariesForDesignDepthCheckpoint(input).find(
+      (summary) => summary.moduleName === sourceTarget.moduleName
+    ) ??
+    componentSummariesForDesignDepthCheckpoint(input)[0] ??
+    null;
+  const componentName =
+    componentSummary?.componentName ?? `${sourceTarget.moduleName} source boundary`;
+  const moduleToken = designDepthIdentifierToken(sourceTarget.moduleName, "module");
+  const componentToken = designDepthIdentifierToken(componentName, "component");
+  const componentId = `cmp.${moduleToken}.${componentToken}`;
+  const publicBoundary =
+    componentSummary === null
+      ? `${sourceTarget.moduleName} source boundary`
+      : `${componentSummary.componentName}: ${componentSummary.publicBoundary}`;
+  const requirementIds = checkpointRequirementIdsForDesignDepthPrompt(
+    input.manifest
+  );
+  const sourceAssetRefs = Object.freeze([sourceArtifactRef]);
+  const checkpointBasisRefs = Object.freeze([
+    DESIGN_DEPTH_MINIMUM_SEMANTIC_CHECKPOINT_PACKET_REF,
+    input.governanceRef,
+    sourceArtifactRef
+  ]);
+  const checkpointEvidenceRefs = Object.freeze([
+    DESIGN_DEPTH_MINIMUM_SEMANTIC_CHECKPOINT_PACKET_REF,
+    sourceArtifactRef
+  ]);
+  return `${JSON.stringify(
+    designDepthEvaluateContentLedger({
+      packetInput: input,
+      sourceBasisRefs: Object.freeze([
+        DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF,
+        DESIGN_DEPTH_MINIMUM_SEMANTIC_CHECKPOINT_PACKET_REF,
+        input.governanceRef,
+        sourceArtifactRef
+      ]),
+      evidenceRefs: checkpointEvidenceRefs,
+      contentRows: Object.freeze([
+        designDepthFirstUpdateContentRow(input),
+        designDepthFragmentContentRow({
+          manifest: input.manifest,
+          section: "fileTargetRows",
+          value: Object.freeze([
+            Object.freeze({
+              kind: "sdlc_file_target_row" as const,
+              relativePath: sourceTarget.relativePath,
+              role: "source" as const
+            })
+          ]),
+          sourceBasisRefs: checkpointBasisRefs,
+          evidenceRefs: checkpointEvidenceRefs
+        }),
+        designDepthFragmentContentRow({
+          manifest: input.manifest,
+          section: "componentTopologyRows",
+          value: Object.freeze([
+            Object.freeze({
+              kind: "sdlc_component_topology_row" as const,
+              componentId,
+              moduleName: sourceTarget.moduleName,
+              relativePath: sourceTarget.relativePath,
+              publicBoundary,
+              concernRole: designDepthConcernRoleFromSummary(componentSummary),
+              requirementIds,
+              sourceAssetRefs
+            })
+          ]),
+          sourceBasisRefs: checkpointBasisRefs,
+          evidenceRefs: checkpointEvidenceRefs
+        }),
+        designDepthFragmentContentRow({
+          manifest: input.manifest,
+          section: "componentRealizationRows",
+          value: Object.freeze([
+            Object.freeze({
+              kind: "sdlc_component_realization_row" as const,
+              componentId,
+              moduleName: sourceTarget.moduleName,
+              relativePath: sourceTarget.relativePath,
+              publicBoundary,
+              trancheId: "1",
+              firstProductFileToChange: sourceTarget.relativePath,
+              upstreamComponentIds: Object.freeze([]),
+              requirementIds,
+              sourceAssetRefs
+            })
+          ]),
+          sourceBasisRefs: checkpointBasisRefs,
+          evidenceRefs: checkpointEvidenceRefs
+        })
+      ])
+    }),
     null,
     2
   )}\n`;
@@ -1032,7 +1344,8 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
 	      "- First tool action: Read only the existing draft content ledger path above with limit <=80. This satisfies the worker tool's read-before-write policy and is not authority inspection.",
 	      "- Second tool action: write the exact first-update JSON packet below to the durable evaluation artifact path.",
 	      "- The packet contains one non-draft designCompletenessVerdict fragment with partial axes. It is a typed first progress carrier, not final design truth.",
-	      "- Third tool action: write a component/file-target semantic checkpoint to the same durable evaluation artifact path using the precomputed ADR implementation-design evidence summary below. If the Write tool requires a fresh read-after-write check, Read only the content ledger with limit <=80, then immediately Write this semantic checkpoint.",
+	      "- Third tool action: write the exact minimum semantic checkpoint JSON packet below to the same durable evaluation artifact path. If the Write tool requires a fresh read-after-write check, Read only the content ledger with limit <=80, then immediately Write this semantic checkpoint packet.",
+	      "- The minimum semantic checkpoint JSON packet is derived from the precomputed ADR implementation-design evidence summary below and preserves only the required liveness row set.",
 	      "- Minimum semantic checkpoint: preserve the first designCompletenessVerdict row and add one source file target plus one matching componentTopologyRows row and one matching componentRealizationRows row from the precomputed ADR summary, ADR Product File Targets table, or higher accepted source authority.",
 	      "- Minimum checkpoint row set: exactly designCompletenessVerdict, fileTargetRows, componentTopologyRows, and componentRealizationRows. Do not include stackProfileRows or implementationModuleRows in the minimum checkpoint.",
 	      "- Prefer the first sourceFileTargets entry and the first matching component summary row. Do not wait to enumerate every component/module before this checkpoint; it is progress, not final design truth.",
@@ -1051,6 +1364,10 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
 	      "```json",
 	      designDepthFirstUpdatePacket(input).trimEnd(),
 	      "```",
+	      "Minimum semantic checkpoint JSON packet:",
+	      "```json",
+	      designDepthMinimumSemanticCheckpointPacket(input).trimEnd(),
+	      "```",
       "Tenant tool boundary:",
       ...tenantToolBoundaryPromptLines(input.tenantToolEnvironment),
       "- Read boundary: use only workspace-relative paths or explicit workspace/run-archive paths named in this prompt; do not read/cite/copy sibling sandboxes, historical test_runs, home memory, /tmp, or outside-workspace absolute paths.",
@@ -1062,7 +1379,7 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
 	      "Tool order:",
 	    `1. first Read only the existing draft content ledger with limit <=80: ${input.contentRegisterPath}.`,
 	    `2. then Write the exact first-update JSON packet above to ${input.contentRegisterPath}.`,
-	    `3. then Write the minimum semantic checkpoint to ${input.contentRegisterPath} from the precomputed ADR implementation-design evidence summary below; if the Write tool requires a fresh read-after-write check, Read only ${input.contentRegisterPath} with limit <=80 before this Write.`,
+	    `3. then Write the exact minimum semantic checkpoint JSON packet above to ${input.contentRegisterPath}; if the Write tool requires a fresh read-after-write check, Read only ${input.contentRegisterPath} with limit <=80 before this Write.`,
 	    `4. after the component/file-target semantic checkpoint succeeds, read compressed work-category governance as needed (${input.governanceRef}): ${input.governancePath}`,
 	    "5. re-open the content ledger only after the semantic checkpoint when you need to refine it.",
 	    `6. after the semantic checkpoint succeeds, inspect the construction brief as needed: ${input.constructionBriefPath}`,
@@ -1088,7 +1405,7 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
     "- Do not say you are writing the register until that file write has succeeded.",
     `- First-update carrier helper contract: ${DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_REF} (${DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_PATH}).`,
     "- The helper contract is authority-neutral carrier mechanics: same-path temp-then-rename publication, selected composition preservation, non-draft fragment envelope construction, and compact row counts only. It emits no semantic section values.",
-    "- Bounded local automation may support summarization, JSON validation, and that named carrier-helper contract only. Do not deterministically construct later semantic register rows from framework rules.",
+    "- Bounded local automation may support summarization, JSON validation, the named carrier-helper contract, and the prompt-embedded minimum checkpoint packet only. Do not deterministically construct final semantic register rows from framework rules.",
     "",
     "First register materialization rule:",
     "- The first Write publishes the selected evaluate.C/F_P partial designCompletenessVerdict carrier.",
@@ -1129,8 +1446,8 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
     "- Time budget is part of correctness: update the draft content ledger before doing deep exploratory review.",
     "- Write the first evaluator update before any construction-brief inspection, ADR reading, worker-report inspection, source-authority lookup, or deep exploratory action. The only allowed prior Read is the existing draft content ledger slot.",
     `- First evaluator update: publish one semantic "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND}" designCompletenessVerdict row with partial axes. The row value is your selected evaluate.C/F_P judgment that evidence review is still required; do not emit null inside required scalar fields.`,
-    "- There is no framework-authored recipe for deriving register rows from authority: do not parse ADR tables by a fixed procedure, read the authority a section needs and decide that section content yourself.",
-    "- The first update must satisfy the named helper contract or an equivalent implementation. F_D seeds the draft scaffolding and admits/projects fragment rows; F_D does not construct semantic register rows for you.",
+    "- There is no framework-authored recipe for deriving the full register from authority: do not parse ADR tables by a fixed procedure for final sections; read the authority a section needs and decide that section content yourself.",
+    "- The first update must satisfy the named helper contract or an equivalent implementation. The minimum checkpoint packet is a bounded liveness candidate from admitted summary facts; F_P owns accepting, correcting, and refining it into final section values. F_D seeds draft scaffolding, packages evidence summaries, and admits/projects fragment rows; F_D does not own final semantic register judgment.",
     "- Then iterate by editing the content ledger file in place: inspect only the authority needed for a specific missing/partial section, add or replace the corresponding section row, then validate the file.",
     "- The next tool action after any post-first-update ADR or authority inspection must write the corresponding section row. Do not collect multiple large sections before writing.",
     "- A valid progress write may be intentionally partial or blocked, but it must replace the target section row with explicit value, evidenceRefs, and reasons instead of leaving the run in hidden synthesis.",

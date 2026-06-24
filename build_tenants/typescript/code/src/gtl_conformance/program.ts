@@ -1352,12 +1352,16 @@ function reviewRenderedPromptProjection(input: {
       "Progress-timeout protection:",
       "component/file-target semantic checkpoint",
       "Minimum semantic checkpoint:",
+      "Minimum semantic checkpoint JSON packet:",
       "one source file target plus one matching componentTopologyRows row",
       "Do not include stackProfileRows or implementationModuleRows in the minimum checkpoint",
       "Do not wait to enumerate every component/module before this checkpoint",
       "Precomputed ADR implementation-design evidence summary:",
       "The next progress checkpoint after the first update is the component/file-target semantic checkpoint",
-      "do not write a plan or checklist"
+      "do not write a plan or checklist",
+      '"section": "fileTargetRows"',
+      '"section": "componentTopologyRows"',
+      '"section": "componentRealizationRows"'
     ]) {
       if (!input.promptText.includes(required)) {
         issues.push({

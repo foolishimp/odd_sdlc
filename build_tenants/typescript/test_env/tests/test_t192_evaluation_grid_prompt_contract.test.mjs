@@ -305,7 +305,35 @@ test("T-192 broad design-depth prompt front-loads first update and summarizes gr
 	  );
 	  assert.match(
 	    projection.promptText,
+	    /Minimum semantic checkpoint JSON packet:/u
+	  );
+	  assert.match(
+	    projection.promptText,
 	    /one source file target plus one matching componentTopologyRows row/u
+	  );
+	  assert.match(
+	    projection.promptText,
+	    /"section": "fileTargetRows"/u
+	  );
+	  assert.match(
+	    projection.promptText,
+	    /"section": "componentTopologyRows"/u
+	  );
+	  assert.match(
+	    projection.promptText,
+	    /"section": "componentRealizationRows"/u
+	  );
+	  assert.match(
+	    projection.promptText,
+	    /"kind": "sdlc_file_target_row"/u
+	  );
+	  assert.match(
+	    projection.promptText,
+	    /"kind": "sdlc_component_topology_row"/u
+	  );
+	  assert.match(
+	    projection.promptText,
+	    /"kind": "sdlc_component_realization_row"/u
 	  );
 	  assert.match(
 	    projection.promptText,
