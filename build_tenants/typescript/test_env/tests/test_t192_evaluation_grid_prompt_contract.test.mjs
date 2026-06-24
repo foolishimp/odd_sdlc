@@ -426,7 +426,7 @@ test("T-192 broad design-depth prompt front-loads first update and summarizes gr
 	  );
 	});
 
-test("T-192 design-depth minimum checkpoint packet is admitted and projectable", () => {
+test("T-192 design-depth minimum checkpoint packet is admitted but not closeable", () => {
   const projection = designDepthProjection();
   const checkpoint = extractMinimumSemanticCheckpointPacket(projection.promptText);
   assert(JSON.stringify(checkpoint).length < 12500);
@@ -464,24 +464,15 @@ test("T-192 design-depth minimum checkpoint packet is admitted and projectable",
     assert.notEqual(admission.register, null);
     assert.equal(admission.register.contentRows.length, 12);
 
-    writeDesignDepthRegisterProjectionFromEvaluateContentRegister({
-      register: admission.register,
-      archiveRoot: workspaceRoot,
-      registerPath
-    });
-    const projected = JSON.parse(readFileSync(registerPath, "utf8"));
-
-    assert.equal(projected.stackProfileRows.length, 1);
-    assert.equal(projected.implementationModuleRows.length, 1);
-    assert.equal(projected.fileTargetRows.length, 1);
-    assert.equal(projected.componentTopologyRows.length, 1);
-    assert.equal(projected.componentRealizationRows.length, 1);
-    assert.equal(projected.aggregateDomainModelRows.length, 0);
-    assert.equal(projected.moduleSchemaFragments.length, 0);
-    assert.equal(projected.moduleStateDiagramFragments.length, 0);
-    assert.equal(projected.aggregateDomainModel.entities.length, 0);
-    assert.equal(projected.sunnyDaySequenceRows.length, 0);
-    assert.equal(projected.aggregateSunnyDaySequence.steps.length, 0);
+    assert.throws(
+      () =>
+        writeDesignDepthRegisterProjectionFromEvaluateContentRegister({
+          register: admission.register,
+          archiveRoot: workspaceRoot,
+          registerPath
+        }),
+      /moduleSchemaFragments.*aggregateDomainModel\.entities.*aggregateSunnyDaySequence\.steps.*designCompletenessVerdict\.entity\.satisfied/u
+    );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
   }

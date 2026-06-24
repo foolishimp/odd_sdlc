@@ -13,7 +13,10 @@ import { pathToFileURL } from "node:url";
 import type { EnginePluginInput, RuntimeRegime } from "@abiogenesis/typescript-tenant";
 import { uniqueLocaleSorted as uniqueSorted } from "../../../shared/collections.js";
 import type { SdlcDesignDepthRegister } from "../../carriers.js";
-import { parseDesignDepthRegisterPayload } from "../../design_depth_register.js";
+import {
+  assertDesignDepthRegisterSemanticFloor,
+  parseDesignDepthRegisterPayload
+} from "../../design_depth_register.js";
 import { writeSdlcSystemArtifact } from "../../system_artifacts.js";
 
 export const SDLC_EVALUATE_AUTHORITY_FUNCTIONS = Object.freeze([
@@ -998,7 +1001,7 @@ function designDepthRegisterPayloadFromFragments(
     const payload = parseDesignDepthRegisterPayload(
       normalizeDesignDepthContentRegisterPayload(assembled)
     );
-    assertDesignDepthProjectionSemanticFloor(payload);
+    assertDesignDepthRegisterSemanticFloor(payload);
     return payload;
   } catch (error) {
     throw new TypeError(
@@ -1023,40 +1026,11 @@ export function designDepthRegisterPayloadFromEvaluateContentRegister(
     const payload = parseDesignDepthRegisterPayload(
       normalizeDesignDepthContentRegisterPayload(row.payload)
     );
-    assertDesignDepthProjectionSemanticFloor(payload);
+    assertDesignDepthRegisterSemanticFloor(payload);
     return payload;
   } catch (error) {
     throw new TypeError(
       `evaluate_content_ledger_design_depth_payload_invalid:${error instanceof Error ? error.message : "unknown"}`
-    );
-  }
-}
-
-function assertDesignDepthProjectionSemanticFloor(
-  register: SdlcDesignDepthRegister
-): void {
-  if (register.targetAssetType !== "implementation_design_surface") {
-    return;
-  }
-  const missing: string[] = [];
-  if (register.stackProfileRows.length === 0) {
-    missing.push("stackProfileRows");
-  }
-  if (register.implementationModuleRows.length === 0) {
-    missing.push("implementationModuleRows");
-  }
-  if (register.componentTopologyRows.length === 0) {
-    missing.push("componentTopologyRows");
-  }
-  if (register.componentRealizationRows.length === 0) {
-    missing.push("componentRealizationRows");
-  }
-  if (register.fileTargetRows.length === 0) {
-    missing.push("fileTargetRows");
-  }
-  if (missing.length > 0) {
-    throw new TypeError(
-      `implementation_design_surface semantic floor missing: ${missing.join(",")}`
     );
   }
 }

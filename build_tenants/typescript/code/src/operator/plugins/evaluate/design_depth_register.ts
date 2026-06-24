@@ -600,7 +600,8 @@ function admitSingleImplementationDesignRegisterPath(input: {
     targetAssetType: "implementation_design_surface",
     outputFile: input.evaluatorRegisterPath,
     archiveRoot: input.manifest.archiveRoot,
-    requireSourceFileTargets: true
+    requireSourceFileTargets: true,
+    requireSemanticFloor: true
   });
   return admission.status === "admitted"
     ? Object.freeze({
@@ -621,7 +622,8 @@ export function admitDesignDepthFpEvaluatorRegisterArtifact(input: {
     targetAssetType: "implementation_design_surface",
     outputFile: input.registerPath,
     archiveRoot: input.archiveRoot ?? null,
-    requireSourceFileTargets: true
+    requireSourceFileTargets: true,
+    requireSemanticFloor: true
   });
   if (admission.status !== "admitted") {
     return admission;

@@ -640,6 +640,85 @@ export function parseDesignDepthRegisterPayload(
   return parseRegister(input, "design_depth_register");
 }
 
+export function assertDesignDepthRegisterSemanticFloor(
+  register: SdlcDesignDepthRegister
+): void {
+  if (register.targetAssetType !== "implementation_design_surface") {
+    return;
+  }
+  const missing: string[] = [];
+  if (register.stackProfileRows.length === 0) {
+    missing.push("stackProfileRows");
+  }
+  if (register.implementationModuleRows.length === 0) {
+    missing.push("implementationModuleRows");
+  }
+  if (register.componentTopologyRows.length === 0) {
+    missing.push("componentTopologyRows");
+  }
+  if (register.componentRealizationRows.length === 0) {
+    missing.push("componentRealizationRows");
+  }
+  if (register.fileTargetRows.length === 0) {
+    missing.push("fileTargetRows");
+  }
+  if (register.moduleSchemaFragments.length === 0) {
+    missing.push("moduleSchemaFragments");
+  }
+  if (
+    register.moduleSchemaFragments.flatMap((fragment) => fragment.entities)
+      .length === 0
+  ) {
+    missing.push("moduleSchemaFragments.entities");
+  }
+  if (
+    register.moduleSchemaFragments
+      .flatMap((fragment) => fragment.entities)
+      .flatMap((entity) => entity.attributes).length === 0
+  ) {
+    missing.push("moduleSchemaFragments.entities.attributes");
+  }
+  if (
+    register.moduleSchemaFragments.flatMap((fragment) => fragment.operations)
+      .length === 0
+  ) {
+    missing.push("moduleSchemaFragments.operations");
+  }
+  if (register.moduleStateDiagramFragments.length === 0) {
+    missing.push("moduleStateDiagramFragments");
+  }
+  if (register.aggregateDomainModel === null) {
+    missing.push("aggregateDomainModel");
+  } else {
+    if (register.aggregateDomainModel.entities.length === 0) {
+      missing.push("aggregateDomainModel.entities");
+    }
+    if (register.aggregateDomainModel.operations.length === 0) {
+      missing.push("aggregateDomainModel.operations");
+    }
+  }
+  if (register.aggregateSunnyDaySequence === null) {
+    missing.push("aggregateSunnyDaySequence");
+  } else if (register.aggregateSunnyDaySequence.steps.length === 0) {
+    missing.push("aggregateSunnyDaySequence.steps");
+  }
+  const verdict = register.designCompletenessVerdict;
+  if (verdict === null) {
+    missing.push("designCompletenessVerdict");
+  } else {
+    for (const axis of ["entity", "attribute", "flow"] as const) {
+      if (verdict[axis].status !== "satisfied") {
+        missing.push(`designCompletenessVerdict.${axis}.satisfied`);
+      }
+    }
+  }
+  if (missing.length > 0) {
+    throw new TypeError(
+      `implementation_design_surface semantic floor missing: ${missing.join(",")}`
+    );
+  }
+}
+
 function objectRecord(input: unknown): Record<string, unknown> | null {
   return mutableRecord(input);
 }
@@ -724,6 +803,7 @@ export function admitDesignDepthRegisterFromArtifact(input: {
   readonly outputFile: string;
   readonly archiveRoot?: string | null;
   readonly requireSourceFileTargets?: boolean | undefined;
+  readonly requireSemanticFloor?: boolean | undefined;
 }): SdlcDesignDepthRegisterAdmission {
   const evidenceRefs = Object.freeze([pathToFileURL(input.outputFile).href]);
   if (!isDesignDepthTarget(input.targetAssetType)) {
@@ -808,6 +888,9 @@ export function admitDesignDepthRegisterFromArtifact(input: {
       if (register.targetAssetType !== input.targetAssetType) {
         errors.push(`design_depth_register_target_mismatch:${register.targetAssetType}`);
         continue;
+      }
+      if (input.requireSemanticFloor === true) {
+        assertDesignDepthRegisterSemanticFloor(register);
       }
       return Object.freeze({
         kind: "sdlc_design_depth_register_admission" as const,

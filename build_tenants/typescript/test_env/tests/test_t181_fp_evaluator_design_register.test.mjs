@@ -353,6 +353,33 @@ function implementationDesignAdr(componentId) {
 }
 
 function implementationDesignRegister(componentId, evidenceRef) {
+  const requirementId = "REQ-T181-001";
+  const entityId = `entity:${componentId}.output`;
+  const attributeId = `attr:${componentId}.output.stdout`;
+  const operationId = `operation:${componentId}.emit`;
+  const axis = (axisName) => ({
+    kind: "sdlc_design_completeness_axis_verdict",
+    axis: axisName,
+    status: "satisfied",
+    reasons: [`${axisName} axis is satisfied by the fixture implementation design`],
+    evidenceRefs: [evidenceRef]
+  });
+  const attribute = {
+    kind: "sdlc_domain_attribute",
+    attributeId,
+    name: "stdout",
+    valueType: "string",
+    cardinality: "one",
+    invariantRefs: [requirementId]
+  };
+  const operation = {
+    kind: "sdlc_domain_operation",
+    operationId,
+    moduleName: "app",
+    inputEntityIds: [],
+    outputEntityIds: [entityId],
+    requiredAttributeIds: [attributeId]
+  };
   return {
     kind: "sdlc_design_depth_register",
     registerVersion: "ts-design-depth-v1",
@@ -372,12 +399,82 @@ function implementationDesignRegister(componentId, evidenceRef) {
         moduleRef: "module://app"
       }
     ],
-    aggregateDomainModelRows: [],
-    moduleSchemaFragments: [],
-    moduleStateDiagramFragments: [],
-    aggregateDomainModel: null,
-    sunnyDaySequenceRows: [],
-    aggregateSunnyDaySequence: null,
+    aggregateDomainModelRows: [
+      {
+        kind: "sdlc_aggregate_domain_model_row",
+        modelRef: `model://${componentId}/aggregate`
+      }
+    ],
+    moduleSchemaFragments: [
+      {
+        kind: "sdlc_module_schema_fragment",
+        moduleName: "app",
+        entities: [
+          {
+            kind: "sdlc_domain_entity",
+            entityId,
+            moduleName: "app",
+            ownership: "owned",
+            attributes: [attribute],
+            invariants: [`${componentId} output is emitted as stdout`],
+            sourceAssetRefs: [evidenceRef]
+          }
+        ],
+        operations: [operation],
+        requirementIds: [requirementId],
+        sourceAssetRefs: [evidenceRef]
+      }
+    ],
+    moduleStateDiagramFragments: [
+      {
+        kind: "sdlc_module_state_diagram_fragment",
+        moduleName: "app",
+        entityId,
+        stateless: true,
+        states: [],
+        transitions: [],
+        requirementIds: [requirementId],
+        sourceAssetRefs: [evidenceRef]
+      }
+    ],
+    aggregateDomainModel: {
+      kind: "sdlc_aggregate_domain_model",
+      modelVersion: "ts-design-depth-v1",
+      entities: [
+        {
+          kind: "sdlc_aggregate_domain_entity",
+          entityId,
+          ownerModuleName: "app",
+          attributes: [attribute],
+          sourceModuleNames: ["app"]
+        }
+      ],
+      operations: [operation],
+      crossModuleReferences: [],
+      evidenceRefs: [evidenceRef]
+    },
+    sunnyDaySequenceRows: [
+      {
+        kind: "sdlc_sunny_day_sequence_row",
+        sequenceRef: `sequence://${componentId}/emit`
+      }
+    ],
+    aggregateSunnyDaySequence: {
+      kind: "sdlc_aggregate_sunny_day_sequence",
+      sequenceVersion: "ts-design-depth-v1",
+      steps: [
+        {
+          kind: "sdlc_sunny_day_sequence_step",
+          stepId: `step:${componentId}.emit`,
+          moduleName: "app",
+          operationId,
+          inputEntityIds: [],
+          outputEntityIds: [entityId],
+          stateTransitionIds: []
+        }
+      ],
+      evidenceRefs: [evidenceRef]
+    },
     componentTopologyRows: [
       {
         kind: "sdlc_component_topology_row",
@@ -386,7 +483,7 @@ function implementationDesignRegister(componentId, evidenceRef) {
         relativePath: `src/${componentId}.js`,
         publicBoundary: "Emits fixture output",
         concernRole: "other",
-        requirementIds: ["REQ-T181-001"],
+        requirementIds: [requirementId],
         sourceAssetRefs: [evidenceRef]
       }
     ],
@@ -400,7 +497,7 @@ function implementationDesignRegister(componentId, evidenceRef) {
         trancheId: null,
         firstProductFileToChange: `src/${componentId}.js`,
         upstreamComponentIds: [],
-        requirementIds: ["REQ-T181-001"],
+        requirementIds: [requirementId],
         sourceAssetRefs: [evidenceRef]
       }
     ],
@@ -411,7 +508,13 @@ function implementationDesignRegister(componentId, evidenceRef) {
         role: "source"
       }
     ],
-    designCompletenessVerdict: null
+    designCompletenessVerdict: {
+      kind: "sdlc_design_completeness_verdict",
+      verdictVersion: "ts-design-depth-v1",
+      entity: axis("entity"),
+      attribute: axis("attribute"),
+      flow: axis("flow")
+    }
   };
 }
 
@@ -1052,6 +1155,157 @@ test("T-181 design-depth content ledger rejects empty full-section implementatio
           registerPath
         }),
       /implementation_design_surface semantic floor missing: stackProfileRows,implementationModuleRows,componentTopologyRows,componentRealizationRows,fileTargetRows/u
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-204 design-depth content ledger rejects shallow semantic checkpoint", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForImplementationDesign(
+      workspaceRoot,
+      "t204-shallow-semantic-checkpoint"
+    );
+    mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+    writeFileSync(
+      manifest.outputFile,
+      implementationDesignAdr("shallow-semantic-checkpoint-component"),
+      "utf8"
+    );
+    const registerPath = designDepthFpEvaluatorRegisterPath(manifest);
+    const contentRegisterPath = designDepthFpEvaluatorContentRegisterPath({
+      archiveRoot: manifest.archiveRoot
+    });
+    const composition = designDepthGtlSelectedComposition();
+    const evidenceRef = pathToFileURL(manifest.outputFile).href;
+    const register = {
+      ...implementationDesignRegister(
+        "shallow-semantic-checkpoint-component",
+        evidenceRef
+      ),
+      moduleSchemaFragments: [],
+      moduleStateDiagramFragments: [],
+      aggregateDomainModel: {
+        kind: "sdlc_aggregate_domain_model",
+        modelVersion: "ts-design-depth-v1",
+        entities: [],
+        operations: [],
+        crossModuleReferences: [],
+        evidenceRefs: [evidenceRef]
+      },
+      aggregateSunnyDaySequence: {
+        kind: "sdlc_aggregate_sunny_day_sequence",
+        sequenceVersion: "ts-design-depth-v1",
+        steps: [],
+        evidenceRefs: [evidenceRef]
+      },
+      designCompletenessVerdict: {
+        kind: "sdlc_design_completeness_verdict",
+        verdictVersion: "ts-design-depth-v1",
+        entity: {
+          kind: "sdlc_design_completeness_axis_verdict",
+          axis: "entity",
+          status: "partial",
+          reasons: ["First update admitted but entity review is incomplete."],
+          evidenceRefs: [evidenceRef]
+        },
+        attribute: {
+          kind: "sdlc_design_completeness_axis_verdict",
+          axis: "attribute",
+          status: "partial",
+          reasons: ["First update admitted but attribute review is incomplete."],
+          evidenceRefs: [evidenceRef]
+        },
+        flow: {
+          kind: "sdlc_design_completeness_axis_verdict",
+          axis: "flow",
+          status: "partial",
+          reasons: ["First update admitted but flow review is incomplete."],
+          evidenceRefs: [evidenceRef]
+        }
+      }
+    };
+    const sections = [
+      "stackProfileRows",
+      "implementationModuleRows",
+      "aggregateDomainModelRows",
+      "moduleSchemaFragments",
+      "moduleStateDiagramFragments",
+      "aggregateDomainModel",
+      "sunnyDaySequenceRows",
+      "aggregateSunnyDaySequence",
+      "componentTopologyRows",
+      "componentRealizationRows",
+      "fileTargetRows",
+      "designCompletenessVerdict"
+    ];
+    mkdirSync(path.dirname(contentRegisterPath), { recursive: true });
+    writeFileSync(
+      contentRegisterPath,
+      `${JSON.stringify(
+        {
+          kind: "sdlc_evaluate_content_ledger",
+          ledgerVersion: "ts-evaluate-content-ledger-v1",
+          stage: "evaluate.C",
+          ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+          ruleRole: "semantic_judgment",
+          computeMeans: "F_P",
+          authorityFunction: "synthesize_model",
+          selectedCompositionRef: composition.compositionRef,
+          selectedCompositionDigest: composition.compositionDigest,
+          selectedCompositionSelectionRef: composition.compositionSelectionRef,
+          selectedRegimeBindingRef: composition.selectedRegimeBindingRef,
+          compositionContributionRef: composition.selectedRegimeBindingRef,
+          sourceBasisRefs: [evidenceRef],
+          candidateArtifactRefs: [evidenceRef],
+          evidenceRefs: [evidenceRef],
+          contentRows: sections.map((section, index) => ({
+            kind: "sdlc_evaluate_content_ledger_row",
+            rowRef: `content-ledger-row://t204/shallow-semantic/${section}`,
+            authorityFunction: "synthesize_model",
+            carrierFamily: "ProductAssetModel",
+            contentKind: "sdlc_design_depth_register_fragment",
+            payload: {
+              kind: "sdlc_design_depth_register_fragment",
+              fragmentVersion: "ts-design-depth-fragment-v1",
+              targetAssetType: "implementation_design_surface",
+              section,
+              sequence: index + 1,
+              mergeMode: "replace",
+              value: register[section]
+            },
+            sourceBasisRefs: [evidenceRef],
+            evidenceRefs: [evidenceRef]
+          }))
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+
+    const admission = admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity({
+      registerPath: contentRegisterPath,
+      selectedIdentity: {
+        selectedCompositionRef: composition.compositionRef,
+        selectedCompositionDigest: composition.compositionDigest,
+        selectedCompositionSelectionRef: composition.compositionSelectionRef,
+        selectedRegimeBindingRef: composition.selectedRegimeBindingRef
+      },
+      ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+      authorityFunction: "synthesize_model"
+    });
+    assert.equal(admission.status, "admitted");
+    assert.throws(
+      () =>
+        writeDesignDepthRegisterProjectionFromEvaluateContentRegister({
+          register: admission.register,
+          archiveRoot: manifest.archiveRoot,
+          registerPath
+        }),
+      /moduleSchemaFragments.*aggregateDomainModel\.entities.*aggregateSunnyDaySequence\.steps.*designCompletenessVerdict\.entity\.satisfied/u
     );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
