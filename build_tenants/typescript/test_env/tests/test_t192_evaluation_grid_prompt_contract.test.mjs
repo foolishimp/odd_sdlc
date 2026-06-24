@@ -309,6 +309,10 @@ test("T-192 broad design-depth prompt front-loads first update and summarizes gr
 	  );
 	  assert.match(
 	    projection.promptText,
+	    /Do not include stackProfileRows or implementationModuleRows in the minimum checkpoint/u
+	  );
+	  assert.match(
+	    projection.promptText,
 	    /Do not wait to enumerate every component\/module before this checkpoint/u
 	  );
 	  assert.match(
