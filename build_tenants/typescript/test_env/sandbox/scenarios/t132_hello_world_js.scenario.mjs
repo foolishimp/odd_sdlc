@@ -208,7 +208,6 @@ export function t132HelloWorldJsDeepSdlcZoomLiveScenario({
         "derive_test_execution_result_surface"
       ],
       edgeAssuranceArchiveSequencePrefix: T132_HELLO_WORLD_JS_MIN_FP_EDGES,
-      firstStartOverlayRef: "overlay://odd-sdlc/deep-sdlc-traversal",
       firstHandoffOverlayRef: "overlay://odd-sdlc/framework-smoke-min-fp",
       executionEvidence: {
         edgeName: FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
@@ -248,7 +247,7 @@ export function t132HelloWorldJsDeepSdlcZoomLiveScenario({
       ]
     },
     liveWorker: worker,
-    startTarget: "overlay:deep-sdlc-traversal",
+    startTarget: "next",
     startUntil,
     maxAdvances,
     continueOnEdgeConverge: true,

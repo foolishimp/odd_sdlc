@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  admitReviewGradeEdgeFulfillmentAssessmentFromArtifact,
   constructSdlcEvaluationGridContract
 } from "../../build/semantic/code/src/operator/index.js";
 import {
@@ -168,6 +169,19 @@ function extractMinimumSemanticCheckpointPacket(promptText) {
   return JSON.parse(promptText.slice(jsonStart, fenceEnd));
 }
 
+function extractFirstAssessmentCheckpointPacket(promptText) {
+  const marker = "First assessment checkpoint JSON packet:\n";
+  const markerOffset = promptText.indexOf(marker);
+  assert.notEqual(markerOffset, -1);
+  const jsonStart = markerOffset + marker.length;
+  const jsonEnd = promptText.indexOf(
+    "\nWrite this exact JSON packet",
+    jsonStart
+  );
+  assert.notEqual(jsonEnd, -1);
+  return JSON.parse(promptText.slice(jsonStart, jsonEnd));
+}
+
 function reviewGradeProjection() {
   return reviewGradeEdgeFulfillmentPromptProjection({
     manifest: minimalManifest("component_code_surface", {
@@ -221,7 +235,7 @@ test("T-192 evaluation grid rejects global coverage as a local cell", () => {
         "evaluation-finding://odd-sdlc/t192/global-coverage"
       ],
       abgOutcomeFoldRef:
-        "package:@abiogenesis/typescript-tenant@4.1.0-rc.10#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows",
+        "package:@abiogenesis/typescript-tenant@4.1.0-rc.11#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows",
       provenanceRefs: ["REQ-F-ODDSDLC-088"]
     }),
     /not cell dimensions/u
@@ -480,14 +494,17 @@ test("T-192 design-depth minimum checkpoint packet is admitted but not closeable
 
 test("T-192 small admitted handoffs render compact fused-grid prompts", () => {
   const broadReview = reviewGradeProjection();
+  const reviewInvocationScope = invocationScope([
+    "requirement:req_t192_001",
+    "requirement:req_t192_002"
+  ]);
   const compactReview = reviewGradeEdgeFulfillmentPromptProjection({
     manifest: compactManifest("component_code_surface", {
-      productMaterialization: materializationContract(true)
+      productMaterialization: materializationContract(true),
+      featureScope: { mode: "steel_thread" },
+      retryContext: { priorGapDossiers: [] }
     }),
-    invocationScope: invocationScope([
-      "requirement:req_t192_001",
-      "requirement:req_t192_002"
-    ]),
+    invocationScope: reviewInvocationScope,
     governanceRef: "config://test/review-grade",
     governancePath: "config/work-category-governance/coding_build.md",
     constructionBriefPath: "worker_construction_brief.json",
@@ -517,13 +534,95 @@ test("T-192 small admitted handoffs render compact fused-grid prompts", () => {
   });
 
   assert(compactReview.promptText.length < broadReview.promptText.length);
-  assert(compactReview.promptText.length < 24000);
-  assert(compactDesign.promptText.length < 25000);
+  assert(compactReview.promptText.length < 28000);
+  assert(compactDesign.promptText.length < 46500);
   assert.match(compactReview.promptText, /Small fused evaluation grid mode:/u);
   assert.match(compactDesign.promptText, /Small fused evaluation grid mode:/u);
+  assert(
+    compactDesign.promptText.indexOf("Immediate first-update protocol:") <
+      compactDesign.promptText.indexOf("Read in order:")
+  );
+  assert(
+    compactDesign.promptText.indexOf("Immediate first-update protocol:") <
+      compactDesign.promptText.indexOf("Evaluation grid contract:")
+  );
+  assert.match(
+    compactDesign.promptText,
+    /Second tool action: write the exact first-update JSON packet/u
+  );
+  assert.match(
+    compactDesign.promptText,
+    /Minimum semantic checkpoint JSON packet:/u
+  );
+  assert.match(
+    compactDesign.promptText,
+    /then Write the exact minimum semantic checkpoint JSON packet above/u
+  );
+  assert.match(
+    compactDesign.promptText,
+    /Do not inspect the construction brief, ADR\/output artifact/u
+  );
   assert.match(compactReview.promptText, /fulfillmentBinding shape for fulfilled component_code_surface findings/u);
   assert.match(compactReview.promptText, /evaluatorFindingRef: stable finding ref inside this fulfillmentBinding only/u);
   assert.match(compactReview.promptText, /Progress-timeout protection:/u);
+  assert.match(
+    compactReview.promptText,
+    /subworkstream manifest, its top-level key set must be exactly kind, manifestVersion, phase, authority, stageRef, selectedEdgeRef, targetCarrierRef, source, subworkstreams, mergeResult, nonAuthority, abgDistributedExecutionClaim/u
+  );
+  assert.match(
+    compactReview.promptText,
+    /"kind":"sdlc_compute_subworkstream_manifest"/u
+  );
+  assert.match(
+    compactReview.promptText,
+    /"manifestVersion":"ts-compute-subworkstream-v1"/u
+  );
+  assert.match(
+    compactReview.promptText,
+    /"phase":"phase_1_parent_agent_internal"/u
+  );
+  assert.match(
+    compactReview.promptText,
+    /"authority":"observation_only_parent_plugin_result"/u
+  );
+  assert.match(compactReview.promptText, /"stageRef":"evaluate\.C"/u);
+  assert.doesNotMatch(
+    compactReview.promptText,
+    /sdlc_evaluate_compute_subworkstream_manifest/u
+  );
+  assert.match(
+    compactReview.promptText,
+    /Do not add note, notes, summary, rationale, status, commentary, or helper fields to the subworkstream manifest/u
+  );
+  assert.match(
+    compactDesign.promptText,
+    /subworkstream manifest, its top-level key set must be exactly kind, manifestVersion, phase, authority, stageRef, selectedEdgeRef, targetCarrierRef, source, subworkstreams, mergeResult, nonAuthority, abgDistributedExecutionClaim/u
+  );
+  assert.match(
+    compactDesign.promptText,
+    /"kind":"sdlc_compute_subworkstream_manifest"/u
+  );
+  assert.match(
+    compactDesign.promptText,
+    /"manifestVersion":"ts-compute-subworkstream-v1"/u
+  );
+  assert.match(
+    compactDesign.promptText,
+    /"phase":"phase_1_parent_agent_internal"/u
+  );
+  assert.match(
+    compactDesign.promptText,
+    /"authority":"observation_only_parent_plugin_result"/u
+  );
+  assert.match(compactDesign.promptText, /"stageRef":"evaluate\.C"/u);
+  assert.doesNotMatch(
+    compactDesign.promptText,
+    /sdlc_evaluate_compute_subworkstream_manifest/u
+  );
+  assert.match(
+    compactDesign.promptText,
+    /Do not add note, notes, summary, rationale, status, commentary, or helper fields to the subworkstream manifest/u
+  );
   assert.match(compactReview.promptText, /First assessment checkpoint:/u);
   assert.match(
     compactReview.promptText,
@@ -531,8 +630,29 @@ test("T-192 small admitted handoffs render compact fused-grid prompts", () => {
   );
   assert.match(
     compactReview.promptText,
+    /First assessment checkpoint JSON packet:/u
+  );
+  assert.match(
+    compactReview.promptText,
     /Do not write a plan or checklist before the first assessment checkpoint/u
   );
+  const firstAssessmentCheckpoint =
+    extractFirstAssessmentCheckpointPacket(compactReview.promptText);
+  assert(
+    JSON.stringify(firstAssessmentCheckpoint).length < 3000
+  );
+  assert.equal(firstAssessmentCheckpoint.status, "blocked");
+  assert.deepEqual(firstAssessmentCheckpoint.reviewedObligationIds, [
+    "requirement:req_t192_001",
+    "requirement:req_t192_002"
+  ]);
+  assert(firstAssessmentCheckpoint.evidenceRefs.length > 0);
+  for (const finding of firstAssessmentCheckpoint.findings) {
+    assert.equal(finding.fulfillmentStatus, "unassessed");
+    assert(finding.evidenceRefs.length > 0);
+    assert(finding.acceptedAuthorityRefs.length > 0);
+    assert(finding.repairSurfaceTriage.evidenceRefs.length > 0);
+  }
   assert.doesNotMatch(
     compactReview.promptText,
     /carrier selection, authority compression, trace binding/u
@@ -643,6 +763,62 @@ test("T-204 review-grade compaction uses admitted invocation scope before broad 
   );
   assert.match(projection.promptText, /obligationRefs=requirement:req_t204_broad_001/u);
   assert.doesNotMatch(projection.promptText, /requirement:req_t204_broad_022/u);
+});
+
+test("T-204 component-test first review checkpoint is admission-valid", () => {
+  const workspaceRoot = mkdtempSync(
+    path.join(tmpdir(), "odd-sdlc-t204-review-checkpoint-")
+  );
+  try {
+    const reviewInvocationScope = invocationScope([
+      "requirement:req_t192_001",
+      "requirement:req_t192_002"
+    ]);
+    const manifest = compactManifest("component_test_surface", {
+      workspaceRoot,
+      archiveRoot: workspaceRoot,
+      outputFile: path.join(
+        workspaceRoot,
+        "build_tenants/rust_hello_service/tests/smoke.sh"
+      ),
+      reportFile: path.join(workspaceRoot, "worker_result_report.json"),
+      productMaterialization: materializationContract(true),
+      featureScope: { mode: "steel_thread" },
+      retryContext: { priorGapDossiers: [] }
+    });
+    const projection = reviewGradeEdgeFulfillmentPromptProjection({
+      manifest,
+      invocationScope: reviewInvocationScope,
+      governanceRef: "config://test/review-grade",
+      governancePath: "config/work-category-governance/coding_build.md",
+      constructionBriefPath: "worker_construction_brief.json",
+      invocationPackagePath: "worker_invocation_package.json",
+      workerReportPath: "worker_result_report.json",
+      assessmentPath: "review_grade_edge_fulfillment_assessment.json",
+      subworkstreamManifestPath: "evaluate_compute_subworkstream_manifest.json",
+      tenantToolEnvironment: null
+    });
+    const checkpoint = extractFirstAssessmentCheckpointPacket(
+      projection.promptText
+    );
+    const assessmentPath = path.join(
+      workspaceRoot,
+      "review_grade_edge_fulfillment_assessment.json"
+    );
+    writeFileSync(assessmentPath, `${JSON.stringify(checkpoint)}\n`, "utf8");
+    const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest,
+      outputFile: assessmentPath,
+      invocationScope: reviewInvocationScope
+    });
+    assert.equal(
+      admission.status,
+      "admitted",
+      admission.blockingReasons?.join(",") ?? "checkpoint rejected"
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
 });
 
 test("T-192 review-grade prompt schema is projected by edge profile", () => {

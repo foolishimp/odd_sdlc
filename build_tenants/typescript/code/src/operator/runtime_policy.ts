@@ -19,6 +19,7 @@ export interface SdlcOperatorRuntimePolicy {
   readonly designDepthFpEvaluatorStdoutBudgetBytes: number;
   readonly reviewGradeEdgeFulfillmentEvaluatorTimeoutMs: number;
   readonly reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs: number;
+  readonly reviewGradeEdgeFulfillmentEvaluatorCheckpointTimeoutMs: number;
   readonly reviewGradeEdgeFulfillmentEvaluatorMaxEffort: SdlcOperatorRuntimeEffort;
   readonly reviewGradeEdgeFulfillmentEvaluatorStdoutBudgetBytes: number;
   readonly executionShardTimeoutMs: number;
@@ -57,6 +58,7 @@ interface SdlcOperatorRuntimePolicyConfig {
   readonly reviewGradeEdgeFulfillmentEvaluator: {
     readonly timeoutMs: number;
     readonly inactivityTimeoutMs: number;
+    readonly checkpointTimeoutMs: number;
     readonly maxEffort: SdlcOperatorRuntimeEffort;
     readonly stdoutBudgetBytes: number;
   };
@@ -280,6 +282,11 @@ function readSdlcOperatorRuntimePolicyConfig(): SdlcOperatorRuntimePolicyConfig 
         "inactivityTimeoutMs",
         "operator-runtime-policy.json.reviewGradeEdgeFulfillmentEvaluator"
       ),
+      checkpointTimeoutMs: positiveIntegerField(
+        reviewGradeEdgeFulfillmentEvaluator,
+        "checkpointTimeoutMs",
+        "operator-runtime-policy.json.reviewGradeEdgeFulfillmentEvaluator"
+      ),
       maxEffort: effortField(
         reviewGradeEdgeFulfillmentEvaluator,
         "maxEffort",
@@ -383,6 +390,10 @@ export function sdlcOperatorRuntimePolicy(): SdlcOperatorRuntimePolicy {
     reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs: configuredPositiveInteger(
       "ODD_SDLC_REVIEW_GRADE_EDGE_FULFILLMENT_EVALUATOR_INACTIVITY_TIMEOUT_MS",
       config.reviewGradeEdgeFulfillmentEvaluator.inactivityTimeoutMs
+    ),
+    reviewGradeEdgeFulfillmentEvaluatorCheckpointTimeoutMs: configuredPositiveInteger(
+      "ODD_SDLC_REVIEW_GRADE_EDGE_FULFILLMENT_EVALUATOR_CHECKPOINT_TIMEOUT_MS",
+      config.reviewGradeEdgeFulfillmentEvaluator.checkpointTimeoutMs
     ),
     reviewGradeEdgeFulfillmentEvaluatorMaxEffort: configuredEffort(
       "ODD_SDLC_REVIEW_GRADE_EDGE_FULFILLMENT_EVALUATOR_MAX_EFFORT",

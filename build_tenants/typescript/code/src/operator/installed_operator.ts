@@ -2538,6 +2538,11 @@ function reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs(): number {
     .reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs;
 }
 
+function reviewGradeEdgeFulfillmentEvaluatorCheckpointTimeoutMs(): number {
+  return sdlcOperatorRuntimePolicy()
+    .reviewGradeEdgeFulfillmentEvaluatorCheckpointTimeoutMs;
+}
+
 function reviewGradeEdgeFulfillmentEvaluatorMaxEffort(): SdlcOperatorRuntimeEffort {
   return sdlcOperatorRuntimePolicy().reviewGradeEdgeFulfillmentEvaluatorMaxEffort;
 }
@@ -4429,6 +4434,18 @@ function designDepthFpEvaluatorBlockingReasonCode(
     : "design_depth_fp_evaluator_rule_blocked";
 }
 
+function reviewGradeEdgeFulfillmentTimedOutBlockingReason(
+  outcome?: SupervisedProcessActorResult["outcome"] | undefined
+): SdlcBlockingReasonCode {
+  if (
+    outcome?.kind === "external_progress_timeout" &&
+    outcome.reason === "review_grade_evaluator_assessment_checkpoint_timeout"
+  ) {
+    return "review_grade_evaluator_assessment_checkpoint_timeout";
+  }
+  return "review_grade_evaluator_process_timeout";
+}
+
 function designDepthFpEvaluatorBlockedPostflight(input: {
   readonly outcome: EvaluationRuleOutcome;
   readonly ruleOutcomeRef: string;
@@ -4634,6 +4651,19 @@ function reviewGradePostflight(input: {
     blockingReasonCarriers: Object.freeze([carrier]),
     evidenceRefs: input.evidenceRefs
   });
+}
+
+function reviewGradeEdgeFulfillmentAssessmentCheckpointObserved(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly assessmentPath: string;
+  readonly invocationScope: ReturnType<typeof readWorkerInvocationPackageScope> | null;
+}): boolean {
+  const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+    manifest: input.manifest,
+    outputFile: input.assessmentPath,
+    invocationScope: input.invocationScope
+  });
+  return admission.status === "admitted" && admission.assessment !== null;
 }
 
 async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
@@ -4863,6 +4893,8 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
   const evaluatorTimeoutMs = reviewGradeEdgeFulfillmentEvaluatorTimeoutMs();
   const evaluatorInactivityTimeoutMs =
     reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs();
+  const evaluatorCheckpointTimeoutMs =
+    reviewGradeEdgeFulfillmentEvaluatorCheckpointTimeoutMs();
   const stdoutBudgetBytes = reviewGradeEdgeFulfillmentEvaluatorStdoutBudgetBytes();
   const traceRoot = `${processEventsPath}.trace`;
   const reviewGradeRunStartedPayload = Object.freeze({
@@ -4879,6 +4911,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
     timeoutMs: evaluatorTimeoutMs,
     workerTimeoutMs: inactivityPolicy.timeoutMs,
     inactivityTimeoutMs: evaluatorInactivityTimeoutMs,
+    checkpointTimeoutMs: evaluatorCheckpointTimeoutMs,
     stdoutBudgetBytes,
     stdoutByteCount: 0,
     stderrByteCount: 0,
@@ -4934,6 +4967,15 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       executorProfile,
       timeoutMs: evaluatorTimeoutMs,
       inactivityTimeoutMs: evaluatorInactivityTimeoutMs,
+      externalProgressTimeoutMs: evaluatorCheckpointTimeoutMs,
+      externalProgressTimeoutReason:
+        "review_grade_evaluator_assessment_checkpoint_timeout",
+      externalProgressCheck: () =>
+        reviewGradeEdgeFulfillmentAssessmentCheckpointObserved({
+          manifest: input.manifest,
+          assessmentPath,
+          invocationScope
+        }),
       terminationGraceMs: inactivityPolicy.terminationGraceMs,
       heartbeatMs: inactivityPolicy.heartbeatMs,
       eventSink: input.eventSink
@@ -4963,6 +5005,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       timeoutMs: evaluatorTimeoutMs,
       workerTimeoutMs: inactivityPolicy.timeoutMs,
       inactivityTimeoutMs: evaluatorInactivityTimeoutMs,
+      checkpointTimeoutMs: evaluatorCheckpointTimeoutMs,
       stdoutBudgetBytes,
       stdoutByteCount,
       stderrByteCount,
@@ -5065,7 +5108,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       workerProcessTextLooksRetryableProviderFailure(evaluatorProcessText)
         ? "worker_connection_failed"
         : processResult.timedOut === true
-          ? "review_grade_evaluator_process_timeout"
+          ? reviewGradeEdgeFulfillmentTimedOutBlockingReason(processResult.outcome)
           : "review_grade_evaluator_process_failed";
     const postflight = reviewGradePostflight({
       manifest: input.manifest,

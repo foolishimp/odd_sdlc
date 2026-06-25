@@ -43,17 +43,16 @@ const DEFAULT_ABG_TYPESCRIPT_ROOT = resolve(
   "../abiogenesis/build_tenants/abiogenesis/typescript"
 );
 
-const DEFAULT_STOP_STATUSES = Object.freeze([
+export const DEFAULT_STOP_STATUSES = Object.freeze([
   "converged",
   "fp_worker_unattached",
   "blocked",
   "yielded"
 ]);
 
-const MULTI_ADVANCE_STOP_STATUSES = Object.freeze([
+export const MULTI_ADVANCE_STOP_STATUSES = Object.freeze([
   "fp_worker_unattached",
-  "blocked",
-  "yielded"
+  "blocked"
 ]);
 
 const EDGE_ASSURANCE_ARCHIVE_ARTIFACTS = Object.freeze([
@@ -172,8 +171,11 @@ function commandPathFromInstall(install, commandName) {
   return commandPath;
 }
 
-function startTargetFromScenarioValue(rawTarget, fallbackGraphFunction) {
-  if (typeof rawTarget !== "string" || rawTarget.length === 0 || rawTarget === "next") {
+export function startTargetFromScenarioValue(rawTarget, fallbackGraphFunction) {
+  if (rawTarget === "next") {
+    return "next";
+  }
+  if (typeof rawTarget !== "string" || rawTarget.length === 0) {
     if (typeof fallbackGraphFunction === "string" && fallbackGraphFunction.length > 0) {
       return `graph_function:${fallbackGraphFunction}`;
     }
@@ -1462,6 +1464,17 @@ export function assertScenarioExpectations(result, scenario) {
     if (status !== expectations.firstStartStatus) {
       throw new Error(
         `${scenario.scenarioId}: first start status mismatch — expected ${expectations.firstStartStatus}, saw ${status}`
+      );
+    }
+  }
+  if (expectations.startErrorIncludes !== undefined) {
+    const error = firstAdvance.start?.payload?.error;
+    if (
+      typeof error !== "string" ||
+      !error.includes(expectations.startErrorIncludes)
+    ) {
+      throw new Error(
+        `${scenario.scenarioId}: start error mismatch — expected ${expectations.startErrorIncludes}, saw ${error}`
       );
     }
   }

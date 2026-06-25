@@ -15,9 +15,12 @@ import path from "node:path";
 
 import {
   assertScenarioExpectations,
+  DEFAULT_STOP_STATUSES,
+  MULTI_ADVANCE_STOP_STATUSES,
   runScenarioSandbox,
   scenarioGraphCloseStopSatisfied,
   scenarioStartTargetForStep,
+  startTargetFromScenarioValue,
   scenarioWorkspaceFileStopSatisfied
 } from "./scenario_sandbox.mjs";
 import { dataMapperInternalScenario } from "./scenarios/data_mapper_internal.scenario.mjs";
@@ -287,11 +290,8 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
     jsZoom.scenarioId,
     "scenario_t200_hello_world_js_deep_sdlc_zoom_live"
   );
-  assert.deepEqual(jsZoom.startTarget, "overlay:deep-sdlc-traversal");
-  assert.deepEqual(
-    jsZoom.expectations.firstStartOverlayRef,
-    "overlay://odd-sdlc/deep-sdlc-traversal"
-  );
+  assert.deepEqual(jsZoom.startTarget, "next");
+  assert.equal(jsZoom.expectations.firstStartOverlayRef, undefined);
   assert.deepEqual(
     jsZoom.expectations.firstHandoffOverlayRef,
     "overlay://odd-sdlc/framework-smoke-min-fp"
@@ -311,7 +311,7 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
   );
   assert(t133HelloWorldRustLiveScenario({ worker }).maxAdvances >= 16);
   const jsLite = t160HelloWorldJsLiteLiveScenario({ worker });
-  assert.deepEqual(jsLite.startTarget, "overlay:lite-design-module-implementation");
+  assert.deepEqual(jsLite.startTarget, "next");
   assert(jsLite.maxAdvances >= 7);
   assert.deepEqual(jsLite.expectations.requiredHandoffEdges, [
     "derive_lite_component_code_surface",
@@ -332,7 +332,7 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
   assert(rustServiceLive.maxAdvances >= 16);
   assert.deepEqual(
     rustServiceLive.expectations.handoffEdgeSequencePrefix[0],
-    "derive_intent_surface"
+    "derive_lite_design_adr_surface"
   );
   assert.deepEqual(rustServiceLive.expectations.requiredHandoffEdges, [
     "derive_lite_component_code_surface",
@@ -358,11 +358,11 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
   const parallelHelloLive = t174ParallelHelloWorldJsLiveScenario({ worker });
   assert.deepEqual(
     scenarioStartTargetForStep(parallelHelloLive, 0),
-    "overlay:bootstrap-requirements"
+    "next"
   );
   assert.deepEqual(
     scenarioStartTargetForStep(parallelHelloLive, 1),
-    "overlay:bootstrap-requirements"
+    "next"
   );
   assert.deepEqual(
     scenarioStartTargetForStep(parallelHelloLive, 2),
@@ -409,7 +409,7 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
     worker,
     variant: "third_party_model_variant"
   });
-  assert.deepEqual(mindforgeLive.startTarget, "overlay:lite-design-module-implementation");
+  assert.deepEqual(mindforgeLive.startTarget, "next");
   assert(mindforgeLive.maxAdvances >= 7);
   assert.deepEqual(
     mindforgeLive.expectations.handoffEdgeSequencePrefix,
@@ -875,6 +875,22 @@ test("scenario sandbox: overlay continuation uses admitted next target after pub
     ),
     "graph_function:manual"
   );
+});
+
+test("scenario sandbox: next target remains ABG-owned despite read-only gaps fallback", () => {
+  assert.equal(
+    startTargetFromScenarioValue("next", "bind_gap_route"),
+    "next"
+  );
+  assert.equal(
+    startTargetFromScenarioValue(undefined, "Fg_conform_project"),
+    "graph_function:Fg_conform_project"
+  );
+});
+
+test("scenario sandbox: yielded re-entry is nonterminal in multi-advance mode", () => {
+  assert.equal(DEFAULT_STOP_STATUSES.includes("yielded"), true);
+  assert.equal(MULTI_ADVANCE_STOP_STATUSES.includes("yielded"), false);
 });
 
 test("scenario sandbox: latest archive JSON assertions audit runtime decisions", () => {

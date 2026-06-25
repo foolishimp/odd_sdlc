@@ -1,6 +1,5 @@
 // T-160 Rust hello-world lite traversal scenario.
-// Starts from loaded project authority and selects the bounded lite overlay
-// instead of the current full traversal.
+// Starts from loaded project authority through an explicit ABG graph target.
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,9 +28,10 @@ export const t160HelloWorldRustLiteScenario = Object.freeze({
     sourceFiles: T160_HELLO_WORLD_RUST_LITE_SOURCE_FILES
   },
   expectations: {
-    terminalStatus: "blocked"
+    startErrorIncludes: "worker dispatch requires admitted worker transport"
   },
-  startTarget: "overlay:lite-design-module-implementation",
+  expectCommandFailure: true,
+  startTarget: "graph_function:lite_design_module_implementation",
   startUntil: "first_traversal",
   maxAdvances: 1
 });
@@ -82,6 +82,7 @@ export function t160HelloWorldRustLiteLiveScenario({
       ]
     },
     liveWorker: worker,
+    startTarget: "next",
     startUntil,
     maxAdvances,
     continueOnEdgeConverge: true,

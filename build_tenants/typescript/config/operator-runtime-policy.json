@@ -19,6 +19,7 @@
   "reviewGradeEdgeFulfillmentEvaluator": {
     "timeoutMs": 1200000,
     "inactivityTimeoutMs": 420000,
+    "checkpointTimeoutMs": 180000,
     "maxEffort": "medium",
     "stdoutBudgetBytes": 524288
   },

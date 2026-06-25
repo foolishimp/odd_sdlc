@@ -30,9 +30,9 @@ for the TypeScript line.
 
 The ABIogenesis TypeScript tenant is substrate evidence consumed through
 explicit release snapshots. The TypeScript line currently consumes the
-immutable `@abiogenesis/typescript-tenant@4.1.0-rc.10` release snapshot at
-`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.1.0-rc.10/abiogenesis-typescript-tenant-4.1.0-rc.10.tgz`.
-The `4.1.0-rc.10` cut proves GTL/ABG carriers, graph-function
+immutable `@abiogenesis/typescript-tenant@4.1.0-rc.11` release snapshot at
+`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.1.0-rc.11/abiogenesis-typescript-tenant-4.1.0-rc.11.tgz`.
+The `4.1.0-rc.11` cut proves GTL/ABG carriers, graph-function
 iteration, traversal probes,
 evented saga-frontier execution, no-compute-basis failure taxonomy,
 bootstrap-lineage slices, selected `abg.fn_composition` identity, canonical
@@ -50,13 +50,17 @@ continuation-transition projection and primitive iteration-outcome projection,
 where typed runtime facts and assurance fold outcomes outrank terminal retry
 fallback evidence. It also proves the ABG public control surface projects
 `gap_stop` as a blocked terminal outcome rather than as a rejected command. It
+also carries ABG CLI `--target next` runtime-binding resolution, so
+product-published public-start law can select the first executable graph
+function while ABG still owns command/control, replay events, and execution
+contract validation. It
 also proves the GTL Node-borne AssetSurface prompt-asset
 interface consumed by `odd_sdlc.TS`, where prompt asset structure is GTL law and
 SDLC prompt authority policy remains product overlay data. It also proves
 segment-scoped evaluation redispatch metadata, so downstream SDLC evaluation
 can preserve segment, dimension-cell, fold, and relation scope across ABG-owned
 redispatch instead of collapsing deep evaluation coverage back to edge-granular
-fallbacks. It also carries the clean ABG 4.1.0-rc.10 consolidation of the
+fallbacks. It also carries the clean ABG 4.1.0-rc.11 consolidation of the
 defaults/lever registry, temporal runtime-scope consolidation, iteration
 state-action algebra, prompt asset interface, and contract-fulfillment binding
 API that `odd_sdlc.TS` consumes. It also carries the ABG-owned

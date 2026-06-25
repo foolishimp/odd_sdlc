@@ -2,10 +2,12 @@ export {
   createOddSdlcAbgRuntimeAssuranceProvider,
   createOddSdlcAbgRuntimeBindingPlugins,
   oddSdlcAbgRuntimeWorkerTransportFromEnv,
+  resolveOddSdlcAbgRuntimeNextTarget,
   resolveOddSdlcAbgRuntimeBindingPolicy
 } from "./abg_runtime_binding.js";
 export type {
   OddSdlcAbgRuntimeBindingPluginFactoryInput,
+  OddSdlcAbgRuntimeNextTargetInput,
   OddSdlcAbgRuntimeBindingPolicyInput
 } from "./abg_runtime_binding.js";
 export {

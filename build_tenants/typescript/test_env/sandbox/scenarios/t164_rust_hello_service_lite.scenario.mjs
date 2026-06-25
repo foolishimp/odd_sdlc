@@ -7,7 +7,13 @@ import { fileURLToPath } from "node:url";
 
 import {
   FG_CONFORM_PROJECT,
-  SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF
+  FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+  FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
+  FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+  FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+  FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
+  FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE,
+  FG_PREPARE_TEST_EXECUTION_SURFACE
 } from "../../../build/semantic/code/src/index.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -28,6 +34,16 @@ export const T164_RUST_HELLO_SERVICE_REQUIREMENT_IDS = Object.freeze([
   "REQ-T164-RUST-SVC-005"
 ]);
 
+export const T164_RUST_HELLO_SERVICE_LITE_EDGES = Object.freeze([
+  FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+  FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+  FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+  FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
+  FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
+  FG_PREPARE_TEST_EXECUTION_SURFACE,
+  FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
+]);
+
 export const t164RustHelloServiceLiteScenario = Object.freeze({
   scenarioId: "scenario_t164_rust_hello_service_lite",
   installedPackageName: "odd-sdlc-scenario-t164-rust-hello-service-lite",
@@ -37,7 +53,7 @@ export const t164RustHelloServiceLiteScenario = Object.freeze({
   },
   expectations: {
     firstEdge: FG_CONFORM_PROJECT,
-    firstStartStatus: "converged",
+    firstStartStatus: "yielded",
     firstEventKinds: [
       "graph_call_opened",
       "frame_opened",
@@ -46,11 +62,10 @@ export const t164RustHelloServiceLiteScenario = Object.freeze({
       "vector_closed"
     ],
     firstStartTargetGraphFunction: FG_CONFORM_PROJECT,
-    firstStartOverlayRef: SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF,
     requirementIds: T164_RUST_HELLO_SERVICE_REQUIREMENT_IDS,
     archiveArtifacts: ["conform_project_report.json"]
   },
-  startTarget: "overlay:bootstrap-requirements",
+  startTarget: "next",
   startUntil: "first_traversal",
   maxAdvances: 1
 });
@@ -77,34 +92,16 @@ export function t164RustHelloServiceLiteLiveScenario({
         "build_tenants/hello_world_rust_service/Cargo.toml",
         "build_tenants/hello_world_rust_service/src/main.rs"
       ],
-      handoffEdgeSequencePrefix: [
-        "derive_intent_surface",
-        "derive_lite_design_adr_surface",
-        "derive_lite_component_code_surface",
-        "derive_lite_test_design_surface",
-        "derive_lite_component_test_surface",
-        "derive_lite_uat_test_source_surface",
-        "prepare_test_execution_surface",
-        "derive_test_execution_result_surface"
-      ],
+      handoffEdgeSequencePrefix: T164_RUST_HELLO_SERVICE_LITE_EDGES,
       requiredHandoffEdges: [
-        "derive_lite_component_code_surface",
-        "derive_lite_test_design_surface",
-        "derive_lite_component_test_surface",
-        "derive_lite_uat_test_source_surface",
-        "prepare_test_execution_surface",
-        "derive_test_execution_result_surface"
+        FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+        FG_DERIVE_LITE_TEST_DESIGN_SURFACE,
+        FG_DERIVE_LITE_COMPONENT_TEST_SURFACE,
+        FG_DERIVE_LITE_UAT_TEST_SOURCE_SURFACE,
+        FG_PREPARE_TEST_EXECUTION_SURFACE,
+        FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
       ],
-      edgeAssuranceArchiveSequencePrefix: [
-        "derive_intent_surface",
-        "derive_lite_design_adr_surface",
-        "derive_lite_component_code_surface",
-        "derive_lite_test_design_surface",
-        "derive_lite_component_test_surface",
-        "derive_lite_uat_test_source_surface",
-        "prepare_test_execution_surface",
-        "derive_test_execution_result_surface"
-      ],
+      edgeAssuranceArchiveSequencePrefix: T164_RUST_HELLO_SERVICE_LITE_EDGES,
       executionEvidence: {
         edgeName: "derive_test_execution_result_surface",
         status: "succeeded",

@@ -5,8 +5,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  FG_CONFORM_PROJECT,
-  SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF
+  FG_CONFORM_PROJECT
 } from "../../../build/semantic/code/src/index.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -71,7 +70,7 @@ export const t174ParallelHelloWorldJsScenario = Object.freeze({
   },
   expectations: {
     firstEdge: FG_CONFORM_PROJECT,
-    firstStartStatus: "converged",
+    firstStartStatus: "yielded",
     firstEventKinds: [
       "graph_call_opened",
       "frame_opened",
@@ -80,10 +79,9 @@ export const t174ParallelHelloWorldJsScenario = Object.freeze({
       "vector_closed"
     ],
     firstStartTargetGraphFunction: FG_CONFORM_PROJECT,
-    firstStartOverlayRef: SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF,
     archiveArtifacts: ["conform_project_report.json"]
   },
-  startTarget: "overlay:bootstrap-requirements",
+  startTarget: "next",
   startUntil: "first_traversal",
   maxAdvances: 1
 });
@@ -205,10 +203,10 @@ export function t174ParallelHelloWorldJsLiveScenario({
       ]
     },
     liveWorker: worker,
-    startTarget: "overlay:lite-design-module-implementation",
+    startTarget: "next",
     startTargetSequence: Object.freeze([
-      "overlay:bootstrap-requirements",
-      "overlay:bootstrap-requirements"
+      "next",
+      "next"
     ]),
     startUntil,
     maxAdvances,

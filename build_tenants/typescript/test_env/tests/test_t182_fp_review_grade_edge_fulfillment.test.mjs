@@ -511,11 +511,45 @@ function writeValidCodeBuilderFrontier(manifest) {
 
 function shallowImplementationDesignRegister(manifest) {
   const evidenceRef = pathToFileURL(manifest.outputFile).href;
+  const requirementId = "REQ-T182-001";
+  const entityId = "entity:app.output";
+  const attributeId = "attr:app.output.stdout";
+  const operationId = "operation:app.emit";
+  const axis = (axisName) => ({
+    kind: "sdlc_design_completeness_axis_verdict",
+    axis: axisName,
+    status: "satisfied",
+    reasons: [`${axisName} axis is satisfied by the structural fixture`],
+    evidenceRefs: [evidenceRef]
+  });
+  const attribute = {
+    kind: "sdlc_domain_attribute",
+    attributeId,
+    name: "stdout",
+    valueType: "string",
+    cardinality: "one",
+    invariantRefs: [requirementId]
+  };
+  const operation = {
+    kind: "sdlc_domain_operation",
+    operationId,
+    moduleName: "app",
+    inputEntityIds: [],
+    outputEntityIds: [entityId],
+    requiredAttributeIds: [attributeId]
+  };
   return {
     kind: "sdlc_design_depth_register",
     registerVersion: "ts-design-depth-v1",
     targetAssetType: "implementation_design_surface",
-    stackProfileRows: [],
+    stackProfileRows: [
+      {
+        kind: "sdlc_stack_profile_row",
+        stackRef: "stack://node",
+        language: "javascript",
+        buildTool: "npm"
+      }
+    ],
     implementationModuleRows: [
       {
         kind: "sdlc_implementation_module_row",
@@ -523,12 +557,82 @@ function shallowImplementationDesignRegister(manifest) {
         moduleRef: "module://app"
       }
     ],
-    aggregateDomainModelRows: [],
-    moduleSchemaFragments: [],
-    moduleStateDiagramFragments: [],
-    aggregateDomainModel: null,
-    sunnyDaySequenceRows: [],
-    aggregateSunnyDaySequence: null,
+    aggregateDomainModelRows: [
+      {
+        kind: "sdlc_aggregate_domain_model_row",
+        modelRef: "model://app/aggregate"
+      }
+    ],
+    moduleSchemaFragments: [
+      {
+        kind: "sdlc_module_schema_fragment",
+        moduleName: "app",
+        entities: [
+          {
+            kind: "sdlc_domain_entity",
+            entityId,
+            moduleName: "app",
+            ownership: "owned",
+            attributes: [attribute],
+            invariants: ["app output is emitted as stdout"],
+            sourceAssetRefs: [evidenceRef]
+          }
+        ],
+        operations: [operation],
+        requirementIds: [requirementId],
+        sourceAssetRefs: [evidenceRef]
+      }
+    ],
+    moduleStateDiagramFragments: [
+      {
+        kind: "sdlc_module_state_diagram_fragment",
+        moduleName: "app",
+        entityId,
+        stateless: true,
+        states: [],
+        transitions: [],
+        requirementIds: [requirementId],
+        sourceAssetRefs: [evidenceRef]
+      }
+    ],
+    aggregateDomainModel: {
+      kind: "sdlc_aggregate_domain_model",
+      modelVersion: "ts-design-depth-v1",
+      entities: [
+        {
+          kind: "sdlc_aggregate_domain_entity",
+          entityId,
+          ownerModuleName: "app",
+          attributes: [attribute],
+          sourceModuleNames: ["app"]
+        }
+      ],
+      operations: [operation],
+      crossModuleReferences: [],
+      evidenceRefs: [evidenceRef]
+    },
+    sunnyDaySequenceRows: [
+      {
+        kind: "sdlc_sunny_day_sequence_row",
+        sequenceRef: "sequence://app/emit"
+      }
+    ],
+    aggregateSunnyDaySequence: {
+      kind: "sdlc_aggregate_sunny_day_sequence",
+      sequenceVersion: "ts-design-depth-v1",
+      steps: [
+        {
+          kind: "sdlc_sunny_day_sequence_step",
+          stepId: "step:app.emit",
+          moduleName: "app",
+          operationId,
+          inputEntityIds: [],
+          outputEntityIds: [entityId],
+          stateTransitionIds: []
+        }
+      ],
+      evidenceRefs: [evidenceRef]
+    },
     componentTopologyRows: [
       {
         kind: "sdlc_component_topology_row",
@@ -537,7 +641,7 @@ function shallowImplementationDesignRegister(manifest) {
         relativePath: "src/app.js",
         publicBoundary: "Program entrypoint",
         concernRole: "other",
-        requirementIds: ["REQ-T182-001"],
+        requirementIds: [requirementId],
         sourceAssetRefs: []
       }
     ],
@@ -551,7 +655,7 @@ function shallowImplementationDesignRegister(manifest) {
         trancheId: null,
         firstProductFileToChange: "src/app.js",
         upstreamComponentIds: [],
-        requirementIds: ["REQ-T182-001"],
+        requirementIds: [requirementId],
         sourceAssetRefs: [evidenceRef]
       }
     ],
@@ -562,7 +666,13 @@ function shallowImplementationDesignRegister(manifest) {
         role: "source"
       }
     ],
-    designCompletenessVerdict: null
+    designCompletenessVerdict: {
+      kind: "sdlc_design_completeness_verdict",
+      verdictVersion: "ts-design-depth-v1",
+      entity: axis("entity"),
+      attribute: axis("attribute"),
+      flow: axis("flow")
+    }
   };
 }
 

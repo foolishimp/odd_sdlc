@@ -42,6 +42,12 @@ export interface OddSdlcAbgRuntimeBindingPolicyInput {
   readonly targetGraphFunction: string;
 }
 
+export interface OddSdlcAbgRuntimeNextTargetInput {
+  readonly workspaceRoot: string;
+  readonly until?: SdlcPublicStartUntil | undefined;
+  readonly workerTransport?: string | null | undefined;
+}
+
 export function oddSdlcAbgRuntimeWorkerTransportFromEnv(
   env: Record<string, string | undefined> = process.env
 ): string | null {
@@ -128,4 +134,51 @@ export function createOddSdlcAbgRuntimeBindingPlugins(
     basis: start.executionContract.basis,
     eventSink: input.eventSink
   }).plugins;
+}
+
+export function resolveOddSdlcAbgRuntimeNextTarget(
+  input: OddSdlcAbgRuntimeNextTargetInput
+): { readonly graphFunctionHandle: string } {
+  const workspaceRoot = resolve(input.workspaceRoot);
+  const module = constructSdlcGtlModule();
+  const conformedProject =
+    deriveSdlcConformProjectProfileFromWorkspace(workspaceRoot);
+  const ingressReport = deriveSdlcWorkspaceIngressReport({
+    workspaceRootUri: pathToFileURL(workspaceRoot).href,
+    projectConstraints: deriveSdlcProjectConstraintsFromWorkspace(workspaceRoot),
+    sourceInputs: collectSdlcWorkspaceSourceInputs(workspaceRoot)
+  });
+  const queryDomain = projectSdlcQueryDomain({
+    module,
+    ingressReport,
+    projectConformance: deriveSdlcConformProjectReportFromWorkspace(workspaceRoot)
+  });
+  const start = projectSdlcRuntimeBindingContract({
+    request: {
+      kind: "sdlc_public_start_request",
+      workspaceRoot,
+      target: {
+        kind: "next",
+        handle: "next"
+      },
+      until: input.until ?? "converged",
+      defaultRegime: "F_P"
+    },
+    module,
+    queryDomain,
+    conformedProject,
+    workerAttachment: projectSdlcWorkerAttachment({
+      transportContract: input.workerTransport ?? null
+    })
+  });
+  if (start.executionContract === null) {
+    const blockingReason =
+      "blockingReason" in start ? start.blockingReason : start.kind;
+    throw new TypeError(
+      `odd_sdlc ABG runtime binding could not resolve next target: ${blockingReason}`
+    );
+  }
+  return Object.freeze({
+    graphFunctionHandle: start.executionContract.targetGraphFunction
+  });
 }

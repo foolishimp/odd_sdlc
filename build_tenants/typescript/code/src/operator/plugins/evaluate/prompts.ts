@@ -20,6 +20,9 @@ import {
   SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS
 } from "./content_register.js";
 import {
+  defaultComputeSubworkstreamManifest
+} from "../../compute_subworkstreams.js";
+import {
   DESIGN_DEPTH_FP_EVALUATOR_RULE_REF
 } from "./design_depth_register.js";
 import {
@@ -88,17 +91,38 @@ function edgeAuthorityCompressionPromptLines(): readonly string[] {
 }
 
 const ABG_ITERATION_OUTCOME_FOLD_REF =
-  "package:@abiogenesis/typescript-tenant@4.1.0-rc.10#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows";
+  "package:@abiogenesis/typescript-tenant@4.1.0-rc.11#abg/m03/iteration_state_action/deriveIterationOutcomeFromRows";
 
 interface EvaluatePromptLineGroups {
   readonly preAuthorityLines: readonly string[];
   readonly postAuthorityLines: readonly string[];
 }
 
+function evaluateSubworkstreamManifestPromptLines(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly subworkstreamManifestPath: string;
+}): readonly string[] {
+  const defaultEmptyManifest = defaultComputeSubworkstreamManifest({
+    manifest: input.manifest,
+    stageRef: "evaluate.C"
+  });
+  return Object.freeze([
+    `- Optional observation-only subworkstream manifest: ${input.subworkstreamManifestPath}`,
+    "- If you write the subworkstream manifest, its top-level key set must be exactly kind, manifestVersion, phase, authority, stageRef, selectedEdgeRef, targetCarrierRef, source, subworkstreams, mergeResult, nonAuthority, abgDistributedExecutionClaim.",
+    "- Do not add note, notes, summary, rationale, status, commentary, or helper fields to the subworkstream manifest.",
+    "- For a no-subworkstream evaluation, omit the file or write the exact default empty manifest packet below. Do not rename it as an evaluate-specific manifest.",
+    "Default empty subworkstream manifest JSON packet:",
+    JSON.stringify(defaultEmptyManifest)
+  ]);
+}
+
 const DESIGN_DEPTH_FIRST_UPDATE_PACKET_REF =
   "prompt://odd-sdlc/design-depth/first-update-partial-verdict" as const;
 const DESIGN_DEPTH_MINIMUM_SEMANTIC_CHECKPOINT_PACKET_REF =
   "prompt://odd-sdlc/design-depth/minimum-semantic-checkpoint" as const;
+const REVIEW_GRADE_FIRST_ASSESSMENT_CHECKPOINT_PACKET_REF =
+  "prompt://odd-sdlc/review-grade/first-assessment-checkpoint" as const;
+const REVIEW_GRADE_FIRST_ASSESSMENT_CHECKPOINT_MAX_PROMPT_CHARS = 12000;
 
 function designDepthFirstUpdateAxisVerdict(axis: "entity" | "attribute" | "flow") {
   return Object.freeze({
@@ -1130,6 +1154,125 @@ function compactObligationPromptLines(
   ]);
 }
 
+function reviewGradeFirstCheckpointEvidenceRefs(input: {
+  readonly constructionBriefPath: string;
+  readonly invocationPackagePath: string;
+  readonly workerReportPath: string;
+}): readonly string[] {
+  return uniquePromptRefs([
+    REVIEW_GRADE_FIRST_ASSESSMENT_CHECKPOINT_PACKET_REF,
+    input.constructionBriefPath,
+    input.invocationPackagePath,
+    input.workerReportPath
+  ]);
+}
+
+function reviewGradeFirstCheckpointAuthorityRefs(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly governanceRef: string;
+}): readonly string[] {
+  return uniquePromptRefs([
+    input.governanceRef,
+    input.manifest.edgeAssuranceContractRef ?? "",
+    input.manifest.targetCarrierContractRef ?? "",
+    ...(input.manifest.methodRefs ?? [])
+  ]);
+}
+
+function reviewGradeFirstAssessmentCheckpointPacket(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly invocationScope?: SdlcReviewGradeInvocationScope | null | undefined;
+  readonly governanceRef: string;
+  readonly constructionBriefPath: string;
+  readonly invocationPackagePath: string;
+  readonly workerReportPath: string;
+}): unknown {
+  const reviewedObligationIds = reviewGradePromptObligationRefs(
+    input.manifest,
+    input.invocationScope
+  );
+  const evidenceRefs = reviewGradeFirstCheckpointEvidenceRefs({
+    constructionBriefPath: input.constructionBriefPath,
+    invocationPackagePath: input.invocationPackagePath,
+    workerReportPath: input.workerReportPath
+  });
+  const acceptedAuthorityRefs = reviewGradeFirstCheckpointAuthorityRefs({
+    manifest: input.manifest,
+    governanceRef: input.governanceRef
+  });
+  const checkpointRationale =
+    "First checkpoint before bounded evidence inspection.";
+  return Object.freeze({
+    kind: "sdlc_review_grade_edge_fulfillment_assessment" as const,
+    assessmentVersion: "ts-review-grade-v1" as const,
+    graphFunctionName: input.manifest.graphFunctionName,
+    edgeName: input.manifest.edgeName,
+    targetAssetType: input.manifest.targetAssetType,
+    status: "blocked" as const,
+    reviewedObligationIds,
+    findings: Object.freeze(
+      reviewedObligationIds.map((obligationId) =>
+        Object.freeze({
+          kind: "sdlc_review_grade_obligation_finding" as const,
+          obligationId,
+          fulfillmentStatus: "unassessed" as const,
+          failureClass: "execution_environment" as const,
+          requiredAction: "Overwrite with final bounded semantic findings.",
+          evidenceRefs,
+          acceptedAuthorityRefs,
+          fulfillmentBinding: null,
+          repairSurfaceTriage: Object.freeze({
+            kind: "sdlc_repair_surface_triage" as const,
+            disposition: "external_blocked" as const,
+            repairGraphFunctionRef: null,
+            repairGraphVectorRef: null,
+            repairAssetRef: null,
+            evidenceRefs,
+            rationale: checkpointRationale
+          }),
+          rationale:
+            "Admitted for review; semantic inspection pending; blocked until final overwrite."
+        })
+      )
+    ),
+    evidenceRefs,
+    summary: "First checkpoint blocked until final review overwrites it."
+  });
+}
+
+function reviewGradeFirstAssessmentCheckpointPacketLines(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly invocationScope?: SdlcReviewGradeInvocationScope | null | undefined;
+  readonly governanceRef: string;
+  readonly constructionBriefPath: string;
+  readonly invocationPackagePath: string;
+  readonly workerReportPath: string;
+}): readonly string[] {
+  const packet = JSON.stringify(reviewGradeFirstAssessmentCheckpointPacket(input));
+  if (packet.length > REVIEW_GRADE_FIRST_ASSESSMENT_CHECKPOINT_MAX_PROMPT_CHARS) {
+    const evidenceRefs = reviewGradeFirstCheckpointEvidenceRefs({
+      constructionBriefPath: input.constructionBriefPath,
+      invocationPackagePath: input.invocationPackagePath,
+      workerReportPath: input.workerReportPath
+    });
+    const acceptedAuthorityRefs = reviewGradeFirstCheckpointAuthorityRefs({
+      manifest: input.manifest,
+      governanceRef: input.governanceRef
+    });
+    return Object.freeze([
+      "First assessment checkpoint seed values:",
+      `- Use these non-empty evidenceRefs for top-level evidenceRefs, every finding.evidenceRefs, and every repairSurfaceTriage.evidenceRefs: ${listForPrompt(evidenceRefs)}`,
+      `- Use these non-empty acceptedAuthorityRefs for every finding.acceptedAuthorityRefs: ${listForPrompt(acceptedAuthorityRefs)}`,
+      "- The first checkpoint may be blocked/unassessed, but empty evidenceRefs or acceptedAuthorityRefs are invalid and will be rejected."
+    ]);
+  }
+  return Object.freeze([
+    "First assessment checkpoint JSON packet:",
+    packet,
+    `Write this exact JSON packet to the assessment artifact before generated-artifact reads, then overwrite it after bounded semantic review.`
+  ]);
+}
+
 function compactDesignDepthPromptLineGroups(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly manifestPath: string;
@@ -1159,10 +1302,44 @@ function compactDesignDepthPromptLineGroups(input: {
       "- Do not reconstruct global coverage, closure, continuation, or trace policy as a second SDLC. Coverage is a structural fold over refs; ABG owns close/block/redispatch.",
       "- This is evaluation work. Do not rewrite the ADR, source files, tests, package files, reports, ledgers, or product materialization outputs.",
       `- Durable evaluation artifact to create and validate: ${input.contentRegisterPath}`,
-      `- Optional observation-only subworkstream manifest: ${input.subworkstreamManifestPath}`,
+      ...evaluateSubworkstreamManifestPromptLines({
+        manifest: input.manifest,
+        subworkstreamManifestPath: input.subworkstreamManifestPath
+      }),
       "- You may use agent-internal subagents or parallel workstreams as read-only compute strategy for independent modules, interfaces, obligation slices, or evidence packets.",
       `- If you use evaluator subworkstreams, record them in ${input.subworkstreamManifestPath}. Rows must cite authority/dependency inputs, stay read-only over workspace/product files, and remain observation only.`,
       "- Evaluator subworkstreams do not emit ABG events, write ledgers, close edges, select traversal, publish consequence projections, or create ABG branch leases. The parent evaluate.C result owns the final content-ledger merge.",
+      "",
+      "Immediate first-update protocol:",
+      `- Durable evaluation artifact: ${input.contentRegisterPath}`,
+      `- First-update carrier helper contract: ${DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_REF} (${DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_PATH}).`,
+      "- First tool action: Read only the existing draft content ledger path above with limit <=80. This satisfies the worker tool's read-before-write policy and is not authority inspection.",
+      "- Second tool action: write the exact first-update JSON packet below to the durable evaluation artifact path.",
+      "- The packet contains one non-draft designCompletenessVerdict fragment with partial axes. It is a typed first progress carrier, not final design truth.",
+      "- Third tool action: write the exact minimum semantic checkpoint JSON packet below to the same durable evaluation artifact path. If the Write tool requires a fresh read-after-write check, Read only the content ledger with limit <=80, then immediately Write this semantic checkpoint packet.",
+      "- The minimum semantic checkpoint JSON packet is derived from the precomputed ADR implementation-design evidence summary below and is a bounded liveness checkpoint, not final design-depth closure authority.",
+      "- Minimum semantic checkpoint: preserve the first partial designCompletenessVerdict row and add compact component/file progress from the precomputed ADR summary: one stackProfileRows row, one implementationModuleRows row, one source file target, one matching componentTopologyRows row, one matching componentRealizationRows row, and explicit empty secondary domain/schema/sequence sections.",
+      "- Minimum checkpoint row set: every design-depth fragment section must be present. stackProfileRows, implementationModuleRows, componentTopologyRows, componentRealizationRows, and fileTargetRows must be non-empty. This checkpoint is not final-projectable until schema fragments, aggregate domain model, state/sequence flow, and satisfied verdict axes are filled.",
+      "- Prefer the first sourceFileTargets entry and the first matching component summary row. Do not wait to enumerate every component/module before this checkpoint; it is progress, not final design truth.",
+      "- The component/file-target semantic checkpoint must preserve the first partial designCompletenessVerdict row and add non-empty stackProfileRows, implementationModuleRows, fileTargetRows, componentTopologyRows, and componentRealizationRows from the same precomputed summary.",
+      "- Fourth tool action: only after that semantic checkpoint exists, read bounded governance, construction, ADR, or worker-report authority as needed to complete or refine the remaining sections.",
+      "- Never publish all required sections with empty/null placeholders as a full checkpoint. An implementation-design register with empty stackProfileRows, implementationModuleRows, componentTopologyRows, componentRealizationRows, fileTargetRows, moduleSchemaFragments, moduleStateDiagramFragments, aggregateDomainModel entities/operations, aggregateSunnyDaySequence steps, or non-satisfied designCompletenessVerdict axes is rejected before projection.",
+      "- After the component/file-target semantic checkpoint succeeds, every exploratory read must be paired with the next tool action that writes at least one named non-empty or explicitly blocked register section back to the same content ledger file.",
+      "- Do not attempt a complete semantic register as hidden synthesis after bounded reads. The next durable progress after the first-update Write is the component/file-target checkpoint Write.",
+      "- Component/file-target checkpoint: write fileTargetRows plus matching componentTopologyRows and componentRealizationRows from the precomputed ADR summary, ADR Product File Targets table, or higher accepted source authority. Preserve existing designCompletenessVerdict rows in the same content ledger.",
+      "- Progress-timeout protection: after the first-update Write, the next evaluator progress checkpoint is the component/file-target semantic checkpoint to the same content ledger. Do not read governance, construction briefs, ADRs, worker reports, manifests, source refs, or broad requirements before that semantic checkpoint unless the precomputed summary is missing or contradictory.",
+      "- Do not produce a post-first-update plan, checklist, summary, or hidden full-register synthesis before the component/file-target semantic checkpoint Write.",
+      "- Do not inspect the construction brief, ADR/output artifact, worker result report, worker invocation package, handoff manifest, source authority corpus, or broad requirement tables before the first content-ledger write.",
+      "- Do not write terminal narration, plans, summaries, or stdout analysis before the first content-ledger write; the first durable progress signal is the ledger file.",
+      "- A compact partial ledger is better than timeout. Timeout before a non-draft fragment row is an evaluator failure.",
+      "First-update JSON packet:",
+      "```json",
+      designDepthFirstUpdatePacket(input).trimEnd(),
+      "```",
+      "Minimum semantic checkpoint JSON packet:",
+      "```json",
+      designDepthMinimumSemanticCheckpointPacket(input).trimEnd(),
+      "```",
       "",
       "Admitted edge packet:",
       ...compactObligationPromptLines(input.manifest, "content_register"),
@@ -1176,11 +1353,13 @@ function compactDesignDepthPromptLineGroups(input: {
     postAuthorityLines: Object.freeze([
       "",
       "Read in order:",
-      `1. compressed work-category governance (${input.governanceRef}): ${input.governancePath}`,
-      `2. construction brief: ${input.constructionBriefPath}`,
-      `3. pre-created draft content ledger: ${input.contentRegisterPath}`,
-      "4. worker result summary below; inspect the worker report only for a named missing detail.",
-      `5. bounded inspection of the ADR/output artifact: ${input.manifest.outputFile}; the framework has already written the draft ledger, so this read is allowed before the first semantic update.`,
+      `1. first Read only the existing draft content ledger with limit <=80: ${input.contentRegisterPath}.`,
+      `2. then Write the exact first-update JSON packet above to ${input.contentRegisterPath}.`,
+      `3. then Write the exact minimum semantic checkpoint JSON packet above to ${input.contentRegisterPath}; if the Write tool requires a fresh read-after-write check, Read only ${input.contentRegisterPath} with limit <=80 before this Write.`,
+      `4. after the component/file-target semantic checkpoint succeeds, read compressed work-category governance as needed (${input.governanceRef}): ${input.governancePath}`,
+      `5. after the semantic checkpoint succeeds, inspect the construction brief as needed: ${input.constructionBriefPath}`,
+      "6. worker result summary below; inspect the worker report only for a named missing detail after the semantic checkpoint.",
+      `7. after the semantic checkpoint succeeds, perform bounded inspection of the ADR/output artifact as needed: ${input.manifest.outputFile}.`,
       "",
       "Precomputed worker result report summary:",
       ...input.workerReportSummaryLines.map((line) => `- ${line}`),
@@ -1192,8 +1371,8 @@ function compactDesignDepthPromptLineGroups(input: {
       "",
       "Hard bounds:",
       `- Do not use the Read tool on the handoff manifest (${input.manifestPath}); selected edge facts are in this prompt.`,
-      `- Do not inspect ${input.workerReportPath} or ${input.invocationPackagePath} before the first semantic update unless a named missing detail requires it.`,
-      "- The first evaluator update after reading the draft ledger and ADR must write semantic rows; do not spend the first pass gathering exhaustive context.",
+      `- Do not inspect ${input.workerReportPath} or ${input.invocationPackagePath} before the component/file-target semantic checkpoint unless a named missing detail requires it.`,
+      "- The first evaluator update after reading the draft ledger must write semantic rows; do not spend the first pass gathering exhaustive context.",
       "- Prefer one compact complete write for a small fused grid. If uncertain, write partial/blocked verdict axes with reasons instead of hidden synthesis.",
       "- Do not print full files, full JSON objects, full ADR tables, requirement tables, or source files to stdout.",
       "- Do not write EvaluationFinding rows into the content ledger. The grid's expected finding refs are prompt-sidecar and ABG-fold refs, not contentRows[].",
@@ -1293,7 +1472,10 @@ function compactReviewGradePromptLineGroups(input: {
       `- The only durable JSON output you may create or modify is the assessment artifact at ${input.assessmentPath}.`,
       `- Any Write/Edit tool path must equal ${input.assessmentPath} or optional observation manifest ${input.subworkstreamManifestPath}; every other workspace path is read-only.`,
       "- For that assessment artifact only, filesystem writes or a single shell redirection are permitted; do not print the assessment JSON to stdout.",
-      `- Optional observation-only subworkstream manifest: ${input.subworkstreamManifestPath}.`,
+      ...evaluateSubworkstreamManifestPromptLines({
+        manifest: input.manifest,
+        subworkstreamManifestPath: input.subworkstreamManifestPath
+      }),
       "- You may use agent-internal subagents or parallel workstreams as read-only compute strategy for independent modules, obligation slices, or evidence packets.",
       `- If you use evaluator subworkstreams, record them in ${input.subworkstreamManifestPath}. Rows must cite authority/dependency inputs, leave write/output-allocation fields empty, and remain observation only.`,
       "- Evaluator subworkstreams do not emit ABG events, write ledgers, close edges, select traversal, publish consequence projections, or create ABG branch leases. The parent evaluate.C result owns the final assessment merge.",
@@ -1317,7 +1499,11 @@ function compactReviewGradePromptLineGroups(input: {
       ...reviewGradeProgressCheckpointLines({
         manifest: input.manifest,
         invocationScope: input.invocationScope,
-        assessmentPath: input.assessmentPath
+        assessmentPath: input.assessmentPath,
+        governanceRef: input.governanceRef,
+        constructionBriefPath: input.constructionBriefPath,
+        invocationPackagePath: input.invocationPackagePath,
+        workerReportPath: input.workerReportPath
       }),
       "",
       "Read in order:",
@@ -1488,6 +1674,10 @@ function designDepthFpEvaluatorPromptLineGroups(input: {
       "- If you cannot ground a register section in accepted product vocabulary, mark the relevant designCompletenessVerdict axis partial or blocked and cite the missing authority instead of filling a plausible generic model.",
       "- This is evaluation work. Do not rewrite the ADR, source files, tests, package files, or product materialization outputs.",
       "- You may use agent-internal subagents or parallel workstreams as read-only compute strategy for independent modules, interfaces, obligation slices, or evidence packets.",
+      ...evaluateSubworkstreamManifestPromptLines({
+        manifest: input.manifest,
+        subworkstreamManifestPath: input.subworkstreamManifestPath
+      }),
       `- If you use evaluator subworkstreams, record them in ${input.subworkstreamManifestPath}. Rows must cite authority/dependency inputs, stay read-only over workspace/product files, and remain observation only.`,
       "- Evaluator subworkstreams do not emit ABG events, write ledgers, close edges, select traversal, publish consequence projections, or create ABG branch leases. The parent evaluate.C result owns the final content-ledger merge.",
       "- The content ledger path is the durable evaluation artifact; the task is not a single-shot JSON response.",
@@ -1920,6 +2110,10 @@ function reviewGradeProgressCheckpointLines(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly invocationScope?: SdlcReviewGradeInvocationScope | null | undefined;
   readonly assessmentPath: string;
+  readonly governanceRef: string;
+  readonly constructionBriefPath: string;
+  readonly invocationPackagePath: string;
+  readonly workerReportPath: string;
 }): readonly string[] {
   const obligationCount = reviewGradePromptObligationRefs(
     input.manifest,
@@ -1935,7 +2129,15 @@ function reviewGradeProgressCheckpointLines(input: {
     "- Final decision immediate-write rule: once you know the final status and finding set, your next tool call must overwrite the assessment JSON before more reasoning, source inspection, schema verification, or stdout summary.",
     "- Final decision output ban: after the final status and finding set are known, emit no assistant text, plans, summaries, or announcements; the next emitted item must be the Write tool call that overwrites the assessment JSON.",
     "- Do not write a plan or checklist before the first assessment checkpoint; terminal prose is not progress.",
-    "- First assessment checkpoint JSON must be valid whole-file JSON for sdlc_review_grade_edge_fulfillment_assessment before any generated artifact inspection."
+    "- First assessment checkpoint JSON must be valid whole-file JSON for sdlc_review_grade_edge_fulfillment_assessment before any generated artifact inspection.",
+    ...reviewGradeFirstAssessmentCheckpointPacketLines({
+      manifest: input.manifest,
+      invocationScope: input.invocationScope,
+      governanceRef: input.governanceRef,
+      constructionBriefPath: input.constructionBriefPath,
+      invocationPackagePath: input.invocationPackagePath,
+      workerReportPath: input.workerReportPath
+    })
   ]);
 }
 
@@ -1975,7 +2177,11 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
       `- The only durable JSON output you may create or modify is the assessment artifact at ${input.assessmentPath}.`,
       `- Any Write/Edit tool path must equal the assessment artifact path ${input.assessmentPath} or the optional observation-only subworkstream manifest path ${input.subworkstreamManifestPath}; every other workspace path is read-only.`,
       "- For that assessment artifact only, filesystem writes or a single shell redirection are permitted; do not print the assessment JSON to stdout.",
-      `- The only optional sidecar you may create or modify is the observation-only subworkstream manifest at ${input.subworkstreamManifestPath}.`,
+      "- The only optional sidecar you may create or modify is the observation-only subworkstream manifest.",
+      ...evaluateSubworkstreamManifestPromptLines({
+        manifest: input.manifest,
+        subworkstreamManifestPath: input.subworkstreamManifestPath
+      }),
       "- You may use agent-internal subagents or parallel workstreams as read-only compute strategy for independent modules, obligation slices, or evidence packets.",
       `- If you use evaluator subworkstreams, record them in ${input.subworkstreamManifestPath}. Rows must cite authority/dependency inputs, leave write/output-allocation fields empty, and remain observation only.`,
       "- Evaluator subworkstreams do not emit ABG events, write ledgers, close edges, select traversal, publish consequence projections, or create ABG branch leases. The parent evaluate.C result owns the final assessment merge.",
@@ -1993,7 +2199,11 @@ function reviewGradeEdgeFulfillmentPromptLineGroups(input: {
       ...reviewGradeProgressCheckpointLines({
         manifest: input.manifest,
         invocationScope: input.invocationScope,
-        assessmentPath: input.assessmentPath
+        assessmentPath: input.assessmentPath,
+        governanceRef: input.governanceRef,
+        constructionBriefPath: input.constructionBriefPath,
+        invocationPackagePath: input.invocationPackagePath,
+        workerReportPath: input.workerReportPath
       }),
       "",
       "Read in order:",

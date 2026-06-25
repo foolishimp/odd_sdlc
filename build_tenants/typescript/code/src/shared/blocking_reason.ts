@@ -76,6 +76,7 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "design_depth_register_admission_invalid",
   "review_grade_evaluator_process_failed",
   "review_grade_evaluator_process_timeout",
+  "review_grade_evaluator_assessment_checkpoint_timeout",
   "review_grade_evaluator_mutated_input",
   "source_asset_dependency_missing",
   "edge_closure_residual_pressure",
@@ -229,6 +230,7 @@ const DETAIL_PRESERVING_LEGACY_REASON_CODES = Object.freeze([
   "design_depth_register_admission_invalid",
   "review_grade_evaluator_process_failed",
   "review_grade_evaluator_process_timeout",
+  "review_grade_evaluator_assessment_checkpoint_timeout",
   "review_grade_evaluator_mutated_input",
   "source_asset_dependency_missing",
   "unsupported_fd_transition",
@@ -416,6 +418,14 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       lawfulReentryPoint: "triage_gap",
       message:
         "Design-depth evaluator target carrier could not be admitted as a closed typed carrier."
+    });
+  }
+  if (code === "review_grade_evaluator_assessment_checkpoint_timeout") {
+    return Object.freeze({
+      reasonClass: "assurance",
+      lawfulReentryPoint: "same_edge_retry",
+      message:
+        "F_P review-grade evaluator timed out before publishing the required assessment checkpoint."
     });
   }
   if (

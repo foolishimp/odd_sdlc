@@ -159,6 +159,7 @@ function installedAbgRuntimeBindingSource(input: {
   createOddSdlcAbgRuntimeAssuranceProvider,
   createOddSdlcAbgRuntimeBindingPlugins,
   oddSdlcAbgRuntimeWorkerTransportFromEnv,
+  resolveOddSdlcAbgRuntimeNextTarget,
   resolveOddSdlcAbgRuntimeBindingPolicy
 } from ${JSON.stringify(input.packageName)};
 
@@ -183,6 +184,13 @@ export const runtimeBinding = {
   resolvePolicy(input) {
     return resolveOddSdlcAbgRuntimeBindingPolicy({
       targetGraphFunction: input.target.graphFunctionHandle
+    });
+  },
+  resolveNextTarget(input) {
+    return resolveOddSdlcAbgRuntimeNextTarget({
+      workspaceRoot: input.workspaceRoot,
+      until: input.command.until,
+      workerTransport: oddSdlcAbgRuntimeWorkerTransportFromEnv()
     });
   },
   createPlugins(input) {

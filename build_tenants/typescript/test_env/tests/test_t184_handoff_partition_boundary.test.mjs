@@ -417,12 +417,20 @@ test("T-184 operator timeout policy is tenant configuration, not handoff glue", 
     420000
   );
   assert.equal(
+    runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.checkpointTimeoutMs,
+    180000
+  );
+  assert.equal(
     runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.maxEffort,
     "medium"
   );
   assert.ok(
     runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.inactivityTimeoutMs <
       runtimePolicy.worker.inactivityTimeoutMs
+  );
+  assert.ok(
+    runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.checkpointTimeoutMs <
+      runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.timeoutMs
   );
   assert.equal(
     runtimePolicy.reviewGradeEdgeFulfillmentEvaluator.stdoutBudgetBytes,
@@ -450,6 +458,10 @@ test("T-184 operator timeout policy is tenant configuration, not handoff glue", 
   assert.match(
     installedOperatorSource,
     /reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /reviewGradeEdgeFulfillmentEvaluatorCheckpointTimeoutMs/u
   );
   assert.match(
     installedOperatorSource,
@@ -611,7 +623,7 @@ test("T-184 F_P evaluator prompt uses incremental content ledger writes", () => 
   );
   assert.match(
     installedOperatorSource,
-    /const processFailureReason: SdlcBlockingReasonCode =[\s\S]*workerProcessTextLooksRetryableProviderFailure\(evaluatorProcessText\)[\s\S]*\?\s*"worker_connection_failed"[\s\S]*:\s*processResult\.timedOut === true[\s\S]*\?\s*"review_grade_evaluator_process_timeout"[\s\S]*:\s*"review_grade_evaluator_process_failed"/u
+    /const processFailureReason: SdlcBlockingReasonCode =[\s\S]*workerProcessTextLooksRetryableProviderFailure\(evaluatorProcessText\)[\s\S]*\?\s*"worker_connection_failed"[\s\S]*:\s*processResult\.timedOut === true[\s\S]*\?\s*reviewGradeEdgeFulfillmentTimedOutBlockingReason\(processResult\.outcome\)[\s\S]*:\s*"review_grade_evaluator_process_failed"/u
   );
   assert.match(
     installedOperatorSource,
@@ -647,6 +659,14 @@ test("T-184 F_P evaluator prompt uses incremental content ledger writes", () => 
   );
   assert.match(
     installedOperatorSource,
+    /externalProgressTimeoutReason:[\s\S]*"review_grade_evaluator_assessment_checkpoint_timeout"/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /externalProgressCheck: \(\) =>[\s\S]*reviewGradeEdgeFulfillmentAssessmentCheckpointObserved\(\{[\s\S]*assessmentPath,[\s\S]*invocationScope/u
+  );
+  assert.match(
+    installedOperatorSource,
     /outcome\.reason === "worker_connection_failed"[\s\S]*return "worker_connection_failed"/u
   );
   assert.match(
@@ -672,6 +692,10 @@ test("T-184 F_P evaluator prompt uses incremental content ledger writes", () => 
   assert.match(
     blockingReasonSource,
     /code === "design_depth_fp_evaluator_progress_timeout"[\s\S]*lawfulReentryPoint: "same_edge_retry"/u
+  );
+  assert.match(
+    blockingReasonSource,
+    /code === "review_grade_evaluator_assessment_checkpoint_timeout"[\s\S]*lawfulReentryPoint: "same_edge_retry"/u
   );
   assert.match(
     evaluatorPromptSource,

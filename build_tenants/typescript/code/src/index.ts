@@ -64,10 +64,15 @@ export {
   createOddSdlcAbgRuntimeAssuranceProvider,
   createOddSdlcAbgRuntimeBindingPlugins,
   oddSdlcAbgRuntimeWorkerTransportFromEnv,
+  resolveOddSdlcAbgRuntimeNextTarget,
   resolveOddSdlcAbgRuntimeBindingPolicy,
   type OddSdlcAbgRuntimeBindingPluginFactoryInput,
+  type OddSdlcAbgRuntimeNextTargetInput,
   type OddSdlcAbgRuntimeBindingPolicyInput
 } from "./operator/abg_runtime_binding.js";
+export {
+  selectSdlcDependencyMapTraversal
+} from "./operator/decomposition_admission.js";
 export * from "./postflight/index.js";
 export * from "./assurance/index.js";
 export * from "./release/index.js";

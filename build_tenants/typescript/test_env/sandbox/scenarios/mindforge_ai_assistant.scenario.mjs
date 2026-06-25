@@ -20,9 +20,6 @@ const COMMON_SOURCE_FILES = Object.freeze([
   "specification/requirements/01-mindforge-governance-output.md"
 ]);
 
-const BOOTSTRAP_REQUIREMENTS_OVERLAY_REF =
-  "overlay://odd-sdlc/bootstrap-requirements";
-
 function projection(input) {
   return Object.freeze({
     useCaseId: input.useCaseId,
@@ -137,13 +134,11 @@ function scenarioFor(row) {
       sourceFiles: sourceFilesFor(row)
     },
     expectations: {
-      terminalStatus: "blocked",
-      firstStartStatus: "blocked",
-      firstStartOverlayRef: BOOTSTRAP_REQUIREMENTS_OVERLAY_REF,
-      firstStartTargetGraphFunction: "bootstrap_requirements"
+      startErrorIncludes: "worker dispatch requires admitted worker transport"
     },
+    expectCommandFailure: true,
     expectedGovernanceOutput: row.expectedOutput,
-    startTarget: "overlay:bootstrap-requirements",
+    startTarget: "graph_function:bootstrap_requirements",
     startUntil: "first_traversal",
     maxAdvances: 1
   });
@@ -263,7 +258,7 @@ export function mindforgeAiAssistantLiveScenario({
     },
     expectedGovernanceOutput: row.expectedOutput,
     liveWorker: worker,
-    startTarget: "overlay:lite-design-module-implementation",
+    startTarget: "next",
     startUntil,
     maxAdvances,
     continueOnEdgeConverge: true,

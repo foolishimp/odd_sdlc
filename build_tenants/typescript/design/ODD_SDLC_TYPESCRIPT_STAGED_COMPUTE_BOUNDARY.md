@@ -297,6 +297,8 @@ target filename, ecosystem command, scenario brand, or downstream product name
 
 ### Reference-To-Target Derivation
 
+Current TypeScript install pin: ABI 4.1.0-rc.11.
+
 | row | current source / reference | target owner API or carrier | target site | proof lane |
 | --- | --- | --- | --- | --- |
 | B1 | `test_t194` proved ABG gate only in tests | ABG `typecheckGtlProgram(...)` and `admitGtlProgramConformanceInput(...)` | product `gtl_conformance/*`, plugin binding, start adapters, release, build preflight | `test:t194`, `test:t197`, `test:t059` |

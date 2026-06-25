@@ -109,6 +109,12 @@ function policyConfig() {
         "inactivityTimeoutMs",
         "operator-runtime-policy.json.reviewGradeEdgeFulfillmentEvaluator"
       ),
+    reviewGradeEdgeFulfillmentEvaluatorCheckpointTimeoutMs:
+      positiveIntegerFromRecord(
+        reviewGradeEdgeFulfillmentEvaluator,
+        "checkpointTimeoutMs",
+        "operator-runtime-policy.json.reviewGradeEdgeFulfillmentEvaluator"
+      ),
     reviewGradeEdgeFulfillmentEvaluatorStdoutBudgetBytes: positiveIntegerFromRecord(
       reviewGradeEdgeFulfillmentEvaluator,
       "stdoutBudgetBytes",
@@ -172,6 +178,10 @@ export function liveOperatorRuntimePolicy() {
     reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs: positiveInteger(
       "ODD_SDLC_REVIEW_GRADE_EDGE_FULFILLMENT_EVALUATOR_INACTIVITY_TIMEOUT_MS",
       config.reviewGradeEdgeFulfillmentEvaluatorInactivityTimeoutMs
+    ),
+    reviewGradeEdgeFulfillmentEvaluatorCheckpointTimeoutMs: positiveInteger(
+      "ODD_SDLC_REVIEW_GRADE_EDGE_FULFILLMENT_EVALUATOR_CHECKPOINT_TIMEOUT_MS",
+      config.reviewGradeEdgeFulfillmentEvaluatorCheckpointTimeoutMs
     ),
     reviewGradeEdgeFulfillmentEvaluatorStdoutBudgetBytes: positiveInteger(
       "ODD_SDLC_REVIEW_GRADE_EDGE_FULFILLMENT_EVALUATOR_STDOUT_BUDGET_BYTES",

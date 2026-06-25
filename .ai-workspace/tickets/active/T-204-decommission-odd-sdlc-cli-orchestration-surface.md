@@ -168,9 +168,10 @@ The relevant release proof used the current staged release packages:
 - odd_sdlc package: `@odd-sdlc/typescript-tenant@3.0.16`
 - ABIogenesis substrate: `@abiogenesis/typescript-tenant@4.1.0-rc.8`
 
-Current substrate after the 2026-06-25 compiler-gate self-run repair:
+Current substrate after the 2026-06-25 compiler-gate self-run repair and rc11
+runtime-binding update:
 
-- ABIogenesis substrate: `@abiogenesis/typescript-tenant@4.1.0-rc.10`
+- ABIogenesis substrate: `@abiogenesis/typescript-tenant@4.1.0-rc.11`
 
 Observed non-closure evidence:
 
@@ -227,23 +228,23 @@ compiler truth. The current lanes do not yet fail closed when:
       `blocked/gap_stop` must either remain a non-close result or carry an
       ABG-admitted retry, yield, or re-entry continuation fact before any later
       edge can be used as closure proof.
-- [ ] Add target materialization closure checks: when target-carrier rows or
+- [x] Add target materialization closure checks: when target-carrier rows or
       scenario expectations declare files such as `src/hello.js`, `test/*.js`,
       `Cargo.toml`, or `src/main.rs`, release proof must fail until admitted
       materialization evidence for those paths exists.
-- [ ] Add a closure-proof guard that distinguishes diagnostic scenario harnesses
+- [x] Add a closure-proof guard that distinguishes diagnostic scenario harnesses
       from release gates; explicit `startTargetSequence`, `stopOnLawful`
       relaxation, and forced continuation through `blocked` outcomes may be
       diagnostic tools but must not satisfy T-204 closure.
-- [ ] Re-run the JS hello-world live release proof and record a clean result
+- [x] Re-run the JS hello-world live release proof and record a clean result
       only if design, component-code, test construction, and execution evidence
       close without blocked-edge bypass.
-- [ ] Re-run the Rust hello-service live release proof and record either a clean
+- [x] Re-run the Rust hello-service live release proof and record either a clean
       materialized service proof or a ratified ABG-side non-closure blocker.
 - [ ] Reconcile the Data Mapper proof requirement: either run the live lane
       against the repaired compiler/runtime boundary or ratify why Data Mapper is
       not required for this ticket's closure.
-- [ ] Update the Phase 7 closure audit with exact commands, archive roots,
+- [x] Update the Phase 7 closure audit with exact commands, archive roots,
       installed package versions, and pass/fail verdicts.
 - [ ] Do not move this ticket back to completed until the closure law and Phase
       7 gate are satisfied by current release artifacts.
@@ -275,6 +276,111 @@ This repairs the first compiler-gate false-positive pattern only. T-204 remains
 active until the installed traversal-unit, scenario descriptor, continuation,
 materialization, and release-proof lanes are implemented and used to reject the
 current JS/Rust false-positive release proof shapes.
+
+### 2026-06-25 RC11 Root Runtime/Compiler Repair And Hello-World Proof
+
+This checkpoint repairs the root ABG/SDLC boundary defects exposed while
+rebuilding the JavaScript hello-world and Rust hello-service proof lanes. It is
+not a Data Mapper source fix, JavaScript application fix, or Rust application
+fix. It keeps the repair at the T-204/product boundary: ABG owns command,
+runtime, replay, retry, next-target resolution, and admitted continuation
+truth; `odd_sdlc` owns GTL declarations, product plugins, prompt policy,
+domain carriers, and product proof interpretation.
+
+Current staged package inputs:
+
+- `@abiogenesis/typescript-tenant@4.1.0-rc.11`
+- `@odd-sdlc/typescript-tenant@3.0.16` source line consuming the rc11 tarball
+
+Root defects fixed in this checkpoint:
+
+| Pattern | Root cause | Repair |
+| --- | --- | --- |
+| ABG `--target next` could fall through to `bind_gap_route` or stale route fallback | installed runtime binding had no product-owned next-target resolver for ABG to call while still keeping command/control in ABG | odd_sdlc now installs `runtimeBinding.resolveNextTarget(...)` over product query-domain interpretation; ABG CLI owns the command and consumes the resolved graph-function handle |
+| descriptor starts could prove only harness-selected routes | live descriptors and no-worker descriptor tests still carried direct overlay starts or stale edge lists | descriptor starts were narrowed to `next` or explicit `graph_function:*`; no-worker descriptors now fail closed on missing worker transport instead of silently accepting overlay route drift |
+| empty or first-only semantic checkpoints could pass enough syntax to churn or mask semantic emptiness | evaluator prompts admitted structurally valid but semantically empty early packets | design-depth and review-grade prompts now require admission-valid first checkpoints while keeping them non-closeable; compact review prompts carry exact first-packet schema and active invocation scope |
+| review-grade evaluator could hang or retry without typed runtime pressure | process progress was not tied to required semantic checkpoint updates | runtime policy now gives review-grade evaluation an external checkpoint timeout and maps checkpoint timeout to typed same-edge retry pressure |
+| evaluate sidecar manifests could be schema-shaped but semantically wrong | prompt text named the key set but did not force the exact default manifest identity | evaluator prompts now include the exact default `sdlc_compute_subworkstream_manifest` packet; regressions reject the wrong `sdlc_evaluate_compute_subworkstream_manifest` kind |
+| stale T-164 proof surface expected old full-lifecycle edges | live Rust service proof asserted `derive_intent_surface` rather than the lite traversal actually under test | T-164 live evidence now expects the lite edge sequence ending in `derive_test_execution_result_surface` |
+
+Clean JavaScript hello-world live proof:
+
+```text
+npm run test:scenario:t132-hello-world-js-live
+```
+
+Archive:
+
+```text
+build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260625T002514767Z_pid49061
+```
+
+Result:
+
+- passed, 1/1, `duration_ms=1886791.420083`;
+- materialized `build_tenants/hello_world_javascript/src/hello.js`;
+- materialized `build_tenants/hello_world_javascript/test/hello.test.js`;
+- review-grade passed for component code, component test, and UAT source with
+  zero open findings;
+- `prepare_test_execution_surface` and
+  `derive_test_execution_result_surface` both ran;
+- execution evidence used `node`, and direct scenario process checks passed
+  `node src/hello.js` and `node --test test/hello.test.js`.
+
+Clean Rust hello-service live proof:
+
+```text
+npm run test:scenario:t164-rust-hello-service-live
+```
+
+Archive:
+
+```text
+build_tenants/typescript/test_env/test_runs/scenario_t164_rust_hello_service_lite_live/20260624T233106778Z_pid16658
+```
+
+Result:
+
+- passed, 1/1, `duration_ms=3230214.802916`;
+- materialized `build_tenants/hello_world_rust_service/Cargo.toml`;
+- materialized `build_tenants/hello_world_rust_service/src/main.rs`;
+- materialized `build_tenants/hello_world_rust_service/tests/smoke.sh`;
+- component-code and UAT-source defects were handled as ABG same-edge retry
+  pressure, then closed on corrected retry artifacts;
+- `prepare_test_execution_surface` and
+  `derive_test_execution_result_surface` both ran;
+- execution evidence used `cargo run` and observed `helloworld` output.
+
+Deterministic validation after the live repairs:
+
+| Check | Result |
+| --- | --- |
+| `npm run build:semantic` | passed |
+| focused T-204/T-197/T-192/T-185/T-184/T-182/T-086 batch | passed, 115/115 |
+| `npm run lint:semantic` | passed |
+| `npm run lint:test-harness` | passed |
+| `node --test test_env/sandbox/test_scenario_sandbox.test.mjs` | passed, 36/36 with 11 opt-in live cases skipped |
+
+The first focused batch attempt was discarded because it was run concurrently
+with `npm run build:semantic`; the semantic build cleans `build/semantic`, so
+the tests raced missing compiled modules. The sequential rerun passed.
+
+Residual non-closure:
+
+- T-204 stays active. The JS live descriptor still carries an explicit
+  `startTargetSequence` over the lite edge list; that is now useful diagnostic
+  and materialization proof, but it is not the final installed traversal-unit
+  proof unless a release gate explicitly accepts the sequence as declared
+  release truth.
+- The installed traversal-unit lane remains open until a clean release proof
+  demonstrates ABG-owned `next`/continuation truth without a product-local
+  per-step route sequence acting as closure authority.
+- The scenario descriptor compiler lane remains open until descriptor
+  executability is a compiler/release gate, not only sandbox descriptor test
+  coverage.
+- The Data Mapper proof requirement remains open. Either rerun Data Mapper
+  against the rc11 boundary or ratify why Data Mapper is not required for this
+  T-204 closure.
 
 ## STDO Triage
 

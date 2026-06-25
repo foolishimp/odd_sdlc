@@ -164,6 +164,13 @@ test("T-188 evaluator process failures do not route to product F_P repair", () =
   });
   assert.equal(semanticFinding.reasonClass, "assurance");
   assert.equal(semanticFinding.lawfulReentryPoint, "same_edge_retry");
+
+  const checkpointTimeout = makeSdlcBlockingReason({
+    code: "review_grade_evaluator_assessment_checkpoint_timeout",
+    evidenceRefs: ["evidence://review-grade-checkpoint-timeout"]
+  });
+  assert.equal(checkpointTimeout.reasonClass, "assurance");
+  assert.equal(checkpointTimeout.lawfulReentryPoint, "same_edge_retry");
 });
 
 test("T-170 F_D failure severity separates protocol context diagnostics and content", () => {

@@ -407,7 +407,7 @@ test("T-197 design ratifies owner partition assets before Wave 1 code", () => {
     "### Decommission Register",
     "### W-105 Construct-Site Sufficiency Inventory",
     "ABG route / dependency",
-    "ABI 4.1.0-rc.10",
+    "ABI 4.1.0-rc.11",
     "runtime continuation transition projection refs",
     "22/22 edge-contract tests and 1/1 Rust-service sandbox proof",
     "must-not-name-governed-target",
@@ -721,18 +721,23 @@ test("T-197 A2 keeps SDLC start as shell over one admitted ABG boundary", () => 
     "build_tenants/typescript/code/src/install/instruction_files.ts"
   );
 
-	  assert.match(product, /control remains in ABG until ABG exits/u);
-	  assert.match(product, /must not implement a product-local loop/u);
-	  assert.match(runtimePolicyConfig, /"maxEffort": "medium"/u);
-	  assert.match(installedOperator, /capWorkerTransportEffort/u);
+		  assert.match(product, /control remains in ABG until ABG exits/u);
+		  assert.match(product, /must not implement a product-local loop/u);
+		  assert.match(runtimePolicyConfig, /"maxEffort": "medium"/u);
+		  assert.match(runtimePolicyConfig, /"checkpointTimeoutMs": 180000/u);
+		  assert.match(installedOperator, /capWorkerTransportEffort/u);
 		  assert.match(
 		    installedOperator,
 		    /maxEffort: designDepthFpEvaluatorMaxEffort\(\)/u
 		  );
-		  assert.match(
-		    installedOperator,
-		    /maxEffort: reviewGradeEdgeFulfillmentEvaluatorMaxEffort\(\)/u
-		  );
+			  assert.match(
+			    installedOperator,
+			    /maxEffort: reviewGradeEdgeFulfillmentEvaluatorMaxEffort\(\)/u
+			  );
+			  assert.match(
+			    installedOperator,
+			    /reviewGradeEdgeFulfillmentEvaluatorCheckpointTimeoutMs\(\)/u
+			  );
 		  assert.match(
 		    abgRuntimeBinding,
 		    /\bcreateOddSdlcAbgRuntimeBindingPlugins\b/u

@@ -1,6 +1,5 @@
 // T-160 JavaScript hello-world lite traversal scenario.
-// Starts from loaded project authority and selects the bounded lite overlay
-// instead of the current full traversal.
+// Starts from loaded project authority through an explicit ABG graph target.
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,9 +28,10 @@ export const t160HelloWorldJsLiteScenario = Object.freeze({
     sourceFiles: T160_HELLO_WORLD_JS_LITE_SOURCE_FILES
   },
   expectations: {
-    terminalStatus: "blocked"
+    startErrorIncludes: "worker dispatch requires admitted worker transport"
   },
-  startTarget: "overlay:lite-design-module-implementation",
+  expectCommandFailure: true,
+  startTarget: "graph_function:lite_design_module_implementation",
   startUntil: "first_traversal",
   maxAdvances: 1
 });
@@ -70,12 +70,10 @@ export const t160HelloWorldJsOverlayScenarios = Object.freeze(
       scenarioId: `scenario_t160_hello_world_js_overlay_${row.id}`,
       installedPackageName: `odd-sdlc-scenario-t160-hello-world-js-overlay-${row.id.replaceAll("_", "-")}`,
       expectations: {
-        terminalStatus: "blocked",
-        firstStartStatus: "blocked",
-        firstStartOverlayRef: row.overlayRef,
-        firstStartTargetGraphFunction: row.targetGraphFunction
+        startErrorIncludes: "worker dispatch requires admitted worker transport"
       },
-      startTarget: `overlay:${row.overlayHandle}`,
+      expectCommandFailure: true,
+      startTarget: `graph_function:${row.targetGraphFunction}`,
       maxAdvances: 1
     })
   )
@@ -126,6 +124,7 @@ export function t160HelloWorldJsLiteLiveScenario({
       ]
     },
     liveWorker: worker,
+    startTarget: "next",
     startUntil,
     maxAdvances,
     continueOnEdgeConverge: true,
