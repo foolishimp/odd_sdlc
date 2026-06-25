@@ -71,6 +71,7 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "design_depth_fp_evaluator_semantic_checkpoint_timeout",
   "design_depth_fp_evaluator_progress_timeout",
   "design_depth_fp_evaluator_process_failed",
+  "design_depth_fp_evaluator_semantic_floor_invalid",
   "design_depth_fp_evaluator_rule_blocked",
   "design_depth_fp_evaluator_pending",
   "design_depth_register_admission_invalid",
@@ -225,6 +226,7 @@ const DETAIL_PRESERVING_LEGACY_REASON_CODES = Object.freeze([
   "design_depth_fp_evaluator_semantic_checkpoint_timeout",
   "design_depth_fp_evaluator_progress_timeout",
   "design_depth_fp_evaluator_process_failed",
+  "design_depth_fp_evaluator_semantic_floor_invalid",
   "design_depth_fp_evaluator_rule_blocked",
   "design_depth_fp_evaluator_pending",
   "design_depth_register_admission_invalid",
@@ -402,6 +404,14 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       lawfulReentryPoint: "same_edge_retry",
       message:
         "F_P design-depth evaluator timed out after publishing semantic content-register progress."
+    });
+  }
+  if (code === "design_depth_fp_evaluator_semantic_floor_invalid") {
+    return Object.freeze({
+      reasonClass: "assurance",
+      lawfulReentryPoint: "same_edge_retry",
+      message:
+        "F_P design-depth evaluator published a semantic content register that missed the required design-depth semantic floor."
     });
   }
   if (code === "design_depth_fp_evaluator_pending") {

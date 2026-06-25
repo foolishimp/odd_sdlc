@@ -98,3 +98,24 @@ re-entry behavior.
 - AC-5: loopback over an applied proposal emits either `gap_retired` or a new
   attributable `gap_event` rather than leaving the originating gap in
   ambiguous limbo
+
+### REQ-F-ODDSDLC-038 — recovery proceeds by attenuation and iteration
+
+`odd_sdlc` treats attenuation and iteration as the primary recovery principle
+for gap pressure.
+
+**Acceptance Criteria**:
+- AC-1: recovery first names the smallest admitted observation, obligation,
+  evidence gap, authority layer, and permitted repair scope that explains the
+  current pressure
+- AC-2: recovery does not begin with broad rewrite, prompt compensation,
+  target-specific hardcoding, or an SDLC-local control loop
+- AC-3: each iteration carries prior evidence, residual pressure, lawful
+  re-entry reason, and open obligation state forward through ABG-owned
+  continuation truth
+- AC-4: repeated attempts are lawful only when they narrow, clear, or lawfully
+  reroute pressure
+- AC-5: identical retry without new evidence, narrower scope, or changed route
+  becomes blocked or reprice pressure rather than hidden convergence
+- AC-6: attenuation does not weaken the requirement; it narrows the repair
+  surface until the next constructive action can prove or falsify the pressure

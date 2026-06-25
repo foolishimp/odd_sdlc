@@ -161,6 +161,24 @@ declarations without proving the installed traversal unit can lawfully execute,
 materialize required product files, close, or re-enter through ABG-owned runtime
 truth.
 
+### 2026-06-25 Restored Source-Inventory Criteria
+
+The 2026-06-24 source survival inventory is no longer closure-authoritative. The
+original T-204 criteria are restored: the default answer for every TypeScript
+source file is delete or move to ABG unless it positively survives as GTL
+program declaration, product plugin/API action, irreducible product
+carrier/projection, or narrow proof/release plumbing. A file under a plugin path
+does not survive if it owns execution transport, archive authority, retry,
+replay, transition, closure, result ingress, or local command/control.
+
+Current restored file walk:
+
+- `.ai-workspace/comments/codex/20260625T133035Z_T204_restored_original_criteria_file_walk.md`
+
+That walk classifies all current 175 `build_tenants/typescript/code/src` files
+and marks the mixed local runtime/control surfaces as unresolved work, not
+closure evidence.
+
 ### Reopening Evidence
 
 The relevant release proof used the current staged release packages:

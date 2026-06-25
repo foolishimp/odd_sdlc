@@ -964,6 +964,28 @@ after gap analysis before forward derivation resumes.
 Lawful re-entry preserves the direction of authority instead of collapsing
 every gap into immediate code repair.
 
+### Recovery Attenuation And Iteration
+
+The primary recovery principle for `odd_sdlc` is attenuation and iteration.
+
+Recovery first attenuates the failure surface. It names the smallest admitted
+observation, obligation, evidence gap, authority layer, and permitted repair
+scope that explains the current pressure. It does not start from broad rewrite,
+prompt compensation, target-specific hardcoding, or a product-local control
+loop.
+
+Recovery then iterates from that attenuated state. Each iteration must carry the
+prior evidence, residual pressure, lawful re-entry reason, and open obligation
+state forward through ABG-owned continuation truth. A repeated attempt is lawful
+only when it narrows, clears, or lawfully reroutes the pressure. An identical
+retry with no new evidence, narrower scope, or changed route becomes blocked or
+reprice pressure rather than hidden convergence.
+
+Attenuation does not mean weakening the requirement. It means reducing the
+repair surface until the next constructive action is specific enough to prove or
+falsify. Iteration does not mean local retry ownership. It means ABG-owned
+runtime continuation over SDLC-admitted product pressure.
+
 ### Route Binding
 
 The action-selection result that binds one triaged gap into fixed repair,

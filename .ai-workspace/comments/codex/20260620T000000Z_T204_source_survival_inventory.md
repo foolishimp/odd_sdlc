@@ -1,5 +1,18 @@
 # T-204 Source Survival Inventory
 
+## 2026-06-25 Supersession
+
+This inventory's 2026-06-24 closure-refresh interpretation is superseded for
+closure purposes by
+`.ai-workspace/comments/codex/20260625T133035Z_T204_restored_original_criteria_file_walk.md`.
+
+The active T-204 ticket restored the original criteria after the release-candidate
+proof showed false-positive closure. Do not use the `move_to_abg: 0` count below
+as current closure evidence.
+
+All sections below this supersession note are historical, including claims about
+which inventory `test_t197_product_gtl_gate` parses.
+
 Generated from the current `build_tenants/typescript/code/src` tree after the T-204 command-surface cut.
 
 ## 2026-06-24 Closure Refresh

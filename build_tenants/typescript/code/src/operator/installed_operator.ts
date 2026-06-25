@@ -139,6 +139,7 @@ import type {
 import {
   deriveSdlcClosureStateTransition,
   makeSdlcClosureResidualPressureCarrier,
+  sdlcClosureStateBucketForLawfulReentryPoint,
   syntheticGapDossierFromClosureRefs
 } from "./closure_state_machine.js";
 import {
@@ -1182,6 +1183,19 @@ function latestRuntimeAttemptRunIdForRetryContext(input: {
     .sort();
   let latestRunId: string | null = null;
   for (const runId of runIds) {
+    const archiveRoot = join(operatorRunsRoot, runId);
+    const hasAttemptBoundaryArtifact = [
+      "sdlc_edge_closure_decision.json",
+      "postflight.json",
+      "review_grade_edge_fulfillment_assessment.json",
+      "worker_process_summary.json"
+    ].some((filename) => {
+      const artifactPath = join(archiveRoot, filename);
+      return existsSync(artifactPath) && statSync(artifactPath).isFile();
+    });
+    if (!hasAttemptBoundaryArtifact) {
+      continue;
+    }
     const manifestPath = join(operatorRunsRoot, runId, "handoff_manifest.json");
     if (!existsSync(manifestPath) || !statSync(manifestPath).isFile()) {
       continue;
@@ -1446,8 +1460,13 @@ export function mergeSdlcWorkerRetryContextWithRuntimeGapRegister(input: {
     retryContext: projected,
     gapDossier: latestGapDossier
   });
+  const latestGapIsLatestRuntimeAttempt =
+    latestRuntimeAttemptRunId !== null &&
+    latestGapRunId !== null &&
+    latestGapRunId === latestRuntimeAttemptRunId;
   if (
     !retryContextCarriesGapAuthority(projected) &&
+    !latestGapIsLatestRuntimeAttempt &&
     (projected.retryAttemptRefs.length === 0 ||
       (!latestGapDossier.currentGapDossierRef.startsWith(
         "closure-gap-dossier://"
@@ -4429,6 +4448,12 @@ function designDepthFpEvaluatorBlockingReasonCode(
   if (outcome.reason === "design_depth_fp_evaluator_progress_timeout") {
     return "design_depth_fp_evaluator_progress_timeout";
   }
+  if (
+    typeof outcome.reason === "string" &&
+    outcome.reason.startsWith("evaluate_content_ledger_design_depth_payload_invalid:")
+  ) {
+    return "design_depth_fp_evaluator_semantic_floor_invalid";
+  }
   return outcome.reason === "design_depth_fp_evaluator_process_failed"
     ? "design_depth_fp_evaluator_process_failed"
     : "design_depth_fp_evaluator_rule_blocked";
@@ -4480,6 +4505,14 @@ function stateWithBlockedDesignDepthFpEvaluatorOutcome(input: {
     outcome: input.outcome,
     ruleOutcomeRef: input.ruleOutcomeRef
   });
+  const gapDossier = constructPostflightGapDossier({
+    manifest: input.state.manifest,
+    postflight
+  });
+  writePostflightGapDossier({
+    manifest: input.state.manifest,
+    gapDossier
+  });
   writeSdlcSystemArtifact({
     archiveRoot: input.state.manifest.archiveRoot,
     relativePath: "design_depth_fp_evaluator_postflight.json",
@@ -4502,12 +4535,12 @@ function stateWithBlockedDesignDepthFpEvaluatorOutcome(input: {
     });
   }
   const blockingReasonCarriers = Object.freeze([
-    ...postflight.blockingReasonCarriers,
-    ...input.state.blockingReasonCarriers
+    ...postflight.blockingReasonCarriers
   ]);
   return Object.freeze({
     ...input.state,
     postflight,
+    gapDossier,
     blockingReason: summarizeBlockingReasons(blockingReasonCarriers),
     blockingReasonCarriers
   });
@@ -6784,6 +6817,19 @@ function structuralBlockReasonRefsForState(
   state: SdlcAbgOwnedFpDispatchState
 ): readonly string[] {
   if (state.status === "worker_invoked" || state.blockingReasonCarriers.length > 0) {
+    return Object.freeze([]);
+  }
+  const activePostflightCarriers =
+    state.postflight === null
+      ? Object.freeze([] as SdlcBlockingReason[])
+      : activePostflightBlockingReasonCarriers(state.postflight);
+  if (
+    activePostflightCarriers.some(
+      (reason) =>
+        sdlcClosureStateBucketForLawfulReentryPoint(reason.lawfulReentryPoint) !==
+        "block"
+    )
+  ) {
     return Object.freeze([]);
   }
   return uniqueSorted([

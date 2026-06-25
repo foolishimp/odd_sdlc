@@ -556,6 +556,15 @@ test("T-192 small admitted handoffs render compact fused-grid prompts", () => {
   );
   assert.match(
     compactDesign.promptText,
+    /evaluator must use bounded admitted evidence to advance one named semantic section/u
+  );
+  assert.match(
+    compactDesign.promptText,
+    /Repeating the checkpoint with empty semantic sections or partial verdict axes after bounded evidence is evaluator failure/u
+  );
+  assert.doesNotMatch(compactDesign.promptText, /semanticFloorSummary/u);
+  assert.match(
+    compactDesign.promptText,
     /then Write the exact minimum semantic checkpoint JSON packet above/u
   );
   assert.match(

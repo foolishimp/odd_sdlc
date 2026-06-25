@@ -3,10 +3,13 @@
 // Validates: REQ-F-ODDSDLC-035
 // Validates: REQ-F-ODDSDLC-036
 // Validates: REQ-F-ODDSDLC-037
+// Validates: REQ-F-ODDSDLC-038
 // Investigates: T-036
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 
 import {
   admitExecutionBasis,
@@ -34,6 +37,12 @@ import {
   SDLC_TRIAGE_CLASSIFICATION_POLICY,
   SDLC_TRIAGE_ROUTE_POLICY
 } from "../../build/semantic/code/src/index.js";
+
+const REPO_ROOT = path.resolve(process.cwd(), "../..");
+
+function repoFile(relativePath) {
+  return readFileSync(path.join(REPO_ROOT, relativePath), "utf8");
+}
 
 function moduleBasis(handle = "bootstrap_release_self_test") {
   const module = constructSdlcGtlModule();
@@ -143,6 +152,64 @@ function openGapDossier() {
     evidenceRefs: ["event://graph-call-open"]
   });
 }
+
+test("T-036 recovery law is attenuation and iteration before broad repair", () => {
+  const product = repoFile("specification/PRODUCT.md");
+  const requirements = repoFile(
+    "specification/requirements/11-odd-sdlc-homeostatic-gap-triage-and-intent-renewal.md"
+  );
+
+  assert.match(product, /### Recovery Attenuation And Iteration/u);
+  assert.match(
+    product,
+    /The primary recovery principle for `odd_sdlc` is attenuation and iteration/u
+  );
+  assert.match(
+    product,
+    /Recovery first attenuates the failure surface/u
+  );
+  assert.match(
+    product,
+    /smallest admitted\s+observation, obligation, evidence gap, authority layer, and permitted repair\s+scope/u
+  );
+  assert.match(
+    product,
+    /Each iteration must carry the\s+prior evidence, residual pressure, lawful re-entry reason, and open obligation\s+state forward through ABG-owned continuation truth/u
+  );
+  assert.match(
+    product,
+    /An identical\s+retry with no new evidence, narrower scope, or changed route becomes blocked or\s+reprice pressure rather than hidden convergence/u
+  );
+  assert.match(
+    product,
+    /Attenuation does not mean weakening the requirement/u
+  );
+  assert.match(
+    product,
+    /Iteration does not mean local retry ownership/u
+  );
+
+  assert.match(
+    requirements,
+    /### REQ-F-ODDSDLC-038 — recovery proceeds by attenuation and iteration/u
+  );
+  assert.match(
+    requirements,
+    /AC-1: recovery first names the smallest admitted observation, obligation,\s+evidence gap, authority layer, and permitted repair scope/u
+  );
+  assert.match(
+    requirements,
+    /AC-2: recovery does not begin with broad rewrite, prompt compensation,\s+target-specific hardcoding, or an SDLC-local control loop/u
+  );
+  assert.match(
+    requirements,
+    /AC-5: identical retry without new evidence, narrower scope, or changed route\s+becomes blocked or reprice pressure rather than hidden convergence/u
+  );
+  assert.match(
+    requirements,
+    /AC-6: attenuation does not weaken the requirement/u
+  );
+});
 
 test("T-036 observation, classification, and route binding remain separate carriers", () => {
   const closureRegister = closureRegisterFor(

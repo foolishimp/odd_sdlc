@@ -1209,6 +1209,99 @@ test("T-199 runtime gap merge restores same-run assurance retry gap dossier", ()
   assert.equal(retryContext.priorGapDossiers[0].reasons[0].reason, reason);
 });
 
+test("T-204 latest completed runtime gap reaches retry worker without ABG selected rows", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t204-empty-abg-retry-"));
+  const runsRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs"
+  );
+  const completedRun = path.join(runsRoot, "20260625T082425104Z_pid64526");
+  const inProgressRun = path.join(runsRoot, "20260625T084250276Z_pid75322");
+  mkdirSync(completedRun, { recursive: true });
+  mkdirSync(inProgressRun, { recursive: true });
+  const gapDossierRef = pathToFileURL(path.join(completedRun, "gap_dossier.json"))
+    .href;
+  const reason =
+    "design_depth_fp_evaluator_semantic_floor_invalid:evaluate_content_ledger_design_depth_payload_invalid";
+  const gapDossier = {
+    kind: "sdlc_postflight_gap_dossier",
+    status: "open",
+    graphFunctionName: "lite_design_module_implementation",
+    edgeName: "derive_lite_design_adr_surface",
+    vectorIndex: 0,
+    targetAssetType: "implementation_design_surface",
+    reasons: [
+      {
+        kind: "sdlc_postflight_gap_reason",
+        reason,
+        reasonClass: "assurance",
+        blockingReason: sdlcBlockingReasonFromLegacy({ reason })
+      }
+    ],
+    evidenceRefs: [
+      pathToFileURL(path.join(completedRun, "postflight.json")).href
+    ],
+    priorManifestId: pathToFileURL(path.join(completedRun, "handoff_manifest.json"))
+      .href,
+    currentGapDossierRef: gapDossierRef,
+    retryEligible: true,
+    nextLawfulActions: ["retry_same_edge"]
+  };
+  writeFileSync(
+    path.join(completedRun, "handoff_manifest.json"),
+    JSON.stringify({
+      kind: "sdlc_worker_handoff_manifest",
+      archiveRoot: completedRun,
+      graphFunctionName: "lite_design_module_implementation",
+      edgeName: "derive_lite_design_adr_surface",
+      vectorIndex: 0,
+      targetAssetType: "implementation_design_surface"
+    }),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(completedRun, "postflight.json"),
+    JSON.stringify({ kind: "sdlc_operator_postflight_result", status: "blocked" }),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(completedRun, "gap_dossier.json"),
+    JSON.stringify(gapDossier),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(inProgressRun, "handoff_manifest.json"),
+    JSON.stringify({
+      kind: "sdlc_worker_handoff_manifest",
+      archiveRoot: inProgressRun,
+      graphFunctionName: "lite_design_module_implementation",
+      edgeName: "derive_lite_design_adr_surface",
+      vectorIndex: 0,
+      targetAssetType: "implementation_design_surface"
+    }),
+    "utf8"
+  );
+
+  const retryContext = mergeSdlcWorkerRetryContextWithRuntimeGapRegister({
+    workspaceRoot: workspace,
+    vectorIndex: 0,
+    edgeName: "derive_lite_design_adr_surface",
+    targetAssetType: "implementation_design_surface",
+    projected: {
+      kind: "sdlc_worker_retry_context",
+      retryAttemptRefs: [],
+      priorGapDossiers: []
+    }
+  });
+
+  assert.equal(retryContext.priorGapDossiers.length, 1);
+  assert.equal(
+    retryContext.priorGapDossiers[0].currentGapDossierRef,
+    gapDossierRef
+  );
+  assert.equal(retryContext.priorGapDossiers[0].reasons[0].reason, reason);
+});
+
 test("T-188 retry context drops stale component repair schedule pressure after current qualification passes", () => {
   const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t188-stale-repair-"));
   mkdirSync(path.join(workspace, ".ai-workspace/context"), { recursive: true });

@@ -165,6 +165,19 @@ test("T-188 evaluator process failures do not route to product F_P repair", () =
   assert.equal(semanticFinding.reasonClass, "assurance");
   assert.equal(semanticFinding.lawfulReentryPoint, "same_edge_retry");
 
+  const semanticFloor = makeSdlcBlockingReason({
+    code: "design_depth_fp_evaluator_semantic_floor_invalid",
+    detail:
+      "evaluate_content_ledger_design_depth_payload_invalid:implementation_design_surface semantic floor missing",
+    evidenceRefs: ["evidence://design-depth-semantic-floor"]
+  });
+  assert.equal(semanticFloor.reasonClass, "assurance");
+  assert.equal(semanticFloor.lawfulReentryPoint, "same_edge_retry");
+  assert.equal(
+    legacyBlockingReasonCode(semanticFloor),
+    "design_depth_fp_evaluator_semantic_floor_invalid:evaluate_content_ledger_design_depth_payload_invalid:implementation_design_surface semantic floor missing"
+  );
+
   const checkpointTimeout = makeSdlcBlockingReason({
     code: "review_grade_evaluator_assessment_checkpoint_timeout",
     evidenceRefs: ["evidence://review-grade-checkpoint-timeout"]

@@ -682,6 +682,10 @@ test("T-184 F_P evaluator prompt uses incremental content ledger writes", () => 
     /outcome\.reason === "design_depth_fp_evaluator_progress_timeout"[\s\S]*return "design_depth_fp_evaluator_progress_timeout"/u
   );
   assert.match(
+    installedOperatorSource,
+    /outcome\.reason\.startsWith\("evaluate_content_ledger_design_depth_payload_invalid:"\)[\s\S]*return "design_depth_fp_evaluator_semantic_floor_invalid"/u
+  );
+  assert.match(
     blockingReasonSource,
     /code === "design_depth_fp_evaluator_first_update_timeout"[\s\S]*lawfulReentryPoint: "same_edge_retry"/u
   );
@@ -695,6 +699,10 @@ test("T-184 F_P evaluator prompt uses incremental content ledger writes", () => 
   );
   assert.match(
     blockingReasonSource,
+    /code === "design_depth_fp_evaluator_semantic_floor_invalid"[\s\S]*lawfulReentryPoint: "same_edge_retry"/u
+  );
+  assert.match(
+    blockingReasonSource,
     /code === "review_grade_evaluator_assessment_checkpoint_timeout"[\s\S]*lawfulReentryPoint: "same_edge_retry"/u
   );
   assert.match(
@@ -705,6 +713,18 @@ test("T-184 F_P evaluator prompt uses incremental content ledger writes", () => 
     installedOperatorSource,
     /implementationDesignArtifactSummaryForDesignDepthPrompt/u
   );
+  assert.doesNotMatch(installedOperatorSource, /function normalizedMarkdownHeadingText/u);
+  assert.doesNotMatch(installedOperatorSource, /function normalizedMarkdownSectionMarker/u);
+  assert.doesNotMatch(installedOperatorSource, /function markdownTableRowsAfterAnySectionMarker/u);
+  assert.doesNotMatch(installedOperatorSource, /semanticFloorSummary=/u);
+  assert.doesNotMatch(installedOperatorSource, /aggregateEntity=\$\{row\[0\]\}/u);
+  assert.doesNotMatch(installedOperatorSource, /aggregateOperation=\$\{row\[0\]\}/u);
+  assert.doesNotMatch(installedOperatorSource, /sunnyDayStep=\$\{index \+ 1\}/u);
+  assert.match(
+    evaluatorPromptSource,
+    /evaluator must use bounded admitted evidence to advance one named semantic section/u
+  );
+  assert.doesNotMatch(evaluatorPromptSource, /semanticFloorSummary/u);
   assert.match(
     evaluatorPromptSource,
     /SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND/u

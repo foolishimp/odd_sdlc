@@ -90,12 +90,16 @@ function repoFilesUnder(relativePath) {
   return files.sort();
 }
 
-function parseT204SourceSurvivalInventory() {
+function parseT204RestoredSourceWalk() {
   const inventory = repoFile(
-    ".ai-workspace/comments/codex/20260620T000000Z_T204_source_survival_inventory.md"
+    ".ai-workspace/comments/codex/20260625T133035Z_T204_restored_original_criteria_file_walk.md"
   );
+  const fileWalk = inventory
+    .split("## File Walk")[1]
+    ?.split("## Immediate Implications")[0];
+  assert.notEqual(fileWalk, undefined, "T-204 restored walk must expose File Walk rows");
   const rows = new Map();
-  for (const line of inventory.split("\n")) {
+  for (const line of fileWalk.split("\n")) {
     const match = /^\| `([^`]+)` \| ([^|]+) \| ([^|]+) \| (.*) \|$/u.exec(line);
     if (match === null) {
       continue;
@@ -109,6 +113,14 @@ function parseT204SourceSurvivalInventory() {
     });
   }
   return rows;
+}
+
+function countRowField(rows, field) {
+  const counts = new Map();
+  for (const row of rows.values()) {
+    counts.set(row[field], (counts.get(row[field]) ?? 0) + 1);
+  }
+  return Object.fromEntries([...counts.entries()].sort());
 }
 
 function assertConformancePassed(report) {
@@ -166,8 +178,8 @@ test("T-197 product gate typechecks the live SDLC graph inventory", () => {
   assert.ok(input.featureCoverageManifest.rows.length >= 26);
 });
 
-test("T-204 source survival inventory closes the current code/src tree", () => {
-  const inventory = parseT204SourceSurvivalInventory();
+test("T-204 restored source walk covers current code/src and preserves open cuts", () => {
+  const inventory = parseT204RestoredSourceWalk();
   const sourceRoot = path.join(REPO_ROOT, "build_tenants/typescript/code/src");
   const currentSourceFiles = repoFilesUnder("build_tenants/typescript/code/src")
     .filter((filePath) => path.extname(filePath) === ".ts")
@@ -176,12 +188,12 @@ test("T-204 source survival inventory closes the current code/src tree", () => {
   const currentSourceFileSet = new Set(currentSourceFiles);
   const allowedClassifications = new Set([
     "gtl_program",
+    "move_to_abg",
     "plugin",
     "product_carrier",
     "product_projection",
     "test_or_release_plumbing"
   ]);
-  const classificationCounts = new Map();
 
   assert.deepEqual(
     currentSourceFiles.filter((file) => !inventory.has(file)),
@@ -189,47 +201,115 @@ test("T-204 source survival inventory closes the current code/src tree", () => {
     "every current code/src file must have a T-204 survival classification"
   );
 
-  const unclosedRows = [];
+  assert.deepEqual(
+    [...inventory.keys()].filter((file) => !currentSourceFileSet.has(file)),
+    [],
+    "T-204 restored walk must not classify non-current source rows"
+  );
+
+  const invalidRows = [];
+  const openActionRows = [];
+  const allowedActions = new Set([
+    "move_to_abg",
+    "review_or_delete",
+    "review_or_move_common",
+    "split",
+    "split_exports",
+    "split_move_to_abg",
+    "split_or_move_to_abg",
+    "survive",
+    "survive_after_contract_audit",
+    "survive_after_effect_audit",
+    "survive_after_law_audit",
+    "survive_narrow"
+  ]);
+  const unresolvedActions = new Set([
+    "move_to_abg",
+    "review_or_delete",
+    "review_or_move_common",
+    "split",
+    "split_exports",
+    "split_move_to_abg",
+    "split_or_move_to_abg"
+  ]);
   for (const file of currentSourceFiles) {
     const row = inventory.get(file);
     assert.notEqual(row, undefined);
     if (
       !allowedClassifications.has(row.classification) ||
-      row.action !== "survive" ||
+      !allowedActions.has(row.action) ||
       row.proof.length < 20
     ) {
-      unclosedRows.push(
+      invalidRows.push(
         `${file}: ${row.classification} / ${row.action} / ${row.proof}`
       );
     }
-    classificationCounts.set(
-      row.classification,
-      (classificationCounts.get(row.classification) ?? 0) + 1
-    );
+    if (unresolvedActions.has(row.action)) {
+      openActionRows.push(`${file}: ${row.classification} / ${row.action}`);
+    }
   }
-  assert.deepEqual(unclosedRows, [], "current source rows must be closed survivors");
+  assert.deepEqual(invalidRows, [], "current source rows must be valid restored T-204 rows");
   assert.deepEqual(
-    Object.fromEntries([...classificationCounts.entries()].sort()),
+    countRowField(inventory, "classification"),
     {
       gtl_program: 10,
+      move_to_abg: 49,
       plugin: 25,
-      product_carrier: 43,
-      product_projection: 72,
+      product_carrier: 45,
+      product_projection: 21,
       test_or_release_plumbing: 25
     }
   );
-
-  const staleOpenRows = [...inventory.entries()]
-    .filter(([file]) => !currentSourceFileSet.has(file))
-    .filter(
-      ([, row]) =>
-        row.classification !== "delete" || !/^done\b/u.test(row.action)
-    )
-    .map(([file, row]) => `${file}: ${row.classification} / ${row.action}`);
   assert.deepEqual(
-    staleOpenRows,
-    [],
-    "non-current inventory rows must be closed deletion history"
+    countRowField(inventory, "action"),
+    {
+      move_to_abg: 20,
+      review_or_delete: 6,
+      review_or_move_common: 8,
+      split: 27,
+      split_exports: 2,
+      split_move_to_abg: 1,
+      split_or_move_to_abg: 29,
+      survive: 12,
+      survive_after_contract_audit: 9,
+      survive_after_effect_audit: 14,
+      survive_after_law_audit: 37,
+      survive_narrow: 10
+    }
+  );
+  assert.equal(openActionRows.length, 93, "restored T-204 walk must remain open");
+  assert.deepEqual(
+    [
+      ["analysis/archive_reader.ts", "move_to_abg", "move_to_abg"],
+      ["operator/installed_operator.ts", "plugin", "split_move_to_abg"],
+      ["operator/traversal_consequence.ts", "move_to_abg", "split_or_move_to_abg"],
+      ["start/public_start.ts", "move_to_abg", "move_to_abg"],
+      ["workspace_api/entry.ts", "move_to_abg", "move_to_abg"]
+    ].map(([file, classification, action]) => {
+      const row = inventory.get(file);
+      return [file, row?.classification, row?.action, classification, action];
+    }),
+    [
+      ["analysis/archive_reader.ts", "move_to_abg", "move_to_abg", "move_to_abg", "move_to_abg"],
+      ["operator/installed_operator.ts", "plugin", "split_move_to_abg", "plugin", "split_move_to_abg"],
+      ["operator/traversal_consequence.ts", "move_to_abg", "split_or_move_to_abg", "move_to_abg", "split_or_move_to_abg"],
+      ["start/public_start.ts", "move_to_abg", "move_to_abg", "move_to_abg", "move_to_abg"],
+      ["workspace_api/entry.ts", "move_to_abg", "move_to_abg", "move_to_abg", "move_to_abg"]
+    ],
+    "high-risk runtime/control surfaces must not be recast as closed survivors"
+  );
+
+  const supersededInventory = repoFile(
+    ".ai-workspace/comments/codex/20260620T000000Z_T204_source_survival_inventory.md"
+  );
+  assert.match(supersededInventory, /2026-06-25 Supersession/u);
+  assert.match(
+    supersededInventory,
+    /Do not use the `move_to_abg: 0` count below\s+as current closure evidence/u
+  );
+  assert.match(
+    supersededInventory,
+    /claims about\s+which inventory `test_t197_product_gtl_gate` parses/u
   );
 });
 
@@ -783,11 +863,11 @@ test("T-197 A2 keeps SDLC start as shell over one admitted ABG boundary", () => 
   );
   assert.match(
     design,
-    /T-204 source survival inventory closes the current code\/src tree/u
+    /historical and not closure-authoritative/u
   );
   assert.match(
     design,
-    /product projection\/plugin-session adapters with explicit survival proof/u
+    /restored source walk plus future source guard and ABG installed traversal-unit proof/u
   );
   assert.doesNotMatch(design, /loop may only call the installed-start boundary/u);
   assert.doesNotMatch(design, /operator-facing retry\/reentry shell/u);

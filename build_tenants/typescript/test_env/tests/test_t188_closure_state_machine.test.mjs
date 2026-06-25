@@ -275,6 +275,39 @@ test("T-188 review-grade same-edge pressure remains redispatch, not structural b
   );
 });
 
+test("T-188 active typed postflight reentry outranks stale structural gap dossier", () => {
+  assert.match(
+    INSTALLED_OPERATOR_SOURCE,
+    /function structuralBlockReasonRefsForState[\s\S]*activePostflightBlockingReasonCarriers\(state\.postflight\)[\s\S]*sdlcClosureStateBucketForLawfulReentryPoint\(reason\.lawfulReentryPoint\) !==[\s\S]*"block"[\s\S]*return Object\.freeze\(\[\]\)/u
+  );
+});
+
+test("T-188 final design-depth postflight replaces pending evaluator blockers", () => {
+  const start = INSTALLED_OPERATOR_SOURCE.indexOf(
+    "function stateWithBlockedDesignDepthFpEvaluatorOutcome"
+  );
+  const end = INSTALLED_OPERATOR_SOURCE.indexOf(
+    "function workerReportWithReviewGradeAssessment",
+    start
+  );
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const source = INSTALLED_OPERATOR_SOURCE.slice(start, end);
+  assert.match(
+    source,
+    /const gapDossier = constructPostflightGapDossier\(\{[\s\S]*manifest: input\.state\.manifest,[\s\S]*postflight[\s\S]*\}\);[\s\S]*writePostflightGapDossier\(\{[\s\S]*manifest: input\.state\.manifest,[\s\S]*gapDossier[\s\S]*\}\);/u
+  );
+  assert.match(
+    source,
+    /const blockingReasonCarriers = Object\.freeze\(\[[\s\S]*\.\.\.postflight\.blockingReasonCarriers[\s\S]*\]\);/u
+  );
+  assert.match(source, /gapDossier,/u);
+  assert.doesNotMatch(
+    source,
+    /const blockingReasonCarriers = Object\.freeze\(\[[\s\S]*\.\.\.input\.state\.blockingReasonCarriers/u
+  );
+});
+
 test("T-188 SDLC repair adapters are ABG redispatch rows", () => {
   const testExecutionFailureTransition = transitionFor({
     residualPressureRefs: [
