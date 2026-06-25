@@ -2,8 +2,9 @@
 
 import { installAbiogenesisTypescript } from "@abiogenesis/typescript-tenant/app/m04/install-bootstrap";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { admitOddSdlcTypescriptInstallRequest } from "./admission.js";
 import type {
   OddSdlcTypescriptInstallManifest,
@@ -152,7 +153,7 @@ function runtimeIdentityFor(
 }
 
 function installedAbgRuntimeBindingSource(input: {
-  readonly packageName: string;
+  readonly packageImportSpecifier: string;
 }): string {
   return `import {
   constructSdlcGtlModule,
@@ -161,7 +162,7 @@ function installedAbgRuntimeBindingSource(input: {
   oddSdlcAbgRuntimeWorkerTransportFromEnv,
   resolveOddSdlcAbgRuntimeNextTarget,
   resolveOddSdlcAbgRuntimeBindingPolicy
-} from ${JSON.stringify(input.packageName)};
+} from ${JSON.stringify(input.packageImportSpecifier)};
 
 export const runtimeBinding = {
   module: constructSdlcGtlModule(),
@@ -209,7 +210,7 @@ export const runtimeBinding = {
 
 async function writeInstalledAbgRuntimeBinding(input: {
   readonly targetRoot: string;
-  readonly packageName: string;
+  readonly packageRoot: string;
 }): Promise<string> {
   const runtimeBindingPath = join(
     input.targetRoot,
@@ -219,10 +220,40 @@ async function writeInstalledAbgRuntimeBinding(input: {
   await writeTextFile(
     runtimeBindingPath,
     installedAbgRuntimeBindingSource({
-      packageName: input.packageName
+      packageImportSpecifier: pathToFileURL(
+        join(input.packageRoot, "build", "semantic", "code", "src", "index.js")
+      ).href
     })
   );
   return runtimeBindingPath;
+}
+
+async function removeTargetLevelAbgDependencyWhenShared(input: {
+  readonly request: OddSdlcTypescriptInstallRequest;
+}): Promise<void> {
+  if (input.request.abgToolchainRoot === null) {
+    return;
+  }
+  await rm(
+    join(input.request.targetRoot, "node_modules", "@abiogenesis", "typescript-tenant"),
+    { recursive: true, force: true }
+  );
+}
+
+function oddSdlcObserverStateRoot(
+  request: OddSdlcTypescriptInstallRequest
+): string {
+  return (
+    request.abgMutableStateRoots?.observerStateRoot ??
+    join(request.targetRoot, ".ai-workspace")
+  );
+}
+
+function oddSdlcRuntimeRoot(request: OddSdlcTypescriptInstallRequest): string {
+  return (
+    request.abgMutableStateRoots?.runtimeRoot ??
+    join(oddSdlcObserverStateRoot(request), "runtime")
+  );
 }
 
 function requireInstalledAbg(
@@ -253,6 +284,7 @@ async function installAdmittedOddSdlcTypescript(
       tarballPath: packed.tarballPath,
       commandNames: []
     });
+    await removeTargetLevelAbgDependencyWhenShared({ request });
     const abgOutcome = requireInstalledAbg(
       await installAbiogenesisTypescript({
         targetRoot: {
@@ -265,7 +297,9 @@ async function installAdmittedOddSdlcTypescript(
         docsSourceRoot:
           request.abgDocsSourceRoot ??
           resolveInstallAbgDocsSourceRoot(request.packageSourceRoot),
-        installedPackageName: `${request.installedPackageName}-abg`
+        installedPackageName: `${request.installedPackageName}-abg`,
+        toolchainRoot: request.abgToolchainRoot,
+        mutableStateRoots: request.abgMutableStateRoots
       })
     );
     await persistPackageDependency({
@@ -295,20 +329,17 @@ async function installAdmittedOddSdlcTypescript(
       abgOutcome.commandPaths.find((candidate) => candidate.endsWith("/abiogenesis-ts")) ??
       null;
     const bootstrapGuidePath = join(
-      request.targetRoot,
-      ".ai-workspace",
+      oddSdlcObserverStateRoot(request),
       "context",
       "odd_sdlc_typescript_bootstrap.md"
     );
     const normalizationPath = join(
-      request.targetRoot,
-      ".ai-workspace",
-      "runtime",
+      oddSdlcRuntimeRoot(request),
       "odd_sdlc-typescript-installation.json"
     );
     const abgRuntimeBindingPath = await writeInstalledAbgRuntimeBinding({
       targetRoot: request.targetRoot,
-      packageName: installedPackageForManifest.packageName
+      packageRoot: installedPackageForManifest.packageRoot
     });
     const installManifestPath = join(productInstallRoot, "install-manifest.json");
     const instructionFiles = await writeOddSdlcInstructionFiles({
@@ -342,6 +373,9 @@ async function installAdmittedOddSdlcTypescript(
       abgInstallManifestPath: abgOutcome.installManifestPath,
       abgInstallerManifestPath: abgOutcome.installerManifestPath,
       abgRuntimeBindingPath,
+      abgToolchainBindingPath: abgOutcome.toolchainBindingPath,
+      abgToolchainRoot: request.abgToolchainRoot,
+      abgMutableStateRoots: request.abgMutableStateRoots,
       bootstrapGuidePath,
       instructionFiles,
       bootstrapGovernance,

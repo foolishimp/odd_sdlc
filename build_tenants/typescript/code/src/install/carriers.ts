@@ -11,7 +11,20 @@ export interface OddSdlcTypescriptInstallRequest {
   readonly abgPackageSourceRoot: string;
   readonly abgStandardsSourceRoot: string | null;
   readonly abgDocsSourceRoot: string | null;
+  readonly abgToolchainRoot: string | null;
+  readonly abgMutableStateRoots: OddSdlcMutableStateRoots | null;
   readonly installedPackageName: string;
+}
+
+export interface OddSdlcMutableStateRoots {
+  readonly observedWorkspaceRoot?: string;
+  readonly observerStateRoot?: string;
+  readonly executorStateRoot?: string;
+  readonly eventRoot?: string;
+  readonly eventLogPath?: string;
+  readonly runtimeRoot?: string;
+  readonly projectionRoot?: string;
+  readonly archiveRoot?: string;
 }
 
 export interface OddSdlcTypescriptRuntimeIdentity {
@@ -56,6 +69,9 @@ export interface OddSdlcTypescriptInstallManifest {
   readonly abgInstallManifestPath: string;
   readonly abgInstallerManifestPath: string;
   readonly abgRuntimeBindingPath: string;
+  readonly abgToolchainBindingPath: string | null;
+  readonly abgToolchainRoot: string | null;
+  readonly abgMutableStateRoots: OddSdlcMutableStateRoots | null;
   readonly bootstrapGuidePath: string;
   readonly instructionFiles: readonly OddSdlcInstructionFileWrite[];
   readonly bootstrapGovernance: OddSdlcBootstrapGovernance;

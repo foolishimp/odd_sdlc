@@ -229,14 +229,20 @@ function installedAbgConfigPath(targetRoot) {
 }
 
 async function assertInstalledAbgRuntimeBinding(input) {
-  const { targetRoot, bindingPath, installedPackageName } = input;
+  const { targetRoot, bindingPath, installedPackageRoot } = input;
   assert.equal(
     bindingPath,
     path.join(targetRoot, ".abiogenesis/typescript-runtime.mjs")
   );
   assert.equal(existsSync(bindingPath), true, "missing installed ABG runtime binding");
   const bindingSource = readFileSync(bindingPath, "utf8");
-  assert(bindingSource.includes(`from "${installedPackageName}"`));
+  assert(
+    bindingSource.includes(
+      `from "${pathToFileURL(
+        path.join(installedPackageRoot, "build/semantic/code/src/index.js")
+      ).href}"`
+    )
+  );
   assert(bindingSource.includes("createPlugins(input)"));
   assert(bindingSource.includes("createOddSdlcAbgRuntimeBindingPlugins"));
   assert(bindingSource.includes("createOddSdlcAbgRuntimeAssuranceProvider"));
@@ -414,7 +420,7 @@ test("T-059 API installs odd_sdlc.TS and ABG runtime into a target workspace", a
   await assertInstalledAbgRuntimeBinding({
     targetRoot,
     bindingPath: manifest.abgRuntimeBindingPath,
-    installedPackageName: outcome.installedPackage.packageName
+    installedPackageRoot: outcome.installedPackage.packageRoot
   });
   assertBootstrapGovernanceCarrier(manifest.bootstrapGovernance);
   const normalization = readJson(outcome.normalizationPath);

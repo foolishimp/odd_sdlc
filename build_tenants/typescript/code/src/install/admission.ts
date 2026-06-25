@@ -1,7 +1,10 @@
 // Implements: REQ-F-ODDSDLC-040
 
 import { resolve } from "node:path";
-import type { OddSdlcTypescriptInstallRequest } from "./carriers.js";
+import type {
+  OddSdlcMutableStateRoots,
+  OddSdlcTypescriptInstallRequest
+} from "./carriers.js";
 import { isRecord as isPlainRecord } from "../admission/codecs.js";
 
 function plainRecord(value: unknown, label: string): Record<string, unknown> {
@@ -34,6 +37,33 @@ function optionalResolvedString(
   return value === null ? null : resolve(value);
 }
 
+function optionalMutableStateRoots(
+  record: Record<string, unknown>
+): OddSdlcMutableStateRoots | null {
+  const value = record["abgMutableStateRoots"];
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const roots = plainRecord(value, "abgMutableStateRoots");
+  const admitted: Record<string, string> = {};
+  for (const key of [
+    "observedWorkspaceRoot",
+    "observerStateRoot",
+    "executorStateRoot",
+    "eventRoot",
+    "eventLogPath",
+    "runtimeRoot",
+    "projectionRoot",
+    "archiveRoot"
+  ] as const) {
+    const root = optionalString(roots, key);
+    if (root !== null) {
+      admitted[key] = resolve(root);
+    }
+  }
+  return Object.freeze(admitted);
+}
+
 export function admitOddSdlcTypescriptInstallRequest(
   input: unknown
 ): OddSdlcTypescriptInstallRequest {
@@ -45,6 +75,8 @@ export function admitOddSdlcTypescriptInstallRequest(
     abgPackageSourceRoot: resolve(requiredString(record, "abgPackageSourceRoot")),
     abgStandardsSourceRoot: optionalResolvedString(record, "abgStandardsSourceRoot"),
     abgDocsSourceRoot: optionalResolvedString(record, "abgDocsSourceRoot"),
+    abgToolchainRoot: optionalResolvedString(record, "abgToolchainRoot"),
+    abgMutableStateRoots: optionalMutableStateRoots(record),
     installedPackageName: requiredString(record, "installedPackageName")
   });
 }

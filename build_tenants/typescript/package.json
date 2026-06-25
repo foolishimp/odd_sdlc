@@ -115,6 +115,7 @@
     "test:t160:hello-world-js-overlays": "npm run build:semantic && node --test --test-name-pattern \"T-160 JavaScript hello-world overlay matrix\" test_env/sandbox/test_scenario_sandbox.test.mjs",
     "test:t160:hello-world-js-lite-live": "npm run test:scenario:t160-hello-world-js-lite-live",
     "test:t160:hello-world-rust-lite-live": "npm run test:scenario:t160-hello-world-rust-lite-live",
+    "test:t161:abg-toolchain": "npm run build:semantic && node --test test_env/tests/test_t161_abg_shared_toolchain_install.test.mjs",
     "test:t161": "npm run build:semantic && node --test test_env/tests/test_t161_fd_run_analysis_linter.test.mjs",
     "test:t162": "npm run build:semantic && node --test test_env/tests/test_t162_graph_overlay_plugin_composition.test.mjs test_env/tests/test_t162_ticket_workflow_projection.test.mjs test_env/tests/test_t162_ticket_execution_contract_admission.test.mjs test_env/tests/test_t162_reviewer_profile_selection.test.mjs test_env/tests/test_t162_review_decision_selective_implementation.test.mjs test_env/tests/test_t162_review_comment_ruling_scenario.test.mjs test_env/tests/test_t162_overlay_segment_ticket_continuation.test.mjs test_env/tests/test_t162_terminal_gap_ticket_intake.test.mjs",
     "test:t162:ticket-workflow-live": "npm run build:semantic && node --test test_env/live/test_t162_ticket_workflow_live.test.mjs",
