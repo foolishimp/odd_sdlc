@@ -1,6 +1,6 @@
 {
   "name": "@odd-sdlc/typescript-tenant",
-  "version": "3.0.16",
+  "version": "3.0.17",
   "private": true,
   "description": "ODD-native TypeScript tenant for odd_sdlc.",
   "type": "module",
@@ -196,5 +196,8 @@
   },
   "dependencies": {
     "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/4.1.0-rc.11/abiogenesis-typescript-tenant-4.1.0-rc.11.tgz"
-  }
+  },
+  "bundledDependencies": [
+    "@abiogenesis/typescript-tenant"
+  ]
 }

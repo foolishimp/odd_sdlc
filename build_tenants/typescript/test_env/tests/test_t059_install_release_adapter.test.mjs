@@ -39,9 +39,9 @@ const ABG_TYPESCRIPT_ROOT = resolve(
 );
 const ABG_RELEASE_VERSION = "4.1.0-rc.11";
 const ABG_RELEASE_SOURCE_REF = "main";
-const ABG_RELEASE_SOURCE_COMMIT = "3735255cb27856705e013d3f686623ab88ce945b";
+const ABG_RELEASE_SOURCE_COMMIT = "772bffa24876f4cc4c6b288e51d8f6445c109567";
 const ABG_RELEASE_TARBALL_SHA256 =
-  "14ae9fba559cc1db7df186fbbdca634f3abec4b87c05f530b8a23f7aa5e3be11";
+  "ab699f0a1827888f8ead11827749a5d60da01dfa200b48981cfca241194b30f2";
 const ABG_RELEASE_SNAPSHOT_REF = ABG_RELEASE_VERSION;
 const ABG_RELEASE_SNAPSHOT_ROOT = resolve(
   REPO_ROOT,
@@ -121,6 +121,72 @@ function assertAbgReleaseSnapshotPin(substrate) {
   assert.equal(substrate.tarballSha256, ABG_RELEASE_TARBALL_SHA256);
   assert.equal(substrate.sourceRef, ABG_RELEASE_SOURCE_REF);
   assert.equal(substrate.sourceCommit, ABG_RELEASE_SOURCE_COMMIT);
+}
+
+function assertReleaseSnapshotCleanInstall(snapshotRoot, packageVersion) {
+  const installRoot = mkdtempSync(
+    path.join(tmpdir(), "odd-sdlc-ts-clean-install-")
+  );
+  const tarballPath = path.join(
+    snapshotRoot,
+    `odd-sdlc-typescript-tenant-${packageVersion}.tgz`
+  );
+  const npmCacheRoot = path.join(installRoot, ".npm-cache");
+  const npmInit = spawnSync("npm", ["init", "-y"], {
+    cwd: installRoot,
+    encoding: "utf8"
+  });
+  assert.equal(npmInit.status, 0, npmInit.stderr);
+  const npmInstall = spawnSync(
+    "npm",
+    [
+      "install",
+      tarballPath,
+      "--ignore-scripts=false",
+      "--cache",
+      npmCacheRoot
+    ],
+    {
+      cwd: installRoot,
+      encoding: "utf8"
+    }
+  );
+  assert.equal(npmInstall.status, 0, npmInstall.stderr);
+
+  const oddPackageRoot = path.join(
+    installRoot,
+    "node_modules/@odd-sdlc/typescript-tenant"
+  );
+  const oddPackageJson = readJson(path.join(oddPackageRoot, "package.json"));
+  assert.equal(oddPackageJson.version, packageVersion);
+  assert.deepEqual(oddPackageJson.bundledDependencies, [
+    "@abiogenesis/typescript-tenant"
+  ]);
+
+  const bundledAbgPackageJson = readJson(
+    path.join(
+      oddPackageRoot,
+      "node_modules/@abiogenesis/typescript-tenant/package.json"
+    )
+  );
+  assert.equal(bundledAbgPackageJson.version, ABG_RELEASE_VERSION);
+
+  const importCheck = spawnSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      [
+        "const mod = await import('@odd-sdlc/typescript-tenant');",
+        "if (typeof mod.assertCurrentSdlcGtlProgramConformance !== 'function') process.exit(2);"
+      ].join("\n")
+    ],
+    {
+      cwd: installRoot,
+      encoding: "utf8"
+    }
+  );
+  assert.equal(importCheck.status, 0, importCheck.stderr);
 }
 
 function assertCommandPath(paths, commandName) {
@@ -583,6 +649,7 @@ test("T-177 release-snapshot adapter writes versioned package evidence and ABG s
 
   const manifest = readJson(outcome.manifestPath);
   assertAbgReleaseSnapshotPin(manifest.abgSubstrate);
+  assertReleaseSnapshotCleanInstall(snapshotRoot, ODD_SDLC_PACKAGE_VERSION);
 
   const packageApiSnapshotRoot = path.join(
     mkdtempSync(path.join(tmpdir(), "odd-sdlc-ts-release-snapshot-package-api-")),
