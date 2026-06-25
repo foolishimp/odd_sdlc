@@ -66,11 +66,6 @@ export const T132_HELLO_WORLD_JS_MIN_FP_EDGES = Object.freeze([
   FG_DERIVE_TEST_EXECUTION_RESULT_SURFACE
 ]);
 
-export const T132_HELLO_WORLD_JS_LIVE_START_TARGET_SEQUENCE = Object.freeze([
-  `graph_function:${FG_CONFORM_PROJECT}`,
-  ...T132_HELLO_WORLD_JS_MIN_FP_EDGES.map((edge) => `graph_function:${edge}`)
-]);
-
 export const T132_HELLO_WORLD_JS_DEEP_CODE_TEST_EDGES = Object.freeze(
   T132_HELLO_WORLD_JS_FULL_LIFECYCLE_EDGES.slice(
     0,
@@ -165,7 +160,6 @@ export function t132HelloWorldJsLiveScenario({
     },
     liveWorker: worker,
     startTarget: "next",
-    startTargetSequence: T132_HELLO_WORLD_JS_LIVE_START_TARGET_SEQUENCE,
     startUntil,
     maxAdvances,
     continueOnEdgeConverge: true,

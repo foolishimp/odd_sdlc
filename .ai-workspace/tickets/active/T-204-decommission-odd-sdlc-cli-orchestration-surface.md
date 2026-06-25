@@ -365,16 +365,42 @@ The first focused batch attempt was discarded because it was run concurrently
 with `npm run build:semantic`; the semantic build cleans `build/semantic`, so
 the tests raced missing compiled modules. The sequential rerun passed.
 
+Next-sequenced JavaScript minimum smoke proof:
+
+```text
+npm run test:scenario:t132-hello-world-js-live
+```
+
+Archive:
+
+```text
+build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260625T013633715Z_pid12733
+```
+
+Result:
+
+- passed, 1/1, `duration_ms=2035800.729834`;
+- descriptor uses `startTarget: "next"` with no `startTargetSequence`;
+- start step 0 selected `Fg_conform_project`;
+- start step 1 selected `framework_smoke_min_fp` through ABG-owned
+  next-target resolution and closed after required handoff edges;
+- closed `derive_lite_design_adr_surface`,
+  `derive_lite_component_code_surface`, `derive_lite_test_design_surface`,
+  `derive_lite_component_test_surface`, `derive_lite_uat_test_source_surface`,
+  `prepare_test_execution_surface`, and
+  `derive_test_execution_result_surface`;
+- deterministic `fp_evaluate_result.json` passed for each materialized edge;
+- review-grade passed for component code, test design, component test, and UAT
+  source with zero open findings.
+
 Residual non-closure:
 
-- T-204 stays active. The JS live descriptor still carries an explicit
-  `startTargetSequence` over the lite edge list; that is now useful diagnostic
-  and materialization proof, but it is not the final installed traversal-unit
-  proof unless a release gate explicitly accepts the sequence as declared
-  release truth.
-- The installed traversal-unit lane remains open until a clean release proof
-  demonstrates ABG-owned `next`/continuation truth without a product-local
-  per-step route sequence acting as closure authority.
+- T-204 stays active. The JS minimum smoke no longer depends on a product-local
+  per-step route sequence and now proves ABG-owned `next` traversal for the
+  lite JavaScript lane.
+- The installed traversal-unit lane remains open until this next-sequenced
+  proof is accepted as release-gate evidence or rerun inside the formal release
+  proof bundle.
 - The scenario descriptor compiler lane remains open until descriptor
   executability is a compiler/release gate, not only sandbox descriptor test
   coverage.
