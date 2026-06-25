@@ -241,9 +241,11 @@ compiler truth. The current lanes do not yet fail closed when:
       close without blocked-edge bypass.
 - [x] Re-run the Rust hello-service live release proof and record either a clean
       materialized service proof or a ratified ABG-side non-closure blocker.
-- [ ] Reconcile the Data Mapper proof requirement: either run the live lane
+- [x] Reconcile the Data Mapper proof requirement: either run the live lane
       against the repaired compiler/runtime boundary or ratify why Data Mapper is
       not required for this ticket's closure.
+- [ ] Resolve or explicitly scope the 3.0.17 Data Mapper release-proof
+      non-closure before using Data Mapper as T-204 closure evidence.
 - [x] Update the Phase 7 closure audit with exact commands, archive roots,
       installed package versions, and pass/fail verdicts.
 - [ ] Do not move this ticket back to completed until the closure law and Phase
@@ -407,6 +409,138 @@ Residual non-closure:
 - The Data Mapper proof requirement remains open. Either rerun Data Mapper
   against the rc11 boundary or ratify why Data Mapper is not required for this
   T-204 closure.
+
+### 2026-06-25 3.0.17 Clean-Install Release Gate And Data Mapper Proof
+
+The 3.0.16 release snapshot was not a valid downstream install proof. The live
+JavaScript smoke passed from the source tenant, but a clean install of the saved
+3.0.16 tarball failed because the package artifact still carried a non-portable
+`file:../../../abiogenesis/.../4.1.0-rc.8.tgz` dependency and the saved snapshot
+was stale against the current rc11 substrate.
+
+Repair:
+
+- bumped `@odd-sdlc/typescript-tenant` to `3.0.17`;
+- kept the source dependency pinned to the immutable ABI snapshot
+  `@abiogenesis/typescript-tenant@4.1.0-rc.11`;
+- bundled `@abiogenesis/typescript-tenant` into the odd_sdlc package artifact
+  so downstream tarball installs do not require a sibling ABI source checkout;
+- added a T-059/T-177 regression that creates an empty npm project, installs the
+  generated odd_sdlc tarball, verifies odd_sdlc version, verifies the nested
+  bundled ABI version, and imports `@odd-sdlc/typescript-tenant`.
+
+Validation:
+
+| Check | Result |
+| --- | --- |
+| `npm run build:semantic && node --test test_env/tests/test_t059_install_release_adapter.test.mjs` | passed, 11/11 |
+| release snapshot | created `release_snapshots/odd-sdlc-typescript-tenant/3.0.17` from source commit `9381c822ebcb4a6d8112783f0fca8b2b996589c4`, `sourceDirty=false` |
+| clean install outside repo | passed in `/tmp/odd_sdlc_clean_install_3_0_17`; odd_sdlc `3.0.17`, bundled ABI `4.1.0-rc.11`, public import ok |
+| clean install under apps sandbox | passed in `/Users/jim/src/apps/odd_sdlc_install_sandbox_3_0_17`; odd_sdlc `3.0.17`, bundled ABI `4.1.0-rc.11`, public import ok |
+
+Current 3.0.17 JavaScript minimum smoke:
+
+```text
+npm run test:scenario:t132-hello-world-js-live
+```
+
+Archive:
+
+```text
+build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260625T034934555Z_pid99134
+```
+
+Result:
+
+- passed, 1/1, `duration_ms=1923723.473542`;
+- descriptor used `startTarget: "next"` with no `startTargetSequence`;
+- start step 0 selected `Fg_conform_project`;
+- start step 1 selected `framework_smoke_min_fp` through ABG-owned
+  next-target resolution and stopped after `required_handoff_edges`;
+- materialized `src/hello.js` and `test/hello.test.js`;
+- materialized `test_execution_surface.md` and
+  `test_execution_result_surface.md`;
+- installed operator execution emitted the JavaScript hello-world test logs;
+- all seven `fp_evaluate_result.json` artifacts passed, and all present
+  review-grade edge-fulfillment assessments passed.
+
+Current 3.0.17 Rust hello-service smoke:
+
+```text
+npm run test:scenario:t164-rust-hello-service-live
+```
+
+Archive:
+
+```text
+build_tenants/typescript/test_env/test_runs/scenario_t164_rust_hello_service_lite_live/20260625T042203337Z_pid19678
+```
+
+Result:
+
+- passed, 1/1, `duration_ms=3424091.295542`;
+- descriptor used `startTarget: "next"` with no `startTargetSequence`;
+- materialized `Cargo.toml`, `src/main.rs`, `tests/smoke.sh`, UAT source, and
+  execution surfaces;
+- installed operator execution summary:
+  `operator-runs/20260625T051905749Z_pid53162/installed_operator_execution/test-shard-01-hello-world-rust-service.summary.json`;
+- execution command used `cargo run --quiet`;
+- execution stdout was exactly `helloworld`;
+- `test_execution_surface.md` and `test_execution_result_surface.md` were
+  materialized under the runtime asset archive.
+
+Data Mapper release proof:
+
+```text
+ODD_SDLC_TS_DATA_MAPPER_RELEASE_SNAPSHOT_ROOT=release_snapshots/odd-sdlc-typescript-tenant/3.0.17 \
+ODD_SDLC_TS_DATA_MAPPER_LANE_NAME=data_mapper_v3_0_17_release_proof \
+ODD_SDLC_TS_DATA_MAPPER_START_TARGET=graph_function:lite_design_module_implementation \
+npm run live:data-mapper-sandbox
+```
+
+Archive:
+
+```text
+build_tenants/typescript/test_env/test_runs/data_mapper_v3_0_17_release_proof/20260625T051949478Z_pid53841
+```
+
+Result:
+
+- failed cleanly with `data_mapper live proof did not close cleanly`;
+- `packageSource.kind` was `release_snapshot_package`;
+- release tarball was
+  `release_snapshots/odd-sdlc-typescript-tenant/3.0.17/odd-sdlc-typescript-tenant-3.0.17.tgz`;
+- ABG main start used `--target graph_function:lite_design_module_implementation`
+  and `--until converged`;
+- process exited status `4`;
+- final assessment reason was `closure_block`;
+- operator run:
+  `workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260625T052005964Z_pid54173`;
+- postflight status was `blocked`;
+- closure disposition was `block`;
+- no execution status was reached;
+- materialized only initial `scala_spark` design/spec/build files:
+  `ADR-002-implementation-design-surface.md`, `TECH_STACK.json`,
+  `TESTING_TECH_STACK.json`, and `project/build.properties`;
+- `design_depth_fp_evaluator_first_update.json` was observable with
+  `rowCount=12`, `draftRowCount=0`, `fragmentRowCount=12`, and no missing
+  sections;
+- `design_depth_fp_evaluator_rule_outcome.json` blocked with
+  `evaluate_content_ledger_design_depth_payload_invalid` because the
+  implementation design surface semantic floor was missing
+  `moduleSchemaFragments`, schema entities/attributes/operations,
+  `moduleStateDiagramFragments`, aggregate model entities/operations,
+  aggregate sunny-day steps, and design-completeness verdict satisfaction
+  fields;
+- the closure decision also recorded `targetCarrierAdmissionStatus: "missing"`.
+
+Interpretation:
+
+- This is not a generated Data Mapper source fix.
+- The 3.0.17 release gate now rejects a semantically thin design checkpoint
+  instead of counting it as closure.
+- T-204 stays active. JS and Rust smoke are coherent against the latest release
+  cut, but Data Mapper is not a closeable release proof.
 
 ## STDO Triage
 
