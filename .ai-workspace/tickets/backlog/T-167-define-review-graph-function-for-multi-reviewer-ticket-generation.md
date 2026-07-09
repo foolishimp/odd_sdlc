@@ -219,3 +219,33 @@ falling back to the current operator or silently dropping that reviewer.
 This ticket enables future graph overlays and graph functions. It does not
 authorize a review bot, UI workflow, or implementation behavior change before
 the reusable review design is ratified.
+
+
+## Substrate-readiness addendum (2026-07-09, cross-repo note — not law)
+
+Recorded from the abiogenesis T-217 consciousness wave; this ticket's
+design remains the owning authority and none of its closure law changes.
+
+- KERNEL LANDING SEAM EXISTS: abiogenesis T-217 Phase 1 S4 delivered
+  `defect_intake_admitted` (typed triage records: owner, change_class,
+  re-entry point per TICKET_METHOD, self-certified intakeRef) and
+  `deriveTicketDraftFromIntake` (drafts derive FROM admitted records;
+  solutioning stops at the draft behind F_H). Finding->ruling->draft
+  routing has a kernel terminal to land on.
+- ATTRIBUTION LAW EXISTS: the T-217 witness family (WITNESS-001..014)
+  makes reviewer attribution, invocation refs, digest-bearing evidence,
+  and replay-visible acts kernel admission law — the profile-digest /
+  invocation-ref non-closure conditions here align with it verbatim.
+- SESSION-ALLOWLIST GOVERNANCE RATIFIED (user, 2026-07-09): the
+  operator grammar admits the session's ALLOWED graph-function set as
+  an initial condition of the root frame (view restriction over the
+  declared catalog; enforced at selection/admission; inherited down
+  recursive frames). Review/consensus campaigns triggered from the CLI
+  run inside that bounded catalog view.
+- WORKER-BINDING DEPENDENCY UNCHANGED: configured reviewer profiles
+  (`reviewer://odd-sdlc/codex`, `reviewer://odd-sdlc/claude`) still
+  await the transport binding line (odd_sdlc T-117 sticky-session
+  lanes / abiogenesis T-110, B-004 scope debt).
+- CONSUMPTION LINKAGE: abiogenesis T-217 Phases 3/5 CONSUME this
+  family for the tier's review campaigns rather than reinventing it in
+  the consciousness module (three-layer ownership law).
