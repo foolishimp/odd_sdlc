@@ -364,3 +364,18 @@ design remains the owning authority and none of its closure law changes.
 - CONSUMPTION LINKAGE: abiogenesis T-217 Phases 3/5 CONSUME this
   family for the tier's review campaigns rather than reinventing it in
   the consciousness module (three-layer ownership law).
+
+## Subsumption upgrade (2026-07-09, user adjudication — supersedes the readiness addendum's linkage line)
+
+The REUSABLE graph-function family specified here is SUBSUMED into the
+abiogenesis consciousness wave (T-217): design authority for the outer
+contract, carrier set, decision vocabulary, recursion/stop law, and
+proof obligations moves there, shipping as a substrate-bundled declared
+module (the gtl://abg/tuner/* slot precedent). THIS TICKET RETAINS its
+odd_sdlc host-binding scope (odd_sdlc-specific bindings and the T-162
+ticket-workflow injection) and closes against bindings over the
+substrate-published family rather than a locally-owned one. Nothing
+lost: every evaluation criterion and non-closure condition here was
+absorbed verbatim as T-217 design input; the odd_glc review host
+binding is a named T-217 Phase 5 deliverable proving the family is not
+a single-host special case.
